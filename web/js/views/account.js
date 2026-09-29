@@ -150,26 +150,21 @@ on('member-leave', async () => {
 export async function settings(el, section) {
   const p = S.profile;
   const prefs = S.prefs || {};
-  const plan = effectivePlan();
   let channels = {};
   let log = [];
-  let pays = [];
   try {
-    [channels, log, pays] = await Promise.all([
+    [channels, log] = await Promise.all([
       db.channelStatus().catch(() => ({})),
       db.myDeliveryLog(S.user.id).catch(() => []),
-      isOrgAdmin() ? db.payments(S.org.id).catch(() => []) : [],
     ]);
   } catch { /* shown as empty */ }
   const toggle = (k, label, sub = '', disabled = false) => html`<label class="toggle ${disabled ? 'disabled' : ''}"><div><div>${label}</div>${when(sub, html`<div class="muted small">${sub}</div>`)}</div>
     <input type="checkbox" data-pref="${k}" ${prefs[k] ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="switch"></span></label>`;
-  const paid = !!plan?.paid_channels;
   const org = S.org;
-  const lapsed = org.plan_expires_at && new Date(org.plan_expires_at) < new Date();
 
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Settings</h1></div></div>
-    <nav class="subnav"><a href="#/settings">Profile & reminders</a><a href="#/settings/billing">Plan & billing</a><a href="#/settings/workspace">Workspace & data</a></nav>
+    <nav class="subnav"><a href="#/settings">Profile & reminders</a><a href="#/settings/billing">Plan</a><a href="#/settings/workspace">Workspace & data</a></nav>
 
     ${when(!section, html`
     <section class="card"><h2>Profile</h2>
@@ -189,8 +184,6 @@ export async function settings(el, section) {
     <section class="card"><h2>Reminders</h2>
       <p class="muted small">We remind you 30 days, 7 days and 1 day before something expires, then weekly while it's overdue. Times are Philippine time (about 7am).</p>
       ${toggle('email_enabled', 'Email', channels.email === false ? 'Email sending is being set up — reminders show here in the app meanwhile.' : p.email)}
-      ${toggle('sms_enabled', 'SMS', !paid ? 'Available on paid plans.' : !p.phone ? 'Add your mobile number above first.' : channels.sms ? p.phone : 'SMS is not connected yet — coming soon.', !paid || !p.phone)}
-      ${toggle('whatsapp_enabled', 'WhatsApp', !paid ? 'Available on paid plans.' : !p.phone ? 'Add your mobile number above first.' : channels.whatsapp ? p.phone : 'WhatsApp is not connected yet — coming soon.', !paid || !p.phone)}
       <h4>What to remind me about</h4>
       ${toggle('business_alerts', 'Business permits')}
       ${toggle('vehicle_alerts', 'Vehicle registration and insurance')}
@@ -207,27 +200,11 @@ export async function settings(el, section) {
     </section>`)}
 
     ${when(section === 'billing', html`
-    <section class="card"><h2>Plan & billing</h2>
-      <p>You're on <b>${plan?.name}</b>${org.plan_expires_at && !lapsed ? ` until ${fmtDate(org.plan_expires_at.slice(0, 10))}` : ''}.
-      ${lapsed ? html`<span class="tag red">Your paid plan ended ${fmtDate(org.plan_expires_at.slice(0, 10))}</span>` : ''}</p>
-      <div class="plans">${S.plans.map((pl) => {
-        const current = pl.id === plan?.id;
-        const buyable = pl.price_php_monthly > 0;
-        return html`<div class="plan ${current ? 'current' : ''}"><h3>${pl.name}</h3>
-          <div class="price">${pl.id === 'free' ? 'Free' : buyable ? peso(pl.price_php_monthly) + ' / month' : 'Pricing coming soon'}</div>
-          <ul>${pl.features.map((f) => html`<li>${f}</li>`)}</ul>
-          ${current ? html`<button class="btn btn-ghost" disabled>Current plan</button>`
-            : pl.id === 'free' ? '' : !isOwner() ? html`<p class="muted small">Ask the workspace owner to upgrade.</p>`
-            : buyable ? html`<div class="btn-row"><select data-months="${pl.id}"><option value="1">1 month</option><option value="3">3 months</option><option value="6">6 months</option><option value="12">12 months</option></select>
-                <button class="btn btn-primary" data-act="upgrade" data-plan="${pl.id}">Pay with GCash / card</button></div>`
-            : html`<a class="btn btn-soft" href="#/help">Contact us</a>`}
-        </div>`;
-      })}</div>
-      <p class="muted small">Payments are processed by PayMongo (GCash, Maya, cards, GrabPay). Plans don't renew automatically — we'll remind you a week before yours ends. Your data is never deleted if a plan ends; you just can't add more than the Free plan allows.</p>
-    </section>
-    ${when(pays.length, html`<section class="card"><h2>Payments</h2><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Plan</th><th>Amount</th><th>Status</th></tr></thead><tbody>
-      ${pays.map((x) => html`<tr><td>${fmtDate((x.paid_at || x.created_at).slice(0, 10))}</td><td>${S.plans.find((pl) => pl.id === x.plan_id)?.name} × ${x.months} mo</td><td>${peso(x.amount_php)}</td><td>${x.status}</td></tr>`)}
-    </tbody></table></div></section>`)}`)}
+    <section class="card"><h2>Your plan</h2>
+      <p>PermitPal is <b>free</b> right now: no limits and no card needed.</p>
+      <ul>${(S.plans.find((pl) => pl.id === 'free')?.features || []).map((f) => html`<li>${f}</li>`)}</ul>
+      <p class="muted small">If paid plans are introduced later, you'll get plenty of notice and your data will never be locked or deleted.</p>
+    </section>`)}
 
     ${when(section === 'workspace', html`
     <section class="card"><h2>Workspace</h2>
@@ -284,13 +261,8 @@ export async function settings(el, section) {
     if (!name) return;
     try { await db.renameOrg(org.id, name); S.org.name = name; await reload(); toast('Renamed.'); } catch (err) { toastError(err); }
   });
-  if (location.hash.includes('paid=1')) toast("Payment received — thank you! It can take a minute for your plan to update.");
 }
 
-on('upgrade', async (ds) => {
-  const months = Number(document.querySelector(`[data-months="${ds.plan}"]`)?.value || 1);
-  try { window.location.href = await db.startCheckout(S.org.id, ds.plan, months); } catch (e) { toastError(e); }
-});
 on('change-password', () => openModal('Change password', html`
   <label class="field"><span>New password</span><input type="password" name="password" minlength="8" required autocomplete="new-password"></label>`, {
   onSubmit: async (fd) => {

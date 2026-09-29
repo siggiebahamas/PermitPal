@@ -2,7 +2,7 @@
 import { html, openModal, confirmDialog, toast, toastError, formObject, when, plural, timeAgo, fmtDate, fileSize } from '../util.js';
 import {
   S, on, go, reload, rerender, canEdit, isOrgAdmin, business, vehicle, location_, locationsOf, reqsOf, typeOf, memberName,
-  empty, ACTIVITIES, STRUCTURES, VEHICLE_TYPES, effectivePlan,
+  empty, ACTIVITIES, STRUCTURES, VEHICLE_TYPES,
 } from '../core.js';
 import { reqRow, statTiles, healthBar, counts, byPriority, ICON, STATUS } from '../components.js';
 import { plateSchedule, suggestDue } from '../rules.js';
@@ -102,12 +102,11 @@ export function businessDetail(el, id) {
       ${when(wide.length, html`<section class="card"><div class="card-head"><h2>Whole business</h2><span class="muted small">Registrations that cover every branch</span></div>
         ${wide.map((r) => reqRow(r, { showSubject: false }))}</section>`)}`);
   } else if (tab === 'branches') {
-    const plan = effectivePlan();
     body.innerHTML = String(html`
       <section class="card"><div class="card-head"><h2>Branches</h2>
         ${when(canEdit(), html`<button class="btn btn-sm btn-primary" data-act="loc-add" data-id="${id}">+ Add branch</button>`)}</div>
         <p class="muted small">Each branch needs its own Mayor's Permit, Barangay Clearance, BIR COR and FSIC. Adding a branch adds those automatically.
-        ${plan?.max_locations_per_business === 1 ? html` Multiple branches are part of the <a href="#/settings/billing">Business Plus</a> plan.` : ''}</p>
+</p>
         ${locs.map((l) => html`<div class="row"><div class="row-main"><div class="row-title">${l.name} ${l.is_main ? html`<span class="tag">Main</span>` : ''}</div>
           <div class="row-sub">${[l.city, l.address].filter(Boolean).join(' · ') || 'No address'} · ${plural(reqs.filter((r) => r.location_id === l.id).length, 'requirement')}</div></div>
           ${when(canEdit(), html`<div class="row-side"><button class="btn btn-sm btn-ghost" data-act="loc-edit" data-id="${l.id}">Edit</button>

@@ -1,44 +1,38 @@
-name: Deploy website
+name: Deploy to GitHub Pages
 
-# Publishes the web/ folder to GitHub Pages on every push to main,
-# after the tests pass.
+# Tests the app, then publishes web/ to the gh-pages branch, which GitHub Pages serves
+# at https://siggiebahamas.github.io/PermitPal/ (same setup as Buzz).
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  test:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: npm install --no-audit --no-fund
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm test
-      - run: CHROMIUM= node tests/ui/smoke.mjs
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-        with: { enablement: true }
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: web }
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - run: node tests/ui/smoke.mjs
+        env:
+          CHROMIUM: ""
+      - run: touch web/.nojekyll && cp web/index.html web/404.html
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./web
+          publish_branch: gh-pages
+          force_orphan: true

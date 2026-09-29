@@ -1,6 +1,6 @@
 // Boot, sign-in state, the page shell (sidebar + mobile tab bar) and the router.
 import { html, toast, toastError, fmtDate } from './util.js';
-import { S, actions, hooks, on, isStaff, effectivePlan } from './core.js';
+import { S, actions, hooks, on, isStaff } from './core.js';
 import { ICON } from './components.js';
 import * as db from 'pp/data';
 import { authPage, invitePage, onboarding, sessionStorageTake } from './views/auth.js';
@@ -105,7 +105,7 @@ function renderShell() {
           ${MORE.slice(1).map(([p, k]) => html`<a class="nav small" href="#/${p}" data-nav="${p}"><span>${t(k)}</span></a>`)}
           ${isStaff() ? html`<a class="nav small" href="#/admin" data-nav="admin"><span>${t('admin')}</span></a>` : ''}
         </nav>
-        <div class="me"><div class="me-name">${name}</div><div class="muted small">${S.org.role} · ${effectivePlan()?.name} plan</div>
+        <div class="me"><div class="me-name">${name}</div><div class="muted small">${S.org.role}</div>
           <button class="linklike small" data-act="sign-out">${t('signout')}</button></div>
       </aside>
       <div class="main-col">
@@ -136,10 +136,8 @@ function banner() {
   const el = document.getElementById('banner');
   if (!el) return;
   const o = S.org;
-  const lapsed = o.plan_expires_at && new Date(o.plan_expires_at) < new Date();
   el.innerHTML = String(o.deleted_at
     ? html`<div class="banner danger"><div>This workspace is scheduled for permanent deletion on ${fmtDate(o.purge_after.slice(0, 10))}.</div><a class="btn btn-sm btn-ghost" href="#/settings/workspace">Review</a></div>`
-    : lapsed ? html`<div class="banner warn"><div>Your ${S.plans.find((p) => p.id === o.plan_id)?.name} plan has ended. Your data is safe; renew to add more and keep SMS/WhatsApp reminders.</div><a class="btn btn-sm btn-ghost" href="#/settings/billing">Renew</a></div>`
     : '');
 }
 

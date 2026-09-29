@@ -6,9 +6,9 @@ const uid = () => crypto.randomUUID();
 const days = (iso) => Math.round((new Date(iso + 'T00:00:00Z') - new Date(today() + 'T00:00:00Z')) / 86400000);
 
 const user = { id: 'u1', email: 'sadie@test.ph' };
-const org = { id: 'o1', name: 'Aligned Solutions', plan_id: 'business_plus', plan_expires_at: null, deleted_at: null, role: 'owner' };
+const org = { id: 'o1', name: 'Aligned Solutions', plan_id: 'free', plan_expires_at: null, deleted_at: null, role: 'owner' };
 const plans = [
-  { id: 'free', name: 'Free', price_php_monthly: 0, max_members: 1, max_locations_per_business: 1, paid_channels: false, features: ['1 business'] },
+  { id: 'free', name: 'Free', available: true, price_php_monthly: 0, max_members: null, max_locations_per_business: null, paid_channels: false, features: ['Unlimited businesses'] },
   { id: 'business', name: 'Business', price_php_monthly: null, max_members: 5, max_locations_per_business: 1, paid_channels: true, features: ['More'] },
   { id: 'business_plus', name: 'Business Plus', price_php_monthly: null, max_members: 20, max_locations_per_business: null, paid_channels: true, features: ['Branches'] },
 ];

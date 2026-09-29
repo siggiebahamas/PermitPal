@@ -26,44 +26,24 @@ The database decides status in one place (`requirement_status`), using Philippin
 - **Compliant:** a document is on file and nothing is due within 30 days.
 - **Renewing** adds a new record and keeps the old one and its file as history. Until the new document is uploaded it shows *Needs info*, not *Compliant*.
 
+## How it's set up (same pattern as Nifti and Buzz, free tiers only)
+
+- **GitHub** holds the code and hosts the site. Every push to `main` runs the tests, then publishes `web/` to the `gh-pages` branch (like Buzz).
+- **Supabase (free plan)** holds logins, data and files. `.mcp.json` links this repo to project `zeaiwvgktakbwnqpchbo` (like Nifti). `keep-alive.yml` pings it every 2 days so the free project never pauses.
+- **Free mode:** everyone is on the Free plan with no limits. Billing and SMS/WhatsApp (they cost per message) are switched off; their code stays in place for later.
+- **Backups:** the nightly GitHub Action (free for public repos) takes over from Supabase Pro backups.
+
 ## Go-live checklist (things only you can do)
 
-1. **Turn on the website.** GitHub → repo **Settings → Pages → Source: GitHub Actions**. The next push to `main` (or *Actions → Deploy website → Run*) publishes it.
-2. **Point logins at the website.** Supabase → **Authentication → URL Configuration**:
-   - Site URL: `https://siggiebahamas.github.io/PermitPal/`
-   - Add the same URL to Redirect URLs.
-3. **Make sign-up emails work for real customers.** Supabase's built-in email only reaches your own team and is heavily rate-limited.
-   1. Create a free [Resend](https://resend.com) account and verify a domain you own (for example `permitpal.ph`).
-   2. In Supabase → **Authentication → Emails → SMTP Settings**, enter Resend's SMTP details.
-
-   Until then, new customers can't confirm their accounts.
-4. **Turn on reminder emails.** Supabase → **Edge Functions → Secrets**, add:
-   - `RESEND_API_KEY`
-   - `EMAIL_FROM`, for example `PermitPal <reminders@permitpal.ph>`
-5. **Make yourself admin.** After you sign up, tell me (or run this in the SQL editor):
-   `update public.profiles set is_platform_admin = true where email = 'YOUR EMAIL';`
-   That unlocks the Admin page, where help requests arrive. They are also emailed to the address set in `private.settings.admin_notify_emails`.
-6. **Backups.**
-   1. Add these GitHub repo secrets: `SUPABASE_DB_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and a long `BACKUP_PASSPHRASE`. See the header of `.github/workflows/backup.yml`.
-   2. Save the passphrase somewhere safe. Lose it and the backups can't be opened.
-   3. Upgrade Supabase to **Pro** (about US$25/month) before real customers arrive. The free plan has no database backups and pauses after a quiet week; the keep-alive workflow covers the pause meanwhile.
-7. **Payments (when you've set prices).**
-   1. Set prices: `update public.plans set price_php_monthly = 499 where id = 'business';` (and `business_plus`).
-   2. Add these Edge Function secrets:
-      - `PAYMONGO_SECRET_KEY`
-      - `PAYMONGO_WEBHOOK_SECRET`
-      - `APP_URL` = the website URL
-   3. In PayMongo, register the webhook `https://zeaiwvgktakbwnqpchbo.supabase.co/functions/v1/paymongo-webhook` for `checkout_session.payment.paid`.
-
-   Until then, the plan cards say "Pricing coming soon". You can give pilot customers any plan from the Admin page.
-8. **SMS / WhatsApp (optional, paid plans only).**
-   - SMS: `SEMAPHORE_API_KEY` (and optionally `SEMAPHORE_SENDER`).
-   - WhatsApp:
-     1. Add `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID`.
-     2. Get a template named `permit_reminder` approved by Meta, with 4 body variables: first name, number of items, first item, link.
-
-   Until a channel is connected, its messages are marked "skipped". They are never sent late in a flood.
-9. **Have a lawyer review** `web/privacy.html` and `web/terms.html`. They are drafts.
+1. **Pages:** after the first deploy, check GitHub → Settings → Pages shows *Deploy from branch: gh-pages*. Set it once if it doesn't.
+2. **Logins:** Supabase → Authentication → URL Configuration. Set Site URL to `https://siggiebahamas.github.io/PermitPal/` and add it to Redirect URLs.
+3. **Emails (free):**
+   1. Create a free [Resend](https://resend.com) account (3,000 emails/month) and verify a domain.
+   2. Put its SMTP details in Supabase → Authentication → Emails → SMTP Settings. Until then, new customers can't confirm sign-up.
+   3. Add the Edge Function secrets `RESEND_API_KEY` and `EMAIL_FROM`.
+4. **Admin:** after you sign up, ask Claude to make your account admin. Help requests also email ty.sigmund@gmail.com.
+5. **Backups:** add the repo secrets `SUPABASE_DB_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `BACKUP_PASSPHRASE`. See `backup.yml`. Keep the passphrase safe.
+6. **Legal:** have a lawyer review `web/privacy.html` and `web/terms.html`.
 
 ## Running tests
 
