@@ -47,6 +47,27 @@ function seed() {
   log('Added business "Corner <Bakery> & Co"', { business_id: b.id });
 }
 seed();
+if (globalThis.PP_DEMO) {
+  // Richer sample data for the design preview (web/demo.html).
+  const b = { id: 'b2', org_id: org.id, name: 'Visayas Sari-Sari Distribution Co.', activity: 'retail', structure: 'Sole Proprietorship', tin: null, deleted_at: null };
+  db.businesses.push(b);
+  db.locations.push({ id: 'l2', business_id: 'b2', name: 'Main branch', city: 'Cebu City', address: 'Mabolo', is_main: true, deleted_at: null });
+  db.locations.push({ id: 'l3', business_id: 'b2', name: 'Mandaue warehouse', city: 'Mandaue City', address: '', is_main: false, deleted_at: null });
+  const mp = addReq('business', 'b2', 'l2', types[0], { reference_no: 'MP-2026-0810', expires_on: addDays(22) });
+  addReq('business', 'b2', 'l2', types[1], { reference_no: 'COR-551204' });
+  db.documents.push({ id: uid(), requirement_id: db.requirements.at(-1).id, cycle_id: db.cycles.at(-1).id, file_name: 'BIR_2303.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 90000, created_at: new Date().toISOString(), deleted_at: null });
+  addReq('business', 'b2', 'l3', types[0], { reference_no: 'MP-2026-0911', expires_on: addDays(-12) });
+  addReq('business', 'b2', 'l3', types[2]);
+  db.requirements.forEach((r) => { if (r.business_id === 'b2') r.confidence = 'confirmed'; });
+  const v2 = { id: 'v2', org_id: org.id, make_model: 'Toyota Hilux', plate_no: 'NBC 4417', vehicle_type: 'Pickup', cr_no: 'CR-2', mv_file_no: '', business_id: 'b2', deleted_at: null };
+  const v3 = { id: 'v3', org_id: org.id, make_model: 'Honda Click 125i', plate_no: '123 ABC', vehicle_type: 'Motorcycle', cr_no: '', mv_file_no: '', business_id: null, deleted_at: null };
+  db.vehicles.push(v2, v3);
+  addReq('vehicle', 'v2', null, types[3], { reference_no: 'OR-5521', expires_on: addDays(160) });
+  db.documents.push({ id: uid(), requirement_id: db.requirements.at(-1).id, cycle_id: db.cycles.at(-1).id, file_name: 'Hilux_OR.jpg', storage_path: 'x', mime_type: 'image/jpeg', size_bytes: 240000, created_at: new Date().toISOString(), deleted_at: null });
+  addReq('vehicle', 'v2', null, types[4], { reference_no: 'CTPL-88', issuer: 'Malayan Insurance', expires_on: addDays(160) });
+  addReq('vehicle', 'v3', null, types[3], { reference_no: 'OR-77', expires_on: addDays(5) });
+  db.notifications.push({ id: 'n2', user_id: user.id, kind: 'due_soon', title: `${mp.name} expires in 22 days`, body: b.name, link: `#/requirement/${mp.id}`, read_at: null, created_at: new Date().toISOString() });
+}
 
 function statusRows() {
   const live = db.requirements.filter((r) => !r.deleted_at
@@ -179,3 +200,18 @@ export const adminRequests = async () => db.requests.map((a) => ({ ...a, orgs: {
 export const adminUpdateRequest = async (id, patch) => Object.assign(db.requests.find((a) => a.id === id), patch);
 export const adminOutbox = async () => [];
 export const adminRequestDocs = async () => [];
+
+// Remaining actions: accepted in the demo so every button works.
+export const invitePreview = async () => ({ org_name: org.name, email: 'teammate@test.ph', role: 'member', invited_by: 'Sadie Luna', status: 'pending' });
+export const acceptInvite = async () => org.id;
+export const createOrg = async () => org.id;
+export const renameOrg = async (id, name) => { org.name = name; };
+export const setMemberRole = async () => {};
+export const removeMember = async () => {};
+export const revokeInvite = async () => {};
+export const uploadAvatar = async () => null;
+export const avatarUrl = async () => null;
+export const requestOrgDeletion = async () => { org.deleted_at = new Date().toISOString(); org.purge_after = new Date(Date.now() + 30 * 864e5).toISOString(); };
+export const cancelOrgDeletion = async () => { org.deleted_at = null; org.purge_after = null; };
+export const adminSetPlan = async () => {};
+export const startCheckout = async () => { throw new Error('Payments are off in free mode.'); };

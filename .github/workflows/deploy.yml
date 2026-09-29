@@ -29,6 +29,7 @@ jobs:
       - run: node tests/ui/smoke.mjs
         env:
           CHROMIUM: ""
+      - run: node scripts/build-demo.mjs
       - run: touch web/.nojekyll && cp web/index.html web/404.html
       - uses: peaceiris/actions-gh-pages@v4
         with:

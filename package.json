@@ -5,9 +5,11 @@
   "scripts": {
     "test": "node --test tests/unit.test.mjs",
     "test:ui": "node tests/ui/smoke.mjs",
-    "serve": "npx --yes http-server web -p 8080 -c-1"
+    "serve": "npx --yes http-server web -p 8080 -c-1",
+    "build:demo": "node scripts/build-demo.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "playwright": "^1.55.0"
   }
 }
