@@ -1,0 +1,4 @@
+node_modules/
+tests/ui/*.png
+.DS_Store
+.env

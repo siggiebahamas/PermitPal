@@ -1,0 +1,73 @@
+name: Nightly backup
+
+# Every night (2:30am Manila): dumps the database and downloads every uploaded file,
+# encrypts both with BACKUP_PASSPHRASE (AES-256), and keeps them for 30 days as a
+# workflow artifact. If BACKUP_S3_* secrets are set, it also copies the encrypted
+# archive to that bucket for long-term, off-GitHub storage.
+#
+# Required repository secrets (Settings > Secrets and variables > Actions):
+#   SUPABASE_DB_URL            Session pooler connection string (Supabase > Connect)
+#   SUPABASE_URL               https://zeaiwvgktakbwnqpchbo.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY  Supabase > Project Settings > API keys (secret key)
+#   BACKUP_PASSPHRASE          Long random passphrase. STORE IT SOMEWHERE SAFE: without it backups cannot be opened.
+# Optional (off-site copy, any S3-compatible storage such as Cloudflare R2 or Backblaze B2):
+#   BACKUP_S3_BUCKET, BACKUP_S3_ENDPOINT, BACKUP_S3_ACCESS_KEY, BACKUP_S3_SECRET_KEY
+on:
+  schedule:
+    - cron: "30 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secrets
+        run: |
+          for v in SUPABASE_DB_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY BACKUP_PASSPHRASE; do
+            if [ -z "${!v}" ]; then echo "::error::Missing secret $v"; exit 1; fi
+          done
+      - name: Dump the database (Postgres 17 client)
+        run: |
+          mkdir -p backup
+          docker run --rm -e PGURL="$SUPABASE_DB_URL" -v "$PWD/backup:/out" postgres:17 \
+            sh -c 'pg_dump "$PGURL" --format=custom --no-owner --no-privileges \
+                     --schema=public --schema=private --schema=auth --schema=storage \
+                     --file=/out/database.dump && pg_restore --list /out/database.dump > /out/database.contents.txt'
+          echo "Tables in dump: $(grep -c 'TABLE DATA' backup/database.contents.txt)"
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Download every stored file
+        run: node scripts/backup-files.mjs backup/files
+      - name: Encrypt
+        run: |
+          stamp=$(date -u +%Y-%m-%d)
+          tar -czf - -C backup . | gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase "$BACKUP_PASSPHRASE" -o "permitpal-backup-$stamp.tar.gz.gpg"
+          ls -lh permitpal-backup-*.gpg
+          rm -rf backup
+      - uses: actions/upload-artifact@v4
+        with:
+          name: permitpal-backup-${{ github.run_id }}
+          path: permitpal-backup-*.gpg
+          retention-days: 30
+      - name: Copy off-site (optional)
+        if: ${{ env.BACKUP_S3_BUCKET != '' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_KEY }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+        run: aws s3 cp permitpal-backup-*.gpg "s3://$BACKUP_S3_BUCKET/" ${BACKUP_S3_ENDPOINT:+--endpoint-url "$BACKUP_S3_ENDPOINT"}
+
+# To restore: gpg -d permitpal-backup-DATE.tar.gz.gpg | tar -xz
+#   -> database.dump (pg_restore) and files/ (re-upload to the "documents" bucket, same paths).

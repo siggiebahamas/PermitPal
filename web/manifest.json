@@ -1,0 +1,9 @@
+{
+  "name": "PermitPal",
+  "short_name": "PermitPal",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F6F7F9",
+  "theme_color": "#2F6FED",
+  "icons": [{ "src": "img/logo.png", "sizes": "240x162", "type": "image/png" }]
+}
