@@ -1,7 +1,7 @@
 // Dashboard, Compliance (filterable list) and Document vault.
-import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
+import { html, raw, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
 import { S, on, canEdit, empty } from '../core.js';
-import { STATUS, reqRow, statTiles, healthBar, counts, byPriority, subjectLabel, dueText, ICON } from '../components.js';
+import { STATUS, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, ICON } from '../components.js';
 import * as db from 'pp/data';
 
 // ---------------------------------------------------------------- dashboard
@@ -19,47 +19,73 @@ export function dashboard(el) {
   }
   const c = counts(reqs);
   const open = reqs.filter((r) => r.status !== 'compliant').sort(byPriority);
-  const groups = ['action_required', 'renew_soon', 'in_progress', 'needs_information'];
 
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Here's what needs your attention, ${first}.</h1>
-      <p class="muted">${S.org.name} · ${plural(businesses.length, 'business', 'businesses')} · ${plural(vehicles.length, 'vehicle')}</p></div></div>
+    ${yearStrip(reqs, first, c)}
     ${statTiles(c)}
-    ${healthBar(c)}
-    <section class="card">
+    <section class="card next">
       <div class="card-head"><h2>Next actions</h2><a class="link" href="#/compliance">See all</a></div>
-      ${open.length ? open.slice(0, 6).map((r) => reqRow(r)) : html`<div class="all-good">${ICON.check} Everything is compliant. Nice work.</div>`}
+      ${open.length ? open.slice(0, 8).map((r) => reqRow(r)) : html`<div class="all-good">${ICON.check} Everything is compliant. Nice work.</div>`}
     </section>
-    ${groups.map((g) => {
-      const items = open.filter((r) => r.status === g);
-      if (!items.length) return '';
-      return html`<section class="cluster ${STATUS[g].cls}">
-        <h2 class="cluster-title">${STATUS[g].label} <span>${items.length}</span></h2>
-        ${bundles(items)}
-      </section>`;
-    })}
-    ${when_(c.compliant, html`<p class="muted small center"><a class="link" href="#/compliance?status=compliant">${plural(c.compliant, 'item')} compliant</a></p>`)}
   `);
 }
-const when_ = (c, v) => (c ? v : '');
 
-// Items grouped under their business / vehicle, most urgent first.
-function bundles(items) {
-  const byKey = new Map();
-  for (const r of items) {
-    const key = r.subject + ':' + (r.business_id || r.vehicle_id);
-    if (!byKey.has(key)) byKey.set(key, []);
-    byKey.get(key).push(r);
+// ---------------------------------------------------------------- year-at-a-glance strip
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const SHORT = { mayors_permit: "Mayor's", barangay_clearance: 'Barangay', bir_cor: 'BIR', fsic: 'FSIC', sanitary_permit: 'Sanitary', dti_business_name: 'DTI',
+  sec_registration: 'SEC', cda_registration: 'CDA', ecc: 'ECC', pcab_license: 'PCAB', doh_lto: 'DOH', school_permit: 'School', lto_registration: 'LTO',
+  ctpl: 'CTPL', emission_test: 'Emission', mvir: 'MVIR' };
+// Colour family of a pin: business permits, vehicle registration, or insurance & others.
+const family = (r) => (r.subject === 'business' ? 'biz' : /ctpl|insur/i.test(r.type_code || r.name) ? 'ins' : 'veh');
+const shortName = (r) => SHORT[r.type_code] || r.name.split(/[\s(/]/)[0];
+const shortSubject = (r) => (r.subject === 'vehicle' ? r.subject_name.split(' ').slice(0, 2).join(' ')
+  : (r.location_id && !r.location_is_main ? r.location_name : r.subject_name).split(/\s+/)[0]);
+
+function pins(list) {
+  // Three or more of the same permit in one month collapse into one "Mayor's ×3" pin.
+  const byName = new Map();
+  for (const r of list) { const k = family(r) + shortName(r); if (!byName.has(k)) byName.set(k, []); byName.get(k).push(r); }
+  const out = [];
+  for (const group of byName.values()) {
+    if (group.length >= 3) out.push(html`<a class="pin ${family(group[0])}" href="#/compliance" title="${group.map((r) => r.name + ' · ' + subjectLabel(r)).join('\n')}">${shortName(group[0])} ×${group.length}</a>`);
+    else group.forEach((r) => out.push(html`<a class="pin ${family(r)}" href="#/requirement/${r.id}" title="${r.name} · ${subjectLabel(r)}">${shortName(r)} · ${shortSubject(r)}</a>`));
   }
-  return [...byKey.values()].map((list) => {
-    const r0 = list[0];
-    const href = r0.subject === 'business' ? `#/businesses/${r0.business_id}` : `#/vehicles/${r0.vehicle_id}`;
-    return html`<div class="bundle">
-      <a class="bundle-head" href="${href}">${r0.subject === 'business' ? ICON.building : ICON.car}
-        <span>${r0.subject_name}${r0.plate_no ? ' · ' + r0.plate_no : ''}</span><span class="count">${list.length}</span></a>
-      ${list.map((r) => reqRow(r, { showSubject: false }))}
-    </div>`;
-  });
+  return out;
+}
+
+function yearStrip(reqs, first, c) {
+  const today = todayPH();
+  const [ty, tm] = today.split('-').map(Number);
+  const dated = reqs.filter((r) => r.expires && r.expires_on);
+  const overdue = dated.filter((r) => r.expires_on < today);
+  const cols = [];
+  for (let i = 0; i < 12; i++) {
+    const m = ((tm - 1 + i) % 12) + 1, y = ty + Math.floor((tm - 1 + i) / 12);
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    const items = dated.filter((r) => r.expires_on >= today && r.expires_on.slice(0, 7) === key);
+    cols.push({ label: MONTHS[m - 1], year: m === 1 && i > 0 ? y : null, items, now: i === 0 });
+  }
+  const busiest = cols.slice(1).reduce((b, x) => (x.items.length > (b?.items.length || 0) ? x : b), null);
+  const note = overdue.length ? html`<span class="strip-note overdue">${plural(overdue.length, 'permit')} already overdue — renew these first</span>`
+    : busiest && busiest.items.length >= 3 ? html`<span class="strip-note">${busiest.label}: ${busiest.items.length} renewals — start early</span>` : '';
+  return html`
+    <section class="year">
+      <div class="year-head">
+        <div><h1>Your compliance year, ${first}</h1>
+          <p class="year-sub">${S.org.name} · ${plural(S.data.businesses.length, 'business', 'businesses')} · ${plural(S.data.vehicles.length, 'vehicle')} · ${plural(c.total, 'permit')} tracked</p></div>
+        ${c.health === null ? '' : html`<a class="score" href="#/compliance?status=compliant" title="${c.compliant} of ${c.total} compliant">${ring(c.health)}<span><b>${c.health}%</b><small>compliant</small></span></a>`}
+      </div>
+      <div class="months">
+        ${overdue.length ? html`<div class="mo late"><small>Overdue</small>${pins(overdue)}</div>` : ''}
+        ${cols.map((x) => html`<div class="mo ${x.now ? 'now' : ''} ${x.items.length ? '' : 'none'}"><small>${x.label}${x.year ? html` <i>${x.year}</i>` : ''}</small>${pins(x.items)}</div>`)}
+      </div>
+      <div class="legend"><span><i class="biz"></i>Business permits</span><span><i class="veh"></i>Vehicle registration</span><span><i class="ins"></i>Insurance & others</span>${note}</div>
+    </section>`;
+}
+
+function ring(pct) {
+  const r = 26, len = 2 * Math.PI * r;
+  return raw(`<svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" class="ring-track"/><circle cx="32" cy="32" r="${r}" class="ring-fill" stroke-dasharray="${(len * pct) / 100} ${len}" transform="rotate(-90 32 32)"/></svg>`);
 }
 
 // ---------------------------------------------------------------- compliance

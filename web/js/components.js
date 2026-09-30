@@ -63,20 +63,46 @@ export function counts(reqs) {
   return c;
 }
 
+// Short, plain status line shown in colour next to each item (never greyed out).
+export function dueShort(r) {
+  const d = r.days_left;
+  if (r.status === 'in_progress') return d !== null && d < 0 ? `Renewal started · ${plural(-d, 'day')} overdue` : 'Renewal in progress';
+  if (r.status === 'needs_information') {
+    if (!r.cycle_id || (r.expires && !r.expires_on)) return 'Add the details';
+    return 'Upload the document';
+  }
+  if (!r.expires) return 'Does not expire';
+  if (d < 0) return `${plural(-d, 'day')} overdue`;
+  if (d === 0) return 'Due today';
+  if (d <= 30) return `Due in ${plural(d, 'day')}`;
+  return `Valid until ${fmtDate(r.expires_on)}`;
+}
+
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// The coloured date tile at the start of each row: when it's due, coloured by status.
+export function dateTile(r) {
+  const s = STATUS[r.status] || STATUS.needs_information;
+  if (!r.expires_on) {
+    return html`<div class="dtile ${s.cls}" title="${r.expires ? 'No expiry date on file' : 'Does not expire'}"><small>${r.expires ? 'Date' : 'No exp.'}</small><b>${r.expires ? '?' : '—'}</b></div>`;
+  }
+  const [y, m, d] = r.expires_on.split('-').map(Number);
+  const thisYear = String(new Date().getFullYear()) === String(y);
+  return html`<div class="dtile ${s.cls}" title="${fmtDate(r.expires_on)}"><small>${MON[m - 1]}${thisYear ? '' : " '" + String(y).slice(2)}</small><b>${d}</b></div>`;
+}
+
 // One requirement as a row. Clicking the row opens its page; the button does the next step.
 export function reqRow(r, { showSubject = true } = {}) {
   const s = STATUS[r.status];
-  const sub = [showSubject ? subjectLabel(r) : '', dueText(r)].filter(Boolean).join(' · ');
   const hint = r.confidence !== 'confirmed' ? html`<span class="tag">Please confirm</span>` : '';
-  const overdueNote = r.status === 'in_progress' && r.is_overdue ? html`<span class="tag red">Overdue</span>` : '';
   const btn = r.next_action && canEdit()
-    ? html`<button class="btn btn-sm ${r.status === 'action_required' ? 'btn-danger' : 'btn-soft'}" data-act="req-next" data-id="${r.id}">${NEXT_ACTION[r.next_action]}</button>`
+    ? html`<button class="btn btn-sm ${r.status === 'action_required' ? 'btn-primary' : 'btn-soft'}" data-act="req-next" data-id="${r.id}">${NEXT_ACTION[r.next_action]}</button>`
     : r.status === 'compliant' ? html`<span class="ok-mark">${ICON.check}</span>` : '';
   return html`
     <div class="row ${s.cls}" data-href="#/requirement/${r.id}" tabindex="0">
+      ${dateTile(r)}
       <div class="row-main">
-        <div class="row-title">${r.name} ${hint}${overdueNote}</div>
-        <div class="row-sub">${sub}</div>
+        <div class="row-title">${r.name} ${hint}</div>
+        <div class="row-sub">${showSubject ? html`<span>${subjectLabel(r)}</span><span class="sep"> · </span>` : ''}<b class="due ${s.cls}">${dueShort(r)}</b></div>
       </div>
       <div class="row-side">${statusChip(r.status)}${btn}</div>
     </div>`;

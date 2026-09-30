@@ -66,6 +66,13 @@ if (globalThis.PP_DEMO) {
   db.documents.push({ id: uid(), requirement_id: db.requirements.at(-1).id, cycle_id: db.cycles.at(-1).id, file_name: 'Hilux_OR.jpg', storage_path: 'x', mime_type: 'image/jpeg', size_bytes: 240000, created_at: new Date().toISOString(), deleted_at: null });
   addReq('vehicle', 'v2', null, types[4], { reference_no: 'CTPL-88', issuer: 'Malayan Insurance', expires_on: addDays(160) });
   addReq('vehicle', 'v3', null, types[3], { reference_no: 'OR-77', expires_on: addDays(5) });
+  // A fuller year for the calendar strip.
+  addReq('business', 'b2', 'l2', types[2], { reference_no: 'FSIC-C-221', expires_on: addDays(130) });
+  db.documents.push({ id: uid(), requirement_id: db.requirements.at(-1).id, cycle_id: db.cycles.at(-1).id, file_name: 'FSIC_Cebu.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 80000, created_at: new Date().toISOString(), deleted_at: null });
+  addReq('business', 'b1', 'l1', { code: 'sanitary_permit', name: 'Sanitary Permit', expires: true }, { reference_no: 'SP-88', expires_on: addDays(250) });
+  db.documents.push({ id: uid(), requirement_id: db.requirements.at(-1).id, cycle_id: db.cycles.at(-1).id, file_name: 'sanitary.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 60000, created_at: new Date().toISOString(), deleted_at: null });
+  for (const [loc, biz] of [['l1', 'b1'], ['l2', 'b2'], ['l3', 'b2']]) addReq('business', biz, loc, { code: 'barangay_clearance', name: 'Barangay Business Clearance', expires: true }, { reference_no: 'BC-' + loc, expires_on: addDays(112) });
+  addReq('vehicle', 'v3', null, types[4], { reference_no: 'CTPL-31', expires_on: addDays(5) });
   db.notifications.push({ id: 'n2', user_id: user.id, kind: 'due_soon', title: `${mp.name} expires in 22 days`, body: b.name, link: `#/requirement/${mp.id}`, read_at: null, created_at: new Date().toISOString() });
 }
 
