@@ -2,7 +2,9 @@
 // It mimics the database's status rules closely enough to drive every screen.
 const today = () => new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 10);
 const addDays = (n) => { const d = new Date(today() + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-const uid = () => crypto.randomUUID();
+// Works on older phones too (no crypto.randomUUID / Array.at before iOS 15.4).
+const uid = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2));
+const last = (a) => a[a.length - 1];
 const days = (iso) => Math.round((new Date(iso + 'T00:00:00Z') - new Date(today() + 'T00:00:00Z')) / 86400000);
 
 const user = { id: 'u1', email: 'sadie@test.ph' };
@@ -40,7 +42,7 @@ function seed() {
   const mp = addReq('business', b.id, l.id, types[0], { reference_no: 'MP-1', expires_on: addDays(-4) });
   addReq('business', b.id, l.id, types[1]);
   const f = addReq('business', b.id, l.id, types[2], { reference_no: 'F-1', expires_on: addDays(200) });
-  db.documents.push({ id: uid(), requirement_id: f.id, cycle_id: db.cycles.at(-1).id, file_name: 'fsic.pdf', storage_path: 'o1/x/fsic.pdf', mime_type: 'application/pdf', size_bytes: 120000, created_at: new Date().toISOString(), deleted_at: null });
+  db.documents.push({ id: uid(), requirement_id: f.id, cycle_id: last(db.cycles).id, file_name: 'fsic.pdf', storage_path: 'o1/x/fsic.pdf', mime_type: 'application/pdf', size_bytes: 120000, created_at: new Date().toISOString(), deleted_at: null });
   const v = { id: 'v1', org_id: org.id, make_model: 'Isuzu Elf', plate_no: 'NGV 5588', vehicle_type: 'Van', cr_no: 'CR1', mv_file_no: '', business_id: null, deleted_at: null };
   db.vehicles.push(v);
   addReq('vehicle', v.id, null, types[3], { reference_no: 'OR-1', expires_on: addDays(10) });
@@ -57,7 +59,7 @@ if (globalThis.PP_DEMO) {
   db.locations.push({ id: 'l3', business_id: 'b2', name: 'Mandaue warehouse', city: 'Mandaue City', address: '', is_main: false, deleted_at: null });
   const mp = addReq('business', 'b2', 'l2', types[0], { reference_no: 'MP-2026-0810', expires_on: addDays(22) });
   addReq('business', 'b2', 'l2', types[1], { reference_no: 'COR-551204' });
-  db.documents.push({ id: uid(), requirement_id: db.requirements.at(-1).id, cycle_id: db.cycles.at(-1).id, file_name: 'BIR_2303.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 90000, created_at: new Date().toISOString(), deleted_at: null });
+  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'BIR_2303.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 90000, created_at: new Date().toISOString(), deleted_at: null });
   addReq('business', 'b2', 'l3', types[0], { reference_no: 'MP-2026-0911', expires_on: addDays(-12) });
   addReq('business', 'b2', 'l3', types[2]);
   db.requirements.forEach((r) => { if (r.business_id === 'b2') r.confidence = 'confirmed'; });
@@ -65,14 +67,14 @@ if (globalThis.PP_DEMO) {
   const v3 = { id: 'v3', org_id: org.id, make_model: 'Honda Click 125i', plate_no: '123 ABC', vehicle_type: 'Motorcycle', cr_no: '', mv_file_no: '', business_id: null, deleted_at: null };
   db.vehicles.push(v2, v3);
   addReq('vehicle', 'v2', null, types[3], { reference_no: 'OR-5521', expires_on: addDays(160) });
-  db.documents.push({ id: uid(), requirement_id: db.requirements.at(-1).id, cycle_id: db.cycles.at(-1).id, file_name: 'Hilux_OR.jpg', storage_path: 'x', mime_type: 'image/jpeg', size_bytes: 240000, created_at: new Date().toISOString(), deleted_at: null });
+  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'Hilux_OR.jpg', storage_path: 'x', mime_type: 'image/jpeg', size_bytes: 240000, created_at: new Date().toISOString(), deleted_at: null });
   addReq('vehicle', 'v2', null, types[4], { reference_no: 'CTPL-88', issuer: 'Malayan Insurance', expires_on: addDays(160) });
   addReq('vehicle', 'v3', null, types[3], { reference_no: 'OR-77', expires_on: addDays(5) });
   // A fuller year for the calendar strip.
   addReq('business', 'b2', 'l2', types[2], { reference_no: 'FSIC-C-221', expires_on: addDays(130) });
-  db.documents.push({ id: uid(), requirement_id: db.requirements.at(-1).id, cycle_id: db.cycles.at(-1).id, file_name: 'FSIC_Cebu.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 80000, created_at: new Date().toISOString(), deleted_at: null });
+  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'FSIC_Cebu.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 80000, created_at: new Date().toISOString(), deleted_at: null });
   addReq('business', 'b1', 'l1', { code: 'sanitary_permit', name: 'Sanitary Permit', expires: true }, { reference_no: 'SP-88', expires_on: addDays(250) });
-  db.documents.push({ id: uid(), requirement_id: db.requirements.at(-1).id, cycle_id: db.cycles.at(-1).id, file_name: 'sanitary.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 60000, created_at: new Date().toISOString(), deleted_at: null });
+  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'sanitary.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 60000, created_at: new Date().toISOString(), deleted_at: null });
   for (const [loc, biz] of [['l1', 'b1'], ['l2', 'b2'], ['l3', 'b2']]) addReq('business', biz, loc, { code: 'barangay_clearance', name: 'Barangay Business Clearance', expires: true }, { reference_no: 'BC-' + loc, expires_on: addDays(112) });
   addReq('vehicle', 'v3', null, types[4], { reference_no: 'CTPL-31', expires_on: addDays(5) });
   db.notifications.push({ id: 'n2', user_id: user.id, kind: 'due_soon', title: `${mp.name} expires in 22 days`, body: b.name, link: `#/requirement/${mp.id}`, read_at: null, created_at: new Date().toISOString() });

@@ -146,7 +146,7 @@ export async function uploadDocument({ orgId, requirementId, cycleId, file }) {
   const problem = checkFile(file);
   if (problem) throw new Error(problem);
   const safe = file.name.normalize('NFKD').replace(/[^\w.\-]+/g, '_').slice(-100) || 'file';
-  const path = `${orgId}/${requirementId}/${crypto.randomUUID()}-${safe}`;
+  const path = `${orgId}/${requirementId}/${globalThis.crypto?.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}-${safe}`;
   const contentType = file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg');
   ok(await sb.storage.from('documents').upload(path, file, { contentType, upsert: false }));
   return ok(await sb.from('documents').insert({

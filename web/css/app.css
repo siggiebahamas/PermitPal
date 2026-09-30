@@ -40,6 +40,9 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .center { text-align: center; }
 .pre { white-space: pre-wrap; }
 .boot, .loading { padding: 40px 16px; color: var(--muted); text-align: center; }
+.boot-slow { display: block; margin-top: 14px; font-size: 14px; opacity: 0; animation: boot-slow 0s 8s forwards; }
+.boot-slow a { font-weight: 700; }
+@keyframes boot-slow { to { opacity: 1; } }
 [hidden] { display: none !important; }
 
 /* ---------- buttons & inputs ---------- */
@@ -92,7 +95,7 @@ input[type=file] { padding: 8px; font-size: 14px; }
 /* ---------- shell (mobile first) ---------- */
 .shell { min-height: 100vh; }
 .sidebar { display: none; }
-.topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: color-mix(in srgb, var(--bg) 88%, transparent);
+.topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: rgba(248, 246, 242, .92); background: color-mix(in srgb, var(--bg) 88%, transparent);
   border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); }
 .topbar .spacer { flex: 1; }
 .brand { display: flex; align-items: center; gap: 8px; color: inherit; }

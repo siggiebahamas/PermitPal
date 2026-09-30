@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PermitPal</title>
+<meta http-equiv="refresh" content="2; url=/PermitPal/">
+<style>body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F8F6F2;color:#0B1B3A;display:grid;place-items:center;min-height:100vh;text-align:center;padding:16px}a{color:#1B4DB5;font-weight:700}</style>
+</head>
+<body>
+<div><h1 style="font-size:22px">That page moved.</h1><p>Taking you to PermitPal… <a href="/PermitPal/">Go now</a> · <a href="/PermitPal/demo/">Open the demo</a></p></div>
+<script>
+  // Pages here use #/ links, so any unknown path goes back to the app (or the demo) instead of a blank screen.
+  var p = location.pathname;
+  location.replace(p.indexOf('/PermitPal/demo') === 0 ? '/PermitPal/demo/' + location.hash : '/PermitPal/' + location.hash);
+</script>
+</body>
+</html>

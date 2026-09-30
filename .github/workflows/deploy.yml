@@ -30,7 +30,7 @@ jobs:
         env:
           CHROMIUM: ""
       - run: node scripts/build-demo.mjs
-      - run: touch web/.nojekyll && cp web/index.html web/404.html
+      - run: touch web/.nojekyll
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
