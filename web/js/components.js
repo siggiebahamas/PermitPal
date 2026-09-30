@@ -30,9 +30,9 @@ export const ICON = {
   chevron: raw('<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>'),
 };
 
-export function statusChip(status, extra = '') {
+export function statusChip(status, extra = '', size = '') {
   const s = STATUS[status] || STATUS.needs_information;
-  return html`<span class="chip ${s.cls}">${s.label}${extra}</span>`;
+  return html`<span class="chip ${s.cls} ${size}">${s.label}${extra}</span>`;
 }
 
 export function dueText(r) {
@@ -95,7 +95,7 @@ export function reqRow(r, { showSubject = true } = {}) {
   const s = STATUS[r.status];
   const hint = r.confidence !== 'confirmed' ? html`<span class="tag">Please confirm</span>` : '';
   const btn = r.next_action && canEdit()
-    ? html`<button class="btn btn-sm ${r.status === 'action_required' ? 'btn-primary' : 'btn-soft'}" data-act="req-next" data-id="${r.id}">${NEXT_ACTION[r.next_action]}</button>`
+    ? html`<button class="btn btn-sm ${r.next_action === 'renew' ? 'btn-primary' : 'btn-soft'}" data-act="req-next" data-id="${r.id}">${NEXT_ACTION[r.next_action]}</button>`
     : r.status === 'compliant' ? html`<span class="ok-mark">${ICON.check}</span>` : '';
   return html`
     <div class="row ${s.cls}" data-href="#/requirement/${r.id}" tabindex="0">

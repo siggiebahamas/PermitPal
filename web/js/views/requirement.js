@@ -2,7 +2,7 @@
 // flows used everywhere else (add details, upload, renew, started renewing).
 import { html, fmtDate, fmtDateTime, timeAgo, fileSize, todayPH, openModal, confirmDialog, toast, toastError, formObject, when } from '../util.js';
 import { S, on, go, reload, canEdit, reqById, typeOf, vehicle, memberName, empty } from '../core.js';
-import { statusChip, dueText, subjectLabel, ICON } from '../components.js';
+import { STATUS, statusChip, dueText, subjectLabel, ICON } from '../components.js';
 import { suggestDue } from '../rules.js';
 import * as db from 'pp/data';
 
@@ -44,9 +44,10 @@ function page(r) {
     <div class="page-head">
       <div>
         <h1>${r.name}</h1>
-        <p class="muted">${[t?.agency, dueText(r)].filter(Boolean).join(' · ')}</p>
+        <p class="due-line due ${STATUS[r.status].cls}">${dueText(r)}</p>
+        ${when(t?.agency, html`<p class="agency">${t?.agency}</p>`)}
       </div>
-      <div class="head-side">${statusChip(r.status)}</div>
+      <div class="head-side">${statusChip(r.status, '', 'lg')}</div>
     </div>
 
     ${when(r.confidence !== 'confirmed', html`
@@ -127,7 +128,7 @@ function recordBody(c, r, compact = false) {
 }
 
 function filesList(docs, compact = false) {
-  if (!docs.length) return compact ? '' : html`<p class="muted small">No document uploaded for this record yet.</p>`;
+  if (!docs.length) return compact ? '' : html`<p class="record-note due needinfo">No document uploaded for this record yet.</p>`;
   return html`<div class="files">${docs.map((d) => html`
     <div class="file">
       <span class="file-ic">${ICON.file}</span>
