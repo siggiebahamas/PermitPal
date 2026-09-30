@@ -101,7 +101,7 @@ function page(r) {
 
     <section class="card">
       <div class="card-head"><h2>Notes</h2>${when(edit, html`<button class="btn btn-sm btn-ghost" data-act="req-notes" data-id="${r.id}">Edit</button>`)}</div>
-      <p class="${r.notes ? '' : 'muted'} pre">${r.notes || 'No notes. Add the office address, contact person, fees paid, or anything worth remembering next year.'}</p>
+      <p class="lined ${r.notes ? '' : 'muted'} pre">${r.notes || 'No notes. Add the office address, contact person, fees paid, or anything worth remembering next year.'}</p>
     </section>
 
     <section class="card">

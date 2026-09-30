@@ -2,7 +2,7 @@
 
 One place for every business permit and vehicle registration, with reminders before anything expires, and help renewing when you don't want to do it yourself.
 
-- **Website:** static HTML/JS in `web/`, hosted on GitHub Pages (`https://siggiebahamas.github.io/PermitPal/`).
+- **Website:** static HTML/JS in `web/`, hosted on GitHub Pages: `https://siggiebahamas.github.io/PermitPal/` (sign-in) and `https://siggiebahamas.github.io/PermitPal/demo/` (the same app on sample data, no sign-in). Both update on every push to `main`.
 - **Backend:** Supabase project `zeaiwvgktakbwnqpchbo`: Postgres database, logins, private file storage, scheduled jobs and Edge Functions.
 
 ## What's where

@@ -16,7 +16,7 @@ const js = res.outputFiles[0].text;
 const css = fs.readFileSync('web/css/app.css', 'utf8');
 const logo = 'data:image/png;base64,' + fs.readFileSync('web/img/logo.png').toString('base64');
 const fonts = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-  + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">';
+  + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">';
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PermitPal — demo</title>${fonts}<style>${css}
@@ -24,5 +24,9 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 </style></head><body><div class="demo-flag">DEMO — sample data, nothing is saved</div>
 <div id="app"><div class="boot">Loading PermitPal…</div></div><div id="modal-root"></div><div id="toast" class="toast" role="status"></div>
 <script>window.PP_DEMO=true;</script><script>${js.replace(/<\/script/g, '<\\/script').replaceAll('img/logo.png', logo)}</script></body></html>`;
-fs.writeFileSync('web/demo.html', html.replaceAll('src="img/logo.png"', `src="${logo}"`));
-console.log(`web/demo.html ${(html.length / 1024).toFixed(0)} KB`);
+// Published at /PermitPal/demo/ (and the older /PermitPal/demo.html link keeps working).
+const out = html.replaceAll('src="img/logo.png"', `src="${logo}"`);
+fs.mkdirSync('web/demo', { recursive: true });
+fs.writeFileSync('web/demo/index.html', out);
+fs.writeFileSync('web/demo.html', out);
+console.log(`web/demo/index.html ${(out.length / 1024).toFixed(0)} KB`);

@@ -56,7 +56,8 @@ export function authPage(el, mode, ctx = {}) {
         <button class="btn btn-primary btn-block">Log in</button>
       </form>
       ${google()}
-      <p class="switch-auth">New to PermitPal? <a href="#/signup">Create an account</a></p>`));
+      <p class="switch-auth">New to PermitPal? <a href="#/signup">Create an account</a></p>
+      <p class="switch-auth"><a href="demo/">Look around the demo first</a> · sample data, no sign-up</p>`));
   }
 
   const form = el.querySelector('#auth-form');

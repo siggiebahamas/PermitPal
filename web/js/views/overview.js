@@ -1,7 +1,7 @@
 // Dashboard, Compliance (filterable list) and Document vault.
-import { html, raw, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
-import { S, on, canEdit, empty } from '../core.js';
-import { STATUS, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, ICON } from '../components.js';
+import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
+import { S, on, hooks, canEdit, empty } from '../core.js';
+import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
 import * as db from 'pp/data';
 
 // ---------------------------------------------------------------- dashboard
@@ -19,74 +19,64 @@ export function dashboard(el) {
   }
   const c = counts(reqs);
   const open = reqs.filter((r) => r.status !== 'compliant').sort(byPriority);
+  if (skip >= open.length) skip = 0;
 
   el.innerHTML = String(html`
-    ${yearStrip(reqs, first, c)}
+    ${brief(first, c, open)}
     ${statTiles(c)}
     <section class="card next">
-      <div class="card-head"><h2>Next actions</h2><a class="link" href="#/compliance">See all</a></div>
+      <div class="card-head"><div><h2>Next actions</h2><p class="card-sub">Most urgent first</p></div><a class="link" href="#/compliance">See all</a></div>
       ${open.length ? open.slice(0, 8).map((r) => reqRow(r)) : html`<div class="all-good">${ICON.check} Everything is compliant. Nice work.</div>`}
+      ${when_(open.length, html`<div class="sheet-foot">${plural(open.length, 'open item')} across your businesses and vehicles</div>`)}
     </section>
   `);
 }
+const when_ = (c, v) => (c ? v : '');
 
-// ---------------------------------------------------------------- year-at-a-glance strip
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const SHORT = { mayors_permit: "Mayor's", barangay_clearance: 'Barangay', bir_cor: 'BIR', fsic: 'FSIC', sanitary_permit: 'Sanitary', dti_business_name: 'DTI',
-  sec_registration: 'SEC', cda_registration: 'CDA', ecc: 'ECC', pcab_license: 'PCAB', doh_lto: 'DOH', school_permit: 'School', lto_registration: 'LTO',
-  ctpl: 'CTPL', emission_test: 'Emission', mvir: 'MVIR' };
-// Colour family of a pin: business permits, vehicle registration, or insurance & others.
-const family = (r) => (r.subject === 'business' ? 'biz' : /ctpl|insur/i.test(r.type_code || r.name) ? 'ins' : 'veh');
-const shortName = (r) => SHORT[r.type_code] || r.name.split(/[\s(/]/)[0];
-const shortSubject = (r) => (r.subject === 'vehicle' ? r.subject_name.split(' ').slice(0, 2).join(' ')
-  : (r.location_id && !r.location_is_main ? r.location_name : r.subject_name).split(/\s+/)[0]);
-
-function pins(list) {
-  // Three or more of the same permit in one month collapse into one "Mayor's ×3" pin.
-  const byName = new Map();
-  for (const r of list) { const k = family(r) + shortName(r); if (!byName.has(k)) byName.set(k, []); byName.get(k).push(r); }
-  const out = [];
-  for (const group of byName.values()) {
-    if (group.length >= 3) out.push(html`<a class="pin ${family(group[0])}" href="#/compliance" title="${group.map((r) => r.name + ' · ' + subjectLabel(r)).join('\n')}">${shortName(group[0])} ×${group.length}</a>`);
-    else group.forEach((r) => out.push(html`<a class="pin ${family(r)}" href="#/requirement/${r.id}" title="${r.name} · ${subjectLabel(r)}">${shortName(r)} · ${shortSubject(r)}</a>`));
-  }
-  return out;
+// ---------------------------------------------------------------- daily brief
+// Greeting and a one-line summary on the left; "Do this first" on the right, with one button to press.
+let skip = 0;
+function greeting() {
+  const h = Number(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', hour12: false })) % 24;
+  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
-
-function yearStrip(reqs, first, c) {
-  const today = todayPH();
-  const [ty, tm] = today.split('-').map(Number);
-  const dated = reqs.filter((r) => r.expires && r.expires_on);
-  const overdue = dated.filter((r) => r.expires_on < today);
-  const cols = [];
-  for (let i = 0; i < 12; i++) {
-    const m = ((tm - 1 + i) % 12) + 1, y = ty + Math.floor((tm - 1 + i) / 12);
-    const key = `${y}-${String(m).padStart(2, '0')}`;
-    const items = dated.filter((r) => r.expires_on >= today && r.expires_on.slice(0, 7) === key);
-    cols.push({ label: MONTHS[m - 1], year: m === 1 && i > 0 ? y : null, items, now: i === 0 });
-  }
-  const busiest = cols.slice(1).reduce((b, x) => (x.items.length > (b?.items.length || 0) ? x : b), null);
-  const note = overdue.length ? html`<span class="strip-note overdue">${plural(overdue.length, 'permit')} already overdue — renew these first</span>`
-    : busiest && busiest.items.length >= 3 ? html`<span class="strip-note">${busiest.label}: ${busiest.items.length} renewals — start early</span>` : '';
+function brief(first, c, open) {
+  const today = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Manila', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const parts = [];
+  if (c.action_required) parts.push(html`<b class="due overdue">${plural(c.action_required, 'overdue permit')}</b>`);
+  if (c.renew_soon) parts.push(html`<b class="due soon">${c.renew_soon} due within 30 days</b>`);
+  if (c.needs_information) parts.push(html`<b class="due needinfo">${plural(c.needs_information, 'permit')} missing details</b>`);
+  const say = !open.length ? html`Everything is compliant. Nothing needs you today.`
+    : html`You have ${parts.map((x, i) => html`${i ? (i === parts.length - 1 ? ' and ' : ', ') : ''}${x}`)}.${open.length > 1 ? ' Start with the one under “Do this first”.' : ''}`;
+  const r = open[skip];
+  const t = r && S.data.types.find((x) => x.code === r.type_code);
+  const hint = !r ? '' : r.status === 'action_required' ? 'It is past its expiry date. Late renewals usually pay a surcharge, so renew it as soon as you can.'
+    : r.status === 'renew_soon' ? 'Renew before the due date to avoid penalties and long queues.'
+    : r.status === 'in_progress' ? 'A renewal is under way. Record the new permit once you have it.'
+    : 'Add the missing details or document so PermitPal can remind you on time.';
   return html`
-    <section class="year">
-      <div class="year-head">
-        <div><h1>Your compliance year, ${first}</h1>
-          <p class="year-sub">${S.org.name} · ${plural(S.data.businesses.length, 'business', 'businesses')} · ${plural(S.data.vehicles.length, 'vehicle')} · ${plural(c.total, 'permit')} tracked</p></div>
-        ${c.health === null ? '' : html`<a class="score" href="#/compliance?status=compliant" title="${c.compliant} of ${c.total} compliant">${ring(c.health)}<span><b>${c.health}%</b><small>compliant</small></span></a>`}
+    <section class="brief card">
+      <div class="brief-hello">
+        <div class="brief-date">${today}</div>
+        <h1>${greeting()}, ${first}.</h1>
+        <p class="brief-say">${say}</p>
+        <p class="brief-note">${c.compliant} of ${c.total} permits compliant${open.length ? html` · <a href="#/compliance">see all ${plural(open.length, 'open item')}</a>` : ''}</p>
       </div>
-      <div class="months">
-        ${overdue.length ? html`<div class="mo late"><small>Overdue</small>${pins(overdue)}</div>` : ''}
-        ${cols.map((x) => html`<div class="mo ${x.now ? 'now' : ''} ${x.items.length ? '' : 'none'}"><small>${x.label}${x.year ? html` <i>${x.year}</i>` : ''}</small>${pins(x.items)}</div>`)}
+      <div class="brief-focus">
+        ${r ? html`
+          <div class="brief-date">Do this first</div>
+          <a class="focus-item" href="#/requirement/${r.id}">${dateTile(r)}
+            <div><div class="focus-name">${r.name}</div><div class="focus-who">${subjectLabel(r)}</div><b class="due ${STATUS[r.status].cls}">${dueShort(r)}</b></div></a>
+          <p class="focus-hint">${t?.help_text ? t.help_text + ' ' : ''}${hint}</p>
+          <div class="btn-row">
+            ${canEdit() && r.next_action ? html`<button class="btn ${r.next_action === 'renew' ? 'btn-primary' : 'btn-soft'} focus-go" data-act="req-next" data-id="${r.id}">${NEXT_ACTION[r.next_action]}</button>`
+              : html`<a class="btn btn-primary focus-go" href="#/requirement/${r.id}">Open it</a>`}
+            ${when_(open.length > 1, html`<button class="btn btn-ghost" data-act="brief-skip">Skip for now</button>`)}
+          </div>` : html`<div class="brief-date">Do this first</div><div class="all-good">${ICON.check} Nothing to do. You're all caught up.</div>`}
       </div>
-      <div class="legend"><span><i class="biz"></i>Business permits</span><span><i class="veh"></i>Vehicle registration</span><span><i class="ins"></i>Insurance & others</span>${note}</div>
     </section>`;
 }
-
-function ring(pct) {
-  const r = 26, len = 2 * Math.PI * r;
-  return raw(`<svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" class="ring-track"/><circle cx="32" cy="32" r="${r}" class="ring-fill" stroke-dasharray="${(len * pct) / 100} ${len}" transform="rotate(-90 32 32)"/></svg>`);
-}
+on('brief-skip', () => { skip++; hooks.render(); });
 
 // ---------------------------------------------------------------- compliance
 const filters = { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', q: '' };
@@ -131,8 +121,13 @@ export function compliance(el, params) {
       <select name="due">${opt('all', 'Any due date', filters.due)}${opt('overdue', 'Overdue', filters.due)}${opt('30', 'Next 30 days', filters.due)}${opt('90', 'Next 90 days', filters.due)}${opt('none', 'No expiry date yet', filters.due)}</select>
       <button class="btn btn-ghost btn-sm" data-act="clear-filters">Clear</button>
     </div>
-    <p class="muted small">${plural(list.length, 'requirement')} · as of ${fmtDate(today)} (Philippine time)</p>
-    <div class="list">${list.length ? list.map((r) => reqRow(r)) : empty('Nothing matches', 'Try clearing a filter.')}</div>`);
+    <section class="card list">
+      <div class="card-head"><div><h2>All requirements</h2><p class="card-sub">${plural(list.length, 'requirement')} · as of ${fmtDate(today)} (Philippine time)</p></div></div>
+      ${list.length ? Object.keys(STATUS).map((k) => {
+        const group = list.filter((r) => r.status === k);
+        return group.length ? html`<div class="band ${STATUS[k].cls}"><span>${STATUS[k].label}</span><span>${group.length}</span></div>${group.map((r) => reqRow(r))}` : '';
+      }) : empty('Nothing matches', 'Try clearing a filter.')}
+    </section>`);
 
   const f = el.querySelector('#filters');
   f.addEventListener('change', (e) => { if (e.target.name) { filters[e.target.name] = e.target.value; if (e.target.name === 'subject') filters.entity = 'all'; compliance(el, new URLSearchParams()); } });

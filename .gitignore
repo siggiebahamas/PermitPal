@@ -3,3 +3,4 @@ tests/ui/*.png
 .DS_Store
 .env
 web/demo.html
+web/demo/

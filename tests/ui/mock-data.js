@@ -18,6 +18,8 @@ const types = [
   { code: 'fsic', name: 'Fire Safety Inspection Certificate (FSIC)', subject: 'business', expires: true, due_rule: 'annual', per_location: true },
   { code: 'lto_registration', name: 'LTO Registration (OR/CR)', subject: 'vehicle', expires: true, due_rule: 'lto_plate', per_location: false },
   { code: 'ctpl', name: 'CTPL Insurance', subject: 'vehicle', expires: true, due_rule: 'lto_plate', per_location: false },
+  { code: 'emission_test', name: 'Emission Test', subject: 'vehicle', expires: true, due_rule: 'lto_plate', per_location: false, help_text: 'Needed before LTO renewal.' },
+  { code: 'mvir', name: 'Motor Vehicle Inspection Report (MVIR)', subject: 'vehicle', expires: true, due_rule: 'lto_plate', per_location: false },
 ];
 const db = { businesses: [], locations: [], vehicles: [], requirements: [], cycles: [], documents: [], requests: [], notifications: [], audit: [] };
 let seq = 0;

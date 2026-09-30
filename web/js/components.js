@@ -63,6 +63,12 @@ export function counts(reqs) {
   return c;
 }
 
+// Short label for a permit (timeline bubbles).
+const SHORT = { mayors_permit: "Mayor's Permit", barangay_clearance: 'Barangay Clearance', bir_cor: 'BIR 2303', fsic: 'FSIC', sanitary_permit: 'Sanitary Permit',
+  dti_business_name: 'DTI Name', sec_registration: 'SEC', cda_registration: 'CDA', ecc: 'ECC', pcab_license: 'PCAB', doh_lto: 'DOH LTO', school_permit: 'School Permit',
+  lto_registration: 'LTO Registration', ctpl: 'CTPL Insurance', emission_test: 'Emission Test', mvir: 'MVIR' };
+export const shortName = (r) => SHORT[r.type_code] || r.name.replace(/\s*\(.*\)$/, '');
+
 // Short, plain status line shown in colour next to each item (never greyed out).
 export function dueShort(r) {
   const d = r.days_left;

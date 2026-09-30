@@ -1,10 +1,10 @@
 // Businesses (with branches) and vehicles: lists, detail pages, add/edit/delete.
-import { html, openModal, confirmDialog, toast, toastError, formObject, when, plural, timeAgo, fmtDate, fileSize } from '../util.js';
+import { html, openModal, confirmDialog, toast, toastError, formObject, when, plural, timeAgo, fmtDate, fileSize, todayPH } from '../util.js';
 import {
   S, on, go, reload, rerender, canEdit, isOrgAdmin, business, vehicle, location_, locationsOf, reqsOf, typeOf, memberName,
   empty, ACTIVITIES, STRUCTURES, VEHICLE_TYPES,
 } from '../core.js';
-import { reqRow, statTiles, healthBar, counts, byPriority, ICON, STATUS } from '../components.js';
+import { reqRow, statTiles, counts, byPriority, dueShort, shortName, ICON, STATUS } from '../components.js';
 import { plateSchedule, suggestDue } from '../rules.js';
 import * as db from 'pp/data';
 
@@ -17,29 +17,82 @@ export function businessList(el, params) {
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Businesses</h1><p class="muted">Every business, branch and the permits each one needs.</p></div>
       ${when(canEdit(), html`<button class="btn btn-primary" data-act="biz-add">+ Add business</button>`)}</div>
-    ${list.length ? html`<div class="cards">${list.map(entityCard('business'))}</div>`
+    ${list.length ? html`${timeline('business', list)}<h3 class="section-label">Your businesses</h3><div class="cards">${list.map(entityCard('business'))}</div>`
       : empty('No businesses yet', "Add one and we'll build its permit checklist for you.",
         when(canEdit(), html`<button class="btn btn-primary" data-act="biz-add">Add a business</button>`))}`);
   if (params.get('add') && canEdit()) { history.replaceState(null, '', '#/businesses'); addBusiness(); }
 }
 
+// One report sheet per business / vehicle: every permit on its own ruled line, status on the right.
 const entityCard = (subject) => (x) => {
-  const reqs = reqsOf(subject, x.id);
+  const reqs = reqsOf(subject, x.id).sort(byPriority);
   const c = counts(reqs);
-  const top = reqs.filter((r) => r.status !== 'compliant').sort(byPriority)[0];
+  const top = reqs.find((r) => r.status !== 'compliant');
   const href = subject === 'business' ? `#/businesses/${x.id}` : `#/vehicles/${x.id}`;
+  const locs = subject === 'business' ? locationsOf(x.id) : [];
   const meta = subject === 'business'
-    ? `${ACTIVITIES[x.activity] || 'Business'} · ${plural(locationsOf(x.id).length, 'branch', 'branches')}${locationsOf(x.id)[0]?.city ? ' · ' + locationsOf(x.id)[0].city : ''}`
-    : `${x.plate_no || 'No plate'} · ${x.vehicle_type}`;
-  return html`<a class="entity" href="${href}">
-    <div class="entity-top"><span class="entity-ic">${subject === 'business' ? ICON.building : ICON.car}</span>
-      <div class="entity-name">${subject === 'business' ? x.name : x.make_model}<div class="muted small">${meta}</div></div>
-      <div class="entity-health">${c.health === null ? '—' : c.health + '%'}</div></div>
-    <div class="chips">${['action_required', 'renew_soon', 'in_progress', 'needs_information', 'compliant'].map((k) =>
-      c[k] ? html`<span class="chip ${STATUS[k].cls}">${c[k]} ${STATUS[k].label.toLowerCase()}</span>` : '')}</div>
-    <div class="entity-next">${top ? html`Next: <b>${top.name}</b> — ${top.status === 'action_required' ? 'overdue' : STATUS[top.status].label.toLowerCase()}` : html`${ICON.check} All compliant`}</div>
-  </a>`;
+    ? `${ACTIVITIES[x.activity] || 'Business'} · ${plural(locs.length, 'branch', 'branches')}${locs[0]?.city ? ' · ' + locs[0].city : ''}`
+    : `${x.vehicle_type}${x.cr_no ? ' · CR ' + x.cr_no : ''}`;
+  return html`<section class="card entity">
+    <a class="card-head entity-head" href="${href}"><div>
+      <h2>${subject === 'business' ? x.name : x.make_model}${subject === 'vehicle' && x.plate_no ? html` <span class="plate">${x.plate_no}</span>` : ''}</h2>
+      <p class="card-sub">${meta}</p>
+      <div class="chips">${['action_required', 'renew_soon', 'in_progress', 'needs_information', 'compliant'].map((k) =>
+        c[k] ? html`<span class="chip ${STATUS[k].cls}">${c[k]} ${STATUS[k].label.toLowerCase()}</span>` : '')}</div></div></a>
+    ${reqs.map((r) => html`<a class="line" href="#/requirement/${r.id}"><span class="line-main"><b>${r.name}</b>${locs.length > 1 && r.location_id ? html`<small>${location_(r.location_id)?.name}</small>` : ''}</span>
+      <b class="due ${STATUS[r.status].cls}">${dueShort(r)}</b></a>`)}
+    ${when(canEdit(), html`<button class="line add" data-act="req-add" data-subject="${subject}" data-id="${x.id}"><span class="plus">+</span>Add a permit</button>`)}
+    <div class="sheet-foot">${c.compliant} of ${c.total} compliant${top ? html` · Next: <b>${top.name}</b> — <b class="due ${STATUS[top.status].cls}">${dueShort(top)}</b>` : ' · all clear'}</div>
+  </section>`;
 };
+
+// Month-by-month lanes: one row per business / vehicle, a bubble in the month each permit is due.
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function timeline(subject, list) {
+  const today = todayPH();
+  const [ty, tm] = today.split('-').map(Number);
+  const cols = [{ key: 'late', label: 'Overdue' }];
+  for (let i = 0; i < 12; i++) {
+    const m = ((tm - 1 + i) % 12) + 1, y = ty + Math.floor((tm - 1 + i) / 12);
+    cols.push({ key: `${y}-${String(m).padStart(2, '0')}`, label: MON[m - 1] + (m === 1 && i ? ` '${String(y).slice(2)}` : ''), now: i === 0 });
+  }
+  const colOf = (r) => (!r.expires || !r.expires_on ? null : r.expires_on < today ? 'late' : r.expires_on.slice(0, 7));
+  const pin = (r, multi, extra = '') => html`<a class="tpin ${STATUS[r.status].cls}" href="#/requirement/${r.id}" title="${r.name} · ${dueShort(r)}">${shortName(r)}${extra}${multi && r.location_id ? html`<small>${location_(r.location_id)?.name.split(' ')[0]}</small>` : ''}</a>`;
+  const row = (x) => {
+    const reqs = reqsOf(subject, x.id).sort(byPriority);
+    const multi = subject === 'business' && locationsOf(x.id).length > 1;
+    const undated = reqs.filter((r) => colOf(r) === null && r.status !== 'compliant');
+    return html`<div class="lrow"><div class="lwho"><a href="${subject === 'business' ? '#/businesses/' : '#/vehicles/'}${x.id}"><b>${subject === 'business' ? x.name : x.make_model}</b></a>
+        <span>${subject === 'business' ? plural(locationsOf(x.id).length, 'branch', 'branches') : [x.plate_no, x.vehicle_type].filter(Boolean).join(' · ')}</span>
+        ${when(undated.length, html`<div class="lundated">${undated.map((r) => pin(r, multi, ' · no date'))}</div>`)}</div>
+      ${cols.map((col) => html`<div class="lcell ${col.now ? 'now' : ''}">${reqs.filter((r) => colOf(r) === col.key).map((r) => pin(r, multi))}</div>`)}</div>`;
+  };
+  return html`<section class="card lanes-card">
+    <div class="card-head"><div><h2>${subject === 'business' ? 'Business permits' : 'Vehicle renewals'} · month by month</h2>
+      <p class="card-sub">Every permit in the month it's due. Tap one to open it${cols.length > 7 ? ' · scroll sideways for later months' : ''}.</p></div>
+      <div class="chips">${Object.values(STATUS).map((st) => html`<span class="chip ${st.cls}">${st.label}</span>`)}</div></div>
+    <div class="lanes-wrap"><div class="lanes">
+      <div class="lrow lhead"><div class="lwho"></div>${cols.map((col) => html`<div class="${col.now ? 'now' : ''} ${col.key === 'late' ? 'late' : ''}">${col.label}</div>`)}</div>
+      ${list.map(row)}
+    </div></div>
+  </section>`;
+}
+
+// Permits this business / vehicle doesn't track yet, one tap to add.
+function suggestions(subject, id) {
+  if (!canEdit()) return '';
+  const have = new Set(reqsOf(subject, id).map((r) => r.type_code).filter(Boolean));
+  const types = S.data.types.filter((t) => t.subject === subject && !have.has(t.code));
+  return html`<section class="card">
+    <div class="card-head"><div><h2>Add more permits</h2><p class="card-sub">Other permits ${subject === 'business' ? 'businesses' : 'vehicles'} often need. Tap one to add it.</p></div></div>
+    <div class="suggest-list">
+      ${types.map((t) => html`<button class="line add" data-act="req-add" data-subject="${subject}" data-id="${id}" data-type="${t.code}"><span class="plus">+</span>
+        <span class="line-main"><b>${t.name}</b>${t.help_text ? html`<small>${t.help_text}</small>` : ''}</span></button>`)}
+      <button class="line add" data-act="req-add" data-subject="${subject}" data-id="${id}" data-type="other"><span class="plus">+</span>
+        <span class="line-main"><b>Something else</b><small>Any permit, license or certificate not on the list</small></span></button>
+    </div>
+  </section>`;
+}
 
 function businessFields(b = {}, withLocation = true) {
   return html`
@@ -86,7 +139,7 @@ export function businessDetail(el, id) {
     <div class="page-head"><div><h1>${b.name}</h1><p class="muted">${ACTIVITIES[b.activity]} · ${b.structure}${b.tin ? ' · TIN ' + b.tin : ''}</p></div>
       ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-soft" data-act="req-add" data-subject="business" data-id="${id}">+ Requirement</button>
         <a class="btn btn-ghost" href="#/help">${ICON.help} Get help</a></div>`)}</div>
-    ${statTiles(c)}${healthBar(c)}
+    ${statTiles(c)}
     <div class="tabs">${tabBtn('requirements', 'Requirements')}${tabBtn('branches', `Branches (${locs.length})`)}${tabBtn('documents', 'Documents')}${tabBtn('activity', 'Activity')}${tabBtn('details', 'Details')}</div>
     <div id="tab-body"></div>`);
   const body = el.querySelector('#tab-body');
@@ -96,11 +149,15 @@ export function businessDetail(el, id) {
     body.innerHTML = String(html`
       ${locs.map((l) => {
         const list = reqs.filter((r) => r.location_id === l.id).sort(byPriority);
+        const c2 = counts(list);
         return html`<section class="card"><div class="card-head"><h2>${l.name}${l.city ? ' · ' + l.city : ''}</h2><span class="muted small">${plural(list.length, 'item')}</span></div>
-          ${list.length ? list.map((r) => reqRow(r, { showSubject: false })) : html`<p class="muted">Nothing tracked for this branch.</p>`}</section>`;
+          ${list.length ? list.map((r) => reqRow(r, { showSubject: false })) : html`<p class="muted pad">Nothing tracked for this branch yet.</p>`}
+          ${when(canEdit(), html`<button class="line add" data-act="req-add" data-subject="business" data-id="${id}" data-loc="${l.id}"><span class="plus">+</span>Add a permit to this branch</button>`)}
+          ${when(list.length, html`<div class="sheet-foot">${c2.compliant} of ${c2.total} compliant</div>`)}</section>`;
       })}
       ${when(wide.length, html`<section class="card"><div class="card-head"><h2>Whole business</h2><span class="muted small">Registrations that cover every branch</span></div>
-        ${wide.map((r) => reqRow(r, { showSubject: false }))}</section>`)}`);
+        ${wide.map((r) => reqRow(r, { showSubject: false }))}</section>`)}
+      ${suggestions('business', id)}`);
   } else if (tab === 'branches') {
     body.innerHTML = String(html`
       <section class="card"><div class="card-head"><h2>Branches</h2>
@@ -193,7 +250,10 @@ on('req-add', (ds) => {
         if (locSel && t) locSel.value = t.per_location ? (locs[0]?.id || '') : '';
       };
       sel.addEventListener('change', upd);
+      if (ds.type) sel.value = ds.type === 'other' ? '' : ds.type;
       upd();
+      const locSel = form.querySelector('[name=location_id]');
+      if (locSel && ds.loc) locSel.value = ds.loc;
     },
     onSubmit: async (fd) => {
       const f = formObject(fd);
@@ -218,7 +278,7 @@ export function vehicleList(el, params) {
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Vehicles</h1><p class="muted">LTO registration, CTPL, emission and inspection for every vehicle.</p></div>
       ${when(canEdit(), html`<button class="btn btn-primary" data-act="veh-add">+ Add vehicle</button>`)}</div>
-    ${list.length ? html`<div class="cards">${list.map(entityCard('vehicle'))}</div>`
+    ${list.length ? html`${timeline('vehicle', list)}<h3 class="section-label">Your vehicles</h3><div class="cards">${list.map(entityCard('vehicle'))}</div>`
       : empty('No vehicles yet', "Add one and we'll track its registration and insurance.", when(canEdit(), html`<button class="btn btn-primary" data-act="veh-add">Add a vehicle</button>`))}`);
   if (params.get('add') && canEdit()) { history.replaceState(null, '', '#/vehicles'); addVehicle(); }
 }
@@ -300,11 +360,17 @@ export function vehicleDetail(el, id) {
       ${when(s, html`<p class="small">LTO renewal window for this plate: <b>${s?.label}</b></p>`)}</div>
       ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-soft" data-act="req-add" data-subject="vehicle" data-id="${id}">+ Requirement</button>
         <a class="btn btn-ghost" href="#/help">${ICON.help} Get help</a></div>`)}</div>
-    ${statTiles(c)}${healthBar(c)}
+    ${statTiles(c)}
     <div class="tabs">${tabBtn('requirements', 'Requirements')}${tabBtn('documents', 'Documents')}${tabBtn('activity', 'Activity')}${tabBtn('details', 'Details')}</div>
     <div id="tab-body"></div>`);
   const body = el.querySelector('#tab-body');
-  if (tab === 'requirements') body.innerHTML = String(html`<section class="card">${reqs.map((r) => reqRow(r, { showSubject: false }))}</section>`);
+  if (tab === 'requirements') {
+    body.innerHTML = String(html`<section class="card"><div class="card-head"><h2>Requirements</h2><span class="muted small">${plural(reqs.length, 'item')}</span></div>
+      ${reqs.map((r) => reqRow(r, { showSubject: false }))}
+      ${when(canEdit(), html`<button class="line add" data-act="req-add" data-subject="vehicle" data-id="${id}"><span class="plus">+</span>Add a permit to this vehicle</button>`)}
+      <div class="sheet-foot">${c.compliant} of ${c.total} compliant</div></section>
+      ${suggestions('vehicle', id)}`);
+  }
   else if (tab === 'documents') filesTab(body, reqs);
   else if (tab === 'activity') activityTab(body, 'vehicle_id', id);
   else {
