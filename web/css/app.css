@@ -18,7 +18,7 @@
   --gray: #8B95A7; --gray-ink: #5F6B7E;
   /* soft status set: pale tint (bg), deeper text (ink), mid tone (strips, meters) */
   --s-over-bg: #FCECEC; --s-over: #B8403F; --s-over-mid: #EFA3A2;
-  --s-soon-bg: #FFF5C4; --s-soon: #B08D00; --s-soon-mid: #F5D547;
+  --s-soon-bg: #FFE14D; --s-soon: #C28A00; --s-soon-mid: #FFD000; --s-soon-on: #0B1B3A; /* sunshine yellow; navy text on it, bright gold text on white */
   --s-prog-bg: #EAF0FC; --s-prog: #3461BD; --s-prog-mid: #9DB8EE;
   --s-info-bg: #F1EFEB; --s-info: #5E6573; --s-info-mid: #C5C8CF;
   --s-ok-bg: #E8F4EC; --s-ok: #2A7650; --s-ok-mid: #98CFAF;
@@ -175,7 +175,7 @@ button.line { background-color: transparent; border-left: 0; border-right: 0; bo
   letter-spacing: .06em; background: #fff; vertical-align: 3px; color: var(--heading); }
 .band { display: flex; justify-content: space-between; margin: 0 -18px; padding: 8px 18px; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
   border-top: 1px solid var(--rule); background: var(--s-info-bg); color: var(--s-info); }
-.band.overdue { background: var(--s-over-bg); color: var(--s-over); } .band.soon { background: var(--s-soon-bg); color: var(--s-soon); }
+.band.overdue { background: var(--s-over-bg); color: var(--s-over); } .band.soon { background: var(--s-soon-bg); color: var(--s-soon-on); }
 .band.progress { background: var(--s-prog-bg); color: var(--s-prog); } .band.ok { background: var(--s-ok-bg); color: var(--s-ok); }
 .card .kv { margin: 0 0 6px; row-gap: 0; }
 .card .kv dt, .card .kv dd { padding: 10px 0; border-bottom: 1px solid var(--rule); }
@@ -244,7 +244,7 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .tpin { display: block; font-size: 12px; font-weight: 700; border-radius: 8px; padding: 5px 7px; line-height: 1.2; text-align: center; background: var(--s-info-bg); color: var(--s-info); transition: transform .12s; }
 .tpin small { display: block; font-weight: 600; font-size: 11px; opacity: .85; }
 .tpin:hover { transform: translateY(-1px); }
-.tpin.overdue { background: var(--s-over-bg); color: var(--s-over); } .tpin.soon { background: var(--s-soon-bg); color: var(--s-soon); }
+.tpin.overdue { background: var(--s-over-bg); color: var(--s-over); } .tpin.soon { background: var(--s-soon-bg); color: var(--s-soon-on); }
 .tpin.progress { background: var(--s-prog-bg); color: var(--s-prog); } .tpin.ok { background: var(--s-ok-bg); color: var(--s-ok); }
 .lundated .tpin { display: inline-block; }
 
@@ -267,7 +267,7 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .dtile { width: 56px; flex-shrink: 0; text-align: center; border-radius: 12px; padding: 6px 0 5px; line-height: 1.05; background: var(--s-info-bg); color: var(--s-info); }
 .dtile small { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; white-space: nowrap; text-transform: uppercase; opacity: .85; }
 .dtile b { display: block; font-size: 20px; font-weight: 800; }
-.dtile.overdue { background: var(--s-over-bg); color: var(--s-over); } .dtile.soon { background: var(--s-soon-bg); color: var(--s-soon); }
+.dtile.overdue { background: var(--s-over-bg); color: var(--s-over); } .dtile.soon { background: var(--s-soon-bg); color: var(--s-soon-on); }
 .dtile.progress { background: var(--s-prog-bg); color: var(--s-prog); } .dtile.ok { background: var(--s-ok-bg); color: var(--s-ok); }
 @media (max-width: 520px) {
   .row { flex-wrap: wrap; padding: 12px 6px; }
@@ -282,7 +282,7 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
   background: var(--s-info-bg); color: var(--s-info); line-height: 1.2; }
 .chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .75; flex-shrink: 0; }
 .chip.overdue { background: var(--s-over-bg); color: var(--s-over); }
-.chip.soon { background: var(--s-soon-bg); color: var(--s-soon); }
+.chip.soon { background: var(--s-soon-bg); color: var(--s-soon-on); }
 .chip.progress { background: var(--s-prog-bg); color: var(--s-prog); }
 .chip.needinfo { background: var(--s-info-bg); color: var(--s-info); }
 .chip.ok { background: var(--s-ok-bg); color: var(--s-ok); }
