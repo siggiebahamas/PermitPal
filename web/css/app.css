@@ -18,7 +18,7 @@
   --gray: #8B95A7; --gray-ink: #5F6B7E;
   /* soft status set: pale tint (bg), deeper text (ink), mid tone (strips, meters) */
   --s-over-bg: #FCECEC; --s-over: #B8403F; --s-over-mid: #EFA3A2;
-  --s-soon-bg: #FFE14D; --s-soon: #C28A00; --s-soon-mid: #FFD000; --s-soon-on: #0B1B3A; /* sunshine yellow; navy text on it, bright gold text on white */
+  --s-soon-bg: #FFF5C4; --s-soon: #B08D00; --s-soon-mid: #F5D547; --s-soon-on: var(--s-soon);
   --s-prog-bg: #EAF0FC; --s-prog: #3461BD; --s-prog-mid: #9DB8EE;
   --s-info-bg: #F1EFEB; --s-info: #5E6573; --s-info-mid: #C5C8CF;
   --s-ok-bg: #E8F4EC; --s-ok: #2A7650; --s-ok-mid: #98CFAF;
