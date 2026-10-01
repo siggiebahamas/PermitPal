@@ -1,4 +1,5 @@
-// Starts a PayMongo checkout (GCash, Maya, cards, GrabPay) for a plan upgrade.
+// Starts a PayMongo checkout (GCash, Maya, cards, GrabPay) for a plan upgrade or for a
+// done-for-you service order the customer has accepted (send { request_id }).
 // Called from the app by a signed-in workspace owner. Needs PAYMONGO_SECRET_KEY and APP_URL.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -16,17 +17,29 @@ Deno.serve(async (req) => {
 
   const key = Deno.env.get("PAYMONGO_SECRET_KEY");
   const appUrl = (Deno.env.get("APP_URL") ?? "").replace(/#.*$/, "");
-  if (!key || !appUrl) return json({ error: "Online payment is not switched on yet. Contact PermitPal to upgrade." }, 503);
+  if (!key || !appUrl) return json({ error: "Online card/GCash checkout is not switched on yet. Please use the GCash or bank transfer details shown instead." }, 503);
 
-  const { org_id, plan_id, months } = await req.json().catch(() => ({}));
+  const { org_id, plan_id, months, request_id } = await req.json().catch(() => ({}));
   const url = Deno.env.get("SUPABASE_URL")!;
-  // Act as the signed-in customer so the database checks they own the workspace.
+  // Act as the signed-in customer so the database checks they may pay for this.
   const asUser = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
     global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     auth: { persistSession: false },
   });
-  const { data: start, error } = await asUser.rpc("billing_start", { p_org: org_id, p_plan: plan_id, p_months: months ?? 1 });
-  if (error) return json({ error: error.message }, 400);
+
+  let start: Record<string, any>;
+  let lineName: string, lineDesc: string, back: string;
+  if (request_id) {
+    const { data, error } = await asUser.rpc("order_payment_start", { p_req: request_id });
+    if (error) return json({ error: error.message }, 400);
+    start = data; lineName = `PermitPal: ${data.name}`; lineDesc = data.description; back = `#/services/orders/${request_id}`;
+  } else {
+    const { data, error } = await asUser.rpc("billing_start", { p_org: org_id, p_plan: plan_id, p_months: months ?? 1 });
+    if (error) return json({ error: error.message }, 400);
+    start = data;
+    lineName = `PermitPal ${data.plan_name} - ${data.months} month${data.months > 1 ? "s" : ""}`;
+    lineDesc = data.org_name; back = "#/settings/billing";
+  }
 
   const amount = Math.round(Number(start.amount_php) * 100); // centavos
   const res = await fetch("https://api.paymongo.com/v1/checkout_sessions", {
@@ -35,20 +48,16 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       data: {
         attributes: {
-          line_items: [{
-            currency: "PHP", amount, quantity: 1,
-            name: `PermitPal ${start.plan_name} - ${start.months} month${start.months > 1 ? "s" : ""}`,
-            description: start.org_name,
-          }],
+          line_items: [{ currency: "PHP", amount, quantity: 1, name: lineName, description: lineDesc }],
           payment_method_types: ["gcash", "paymaya", "card", "grab_pay"],
           reference_number: start.payment_id,
           billing: start.email ? { email: start.email } : undefined,
           send_email_receipt: true,
           show_description: true,
-          description: `PermitPal ${start.plan_name} for ${start.org_name}`,
-          success_url: `${appUrl}#/settings/billing?paid=1`,
-          cancel_url: `${appUrl}#/settings/billing`,
-          metadata: { payment_id: start.payment_id, org_id },
+          description: lineName,
+          success_url: `${appUrl}${back}${back.includes("?") ? "&" : "?"}paid=1`,
+          cancel_url: `${appUrl}${back}`,
+          metadata: { payment_id: start.payment_id, org_id: org_id ?? null, request_id: request_id ?? null },
         },
       },
     }),

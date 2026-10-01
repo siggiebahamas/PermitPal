@@ -56,7 +56,7 @@ reset role;
 insert into t_results (step, ok, detail) select 'staff alerted in-app', count(*) = 1, count(*)::text
   from public.notifications where user_id = '44444444-4444-4444-4444-444444444444' and kind = 'help';
 insert into t_results (step, ok, detail) select 'founder email queued', count(*) >= 1, string_agg(to_address, ',')
-  from public.message_outbox where dedupe_key like 'helpmail:%';
+  from public.message_outbox where dedupe_key like 'ordernew:%';
 
 -- ---------------------------------------------------------------- staff handles it
 select set_config('request.jwt.claims', '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}', true);
@@ -67,7 +67,7 @@ insert into t_results (step, ok, detail) select 'staff cannot see other business
 update public.assistance_requests set status = 'provider_contacted', quote_php = 2500, admin_note = 'Agent visits Pasig BPLO Monday' where id = (select help from t_ids);
 reset role;
 insert into t_results (step, ok, detail) select 'customer notified of update', count(*) >= 1, string_agg(title, '; ')
-  from public.notifications where user_id = '33333333-3333-3333-3333-333333333333' and title like 'Help request update%';
+  from public.notifications where user_id = '33333333-3333-3333-3333-333333333333' and title like '%Provider contacted%';
 
 -- ---------------------------------------------------------------- invites & roles
 select set_config('request.jwt.claims', '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}', true);
