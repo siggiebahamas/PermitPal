@@ -41,9 +41,12 @@ The database decides status in one place (`requirement_status`), using Philippin
    1. Create a free [Resend](https://resend.com) account (3,000 emails/month) and verify a domain.
    2. Put its SMTP details in Supabase → Authentication → Emails → SMTP Settings. Until then, new customers can't confirm sign-up.
    3. Add the Edge Function secrets `RESEND_API_KEY` and `EMAIL_FROM`.
-4. **Admin:** after you sign up, ask Claude to make your account admin. Help requests also email ty.sigmund@gmail.com.
+4. **Admin:** after you sign up, ask Claude to make your account admin. New service orders also email every admin account.
 5. **Backups:** add the repo secrets `SUPABASE_DB_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `BACKUP_PASSPHRASE`. See `backup.yml`. Keep the passphrase safe.
 6. **Legal:** have a lawyer review `web/privacy.html` and `web/terms.html`.
+7. **Getting paid for services:** in the app, Admin → Payment details: fill in your GCash and bank details. Customers see these after accepting a quote.
+8. **Online card/GCash checkout (optional):** add the Edge Function secrets `PAYMONGO_SECRET_KEY` and `APP_URL`, then set *online_payments* to `on` in Admin → Payment details.
+9. **Prices and partners:** review every price in Admin → Services & prices, and add your real partners (insurers, pest control, clinics) with their commission terms in Admin → Partners. The two sample partners exist only in the demo.
 
 ## Running tests
 

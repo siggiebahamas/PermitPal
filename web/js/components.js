@@ -19,6 +19,14 @@ export const NEXT_ACTION = {
 export const ICON = {
   home: raw('<svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h4v-5h4v5h4v-9"/></svg>'),
   building: raw('<svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M11 21v-3h2v3"/></svg>'),
+  person: raw('<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/></svg>'),
+  briefcase: raw('<svg viewBox="0 0 24 24"><rect x="3.5" y="7" width="17" height="12.5" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/></svg>'),
+  handshake: raw('<svg viewBox="0 0 24 24"><path d="M3 12l4-4 4 3 2-2 4 3 4-4"/><path d="M7 8l5 5c.8.8 2 .8 2.8 0M10 15l2 2c.8.8 2 .8 2.8 0l2-2"/></svg>'),
+  share: raw('<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.2"/><circle cx="17.5" cy="6" r="2.2"/><circle cx="17.5" cy="18" r="2.2"/><path d="M8 11l7.5-4M8 13l7.5 4"/></svg>'),
+  peso: raw('<svg viewBox="0 0 24 24"><path d="M8 20V4h5a4.5 4.5 0 0 1 0 9H8M5 8h13M5 11h13"/></svg>'),
+  grid: raw('<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>'),
+  download: raw('<svg viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>'),
+  calendar: raw('<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>'),
   car: raw('<svg viewBox="0 0 24 24"><path d="M4 16v-4l1.7-4.2A2 2 0 0 1 7.5 6.5h9a2 2 0 0 1 1.8 1.3L20 12v4"/><path d="M4 16h16"/><circle cx="7.5" cy="17.5" r="1.4"/><circle cx="16.5" cy="17.5" r="1.4"/></svg>'),
   check: raw('<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'),
   list: raw('<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>'),
@@ -47,6 +55,7 @@ export function dueText(r) {
 
 export function subjectLabel(r) {
   if (r.subject === 'vehicle') return r.subject_name + (r.plate_no ? ` · ${r.plate_no}` : '');
+  if (r.subject === 'person') return r.subject_name + (r.person_role ? ` · ${r.person_role}` : '');
   const branch = r.location_id && !r.location_is_main ? ` · ${r.location_name}` : '';
   return (r.subject_name || '') + branch;
 }

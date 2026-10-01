@@ -9,7 +9,7 @@ export const S = {
   orgs: [],
   org: null,       // current workspace (includes .role)
   plans: [],
-  data: null,      // { types, businesses, locations, vehicles, reqs, requests, members }
+  data: null,      // { types, services, businesses, locations, vehicles, people, reqs, requests, members }
   unread: 0,
 };
 
@@ -39,12 +39,18 @@ export function effectivePlan() {
 // ---------------------------------------------------------------- lookups
 export const business = (id) => S.data?.businesses.find((b) => b.id === id);
 export const vehicle = (id) => S.data?.vehicles.find((v) => v.id === id);
+export const person = (id) => S.data?.people?.find((p) => p.id === id);
 export const location_ = (id) => S.data?.locations.find((l) => l.id === id);
 export const reqById = (id) => S.data?.reqs.find((r) => r.id === id);
 export const typeOf = (code) => S.data?.types.find((t) => t.code === code);
 export const locationsOf = (bizId) => S.data.locations.filter((l) => l.business_id === bizId);
 export const reqsOf = (subject, id) =>
-  S.data.reqs.filter((r) => (subject === 'business' ? r.business_id === id : r.vehicle_id === id));
+  S.data.reqs.filter((r) => (subject === 'business' ? r.business_id === id : subject === 'person' ? r.person_id === id : r.vehicle_id === id));
+export const service = (code) => S.data?.services?.find((x) => x.code === code);
+// The done-for-you service that handles a given permit type, if we offer one.
+export const serviceFor = (r) => S.data?.services?.find((x) => x.category === 'renewal' && x.type_codes.includes(r.type_code))
+  || (r.subject !== 'person' ? S.data?.services?.find((x) => x.code === 'renew_other') : null);
+export const subjectHref = (r) => (r.subject === 'business' ? `#/businesses/${r.business_id}` : r.subject === 'person' ? `#/people/${r.person_id}` : `#/vehicles/${r.vehicle_id}`);
 export function memberName(userId) {
   if (!userId) return 'PermitPal';
   if (userId === S.user?.id) return 'You';
@@ -70,8 +76,8 @@ export const ROLES = {
 
 // Plain-language names for a few table names shown in History / Trash.
 export const ENTITY_LABELS = {
-  businesses: 'Business', business_locations: 'Branch', vehicles: 'Vehicle', requirements: 'Requirement',
-  requirement_cycles: 'Record', documents: 'Document', assistance_requests: 'Help request', org_members: 'Team', orgs: 'Workspace',
+  businesses: 'Business', business_locations: 'Branch', vehicles: 'Vehicle', people: 'Person', requirements: 'Requirement',
+  requirement_cycles: 'Record', documents: 'Document', assistance_requests: 'Service request', org_members: 'Team', orgs: 'Workspace',
 };
 
 export const empty = (title, text, action = '') => html`

@@ -1,7 +1,9 @@
 // A single requirement: its current record, files, past records and history — plus the
 // flows used everywhere else (add details, upload, renew, started renewing).
-import { html, fmtDate, fmtDateTime, timeAgo, fileSize, todayPH, openModal, confirmDialog, toast, toastError, formObject, when } from '../util.js';
-import { S, on, go, reload, canEdit, reqById, typeOf, vehicle, memberName, empty } from '../core.js';
+import { html, fmtDate, fmtDateTime, timeAgo, fileSize, todayPH, openModal, confirmDialog, toast, toastError, formObject, when, peso } from '../util.js';
+import { S, on, go, reload, canEdit, reqById, typeOf, vehicle, memberName, empty, subjectHref } from '../core.js';
+import { serviceOffer } from './services.js';
+import { loadPartners, partnerSuggestions, penaltyNote } from './extras.js';
 import { STATUS, statusChip, dueText, subjectLabel, ICON } from '../components.js';
 import { suggestDue } from '../rules.js';
 import * as db from 'pp/data';
@@ -21,7 +23,8 @@ export async function render(el, id) {
     if (loadingId === id) return;
     loadingId = id;
     try {
-      detail = { id, ...(await db.requirementDetail(id)) };
+      const [d] = await Promise.all([db.requirementDetail(id), loadPartners()]);
+      detail = { id, ...d };
     } catch (e) { toastError(e); }
     loadingId = null;
     if (!location.hash.includes(id)) return; // navigated away while loading
@@ -36,7 +39,7 @@ function page(r) {
   const current = detail.cycles.find((c) => c.id === r.cycle_id);
   const past = detail.cycles.filter((c) => c.id !== r.cycle_id);
   const docsOf = (cycleId) => detail.documents.filter((d) => d.cycle_id === cycleId);
-  const parentHref = r.subject === 'business' ? `#/businesses/${r.business_id}` : `#/vehicles/${r.vehicle_id}`;
+  const parentHref = subjectHref(r);
   const edit = canEdit();
 
   return html`
@@ -70,6 +73,8 @@ function page(r) {
       </div>`)}
 
     ${when(t?.help_text, html`<p class="help-text">${t?.help_text}</p>`)}
+    ${['action_required', 'renew_soon'].includes(r.status) ? penaltyNote(r) : ''}
+    ${serviceOffer(r)}
 
     <section class="card">
       <div class="card-head"><h2>Current record</h2>
@@ -86,8 +91,8 @@ function page(r) {
     <div class="btn-row wrap">
       ${when(edit && r.expires && r.status !== 'in_progress' && r.status !== 'compliant', html`
         <button class="btn btn-ghost" data-act="req-start-renewal" data-id="${r.id}">I've started the renewal</button>`)}
-      ${when(edit && !r.open_request_id, html`<a class="btn btn-ghost" href="#/help/${r.id}">${ICON.help} Get help with this</a>`)}
     </div>
+    ${partnerSuggestions(r)}
 
     ${when(past.length, html`
       <section class="card">
@@ -122,6 +127,7 @@ function recordBody(c, r, compact = false) {
     ['Issued by', c.issuer || '—'],
     ['Issued on', c.issued_on ? fmtDate(c.issued_on) : '—'],
     ['Expires', r.expires ? (c.expires_on ? fmtDate(c.expires_on) : 'Not entered') : 'Does not expire'],
+    ['Amount paid', c.amount_paid != null ? peso(c.amount_paid) : '—'],
   ];
   return html`<dl class="${compact ? 'kv compact' : 'kv'}">${rows.map(([k, v]) => html`<dt>${k}</dt><dd>${v}</dd>`)}</dl>
     ${when(compact, html`<div class="muted small">Recorded ${fmtDateTime(c.created_at)}</div>`)}`;
@@ -154,6 +160,7 @@ function dueFields(r, values = {}) {
       <label class="field"><span>Issued by <small>(optional)</small></span><input name="issuer" value="${values.issuer || ''}" maxlength="120" placeholder="${r.subject === 'vehicle' && r.type_code === 'ctpl' ? 'Insurance company' : 'Office or agency'}"></label>
       <label class="field"><span>Issued on</span><input type="date" name="issued_on" value="${values.issued_on || ''}" max="${todayPH()}"></label>
       <label class="field expiry-field" ${r.expires ? '' : 'hidden'}><span>Expires on</span><input type="date" name="expires_on" value="${values.expires_on || ''}"></label>
+      <label class="field"><span>Amount paid <small>(₱, optional — for your budget)</small></span><input type="number" name="amount_paid" min="0" step="0.01" value="${values.amount_paid ?? ''}" placeholder="e.g. 4500"></label>
     </div>
     <div class="suggest" data-rule="${t?.due_rule || 'manual'}" hidden></div>
     <label class="check"><input type="checkbox" name="no_expiry" ${r.expires ? '' : 'checked'}> This document does not expire</label>`;
@@ -187,7 +194,7 @@ async function saveRecord(r, f, { cycleId, file }) {
   if (noExpiry === r.expires) await db.updateRequirement(r.id, { expires: !noExpiry });
   const id = await db.saveCycle({
     cycleId, orgId: r.org_id, requirementId: r.id,
-    reference_no: f.reference_no, issuer: f.issuer, issued_on: f.issued_on, expires_on: noExpiry ? null : f.expires_on,
+    reference_no: f.reference_no, issuer: f.issuer, issued_on: f.issued_on, expires_on: noExpiry ? null : f.expires_on, amount_paid: f.amount_paid,
   });
   if (file && file.size) await db.uploadDocument({ orgId: r.org_id, requirementId: r.id, cycleId: id, file });
   return id;
@@ -201,7 +208,7 @@ async function afterChange(message) {
 
 export function openEdit(r) {
   const current = r.cycle_id ? {
-    reference_no: r.reference_no, issuer: r.issuer, issued_on: r.issued_on, expires_on: r.expires_on,
+    reference_no: r.reference_no, issuer: r.issuer, issued_on: r.issued_on, expires_on: r.expires_on, amount_paid: r.amount_paid,
   } : {};
   openModal(r.cycle_id ? `Edit details — ${r.name}` : `Add details — ${r.name}`, html`
     <p class="muted small">${subjectLabel(r)}. ${r.cycle_id ? 'Use this to correct the current record. To record a new permit period, use Renew instead.' : ''}</p>

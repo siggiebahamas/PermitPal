@@ -45,7 +45,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: BIR COR (never recorded) is NOT shown as compliant`,
     (await page.locator('.row.needinfo', { hasText: 'BIR Certificate' }).count()) > 0);
 
-  for (const h of ['#/businesses', '#/businesses/b1', '#/vehicles', '#/vehicles/v1', '#/compliance', '#/documents', '#/help', '#/notifications', '#/history', '#/trash', '#/team', '#/settings', '#/settings/billing', '#/settings/workspace', '#/admin']) {
+  for (const h of ['#/businesses', '#/businesses/b1', '#/vehicles', '#/vehicles/v1', '#/compliance', '#/documents', '#/help', '#/services', '#/people', '#/partners', '#/costs', '#/sharing', '#/workspaces', '#/notifications', '#/history', '#/trash', '#/team', '#/settings', '#/settings/billing', '#/settings/workspace', '#/admin']) {
     await go(h);
     await page.waitForSelector('main h1', { timeout: 5000 }).catch(() => {});
     const t = await page.textContent('main').catch(() => '');
@@ -87,15 +87,31 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check('new business has a starter checklist, none compliant',
       (await page.locator('#tab-body .row').count()) === 3 && (await page.locator('#tab-body .row.ok').count()) === 0);
 
-    // Get help flow -> request listed and requirement goes in progress (bug #3).
-    await go('#/help');
-    await page.click('.pick-item:has-text("CTPL")');
-    await page.click('button:has-text("Continue")');
-    await page.click('button:has-text("Send request")');
-    await page.waitForTimeout(400);
-    check('help request listed', (await page.locator('.request', { hasText: 'CTPL' }).count()) === 1);
+    // Done-for-you order: request -> quote -> accept -> pay; the permit shows in progress meanwhile.
+    await go('#/services');
+    await page.click('[data-act=svc-request][data-code=renew_ctpl]');
+    await page.waitForSelector('.modal select[name=target]');
+    await page.click('.modal button[type=submit]');
+    await page.waitForSelector('main .stepper');
+    const orderHash = await page.evaluate(() => location.hash);
+    check('service request opens its order page', orderHash.startsWith('#/services/orders/'), orderHash);
     await go('#/vehicles/v1');
-    check('requirement with open help request shows in progress', (await page.locator('.row.progress', { hasText: 'CTPL' }).count()) === 1);
+    check('requirement with open request shows in progress', (await page.locator('.row.progress', { hasText: 'CTPL' }).count()) === 1);
+    await go('#/admin');
+    await page.click('[data-act=admin-order]:has-text("CTPL")');
+    await page.fill('.admin-quote [name=fee]', '300');
+    await page.fill('.admin-quote [name=gov]', '610');
+    await page.click('.admin-quote button');
+    await page.waitForTimeout(300);
+    await go(orderHash);
+    check('customer sees the quote total', (await page.textContent('.quote .qline.total')).includes('910'));
+    await page.click('[data-act=quote-accept]');
+    await page.click('.modal button[type=submit]');
+    await page.waitForSelector('.pay-form');
+    await page.fill('.pay-form [name=ref]', '1009 234');
+    await page.click('.pay-form button[type=submit]');
+    await page.waitForTimeout(400);
+    check('payment goes to checking', (await page.locator('text=checking your payment').count()) === 1);
 
     // Delete and restore a vehicle.
     await go('#/vehicles/v1');

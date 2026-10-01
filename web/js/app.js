@@ -5,9 +5,11 @@ import { ICON } from './components.js';
 import * as db from 'pp/data';
 import { authPage, invitePage, onboarding, sessionStorageTake } from './views/auth.js';
 import { dashboard, compliance, documents } from './views/overview.js';
-import { businessList, businessDetail, vehicleList, vehicleDetail } from './views/entities.js';
+import { businessList, businessDetail, vehicleList, vehicleDetail, personList, personDetail } from './views/entities.js';
 import { render as requirementPage, forget as forgetRequirement } from './views/requirement.js';
-import { help } from './views/help.js';
+import { services, order } from './views/services.js';
+import { partners, costs, workspaces, shares } from './views/extras.js';
+import { landing } from './views/landing.js';
 import { notifications, historyPage, trashPage, team, settings } from './views/account.js';
 import { admin } from './views/admin.js';
 
@@ -17,10 +19,12 @@ let lastLoad = 0;
 let unsubscribe = null;
 
 const T = {
-  en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', compliance: 'Compliance', documents: 'Documents',
-        help: 'Get help', notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More' },
-  tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', compliance: 'Compliance', documents: 'Mga Dokumento',
-        help: 'Humingi ng Tulong', notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa' },
+  en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
+        services: 'Services', partners: 'Partners', costs: 'Costs & budget', sharing: 'Shared links', workspaces: 'All workspaces',
+        notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More' },
+  tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
+        services: 'Mga Serbisyo', partners: 'Mga Partner', costs: 'Gastos', sharing: 'Mga Ibinahaging Link', workspaces: 'Lahat ng Workspace',
+        notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa' },
 };
 const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k];
 
@@ -40,6 +44,7 @@ async function start() {
   if (!S.user) {
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (parts[0] === 'invite' && parts[1]) return invitePage(app, parts[1], false);
+    if (!parts[0] || parts[0] === 'welcome') return landing(app);
     const mode = ['signup', 'forgot'].includes(parts[0]) ? parts[0] : 'login';
     return authPage(app, mode);
   }
@@ -87,9 +92,10 @@ hooks.render = () => renderPage();
 // ---------------------------------------------------------------- shell
 const NAV = [
   ['', 'dashboard', ICON.home], ['businesses', 'businesses', ICON.building], ['vehicles', 'vehicles', ICON.car],
-  ['compliance', 'compliance', ICON.list], ['documents', 'documents', ICON.file], ['help', 'help', ICON.help],
+  ['compliance', 'compliance', ICON.list], ['people', 'people', ICON.person], ['documents', 'documents', ICON.file], ['services', 'services', ICON.briefcase],
 ];
-const MORE = [['notifications', 'notifications'], ['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings']];
+const MORE = [['notifications', 'notifications'], ['partners', 'partners'], ['costs', 'costs'], ['sharing', 'sharing'], ['workspaces', 'workspaces'],
+  ['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings']];
 
 function renderShell() {
   const name = [S.profile.first_name, S.profile.last_name].filter(Boolean).join(' ') || S.profile.email;
@@ -147,17 +153,22 @@ async function renderPage() {
   if (!main || !S.data) return;
   const { parts, params } = route();
   const [a, b] = parts;
-  document.querySelectorAll('[data-nav]').forEach((n) => n.classList.toggle('active', (n.dataset.nav || '') === (a || '')));
+  document.querySelectorAll('[data-nav]').forEach((n) => n.classList.toggle('active', (n.dataset.nav || '') === (a === 'help' ? 'services' : a || '')));
   paintBadges();
   banner();
   try {
     if (!a) dashboard(main);
     else if (a === 'businesses') b ? businessDetail(main, b) : businessList(main, params);
     else if (a === 'vehicles') b ? vehicleDetail(main, b) : vehicleList(main, params);
+    else if (a === 'people') b ? personDetail(main, b) : personList(main, params);
     else if (a === 'requirement') await requirementPage(main, b);
     else if (a === 'compliance') compliance(main, params);
     else if (a === 'documents') await documents(main);
-    else if (a === 'help') help(main, b);
+    else if (a === 'services' || a === 'help') (b === 'orders' && parts[2]) ? await order(main, parts[2]) : services(main, b && a === 'help' ? new URLSearchParams('req=' + b) : params);
+    else if (a === 'partners') await partners(main);
+    else if (a === 'costs') await costs(main);
+    else if (a === 'sharing') await shares(main);
+    else if (a === 'workspaces') await workspaces(main);
     else if (a === 'notifications') await notifications(main);
     else if (a === 'history') await historyPage(main);
     else if (a === 'trash') await trashPage(main);
@@ -174,7 +185,7 @@ async function renderPage() {
 let lastPath = '';
 window.addEventListener('hashchange', () => {
   const { parts } = route();
-  if (!S.user || !S.data || ['login', 'signup', 'forgot', 'invite', 'reset'].includes(parts[0])) return start();
+  if (!S.user || !S.data || ['login', 'signup', 'forgot', 'invite', 'reset', 'welcome'].includes(parts[0])) return start();
   const path = location.hash.split('?')[0];
   if (path !== lastPath) window.scrollTo(0, 0);
   lastPath = path;

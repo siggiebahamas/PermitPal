@@ -4,7 +4,7 @@ import {
   normalizePhone,
 } from '../util.js';
 import {
-  S, on, reload, rerender, canEdit, isOrgAdmin, isOwner, memberName, empty, effectivePlan, ROLES, ENTITY_LABELS, business, vehicle,
+  S, on, reload, rerender, canEdit, isOrgAdmin, isOwner, memberName, empty, effectivePlan, ROLES, ENTITY_LABELS, business, vehicle, person,
 } from '../core.js';
 import { avatar } from '../components.js';
 import * as db from 'pp/data';
@@ -72,7 +72,8 @@ export async function trashPage(el) {
     ${section('Businesses', 'businesses', t.businesses, (x) => x.name)}
     ${section('Branches', 'business_locations', t.locations, (x) => `${x.name} (${bizName(x.business_id)})`)}
     ${section('Vehicles', 'vehicles', t.vehicles, (x) => `${x.make_model}${x.plate_no ? ' · ' + x.plate_no : ''}`)}
-    ${section('Requirements', 'requirements', t.requirements, (x) => `${x.name} — ${x.business_id ? bizName(x.business_id) : vehicle(x.vehicle_id)?.make_model || 'a deleted vehicle'}`)}
+    ${section('People', 'people', t.people || [], (x) => `${x.full_name}${x.role ? ' · ' + x.role : ''}`)}
+    ${section('Requirements', 'requirements', t.requirements, (x) => `${x.name} — ${x.business_id ? bizName(x.business_id) : x.vehicle_id ? vehicle(x.vehicle_id)?.make_model || 'a deleted vehicle' : person(x.person_id)?.full_name || 'a deleted person'}`)}
     ${section('Records', 'requirement_cycles', t.cycles, (x) => `${x.reference_no || 'Record'}${x.expires_on ? ' · expires ' + fmtDate(x.expires_on) : ''}`)}
     ${section('Files', 'documents', t.documents, (x) => x.file_name)}`);
 }
@@ -197,6 +198,13 @@ export async function settings(el, section) {
         ${log.map((m) => html`<tr><td>${fmtDateTime(m.created_at)}</td><td>${m.channel}</td><td>${m.subject || m.body_text.slice(0, 80)}</td>
           <td><span class="tag ${m.status === 'sent' ? 'green' : m.status === 'failed' ? 'red' : ''}" title="${m.last_error || ''}">${m.status}</span></td></tr>`)}
       </tbody></table></div>` : html`<p class="muted">Nothing sent yet.</p>`}
+    </section>
+    <section class="card" id="install"><h2>Put PermitPal on your phone</h2>
+      <p class="muted small">It opens like an app, full screen, with no app store needed.</p>
+      <div class="grid2">
+        <div><b>iPhone (Safari)</b><ol class="small"><li>Open PermitPal in Safari.</li><li>Tap the Share button (square with an arrow).</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol></div>
+        <div><b>Android (Chrome)</b><ol class="small"><li>Open PermitPal in Chrome.</li><li>Tap the ⋮ menu at the top right.</li><li>Tap <b>Add to Home screen</b> or <b>Install app</b>.</li></ol></div>
+      </div>
     </section>`)}
 
     ${when(section === 'billing', html`
