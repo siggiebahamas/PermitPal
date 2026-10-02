@@ -1,7 +1,7 @@
 // PermitPal staff console: service orders (quote, payment, progress, finished permit), the service
 // catalog and prices, partners and referral commissions, payment details, workspaces and messages.
 // Only accounts with profiles.is_platform_admin can load any of this (enforced in the database).
-import { html, fmtDate, fmtDateTime, timeAgo, toast, toastError, when, peso, plural, todayPH } from '../util.js';
+import { html, fmtDate, fmtDateTime, timeAgo, toast, toastError, when, peso, plural, todayPH, confirmDialog } from '../util.js';
 import { S, on, rerender, empty } from '../core.js';
 import { ORDER_STATUS, PAYMENT_STATUS } from './services.js';
 import { PARTNER_CATEGORIES } from './extras.js';
@@ -30,7 +30,7 @@ export async function admin(el) {
     else if (tab === 'referrals') body = referralsTab(await db.adminReferrals());
     else if (tab === 'payments') body = settingsTab(await db.adminSettings());
     else if (tab === 'orgs') body = orgsTab(await db.adminOrgs());
-    else body = outboxTab(await db.adminOutbox());
+    else body = outboxTab(await db.adminOutbox(), await db.channelStatus().catch(() => ({})));
   } catch (e) { toastError(e); }
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>PermitPal admin</h1><p class="muted">Staff tools. Customers never see this page.</p></div></div>
@@ -128,10 +128,21 @@ function orderDetail(a, events) {
         <label class="field"><span>The new permit (PDF or photo)</span><input type="file" name="file" accept=".pdf,image/*"></label></div>
         <button class="btn btn-primary">Save permit & complete order</button></form></section>`)}
 
+    ${when(['paid', 'refunded'].includes(a.payment_status), html`<section class="card"><h2>Refund</h2>
+      <p class="muted small">Send the money back first (GCash or bank), then record it here. The customer sees it in their order.
+        Our promise: if we can't deliver, the service fee is refunded in full; if government fees were lower than quoted, refund the difference.</p>
+      <form class="admin-refund" data-id="${a.id}"><div class="grid2">
+        <label class="field"><span>Type</span><select name="kind"><option value="fee_difference">Government fees were lower</option><option value="partial">Partial refund</option><option value="full">Full refund (cancels the order)</option></select></label>
+        <label class="field"><span>Amount refunded (₱)</span><input name="amount" type="number" min="0.01" step="0.01" required></label>
+        <label class="field"><span>Sent by</span><input name="method" maxlength="60" placeholder="GCash / BPI"></label>
+        <label class="field"><span>Reference no.</span><input name="reference" maxlength="120"></label></div>
+        <label class="field"><span>Reason the customer will see</span><input name="reason" maxlength="500" required placeholder="e.g. The city's fee was ₱700 lower than our estimate."></label>
+        <button class="btn btn-soft">Record refund</button></form></section>`)}
+
     <section class="card"><h2>Timeline</h2><ol class="timeline">${events.map((e) => html`<li class="${e.by_staff ? 'staff' : ''}"><div class="tl-dot"></div><div class="tl-body">
       <div class="tl-head"><b>${e.by_staff ? 'PermitPal' : 'Customer'}</b><span class="muted small">${fmtDateTime(e.created_at)}</span></div>
       ${when(e.message, html`<div class="pre">${e.message}</div>`)}
-      ${when(e.file_path, html`<button class="linklike doc-file" data-act="doc-download" data-path="${e.file_path}" data-name="${e.file_name || 'file'}">${ICON.file}${e.file_name || 'file'}</button>`)}</div></li>`)}</ol></section>`;
+      ${when(e.file_path, html`<button class="linklike doc-file" data-act="staff-file" data-path="${e.file_path}" data-name="${e.file_name || 'file'}">${ICON.file}${e.file_name || 'file'}</button>`)}</div></li>`)}</ol></section>`;
 }
 on('admin-pay', async (ds) => {
   try {
@@ -217,8 +228,17 @@ function orgsTab(list) {
     </tbody></table></div></section>`;
 }
 
-function outboxTab(list) {
-  return html`<section class="card"><p class="muted small">Latest 100 messages. "Skipped" means that channel isn't connected yet.</p>
+function outboxTab(list, channels = {}) {
+  return html`<section class="card"><div class="card-head"><div><h2>Email reminders</h2>
+      <p class="card-sub">${channels.email ? 'Connected: reminders are going out.' : 'Not connected: customers only see reminders inside the app.'}</p></div>
+      <span class="chip ${channels.email ? 'ok' : 'overdue'}">${channels.email ? 'On' : 'Off'}</span></div>
+    ${when(!channels.email, html`<ol class="small setup-steps">
+      <li>Create a free account at resend.com (3,000 emails a month) and verify your domain.</li>
+      <li>Supabase → Edge Functions → Secrets: add <b>RESEND_API_KEY</b> and <b>EMAIL_FROM</b> (e.g. PermitPal &lt;reminders@yourdomain.ph&gt;).</li>
+      <li>Supabase → Authentication → Emails → SMTP: use the same Resend details so sign-up emails arrive too.</li>
+      <li>Press the button below. You should get an email within a minute.</li></ol>`)}
+    <button class="btn btn-soft btn-sm" data-act="admin-test-email">Send me a test email</button></section>
+  <section class="card"><p class="muted small">Latest 100 messages. "Skipped" means that channel isn't connected yet.</p>
     <div class="table-wrap"><table class="table"><thead><tr><th>When</th><th>Channel</th><th>To</th><th>Subject</th><th>Status</th><th>Error</th></tr></thead><tbody>
     ${list.map((m) => html`<tr><td>${fmtDateTime(m.created_at)}</td><td>${m.channel}</td><td>${m.to_address}</td><td>${m.subject || ''}</td>
       <td><span class="tag ${m.status === 'sent' ? 'green' : m.status === 'failed' ? 'red' : ''}">${m.status}${m.attempts > 1 ? ` ×${m.attempts}` : ''}</span></td><td class="small">${m.last_error || ''}</td></tr>`)}
@@ -241,6 +261,12 @@ function wire(el) {
   submit('.admin-update', async (f, fd) => {
     await db.adminUpdateOrder(order(f), { status: fd.get('status'), message: String(fd.get('message')).trim(), file: fd.get('file'), govActual: fd.get('gov'), provider: String(fd.get('provider')).trim() });
     toast('Update sent.'); rerender();
+  });
+  submit('.admin-refund', async (f, fd) => {
+    const v = Object.fromEntries(fd.entries());
+    if (v.kind === 'full' && !(await confirmDialog('Record a full refund?', 'This also cancels the order.', { confirmLabel: 'Record full refund' }))) return;
+    await db.adminRefund(f.dataset.id, v);
+    toast('Refund recorded. The customer can see it in their order.'); rerender();
   });
   submit('.admin-renewal', async (f, fd) => {
     const v = Object.fromEntries(fd.entries());
@@ -289,7 +315,15 @@ on('admin-docs', async (ds) => {
   try {
     const docs = await db.adminRequestDocs(ds.id);
     box.innerHTML = String(docs.length ? html`<div class="files">${docs.map((d) => html`<div class="file"><div class="file-main">${d.file_name}</div>
-      <button class="btn btn-sm btn-soft" data-act="doc-download" data-path="${d.storage_path}" data-name="${d.file_name}">Download</button></div>`)}</div>`
+      <button class="btn btn-sm btn-soft" data-act="staff-file" data-path="${d.storage_path}" data-name="${d.file_name}">Download</button></div>`)}</div>`
       : html`<p class="muted small">No files uploaded for this requirement.</p>`);
   } catch (e) { toastError(e); }
+});
+
+on('staff-file', async (ds) => {
+  const w = window.open('about:blank', '_blank'); // open now so pop-up blockers allow it
+  try { const url = await db.staffFileUrl(ds.path, ds.name); if (w) w.location.href = url; else location.href = url; } catch (e) { w?.close(); toastError(e); }
+});
+on('admin-test-email', async () => {
+  try { await db.adminTestEmail(); toast('Test email queued. Check your inbox, then the list below for its status.'); rerender(); } catch (e) { toastError(e); }
 });

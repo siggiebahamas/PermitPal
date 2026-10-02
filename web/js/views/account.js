@@ -153,10 +153,12 @@ export async function settings(el, section) {
   const prefs = S.prefs || {};
   let channels = {};
   let log = [];
+  let access = [];
   try {
-    [channels, log] = await Promise.all([
+    [channels, log, access] = await Promise.all([
       db.channelStatus().catch(() => ({})),
       db.myDeliveryLog(S.user.id).catch(() => []),
+      section === 'workspace' ? db.staffAccessLog(S.org.id).catch(() => []) : [],
     ]);
   } catch { /* shown as empty */ }
   const toggle = (k, label, sub = '', disabled = false) => html`<label class="toggle ${disabled ? 'disabled' : ''}"><div><div>${label}</div>${when(sub, html`<div class="muted small">${sub}</div>`)}</div>
@@ -228,6 +230,13 @@ export async function settings(el, section) {
       <div class="btn-row"><button class="btn ${p.lang === 'en' ? 'btn-primary' : 'btn-ghost'}" data-act="lang" data-lang="en">English</button>
       <button class="btn ${p.lang === 'tl' ? 'btn-primary' : 'btn-ghost'}" data-act="lang" data-lang="tl">Tagalog</button></div>
       <p class="muted small">Tagalog covers the menus for now; more screens will follow.</p>
+    </section>
+
+    <section class="card" id="staff-access"><div class="card-head"><div><h2>Who at PermitPal opened your files</h2>
+      <p class="card-sub">PermitPal staff can only open a file while you have an open service request for it, and every open is listed here. It can't be edited or erased.</p></div></div>
+      ${access.length ? access.map((x) => html`<div class="line"><span class="line-main"><b>${x.file_name}</b>
+        <small>${x.staff_name} · ${fmtDateTime(x.created_at)} · ${x.reason}</small></span></div>`)
+        : html`<p class="muted">No one at PermitPal has opened your files.</p>`}
     </section>
 
     <section class="card"><h2>Your data</h2>

@@ -189,6 +189,10 @@ export const requestService = async (f) => ok(await sb.rpc('request_service', {
   p_contact_method: f.contact_method || 'email', p_contact_value: f.contact_value || null, p_docs_status: f.docs_status || 'not_sure',
 }));
 export const cancelHelpRequest = async (id) => ok(await sb.from('assistance_requests').update({ status: 'cancelled' }).eq('id', id));
+export const orderRefunds = async (reqId) =>
+  ok(await sb.from('order_refunds').select('id, amount_php, kind, reason, method, reference, created_at').eq('request_id', reqId).order('created_at'));
+export const staffAccessLog = async (orgId) =>
+  ok(await sb.from('staff_file_access').select('id, staff_name, file_name, reason, created_at').eq('org_id', orgId).order('created_at', { ascending: false }).limit(200));
 export const getRequest = async (id) => ok(await sb.from('assistance_requests').select('*').eq('id', id).maybeSingle());
 export const orderEvents = async (reqId) =>
   ok(await sb.from('request_events').select('*').eq('request_id', reqId).order('id'));
@@ -234,7 +238,7 @@ export const requestReferral = async (f) => ok(await sb.rpc('request_referral', 
 export const myReferrals = async (orgId) =>
   ok(await sb.from('referrals').select('id, partner_id, requirement_id, note, status, created_at').eq('org_id', orgId).order('created_at', { ascending: false }));
 
-// ---------------------------------------------------------------- sharing & workspaces
+// ---------------------------------------------------------------- sharing
 export const createShare = async (f) => ok(await sb.from('compliance_shares').insert({
   org_id: f.org_id, scope: f.scope, subject_id: f.subject_id || null, label: f.label || '', show_refs: f.show_refs !== false,
   expires_at: new Date(Date.now() + Number(f.days || 30) * 864e5).toISOString(),
@@ -243,7 +247,6 @@ export const listShares = async (orgId) =>
   ok(await sb.from('compliance_shares').select('*').eq('org_id', orgId).order('created_at', { ascending: false }));
 export const revokeShare = async (id) => ok(await sb.from('compliance_shares').update({ revoked_at: new Date().toISOString() }).eq('id', id));
 export const getSharedCompliance = async (token) => ok(await sb.rpc('get_shared_compliance', { p_token: token }));
-export const myWorkspaces = async () => ok(await sb.rpc('my_workspaces'));
 
 // ---------------------------------------------------------------- notifications & delivery log
 export const listNotifications = async (limit = 100) =>
@@ -358,4 +361,18 @@ export const adminReferrals = async () =>
 export const adminSaveReferral = async (id, status) => ok(await sb.from('referrals').update({ status }).eq('id', id));
 export const adminSaveCommission = async (id, patch) => ok(await sb.from('referral_commissions').update(patch).eq('referral_id', id));
 export const adminSettings = appSettings;
+export const adminRefund = async (reqId, f) => ok(await sb.rpc('admin_refund_order', {
+  p_req: reqId, p_amount: Number(f.amount), p_kind: f.kind, p_reason: f.reason, p_method: f.method || null, p_reference: f.reference || null,
+}));
+export const adminTestEmail = async () => ok(await sb.rpc('admin_test_email'));
+// Staff open customer files through the staff-file function, which logs every open.
+export async function staffFileUrl(path, download) {
+  const { data, error } = await sb.functions.invoke('staff-file', { body: { path, download: download || null } });
+  if (error) {
+    let msg = error.message;
+    try { msg = (await error.context.json()).error || msg; } catch { /* keep default */ }
+    throw new Error(msg);
+  }
+  return data.url;
+}
 export const adminSaveSetting = async (key, value) => ok(await sb.from('app_settings').update({ value, updated_at: new Date().toISOString() }).eq('key', key));

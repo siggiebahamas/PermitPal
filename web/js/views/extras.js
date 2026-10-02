@@ -1,4 +1,4 @@
-// Smaller tools: partners & introductions, costs & yearly budget, all workspaces (for consultants),
+// Smaller tools: partners & introductions, costs & yearly budget,
 // shareable proof-of-compliance links, the inspection pack (.zip) and calendar export (.ics).
 import { html, fmtDate, fmtDateTime, peso, toast, toastError, when, plural, timeAgo, openModal, formObject, normalizePhone, todayPH, download, confirmDialog } from '../util.js';
 import { S, on, go, reload, canEdit, business, vehicle, person, reqsOf, empty } from '../core.js';
@@ -138,40 +138,10 @@ export function penaltyNote(r) {
     (a 25% surcharge plus 2% interest a month, figured on the ${peso(base)} you paid last time). This is the most the Local Government Code allows; many cities charge less.</div></div>`;
 }
 
-// ================================================================ all workspaces
-export async function workspaces(el) {
-  el.innerHTML = String(html`<div class="loading">Loading…</div>`);
-  let list = [];
-  try { list = await db.myWorkspaces(); } catch (e) { toastError(e); }
-  el.innerHTML = String(html`
-    <div class="page-head"><div><h1>All workspaces</h1><p class="muted">For accountants, consultants and owners of several companies: every workspace at a glance.</p></div>
-      <button class="btn btn-primary" data-act="ws-new">+ New workspace</button></div>
-    <div class="cards">${list.map((w) => html`<section class="card entity">
-      <div class="card-head"><div><h2>${w.name}</h2><p class="card-sub">${w.role[0].toUpperCase() + w.role.slice(1)} · ${plural(w.total, 'item')}</p>
-        <div class="chips">${[['overdue', 'overdue'], ['soon', 'renew soon', 'soon'], ['in_progress', 'in progress', 'progress'], ['needs_info', 'needs info', 'needinfo'], ['compliant', 'compliant', 'ok']]
-          .map(([k, l, cls]) => (w[k] ? html`<span class="chip ${cls || k}">${w[k]} ${l}</span>` : ''))}</div></div></div>
-      <div class="sheet-foot">${w.org_id === S.org.id ? html`<b>You're here</b>` : html`<button class="btn btn-sm btn-soft" data-act="ws-open" data-id="${w.org_id}">Open</button>`}</div>
-    </section>`)}</div>`);
-}
-on('ws-open', async (ds) => {
-  try { await db.setCurrentOrg(S.user.id, ds.id); location.hash = '#/'; location.reload(); } catch (e) { toastError(e); }
-});
-on('ws-new', () => openModal('New workspace', html`
-  <p class="muted small">Use one workspace per company or client. Each has its own businesses, team and billing.</p>
-  <label class="field"><span>Name</span><input name="name" required maxlength="120" placeholder="e.g. Dela Cruz Trading"></label>`, {
-  submitLabel: 'Create',
-  onSubmit: async (fd) => {
-    const name = String(fd.get('name') || '').trim();
-    if (!name) throw new Error('Please enter a name.');
-    const id = await db.createOrg(name);
-    await db.setCurrentOrg(S.user.id, id);
-    location.hash = '#/'; location.reload();
-  },
-}));
-
 // ================================================================ share links
 const shareUrl = (token) => `${location.origin}${location.pathname.replace(/[^/]*$/, '')}share.html#${token}`;
-on('share-open', (ds) => {
+on('share-open', (ds) => openShare(ds));
+function openShare(ds) {
   const scope = ds.scope || 'org';
   const name = scope === 'business' ? business(ds.id)?.name : scope === 'vehicle' ? vehicle(ds.id)?.make_model : scope === 'person' ? person(ds.id)?.full_name : S.org.name;
   if (!canEdit()) return toast('Ask an owner or admin to create a share link.', 'error');
@@ -184,13 +154,14 @@ on('share-open', (ds) => {
     onSubmit: async (fd) => {
       const f = formObject(fd);
       const row = await db.createShare({ org_id: S.org.id, scope, subject_id: scope === 'org' ? null : ds.id, label: f.label, days: f.days, show_refs: !!f.show_refs });
+      if (location.hash.startsWith('#/sharing')) shares(document.getElementById('main'));
       setTimeout(() => showLink(row.token), 0);
     },
   });
-});
+}
 function showLink(token) {
   const url = shareUrl(token);
-  openModal('Your link is ready', html`<p class="muted small">Send this link. It stops working when it expires or when you turn it off under Shared links.</p>
+  openModal('Your link is ready', html`<p class="muted small">Send this link. It stops working when it expires or when you turn it off under Share proof.</p>
     <div class="copy-row"><input readonly value="${url}" id="share-url"><button type="button" class="btn btn-primary btn-sm" id="share-copy">Copy</button></div>
     <p><a href="${url}" target="_blank" rel="noopener">Open it to check</a></p>`, {
     onOpen: (form) => form.querySelector('#share-copy').addEventListener('click', async () => {
@@ -199,23 +170,59 @@ function showLink(token) {
   });
 }
 
+const USES = ['Mall or landlord', 'Bank or loan', 'Franchisor', 'Corporate client accreditation', 'Government bidding', 'Insurer', 'Business partner'];
 export async function shares(el) {
   el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   let list = [];
   try { list = await db.listShares(S.org.id); } catch (e) { toastError(e); }
   const now = new Date().toISOString();
-  const what = (s) => (s.scope === 'org' ? 'Whole workspace' : s.scope === 'business' ? business(s.subject_id)?.name : s.scope === 'vehicle' ? vehicle(s.subject_id)?.make_model : person(s.subject_id)?.full_name) || 'Deleted item';
+  const what = (s) => (s.scope === 'org' ? `Everything in ${S.org.name}` : s.scope === 'business' ? business(s.subject_id)?.name : s.scope === 'vehicle' ? vehicle(s.subject_id)?.make_model : person(s.subject_id)?.full_name) || 'Deleted item';
+  const { businesses, vehicles, people } = S.data;
+  const active = list.filter((x) => !x.revoked_at && x.expires_at > now);
+  const old = list.filter((x) => !active.includes(x));
+  const row = (x) => {
+    const on_ = active.includes(x);
+    return html`<div class="line"><span class="line-main"><b>${what(x)}${x.label ? html` <span class="muted">· for ${x.label}</span>` : ''}</b>
+      <small>${on_ ? `Works until ${fmtDate(x.expires_at.slice(0, 10))}` : x.revoked_at ? 'Turned off' : 'Expired'} · opened ${plural(x.view_count, 'time')}${x.last_viewed_at ? ', last ' + timeAgo(x.last_viewed_at) : ''}</small></span>
+      ${on_ ? html`<span class="btn-row"><button class="btn btn-sm btn-primary" data-act="share-copy" data-token="${x.token}">Copy link</button>
+        <a class="btn btn-sm btn-soft" href="${shareUrl(x.token)}" target="_blank" rel="noopener">Open</a>
+        ${when(canEdit(), html`<button class="btn btn-sm btn-ghost danger" data-act="share-revoke" data-id="${x.id}">Turn off</button>`)}</span>` : html`<span class="chip needinfo">Off</span>`}</div>`;
+  };
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Shared links</h1><p class="muted">Read-only proof of compliance you've shared with landlords, malls, franchisors, banks or bid committees.</p></div>
-      <button class="btn btn-primary" data-act="share-open" data-scope="org">${ICON.share} Share whole workspace</button></div>
-    ${list.length ? html`<section class="card">${list.map((s) => {
-      const active = !s.revoked_at && s.expires_at > now;
-      return html`<div class="line"><span class="line-main"><b>${what(s)}${s.label ? ' — ' + s.label : ''}</b>
-        <small>${active ? `Works until ${fmtDate(s.expires_at.slice(0, 10))}` : s.revoked_at ? 'Turned off' : 'Expired'} · opened ${plural(s.view_count, 'time')}${s.last_viewed_at ? ', last ' + timeAgo(s.last_viewed_at) : ''}</small></span>
-        ${active ? html`<span class="btn-row"><button class="btn btn-sm btn-soft" data-act="share-copy" data-token="${s.token}">Copy link</button>
-          ${when(canEdit(), html`<button class="btn btn-sm btn-ghost danger" data-act="share-revoke" data-id="${s.id}">Turn off</button>`)}</span>` : html`<span class="chip needinfo">Off</span>`}</div>`;
-    })}</section>` : empty('No shared links yet', 'Use "Share proof" on a business, vehicle or person, or share the whole workspace.')}`);
+    <div class="page-head"><div><h1>Share proof</h1><p class="muted">Someone asking if your permits are up to date? Send them one link instead of photocopies.</p></div></div>
+
+    <section class="card proof-how">
+      <div class="card-head"><div><h2>How it works</h2><p class="card-sub">No account needed on their side</p></div></div>
+      <ol class="proof-steps">
+        <li><span>1</span><div><b>Pick what to share</b><p>Everything, or just one business, vehicle or staff member.</p></div></li>
+        <li><span>2</span><div><b>Copy the link</b><p>Send it by Viber, Messenger or email. It works for 7 days up to a year.</p></div></li>
+        <li><span>3</span><div><b>They see a live summary</b><p>Each permit, whether it's valid, and its expiry date, always up to date. Turn it off anytime.</p></div></li>
+      </ol>
+      <div class="proof-see">
+        <div class="yes"><b>${ICON.check} What they see</b><p>Permit names, status (valid, renew soon, overdue), expiry dates, and reference numbers if you allow it.</p></div>
+        <div class="no"><b>✕ What they never see</b><p>Your files, notes, costs, team, contact details, or anything you didn't pick.</p></div>
+      </div>
+      <p class="proof-uses"><span class="muted small">Often asked for by:</span> ${USES.map((u) => html`<span class="tag">${u}</span>`)}</p>
+    </section>
+
+    ${when(canEdit(), html`<section class="card proof-make">
+      <div class="card-head"><div><h2>Create a link</h2></div></div>
+      <div class="proof-pick"><select id="proof-what">
+        <option value="org:">Everything in ${S.org.name}</option>
+        ${when(businesses.length, html`<optgroup label="One business">${businesses.map((b) => html`<option value="business:${b.id}">${b.name}</option>`)}</optgroup>`)}
+        ${when(vehicles.length, html`<optgroup label="One vehicle">${vehicles.map((v) => html`<option value="vehicle:${v.id}">${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}</option>`)}</optgroup>`)}
+        ${when(people.length, html`<optgroup label="One staff member">${people.map((x) => html`<option value="person:${x.id}">${x.full_name}</option>`)}</optgroup>`)}
+      </select><button class="btn btn-primary" data-act="share-pick">${ICON.share} Create link</button></div>
+    </section>`)}
+
+    <section class="card"><div class="card-head"><div><h2>Your links</h2><p class="card-sub">${plural(active.length, 'link')} working now</p></div></div>
+      ${list.length ? html`${active.map(row)}${old.map(row)}` : html`<p class="muted">No links yet. Create one above.</p>`}
+    </section>`);
 }
+on('share-pick', () => {
+  const [scope, id] = document.getElementById('proof-what').value.split(':');
+  openShare({ scope, id });
+});
 on('share-copy', async (ds) => { try { await navigator.clipboard.writeText(shareUrl(ds.token)); toast('Copied.'); } catch { showLink(ds.token); } });
 on('share-revoke', async (ds) => {
   if (!(await confirmDialog('Turn off this link?', 'Anyone who has it will no longer be able to open it.', { confirmLabel: 'Turn off' }))) return;

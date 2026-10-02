@@ -45,7 +45,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: BIR COR (never recorded) is NOT shown as compliant`,
     (await page.locator('.row.needinfo', { hasText: 'BIR Certificate' }).count()) > 0);
 
-  for (const h of ['#/businesses', '#/businesses/b1', '#/vehicles', '#/vehicles/v1', '#/compliance', '#/documents', '#/help', '#/services', '#/people', '#/partners', '#/costs', '#/sharing', '#/workspaces', '#/notifications', '#/history', '#/trash', '#/team', '#/settings', '#/settings/billing', '#/settings/workspace', '#/admin']) {
+  for (const h of ['#/businesses', '#/businesses/b1', '#/vehicles', '#/vehicles/v1', '#/compliance', '#/documents', '#/help', '#/services', '#/people', '#/partners', '#/costs', '#/sharing', '#/notifications', '#/history', '#/trash', '#/team', '#/settings', '#/settings/billing', '#/settings/workspace', '#/admin']) {
     await go(h);
     await page.waitForSelector('main h1', { timeout: 5000 }).catch(() => {});
     const t = await page.textContent('main').catch(() => '');
@@ -112,6 +112,39 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('.pay-form button[type=submit]');
     await page.waitForTimeout(400);
     check('payment goes to checking', (await page.locator('text=checking your payment').count()) === 1);
+
+    // Import vehicles from a CSV: good rows go in, bad rows are shown and skipped.
+    await go('#/vehicles');
+    await page.click('[data-act=veh-import]');
+    await page.setInputFiles('#imp-file', { name: 'fleet.csv', mimeType: 'text/csv', buffer: Buffer.from(
+      'Make and model,Plate number,Type,Registration expires,CTPL expires\n"Mitsubishi L300, FB",ABC 1234,Van,3/10/2027,2027-03-10\nHonda Beat,XYZ 99,Spaceship,,\nIsuzu Elf,NGV 5588,Van,2027-01-05,\n') });
+    await page.waitForSelector('.import-sum');
+    check('import preview: 1 ready, 2 skipped', (await page.textContent('.import-sum')).includes('1 vehicle ready') && (await page.locator('tr.imp-bad').count()) === 2);
+    check('import reads month-first dates', (await page.textContent('#imp-preview tbody tr:first-child')).includes('Mar 10, 2027'));
+    await page.click('.modal button[type=submit]');
+    await page.waitForSelector('.modal', { state: 'detached' });
+    check('imported vehicle appears', (await page.locator('.entity', { hasText: 'Mitsubishi L300, FB' }).count()) === 1);
+
+    // Share proof page creates a link and lists it.
+    await go('#/sharing');
+    await page.click('[data-act=share-pick]');
+    await page.click('.modal button[type=submit]');
+    await page.waitForSelector('#share-url');
+    await page.click('[data-modal-close]');
+    check('share proof link listed', (await page.locator('main [data-act=share-copy]').count()) === 1);
+
+    // Staff opening a customer file is logged where the customer can see it.
+    await go('#/admin');
+    await page.waitForTimeout(300);
+    if (await page.locator('[data-act=admin-order]:has-text("CTPL")').count()) await page.click('[data-act=admin-order]:has-text("CTPL")');
+    await page.click('[data-act=admin-pay][data-ok="1"]');
+    await page.waitForTimeout(300);
+    await page.fill('.admin-refund [name=amount]', '100');
+    await page.fill('.admin-refund [name=reason]', 'Insurer charged less than quoted');
+    await page.click('.admin-refund button');
+    await page.waitForTimeout(300);
+    await go(orderHash);
+    check('customer sees the refund', (await page.textContent('main .kv')).includes('Insurer charged less'));
 
     // Delete and restore a vehicle.
     await go('#/vehicles/v1');

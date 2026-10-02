@@ -279,9 +279,10 @@ export function vehicleList(el, params) {
   const list = S.data.vehicles;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Vehicles</h1><p class="muted">LTO registration, CTPL, emission and inspection for every vehicle.</p></div>
-      ${when(canEdit(), html`<button class="btn btn-primary" data-act="veh-add">+ Add vehicle</button>`)}</div>
+      ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-ghost" data-act="veh-import">${ICON.upload} Import from spreadsheet</button>
+        <button class="btn btn-primary" data-act="veh-add">+ Add vehicle</button></div>`)}</div>
     ${list.length ? html`${timeline('vehicle', list)}<h3 class="section-label">Your vehicles</h3><div class="cards">${list.map(entityCard('vehicle'))}</div>`
-      : empty('No vehicles yet', "Add one and we'll track its registration and insurance.", when(canEdit(), html`<button class="btn btn-primary" data-act="veh-add">Add a vehicle</button>`))}`);
+      : empty('No vehicles yet', "Add one and we'll track its registration and insurance. Have a fleet? Import them all from a spreadsheet.", when(canEdit(), html`<div class="btn-row"><button class="btn btn-primary" data-act="veh-add">Add a vehicle</button><button class="btn btn-ghost" data-act="veh-import">Import from spreadsheet</button></div>`))}`);
   if (params.get('add') && canEdit()) { history.replaceState(null, '', '#/vehicles'); addVehicle(); }
 }
 
@@ -460,11 +461,13 @@ function addPerson() {
     </div>
     <h4>Which licences should we track?</h4>
     ${types.map((t) => html`<label class="check"><input type="checkbox" name="types" value="${t.code}"> ${t.name} <small class="muted">· ${t.agency}</small></label>`)}
-    <p class="muted small">You'll enter each expiry date from the card itself. You can add more later.</p>`, {
+    <p class="muted small">You'll enter each expiry date from the card itself. You can add more later.</p>
+    <label class="check"><input type="checkbox" name="consent" required> This person knows we'll keep their licence details in PermitPal to track renewals.</label>`, {
     submitLabel: 'Add person',
     onSubmit: async (fd) => {
       const f = formObject(fd);
       if (!f.full_name) throw new Error('Please enter the name.');
+      if (!f.consent) throw new Error("Please confirm this person knows we'll keep their licence details. Licence numbers are protected personal information.");
       const id = await db.createPerson(S.org.id, { ...f, types: fd.getAll('types') });
       await reload();
       go(`#/people/${id}`);

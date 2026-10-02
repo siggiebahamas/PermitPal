@@ -153,8 +153,8 @@ export async function createVehicle(orgId, f) {
   const id = uid();
   db.vehicles.push({ id, org_id: orgId, make_model: f.make_model, plate_no: (f.plate_no || '').toUpperCase(), vehicle_type: f.vehicle_type, cr_no: f.cr_no || '', mv_file_no: '', business_id: null, deleted_at: null });
   const reg = addReq('vehicle', id, null, types[3], f.registration_expires ? { reference_no: f.or_no, expires_on: f.registration_expires } : null);
-  const ctpl = addReq('vehicle', id, null, types[4]);
-  return { vehicle_id: id, registration: { requirement_id: reg.id, cycle_id: db.cycles.find((c) => c.requirement_id === reg.id)?.id || null }, ctpl: { requirement_id: ctpl.id, cycle_id: null } };
+  const ctpl = addReq('vehicle', id, null, types[4], f.ctpl_expires ? { reference_no: f.ctpl_policy_no, issuer: f.ctpl_provider, expires_on: f.ctpl_expires } : null);
+  return { vehicle_id: id, registration: { requirement_id: reg.id, cycle_id: db.cycles.find((c) => c.requirement_id === reg.id)?.id || null }, ctpl: { requirement_id: ctpl.id, cycle_id: db.cycles.find((c) => c.requirement_id === ctpl.id)?.id || null } };
 }
 export const updateVehicle = async (id, patch) => Object.assign(db.vehicles.find((v) => v.id === id), patch);
 const tableOf = { people: 'people', businesses: 'businesses', business_locations: 'locations', vehicles: 'vehicles', requirements: 'requirements', requirement_cycles: 'cycles', documents: 'documents' };
@@ -259,6 +259,8 @@ export async function requestService(f) {
   event(a, 'created', a.notes || 'Request sent');
   return a.id;
 }
+export const orderRefunds = async (id) => db.refunds.filter((r) => r.request_id === id);
+export const staffAccessLog = async () => db.access;
 export const getRequest = async (id) => { const a = db.requests.find((x) => x.id === id); return a ? { ...a } : null; };
 export const orderEvents = async (id) => db.events.filter((e) => e.request_id === id);
 export async function acceptQuote(id) {
@@ -298,11 +300,6 @@ export const revokeShare = async (id) => { db.shares.find((x) => x.id === id).re
 export async function getSharedCompliance() {
   return { org_name: org.name, label: '', as_of: today(), generated_at: now(), expires_at: addDays(30), items: statusRows().map((r) => ({ ...r, on_file: r.document_count > 0 })) };
 }
-export async function myWorkspaces() {
-  const rows = statusRows();
-  const n = (s) => rows.filter((r) => r.status === s).length;
-  return [{ org_id: org.id, name: org.name, role: 'owner', total: rows.length, overdue: n('action_required'), soon: n('renew_soon'), in_progress: n('in_progress'), needs_info: n('needs_information'), compliant: n('compliant') }];
-}
 
 // ---------------------------------------------------------------- admin console
 export async function adminQuote(id, fee, gov, note) {
@@ -337,6 +334,20 @@ export const adminReferrals = async () => db.referrals.map((r) => ({ ...r, orgs:
 export const adminSaveReferral = async (id, status) => { db.referrals.find((r) => r.id === id).status = status; };
 export const adminSaveCommission = async (id, patch) => { const r = db.referrals.find((x) => x.id === id); r.commission = { ...(r.commission || {}), ...patch }; };
 export const adminSettings = appSettings;
+db.refunds = []; db.access = [];
+export async function adminRefund(id, f) {
+  const a = db.requests.find((x) => x.id === id);
+  if (!['paid', 'refunded'].includes(a.payment_status)) throw new Error('Nothing was paid on this order.');
+  db.refunds.push({ id: uid(), request_id: id, amount_php: Number(f.amount), kind: f.kind, reason: f.reason, method: f.method, reference: f.reference, created_at: now() });
+  if (f.kind === 'full') Object.assign(a, { payment_status: 'refunded', status: a.status === 'completed' ? a.status : 'cancelled' });
+  event(a, 'payment', `Refund sent: ₱${f.amount}. ${f.reason}`, true);
+}
+export const adminTestEmail = async () => { throw new Error('Email is not connected yet. Add RESEND_API_KEY and EMAIL_FROM first.'); };
+export async function staffFileUrl(path) {
+  const d = db.documents.find((x) => x.storage_path === path);
+  db.access.unshift({ id: uid(), staff_name: 'Sadie Luna', file_name: d?.file_name || path.split('/').pop(), reason: 'Request: sample', created_at: now() });
+  return 'data:application/pdf;base64,JVBERi0=';
+}
 export const adminSaveSetting = async (key, value) => { settings[key] = value; };
 
 // ---------------------------------------------------------------- sample partners and orders

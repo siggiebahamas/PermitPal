@@ -55,3 +55,20 @@ test('CSV export quoting and date helpers', () => {
   assert.equal(addDays('2026-12-31', 1), '2027-01-01');
   assert.equal(daysBetween('2026-09-29', '2026-10-29'), 30);
 });
+
+import { parseCsv, parseDate } from '../web/js/csv.js';
+test('CSV: quotes, commas inside quotes, CRLF, semicolons, BOM', () => {
+  assert.deepEqual(parseCsv('﻿a,b\r\n"Hilux, 4x4","say ""hi"""\r\n'), [['a', 'b'], ['Hilux, 4x4', 'say "hi"']]);
+  assert.deepEqual(parseCsv('a;b\n1;2\n\n'), [['a', 'b'], ['1', '2']]);
+  assert.deepEqual(parseCsv('a,b\n"line\nbreak",x'), [['a', 'b'], ['line\nbreak', 'x']]);
+});
+test('dates people type into spreadsheets', () => {
+  assert.equal(parseDate('2027-03-10').value, '2027-03-10');
+  assert.equal(parseDate('3/10/2027').value, '2027-03-10');      // Excel PH: month first
+  assert.equal(parseDate('25/3/2027').value, '2027-03-25');      // first number can only be a day
+  assert.equal(parseDate('Mar 10, 2027').value, '2027-03-10');
+  assert.equal(parseDate('10 March 2027').value, '2027-03-10');
+  assert.equal(parseDate('').value, null);
+  assert.ok(parseDate('2/30/2027').error);                        // no Feb 30
+  assert.ok(parseDate('next week').error);
+});

@@ -12,7 +12,6 @@ const FEATURES = [
   [ICON.share, 'Proof in one link', 'Send a read-only compliance summary to a landlord, mall, franchisor or bank. Turn it off anytime.'],
   [ICON.download, 'Inspection-ready', 'Download every current document in one zip, with a summary page, when an inspector walks in.'],
   [ICON.peso, 'Know what January will cost', 'Track what each renewal cost and see what is coming month by month.'],
-  [ICON.grid, 'For accountants and consultants', 'Run a workspace per client and see all of them at a glance.'],
 ];
 
 export async function landing(app) {
@@ -48,8 +47,9 @@ export async function landing(app) {
           <p class="svc-sum">${s.summary}</p></section>`)}</div>`)}
 
       <section class="card lp-trust">
-        <div><b>Private by default</b><p>Only your team can see your workspace. PermitPal staff see a permit's files only while you have an open request for it.</p></div>
+        <div><b>Private by default</b><p>Only your team can see your workspace. PermitPal staff can open a permit's files only while you have an open request for it, and you can see every time they did.</p></div>
         <div><b>Nothing gets lost</b><p>Deleted items go to Trash, every change is logged, and an encrypted backup runs every night.</p></div>
+        <div><b>Money back if we can't deliver</b><p>If we can't get it done, the service fee comes back to you in full. Lower government fees? We refund the difference.</p></div>
         <div><b>No fixers</b><p>We work with your written authorization and pay only official fees, with receipts. We never pay anyone to speed things up.</p></div>
       </section>
 

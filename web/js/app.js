@@ -8,7 +8,8 @@ import { dashboard, compliance, documents } from './views/overview.js';
 import { businessList, businessDetail, vehicleList, vehicleDetail, personList, personDetail } from './views/entities.js';
 import { render as requirementPage, forget as forgetRequirement } from './views/requirement.js';
 import { services, order } from './views/services.js';
-import { partners, costs, workspaces, shares } from './views/extras.js';
+import { partners, costs, shares } from './views/extras.js';
+import './views/import.js';
 import { landing } from './views/landing.js';
 import { notifications, historyPage, trashPage, team, settings } from './views/account.js';
 import { admin } from './views/admin.js';
@@ -20,10 +21,10 @@ let unsubscribe = null;
 
 const T = {
   en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
-        services: 'Services', partners: 'Partners', costs: 'Costs & budget', sharing: 'Shared links', workspaces: 'All workspaces',
+        services: 'Services', partners: 'Partners', costs: 'Costs & budget', sharing: 'Share proof',
         notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More' },
   tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
-        services: 'Mga Serbisyo', partners: 'Mga Partner', costs: 'Gastos', sharing: 'Mga Ibinahaging Link', workspaces: 'Lahat ng Workspace',
+        services: 'Mga Serbisyo', partners: 'Mga Partner', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
         notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa' },
 };
 const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k];
@@ -94,7 +95,7 @@ const NAV = [
   ['', 'dashboard', ICON.home], ['businesses', 'businesses', ICON.building], ['vehicles', 'vehicles', ICON.car],
   ['compliance', 'compliance', ICON.list], ['people', 'people', ICON.person], ['documents', 'documents', ICON.file], ['services', 'services', ICON.briefcase],
 ];
-const MORE = [['notifications', 'notifications'], ['partners', 'partners'], ['costs', 'costs'], ['sharing', 'sharing'], ['workspaces', 'workspaces'],
+const MORE = [['notifications', 'notifications'], ['partners', 'partners'], ['costs', 'costs'], ['sharing', 'sharing'],
   ['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings']];
 
 function renderShell() {
@@ -168,7 +169,6 @@ async function renderPage() {
     else if (a === 'partners') await partners(main);
     else if (a === 'costs') await costs(main);
     else if (a === 'sharing') await shares(main);
-    else if (a === 'workspaces') await workspaces(main);
     else if (a === 'notifications') await notifications(main);
     else if (a === 'history') await historyPage(main);
     else if (a === 'trash') await trashPage(main);

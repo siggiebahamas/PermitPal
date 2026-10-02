@@ -32,6 +32,7 @@ const PROMISES = [
   ['Government fees at cost', 'You pay the agency\'s fees exactly as charged, with official receipts uploaded here.'],
   ['Track every step', 'Every update, message and receipt is in your request timeline.'],
   ['Saved for you', 'When it\'s done, the new permit is saved to your account and your reminders reset.'],
+  ['Money back if we can\'t deliver', 'If we can\'t get it done, you get the service fee back in full. If government fees come in lower than quoted, we refund the difference.'],
 ];
 let settingsCache = null;
 const settings = async () => (settingsCache ||= await db.appSettings().catch(() => ({})));
@@ -170,8 +171,8 @@ export async function order(el, id) {
   if (!location.hash.includes(id)) return;
   if (!a) { el.innerHTML = String(empty('Request not found', 'It may belong to another workspace.', html`<a class="btn btn-primary" href="#/services">Back to services</a>`)); return; }
   el.innerHTML = String(html`<div class="loading">Loading…</div>`);
-  let ev = [], st = {};
-  try { [ev, st] = await Promise.all([db.orderEvents(id), settings()]); } catch (e) { toastError(e); }
+  let ev = [], st = {}, refunds = [];
+  try { [ev, st, refunds] = await Promise.all([db.orderEvents(id), settings(), db.orderRefunds(id).catch(() => [])]); } catch (e) { toastError(e); }
   if (!location.hash.includes(id)) return;
   events = ev;
   const [label, cls] = ORDER_STATUS[a.status] || [a.status, 'needinfo'];
@@ -204,6 +205,7 @@ export async function order(el, id) {
         <dt>Quote</dt><dd>${a.quote_php != null ? html`${peso(a.quote_php)} <span class="muted small">(service ${peso(a.quote_service_fee)} + government fees ${peso(a.quote_gov_fees)})</span>` : 'Being prepared'}</dd>
         <dt>Payment</dt><dd>${PAYMENT_STATUS[a.payment_status] || a.payment_status}${a.paid_at ? ' · ' + fmtDate(a.paid_at.slice(0, 10)) : ''}</dd>
         ${when(a.gov_fees_actual != null, html`<dt>Government fees paid</dt><dd>${peso(a.gov_fees_actual)}</dd>`)}
+        ${refunds.map((x) => html`<dt>Refunded</dt><dd><b>${peso(x.amount_php)}</b> <span class="muted small">${fmtDate(x.created_at.slice(0, 10))} · ${x.reason}${x.reference ? ' · ref ' + x.reference : ''}</span></dd>`)}
         <dt>Sent</dt><dd>${fmtDateTime(a.created_at)}</dd>
       </dl>
     </section>
@@ -221,7 +223,8 @@ export async function order(el, id) {
     </section>
 
     ${when(!closed && canEdit() && !['paid', 'waived'].includes(a.payment_status), html`<div class="danger-zone"><button class="btn btn-ghost danger" data-act="order-cancel" data-id="${a.id}">Cancel this request</button>
-      <span class="muted small">Nothing has been charged.</span></div>`)}`);
+      <span class="muted small">Nothing has been charged.</span></div>`)}
+    ${when(!closed && ['paid', 'waived'].includes(a.payment_status), html`<p class="fineprint">Need to stop this order? Send us a message above. If we haven't filed anything yet, you get the service fee back. If we can't deliver, you get it back in full.</p>`)}`);
 
   el.querySelector('.msg-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -251,7 +254,7 @@ function quoteBox(a) {
     ${when(a.quote_note, html`<p class="quote-note pre">${a.quote_note}</p>`)}
     ${when(canEdit(), html`<div class="btn-row qbtns"><button class="btn btn-primary" data-act="quote-accept" data-id="${a.id}">Accept quote</button>
       <button class="btn btn-ghost" data-act="order-cancel" data-id="${a.id}">No thanks</button></div>`)}
-    <div class="sheet-foot">If the government fees end up lower, we refund the difference. If they are higher, we ask you before paying.</div>
+    <div class="sheet-foot">If the government fees end up lower, we refund the difference. If they are higher, we ask you before paying. If we can't deliver, the service fee is refunded in full.</div>
   </section>`;
 }
 

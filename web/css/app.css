@@ -526,4 +526,29 @@ iframe.preview { height: 70vh; }
 .section-sub.svc-cat-sub { font-size: 15px; color: var(--text); margin: 0 0 14px; }
 .svc-sum, .svc-inc { color: #161A22; font-weight: 500; }
 /* costs: month bands easy to spot */
-.band.month { font-size: 13.5px; color: var(--heading); }
+.band.month { font-size: 16px; color: var(--heading); }
+
+/* share proof page */
+.proof-steps { list-style: none; margin: 0 0 14px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.proof-steps li { display: flex; gap: 10px; }
+.proof-steps li > span { width: 30px; height: 30px; border-radius: 50%; background: #1B4DB5; color: #fff; display: grid; place-items: center; font-weight: 800; flex: none; }
+.proof-steps p, .proof-see p { margin: 2px 0 0; font-size: 14px; color: var(--text); }
+.proof-see { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.proof-see > div { border-radius: 12px; padding: 12px 14px; }
+.proof-see .yes { background: var(--s-ok-bg); } .proof-see .yes b { color: var(--s-ok); }
+.proof-see .no { background: var(--s-over-bg); } .proof-see .no b { color: var(--s-over); }
+.proof-see b { display: flex; align-items: center; gap: 6px; }
+.proof-see svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.6; }
+.proof-uses { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; }
+.proof-pick { display: flex; gap: 10px; flex-wrap: wrap; }
+.proof-pick select { flex: 1 1 260px; min-width: 0; }
+
+/* vehicle import */
+.import-steps { padding-left: 20px; margin: 0 0 12px; }
+.import-steps li { margin-bottom: 10px; }
+.import-steps li > b { margin-right: 8px; }
+.import-steps .muted { display: block; }
+.import-sum { margin: 8px 0 4px; }
+tr.imp-bad td { background: var(--s-over-bg); }
+.setup-steps { padding-left: 20px; }
+.proof-uses .tag { text-transform: none; font-size: 12px; }

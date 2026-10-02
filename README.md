@@ -46,7 +46,8 @@ The database decides status in one place (`requirement_status`), using Philippin
 6. **Legal:** have a lawyer review `web/privacy.html` and `web/terms.html`.
 7. **Getting paid for services:** in the app, Admin → Payment details: fill in your GCash and bank details. Customers see these after accepting a quote.
 8. **Online card/GCash checkout (optional):** add the Edge Function secrets `PAYMONGO_SECRET_KEY` and `APP_URL`, then set *online_payments* to `on` in Admin → Payment details.
-9. **Prices and partners:** review every price in Admin → Services & prices, and add your real partners (insurers, pest control, clinics) with their commission terms in Admin → Partners. The two sample partners exist only in the demo.
+9. **Data Privacy Act:** you are the Data Protection Officer until you name someone else. Set up a dedicated privacy email and add it to `web/privacy.html`. Registering with the National Privacy Commission becomes required once you hold sensitive data (like staff licence numbers) on 1,000 or more people, or have 250+ employees.
+10. **Prices and partners:** review every price in Admin → Services & prices, and add your real partners (insurers, pest control, clinics) with their commission terms in Admin → Partners. The two sample partners exist only in the demo.
 
 ## Running tests
 
