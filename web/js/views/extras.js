@@ -117,7 +117,7 @@ export async function costs(el) {
     </div>
     ${rows.length ? html`<section class="card">
       <div class="card-head"><div><h2>Coming up</h2><p class="card-sub">Estimates use the amount you entered for each permit's current record</p></div></div>
-      ${rows.map((m) => html`<div class="band ${m.key === 'late' ? 'overdue' : ''}"><span>${m.label}</span><span>${peso(known(m.items))}${unknown(m.items) ? ` + ${unknown(m.items)} unknown` : ''}</span></div>
+      ${rows.map((m) => html`<div class="band month ${m.key === 'late' ? 'overdue' : ''}"><span>${m.label}</span><span>${peso(known(m.items))}${unknown(m.items) ? ` + ${unknown(m.items)} unknown` : ''}</span></div>
         ${m.items.sort(byPriority).map((r) => html`<a class="line" href="#/requirement/${r.id}"><span class="line-main"><b>${r.name}</b><small>${subjectLabel(r)} · ${dueShort(r)}</small></span>
           ${r.amount_paid != null ? html`<b>${peso(r.amount_paid)}</b>` : html`<span class="chip needinfo">Add amount</span>`}</a>`)}`)}
       <div class="sheet-foot">Add "Amount paid" when you record or renew a permit to make this more accurate.</div>

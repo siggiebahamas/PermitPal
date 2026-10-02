@@ -56,7 +56,7 @@ export function services(el, params) {
 
     ${CATEGORIES.map(([cat, title, sub]) => {
       const list = svc.filter((s) => s.category === cat);
-      return list.length ? html`<h3 class="section-label">${title}</h3><p class="muted small section-sub">${sub}</p>
+      return list.length ? html`<h3 class="section-label svc-cat">${title}</h3><p class="section-sub svc-cat-sub">${sub}</p>
         <div class="svc-grid">${list.map(serviceCard)}</div>` : '';
     })}
     <p class="muted small fineprint">Prices are starting points: your quote depends on your city, the permit and how urgent it is. Government fees are passed on at cost.
