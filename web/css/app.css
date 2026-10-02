@@ -522,8 +522,8 @@ iframe.preview { height: 70vh; }
 .lp-foot { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); padding-top: 18px; border-top: 1px solid var(--border); }
 
 /* services: category headers that stand out, easier-to-read card text */
-.section-label.svc-cat { font-size: 19px; color: var(--heading); margin: 30px 0 6px; }
-.section-sub.svc-cat-sub { font-size: 15px; color: var(--text); margin: 0 0 14px; }
+.section-label.svc-cat { font-size: 19px; color: #1F6F5C; margin: 30px 0 6px; }
+.section-sub.svc-cat-sub { font-size: 15px; color: #1F6F5C; margin: 0 0 14px; }
 .svc-sum, .svc-inc { color: #161A22; font-weight: 500; }
 /* costs: month bands easy to spot */
 .band.month { font-size: 16px; color: var(--heading); }
