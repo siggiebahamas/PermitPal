@@ -18,7 +18,7 @@
   --gray: #8B95A7; --gray-ink: #5F6B7E;
   /* soft status set: pale tint (bg), deeper text (ink), mid tone (strips, meters) */
   --s-over-bg: #FCECEC; --s-over: #B8403F; --s-over-mid: #EFA3A2;
-  --s-soon-bg: #FFF5C4; --s-soon: #B08D00; --s-soon-mid: #F5D547; --s-soon-on: var(--s-soon); --s-soon-text: #F5D547;
+  --s-soon-bg: #FFF5C4; --s-soon: #B08D00; --s-soon-mid: #F5D547; --s-soon-on: var(--s-soon);
   --s-prog-bg: #EAF0FC; --s-prog: #3461BD; --s-prog-mid: #9DB8EE;
   --s-info-bg: #F1EFEB; --s-info: #5E6573; --s-info-mid: #C5C8CF;
   --s-ok-bg: #E8F4EC; --s-ok: #2A7650; --s-ok-mid: #98CFAF;
@@ -196,7 +196,7 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .stat-n small { font-size: 16px; color: var(--muted); font-family: var(--font); }
 .stat-l { font-size: 13px; color: var(--heading); font-weight: 700; margin-top: 6px; }
 .stat.overdue { border-top-color: var(--s-over-mid); } .stat.overdue .stat-n { color: var(--s-over); }
-.stat.soon { border-top-color: var(--s-soon-mid); } .stat.soon .stat-n { color: var(--s-soon-text); }
+.stat.soon { border-top-color: var(--s-soon-mid); } .stat.soon .stat-n { color: var(--s-soon); }
 .stat.progress { border-top-color: var(--s-prog-mid); } .stat.progress .stat-n { color: var(--s-prog); }
 .stat.ok { border-top-color: var(--s-ok-mid); } .stat.ok .stat-n { color: var(--s-ok); }
 .stats .stat:last-child:nth-child(odd) { grid-column: span 2; }
@@ -263,7 +263,7 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .row .row-side .btn { width: 100%; }
 .row .row-side .ok-mark { justify-self: center; }
 .due { font-weight: 700; }
-.due.overdue { color: var(--s-over); } .due.soon { color: var(--s-soon-text); } .due.progress { color: var(--s-prog); } .due.needinfo { color: var(--s-info); } .due.ok { color: var(--s-ok); }
+.due.overdue { color: var(--s-over); } .due.soon { color: var(--s-soon); } .due.progress { color: var(--s-prog); } .due.needinfo { color: var(--s-info); } .due.ok { color: var(--s-ok); }
 .dtile { width: 56px; flex-shrink: 0; text-align: center; border-radius: 12px; padding: 6px 0 5px; line-height: 1.05; background: var(--s-info-bg); color: var(--s-info); }
 .dtile small { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; white-space: nowrap; text-transform: uppercase; opacity: .85; }
 .dtile b { display: block; font-size: 20px; font-weight: 800; }
@@ -527,6 +527,7 @@ iframe.preview { height: 70vh; }
 .svc-sum, .svc-inc { color: #161A22; font-weight: 500; }
 /* costs: month bands easy to spot */
 .band.month { font-size: 16px; color: var(--heading); }
+.band.month:not(.overdue) { background: #1F2A44; color: #fff; }
 
 /* share proof page */
 .proof-steps { list-style: none; margin: 0 0 14px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
