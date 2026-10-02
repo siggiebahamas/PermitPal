@@ -9,30 +9,6 @@ import {
 import { avatar } from '../components.js';
 import * as db from 'pp/data';
 
-// ================================================================ notifications
-export async function notifications(el) {
-  el.innerHTML = String(html`<div class="loading">Loading…</div>`);
-  let list = [];
-  try { list = await db.listNotifications(); } catch (e) { toastError(e); }
-  el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Notifications</h1><p class="muted">Reminders and updates. Emails and texts follow your settings.</p></div>
-      <div class="btn-row"><button class="btn btn-ghost btn-sm" data-act="notif-all-read">Mark all read</button>
-      <button class="btn btn-ghost btn-sm" data-act="notif-clear">Clear all</button></div></div>
-    ${list.length ? html`<div class="list">${list.map((n) => html`
-      <div class="notif ${n.read_at ? '' : 'unread'} ${n.kind}">
-        <a class="row-main" href="${n.link || '#/'}" data-act="notif-open" data-id="${n.id}">
-          <div class="row-title">${n.title}</div><div class="row-sub">${n.body || ''}</div><div class="muted small">${timeAgo(n.created_at)}</div></a>
-        <button class="icon-btn" data-act="notif-delete" data-id="${n.id}" aria-label="Delete">✕</button>
-      </div>`)}</div>` : empty("You're all caught up", "We'll let you know here, and by email, when something needs attention.")}`);
-}
-on('notif-open', async (ds) => { try { await db.markRead([ds.id]); S.unread = Math.max(0, S.unread - 1); } catch { /* not critical */ } });
-on('notif-delete', async (ds) => { try { await db.deleteNotification(ds.id); rerender(); } catch (e) { toastError(e); } });
-on('notif-all-read', async () => { try { await db.markAllRead(); S.unread = 0; rerender(); } catch (e) { toastError(e); } });
-on('notif-clear', async () => {
-  if (!(await confirmDialog('Clear all notifications?', 'This only clears the list here. Your records are not affected.', { confirmLabel: 'Clear' }))) return;
-  try { await db.clearNotifications(S.user.id); S.unread = 0; rerender(); } catch (e) { toastError(e); }
-});
-
 // ================================================================ history
 let histEntity = '';
 export async function historyPage(el) {

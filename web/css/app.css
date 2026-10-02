@@ -107,7 +107,7 @@ main { padding: 16px 16px 96px; max-width: 1080px; margin: 0 auto; outline: none
 .tabbar a, .tabbar button { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; color: var(--muted);
   background: none; border: 0; padding: 6px 0; font-family: inherit; position: relative; cursor: pointer; }
 .tabbar .active { color: var(--accent-ink); font-weight: 700; }
-.badge { background: var(--red); color: #fff; border-radius: 999px; font-size: 10px; padding: 1px 5px; min-width: 16px; text-align: center; line-height: 14px; }
+.badge { background: #3461BD; color: #fff; border-radius: 999px; font-size: 10px; padding: 1px 5px; min-width: 16px; text-align: center; line-height: 14px; }
 .bell .badge, .tabbar .badge { position: absolute; top: 0; right: 4px; }
 .tabbar .badge { right: calc(50% - 20px); }
 .more-menu { display: flex; flex-direction: column; }
@@ -351,8 +351,6 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .folder summary .muted { margin-left: auto; font-weight: 500; }
 .doc-file { display: flex; gap: 6px; align-items: center; font-size: 13.5px; margin-top: 4px; }
 .doc-file svg { width: 15px; height: 15px; color: var(--accent-ink); }
-.notif.unread { background: var(--hover); }
-.notif.unread .row-title::before { content: "● "; color: var(--accent); }
 .request .note { background: var(--gray-bg); border-radius: 8px; padding: 8px 10px; margin-top: 6px; font-size: 14px; }
 .member { display: flex; gap: 10px; align-items: center; }
 .avatar { border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; object-fit: cover; flex-shrink: 0; }
@@ -553,3 +551,56 @@ iframe.preview { height: 70vh; }
 tr.imp-bad td { background: var(--s-over-bg); }
 .setup-steps { padding-left: 20px; }
 .proof-uses .tag { text-transform: none; font-size: 12px; }
+
+/* ================================================================ notifications page: grouped, gray with a blue dot */
+.ngroup { background: var(--paper); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.ng-head { display: flex; align-items: center; gap: 10px; padding: 11px 16px; background: #F4F2EE; font-weight: 800; font-size: 15.5px; color: var(--heading); }
+.ng-head a { color: inherit; }
+.ng-ic { width: 32px; height: 32px; border-radius: 50%; background: #FFFEF9; display: grid; place-items: center; flex: none; }
+.ng-ic svg { width: 17px; height: 17px; stroke: var(--muted); fill: none; stroke-width: 1.8; }
+.ng-count { margin-left: auto; white-space: nowrap; background: #E9E6E0; color: #4B5568; border-radius: 99px; font-size: 12px; font-weight: 800; padding: 2px 10px; }
+.ng-count.none { background: transparent; border: 1px solid #D9D4CB; color: #8a8f99; font-weight: 700; }
+.ng-row { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-top: 1px solid var(--rule); }
+.ng-head + .ng-row { border-top: 0; }
+.ng-row.done { opacity: .55; }
+.ng-check { width: 22px; height: 22px; border-radius: 6px; border: 2px solid #C5C8CF; background: #fff; flex: none; padding: 0; cursor: pointer; display: grid; place-items: center; }
+.ng-check:hover { border-color: #3461BD; }
+.ng-check.on { background: var(--s-ok); border-color: var(--s-ok); cursor: default; }
+.ng-check.on svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 3; }
+.ng-main { flex: 1; min-width: 0; display: flex; flex-direction: column; color: inherit; text-decoration: none; }
+.ng-main b { color: var(--heading); font-size: 15px; }
+.ng-main small { color: var(--muted); font-size: 12.5px; }
+.ng-row.done .ng-main b { font-weight: 600; }
+.ng-dot { width: 10px; height: 10px; border-radius: 50%; background: #3461BD; flex: none; }
+.ng-act { flex: none; }
+.btn.nb1 { background: #1F2A44; color: #fff; border-color: #1F2A44; }
+.btn.nb2 { background: #F1EFEB; color: #1F2A44; border-color: #F1EFEB; }
+.ng-x { flex: none; }
+.ng-empty p { padding: 4px 16px 14px; margin: 0; }
+@media (max-width: 560px) {
+  .ng-row { flex-wrap: wrap; }
+  .ng-main { flex-basis: calc(100% - 80px); }
+  .ng-act { margin-left: 34px; }
+}
+
+/* ================================================================ bell drop-down: report-sheet style */
+.icon-btn.bell { border: 0; }
+.bell-drop { position: fixed; top: 54px; right: 14px; z-index: 60; width: min(390px, calc(100vw - 28px)); max-height: min(560px, calc(100vh - 80px)); overflow: auto;
+  background: var(--paper); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 18px 40px -16px rgba(28,25,23,.4); padding: 12px; }
+.bd-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px 10px; border-bottom: 3px solid var(--heading); margin-bottom: 6px; }
+.bd-head b { font-size: 17px; color: var(--heading); }
+.bd-count { background: #EAF0FC; color: #1B4DB5; border-radius: 99px; font-size: 11.5px; font-weight: 800; padding: 2px 9px; }
+.bd-pill { margin-left: auto; background: #EAF0FC; color: #1B4DB5; border: 0; border-radius: 99px; font: inherit; font-size: 12px; font-weight: 800; padding: 5px 12px; cursor: pointer; }
+.bd-item { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 10px; color: inherit; text-decoration: none; }
+.bd-item + .bd-item { margin-top: 2px; }
+.bd-item.new { background: #F6F9FE; }
+.bd-item:hover { background: #EEF3FC; }
+.bd-ic { width: 34px; height: 34px; border-radius: 50%; background: #F1EFEB; display: grid; place-items: center; flex: none; }
+.bd-ic svg { width: 17px; height: 17px; stroke: var(--muted); fill: none; stroke-width: 1.8; }
+.bd-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bd-main b { font-size: 14px; color: var(--heading); }
+.bd-item:not(.new) .bd-main b { font-weight: 600; color: var(--muted); }
+.bd-main small { font-size: 12px; color: var(--muted); }
+.bd-dot { width: 9px; height: 9px; border-radius: 50%; background: #3461BD; flex: none; }
+.bd-all { display: block; text-align: center; font-weight: 800; color: #1B4DB5; padding: 10px 0 2px; border-top: 1px solid var(--rule); margin-top: 6px; }
+.bd-empty { color: var(--muted); padding: 10px 6px; margin: 0; }

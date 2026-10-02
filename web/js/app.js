@@ -11,7 +11,8 @@ import { services, order } from './views/services.js';
 import { partners, costs, shares } from './views/extras.js';
 import './views/import.js';
 import { landing } from './views/landing.js';
-import { notifications, historyPage, trashPage, team, settings } from './views/account.js';
+import { historyPage, trashPage, team, settings } from './views/account.js';
+import { notifications } from './views/notifications.js';
 import { admin } from './views/admin.js';
 
 const app = document.getElementById('app');
@@ -119,7 +120,7 @@ function renderShell() {
         <header class="topbar">
           <a class="brand mobile-only" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
           <div class="spacer"></div>
-          <a class="icon-btn bell" href="#/notifications" aria-label="Notifications">${ICON.bell}<b class="badge" data-badge></b></a>
+          <button class="icon-btn bell" data-act="bell-open" aria-label="Notifications" aria-haspopup="dialog">${ICON.bell}<b class="badge" data-badge></b></button>
         </header>
         <div id="banner"></div>
         <main id="main" tabindex="-1"></main>
@@ -135,6 +136,7 @@ function renderShell() {
   renderPage();
 }
 
+hooks.paintBadges = () => paintBadges();
 function paintBadges() {
   document.querySelectorAll('[data-badge]').forEach((b) => { b.textContent = S.unread > 99 ? '99+' : S.unread || ''; b.hidden = !S.unread; });
 }

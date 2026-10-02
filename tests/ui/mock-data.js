@@ -190,7 +190,7 @@ export const fileUrl = async () => 'data:application/pdf;base64,JVBERi0=';
 export const orgDocuments = async () => db.documents.filter((d) => !d.deleted_at);
 export const allCycles = async () => db.cycles;
 export const cancelHelpRequest = async (id) => { const a = db.requests.find((x) => x.id === id); a.status = 'cancelled'; event(a, 'cancelled', 'You cancelled this request.'); };
-export const listNotifications = async () => db.notifications;
+export const listNotifications = async (limit = 100) => [...db.notifications].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, limit);
 export const markRead = async (ids) => ids.forEach((id) => { const n = db.notifications.find((x) => x.id === id); if (n) n.read_at = 'now'; });
 export const markAllRead = async () => db.notifications.forEach((n) => { n.read_at = 'now'; });
 export const deleteNotification = async (id) => { db.notifications = db.notifications.filter((n) => n.id !== id); };
@@ -367,6 +367,9 @@ if (globalThis.PP_DEMO) {
   db.requests.unshift(a);
   event(a, 'created', a.notes);
   event(a, 'quote', 'Quote sent: ₱3,300', true);
+  db.notifications.push(
+    { id: 'n3', user_id: user.id, org_id: org.id, kind: 'help', title: 'Your FSIC quote is ready: ₱3,300', body: 'Mandaue warehouse', link: '#/services/orders/ord1', read_at: null, created_at: new Date(Date.now() - 2 * 3600e3).toISOString() },
+    { id: 'n4', user_id: user.id, org_id: org.id, kind: 'system', title: 'CTPL Insurance renewed', body: 'Toyota Hilux', link: `#/requirement/${db.requirements.find((r) => r.vehicle_id === 'v2' && r.type_code === 'ctpl').id}`, read_at: 'now', created_at: new Date(Date.now() - 3 * 864e5).toISOString() });
 }
 if (globalThis.PP_DEMO) {
   // Sample amounts paid so Costs & budget has something to show.

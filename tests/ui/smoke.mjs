@@ -146,6 +146,21 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await go(orderHash);
     check('customer sees the refund', (await page.textContent('main .kv')).includes('Insurer charged less'));
 
+    // Notifications: grouped by business, with a task button; ticking one off marks it done.
+    await go('#/notifications');
+    check('notifications grouped by business', (await page.locator('.ngroup .ng-head', { hasText: 'Corner <Bakery> & Co' }).count()) === 1);
+    const before = await page.locator('.ng-row.new').count();
+    await page.click('.ng-row.new [data-act=notif-done]');
+    await page.waitForTimeout(300);
+    check('ticking a notification marks it done', (await page.locator('.ng-row.new').count()) === before - 1);
+    // Bell drop-down opens from any page and links to the full list.
+    await go('#/');
+    await page.click('[data-act=bell-open]');
+    await page.waitForSelector('.bell-drop .bd-all');
+    check('bell drop-down lists notifications', (await page.locator('.bell-drop .bd-item').count()) >= 1);
+    await page.keyboard.press('Escape');
+    check('bell drop-down closes with Escape', (await page.locator('.bell-drop').count()) === 0);
+
     // Delete and restore a vehicle.
     await go('#/vehicles/v1');
     await page.click('button.tab:has-text("Details")');
