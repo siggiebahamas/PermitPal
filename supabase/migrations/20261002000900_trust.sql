@@ -117,3 +117,6 @@ begin
 end $$;
 revoke execute on function public.admin_test_email() from public, anon;
 grant execute on function public.admin_test_email() to authenticated;
+
+-- Strangers have no business reading these tables at all (their row rules already returned nothing).
+revoke all on public.order_refunds, public.staff_file_access from anon;

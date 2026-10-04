@@ -161,6 +161,15 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.keyboard.press('Escape');
     check('bell drop-down closes with Escape', (await page.locator('.bell-drop').count()) === 0);
 
+    // Compliance filters: Clear brings every row back.
+    await go('#/compliance');
+    const allRows = await page.locator('main .row').count();
+    await page.selectOption('#filters select[name=status]', 'action_required');
+    await page.waitForTimeout(250);
+    await page.click('[data-act=clear-filters]');
+    await page.waitForTimeout(250);
+    check('Clear resets the compliance filters', (await page.locator('main .row').count()) === allRows);
+
     // Delete and restore a vehicle.
     await go('#/vehicles/v1');
     await page.click('button.tab:has-text("Details")');

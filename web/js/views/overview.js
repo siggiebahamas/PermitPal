@@ -140,7 +140,10 @@ export function compliance(el, params) {
     t = setTimeout(() => { filters.q = e.target.value; compliance(el, new URLSearchParams()); el.querySelector('[name=q]').focus(); }, 250);
   });
 }
-on('clear-filters', () => { Object.assign(filters, { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', q: '' }); location.hash = '#/compliance'; });
+on('clear-filters', () => { Object.assign(filters, { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', q: '' });
+  // Already on the page: redraw it (changing the hash to the same value fires no event).
+  if (location.hash === '#/compliance') hooks.render(); else location.hash = '#/compliance';
+});
 
 // Everything tracked, with each permit's full record history, as a spreadsheet.
 on('export-csv', async () => {
