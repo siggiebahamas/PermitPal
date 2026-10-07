@@ -250,7 +250,7 @@ export async function settings(el, section) {
     </section>
 
     <section class="card"><div class="card-head"><div><h2>What this workspace is for</h2><p class="card-sub">Team types add a board for everything you're responsible for. 30-day free trial.</p></div></div>
-      <form id="kind-form">${Object.entries(KINDS).map(([k, v]) => html`<label class="radio-card ${org.kind === k ? 'on' : ''}"><input type="radio" name="kind" value="${k}" ${org.kind === k ? 'checked' : ''} ${isOrgAdmin() ? '' : 'disabled'}>
+      <form id="kind-form">${Object.entries(KINDS).filter(([k, v]) => !v.hidden || org.kind === k).map(([k, v]) => html`<label class="radio-card ${org.kind === k ? 'on' : ''}"><input type="radio" name="kind" value="${k}" ${org.kind === k ? 'checked' : ''} ${isOrgAdmin() ? '' : 'disabled'}>
         <span><b>${v.title}</b><small>${k === 'business' ? 'Free. Track your own permits, vehicles and staff licences.' : v.pitch}</small></span></label>`)}
         ${when(isOrgAdmin(), html`<button class="btn btn-primary">Save</button>`)}</form>
     </section>
@@ -342,7 +342,7 @@ function billingSection(pay) {
   const acc = teamAccess();
   const k = KINDS[org.kind || 'business'];
   const plan = S.plans.find((p) => p.id === k?.plan);
-  const teamPlans = ['fleet', 'firm', 'head_office', 'property'].map((id) => S.plans.find((p) => p.id === id)).filter(Boolean);
+  const teamPlans = ['fleet', 'firm', 'property'].map((id) => S.plans.find((p) => p.id === id)).filter(Boolean);
   const status = org.kind === 'business' ? html`<p>This workspace is a <b>single business</b>: PermitPal is <b>free</b>, with no limits on businesses, vehicles or team members.</p>`
     : acc.why === 'plan' ? html`<p>You're on the <b>${plan?.name}</b> plan${org.plan_expires_at ? html`, paid until <b>${fmtDate(org.plan_expires_at.slice(0, 10))}</b>` : ''}.</p>`
     : acc.why === 'trial' ? html`<p>You're on a <b>free trial</b> of ${plan?.name}: ${plural(acc.days, 'day')} left. Choose the plan below to keep your board after the trial.</p>`

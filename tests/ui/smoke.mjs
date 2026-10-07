@@ -118,19 +118,19 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('[data-modal-close]');
     check('share proof link listed', (await page.locator('main [data-act=share-copy]').count()) === 1);
 
-    // Team tools: start a head-office trial, see own branches on the board, invite a franchisee.
+    // Team tools: start a mall/property trial and invite a tenant (head office is no longer offered).
     await go('#/network');
-    await page.click('[data-act=nb-set-kind][data-kind=head_office]');
+    check('head office is no longer offered', (await page.locator('[data-act=nb-set-kind][data-kind=head_office]').count()) === 0);
+    await page.click('[data-act=nb-set-kind][data-kind=property]');
     await page.click('.modal button[type=submit]');
-    await page.waitForSelector('main h1:has-text("Branches")');
-    check('head office board lists company branches', (await page.locator('.nb-table tbody tr').count()) >= 1);
-    check('menu shows Branches', (await page.locator('[data-nav=network]').count()) >= 1);
+    await page.waitForSelector('main h1:has-text("Tenants")');
+    check('menu shows Tenants', (await page.locator('[data-nav=network]').count()) >= 1);
     await page.click('[data-act=nb-add]');
-    await page.fill('.modal [name=email]', 'owner@franchisee.ph');
-    await page.fill('.modal [name=label]', 'QC-001');
+    await page.fill('.modal [name=email]', 'owner@tenant.ph');
+    await page.fill('.modal [name=label]', 'G/F Unit 3');
     await page.click('.modal button[type=submit]');
     await page.waitForTimeout(400);
-    check('franchisee invite waits to connect', (await page.locator('main .card', { hasText: 'owner@franchisee.ph' }).count()) === 1);
+    check('tenant invite waits to connect', (await page.locator('main .card', { hasText: 'owner@tenant.ph' }).count()) === 1);
     // Switch the workspace to fleet: the fleet board shows every vehicle.
     await go('#/settings/workspace');
     await page.click('#kind-form input[value=fleet]');

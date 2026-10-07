@@ -509,7 +509,7 @@ export async function adminSetSupportStatus(id, status) { db.support.find((x) =>
 export const adminOrgKinds = async () => [{ id: org.id, kind: org.kind, trial_ends_at: org.trial_ends_at }];
 if (globalThis.PP_DEMO) {
   // The demo shows the head-office board: company branches plus connected franchisees.
-  Object.assign(org, { kind: 'head_office', trial_ends_at: new Date(Date.now() + 21 * 864e5).toISOString() });
+  // (demo workspace is a regular business; the sample connections below are only used by test hooks)
   const mk = (name, label, spec, extra = {}) => db.links.push({ link_id: uid(), org_id: uid(), relation: 'franchisee', label, status: 'active', share_files: !!extra.share,
     invited_email: 'owner@' + name.toLowerCase().replace(/[^a-z]/g, '') + '.ph', token: 'tok' + uid().slice(0, 8), created_at: addDays(-60), accepted_at: addDays(-55), last_nudged_at: null, name, items: sampleItems(spec) });
   mk('Kape Uno – SM North', 'QC-014', [['mayors_permit', 'action_required', -6, 'Quezon City'], ['barangay_clearance', 'compliant', 110, 'Quezon City'], ['fsic', 'renew_soon', 18, 'Quezon City'], ['sanitary_permit', 'compliant', 200, 'Quezon City'], ['bir_cor', 'compliant', null, 'Quezon City']], { share: true });
@@ -549,4 +549,20 @@ if (globalThis.PP_DEMO) {
   old.forEach((a, i) => db.audit.push({ ...a, id: ++n, created_at: ago(26, 8 - i) }));
   for (const [d, h, entity, action, summary, extra] of past.reverse()) db.audit.push({ id: ++n, entity, action, summary, actor_id: user.id, created_at: ago(d, h), ...extra });
   db.audit.sort((a, b) => b.id - a.id);
+}
+// Test hook for layout previews: several more businesses with mixed statuses.
+if (globalThis.PP_EXTRA_BIZ) {
+  const bizTypes = types.filter((t) => t.subject === 'business');
+  [['Lola Nena Bakeshop', 'restaurant', 'Quezon City', [-12, 15, 200, null]], ['Bright Smile Dental', 'clinic', 'Pasig City', [120, 210, 300, 90]],
+   ['Kuya Jun Hardware', 'retail', 'Davao City', [25, 40, null, 180]], ['Sunrise Laundry Hub', 'services', 'Makati City', [300, 280, 260, 250]],
+   ['Mabuhay Printing', 'services', 'Cebu City', [-3, -1, 12, null]]].forEach(([name, activity, city, offs], i) => {
+    const id = 'bx' + i;
+    db.businesses.push({ id, org_id: org.id, name, activity, structure: 'Sole Proprietorship', tin: null, deleted_at: null });
+    db.locations.push({ id: 'lx' + i, business_id: id, name: 'Main branch', city, address: '', is_main: true, deleted_at: null });
+    bizTypes.forEach((t, k) => {
+      const off = offs[k % offs.length];
+      const r = addReq('business', id, t.per_location ? 'lx' + i : null, t, off == null ? null : { reference_no: 'R-' + i + k, expires_on: addDays(off) });
+      if (off != null && off > 0) db.documents.push({ id: uid(), requirement_id: r.id, cycle_id: last(db.cycles).id, file_name: 'permit.pdf', storage_path: 'o1/demo/permit.pdf', mime_type: 'application/pdf', size_bytes: 50000, created_at: new Date().toISOString(), deleted_at: null });
+    });
+  });
 }

@@ -12,6 +12,7 @@ import * as db from 'pp/data';
 export const KINDS = {
   business: { title: 'A business', nav: null, blurb: 'Track your own permits and vehicles.' },
   head_office: {
+    hidden: true, // no longer offered: PermitPal serves small businesses, not large chains
     title: 'Head office or franchisor', nav: 'Branches', plan: 'head_office', relation: 'franchisee', one: 'branch', many: 'branches',
     icon: ICON.building, page: 'Branches', sub: 'Every branch and franchisee, one screen. Spot the store that is about to lapse before the city does.',
     pitch: 'See every branch and franchisee on one screen, remind the ones falling behind, and export it all for audits.',
@@ -219,7 +220,7 @@ function fleetBoard(el, k, acc) {
 function chooser(el) {
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Team tools</h1><p class="muted">For businesses that are responsible for more than their own permits. Free for 30 days, no card needed.</p></div></div>
-    <div class="nb-kinds">${['head_office', 'firm', 'property', 'fleet'].map((kind) => {
+    <div class="nb-kinds">${['firm', 'property', 'fleet'].map((kind) => {
       const k = KINDS[kind]; const plan = S.plans.find((p) => p.id === k.plan);
       return html`<section class="card nb-kind">${k.icon}<h2>${k.title}</h2><p>${k.pitch}</p>
         <div class="nb-kind-foot"><span class="muted small">${plan?.price_php_monthly ? `₱${Number(plan.price_php_monthly).toLocaleString()}/month after the trial` : ''}</span>

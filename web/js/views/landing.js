@@ -14,7 +14,6 @@ const FEATURES = [
 ];
 
 const TEAMS = [
-  ['head_office', ICON.building, 'Franchisors & chains', 'Every branch and franchisee on one board. Spot the store about to lapse before the city does, and remind them in one click.'],
   ['firm', ICON.briefcase, 'Accounting & bookkeeping firms', "Stop tracking clients' renewals in spreadsheets. Every client on one board, with one-click reminders."],
   ['property', ICON.grid, 'Malls & property managers', 'Tenants keep their permits current in PermitPal; you see who is compliant and download their shared copies.'],
   ['fleet', ICON.car, 'Fleet operators', "Every vehicle's registration, CTPL, emission test and inspection on one board. Import your whole fleet from a spreadsheet."],
