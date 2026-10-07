@@ -10,8 +10,7 @@ function entityOf(n) {
   let r = n.requirement_id ? reqById(n.requirement_id) : null;
   const m = /^#\/requirement\/([\w-]+)/.exec(n.link || '');
   if (!r && m) r = reqById(m[1]);
-  const o = /^#\/services\/orders\/([\w-]+)/.exec(n.link || '');
-  const order = o ? S.data?.requests?.find((a) => a.id === o[1]) : null;
+  const order = null; // done-for-you orders were retired
   const src = r || order;
   if (src?.business_id && business(src.business_id)) { const b = business(src.business_id); return { key: 'b:' + b.id, name: b.name, icon: ICON.building, href: '#/businesses/' + b.id, r, order }; }
   if (src?.vehicle_id && vehicle(src.vehicle_id)) { const v = vehicle(src.vehicle_id); return { key: 'v:' + v.id, name: v.make_model + (v.plate_no ? ' · ' + v.plate_no : ''), icon: ICON.car, href: '#/vehicles/' + v.id, r, order }; }

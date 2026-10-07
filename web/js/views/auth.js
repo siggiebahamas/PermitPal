@@ -11,7 +11,9 @@ const shell = (inner) => html`<div class="auth"><div class="auth-card">
 export function authPage(el, mode, ctx = {}) {
   const invite = ctx.invite;
   const inviteNote = invite ? html`<div class="banner info"><div><b>${invite.invited_by || 'Someone'}</b> invited you to <b>${invite.org_name}</b>.
-    ${mode === 'signup' ? 'Create your account' : 'Log in'} with <b>${invite.email}</b> to join.</div></div>` : '';
+    ${mode === 'signup' ? 'Create your account' : 'Log in'} with <b>${invite.email}</b> to join.</div></div>`
+    : ctx.connect ? html`<div class="banner info"><div><b>A company invited you to connect on PermitPal.</b> ${mode === 'signup' ? 'Create your free account' : 'Log in'} to review what they would see before you accept.
+      ${mode === 'signup' ? html`Already have an account? <a href="#/login">Log in</a>.` : ''}</div></div>` : '';
 
   if (mode === 'signup') {
     el.innerHTML = String(shell(html`

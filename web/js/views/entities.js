@@ -140,7 +140,7 @@ export function businessDetail(el, id) {
     <div class="page-head"><div><h1>${b.name}</h1><p class="muted">${ACTIVITIES[b.activity]} · ${b.structure}${b.tin ? ' · TIN ' + b.tin : ''}</p></div>
       <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="business" data-id="${id}">+ Requirement</button>`)}
         <button class="btn btn-ghost" data-act="share-open" data-scope="business" data-id="${id}">${ICON.share} Share proof</button>
-        <a class="btn btn-ghost" href="#/services">${ICON.briefcase} Services</a></div></div>
+        <a class="btn btn-ghost" href="#/pros">${ICON.briefcase} Find a professional</a></div></div>
     ${statTiles(c)}
     <div class="tabs">${tabBtn('requirements', 'Requirements')}${tabBtn('branches', `Branches (${locs.length})`)}${tabBtn('documents', 'Documents')}${tabBtn('activity', 'Activity')}${tabBtn('details', 'Details')}</div>
     <div id="tab-body"></div>`);
@@ -363,7 +363,7 @@ export function vehicleDetail(el, id) {
       ${when(s, html`<p class="small">LTO renewal window for this plate: <b>${s?.label}</b></p>`)}</div>
       <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="vehicle" data-id="${id}">+ Requirement</button>`)}
         <button class="btn btn-ghost" data-act="share-open" data-scope="vehicle" data-id="${id}">${ICON.share} Share proof</button>
-        <a class="btn btn-ghost" href="#/services">${ICON.briefcase} Services</a></div></div>
+        <a class="btn btn-ghost" href="#/pros">${ICON.briefcase} Find a professional</a></div></div>
     ${statTiles(c)}
     <div class="tabs">${tabBtn('requirements', 'Requirements')}${tabBtn('documents', 'Documents')}${tabBtn('activity', 'Activity')}${tabBtn('details', 'Details')}</div>
     <div id="tab-body"></div>`);

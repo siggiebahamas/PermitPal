@@ -3,11 +3,11 @@ import { html, toast, toastError, fmtDate } from './util.js';
 import { S, actions, hooks, on, isStaff } from './core.js';
 import { ICON } from './components.js';
 import * as db from 'pp/data';
-import { authPage, invitePage, onboarding, sessionStorageTake } from './views/auth.js';
+import { authPage, invitePage, onboarding, sessionStorageTake, sessionStorageSet } from './views/auth.js';
 import { dashboard, compliance, documents } from './views/overview.js';
 import { businessList, businessDetail, vehicleList, vehicleDetail, personList, personDetail } from './views/entities.js';
 import { render as requirementPage, forget as forgetRequirement } from './views/requirement.js';
-import { services, order } from './views/services.js';
+import { network, connectPage, KINDS } from './views/network.js';
 import { partners, costs, shares } from './views/extras.js';
 import './views/import.js';
 import { landing } from './views/landing.js';
@@ -22,13 +22,13 @@ let unsubscribe = null;
 
 const T = {
   en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
-        services: 'Services', partners: 'Partners', costs: 'Costs & budget', sharing: 'Share proof',
+        pros: 'Find a professional', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
         notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More' },
   tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
-        services: 'Mga Serbisyo', partners: 'Mga Partner', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
+        pros: 'Maghanap ng Propesyonal', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
         notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa' },
 };
-const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k];
+const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k] || k;
 
 function route() {
   const [path, query] = location.hash.replace(/^#/, '').split('?');
@@ -46,6 +46,10 @@ async function start() {
   if (!S.user) {
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (parts[0] === 'invite' && parts[1]) return invitePage(app, parts[1], false);
+    // Invited to connect (franchisor, accountant, mall): remember it through sign-up / log-in.
+    if (parts[0] === 'connect' && parts[1]) { sessionStorageSet('pp-connect', parts[1]); return authPage(app, 'signup', { connect: true }); }
+    const kindParam = new URLSearchParams(location.hash.split('?')[1] || '').get('type');
+    if (kindParam && KINDS[kindParam]) sessionStorageSet('pp-kind', kindParam);
     if (!parts[0] || parts[0] === 'welcome') return landing(app);
     const mode = ['signup', 'forgot'].includes(parts[0]) ? parts[0] : 'login';
     return authPage(app, mode);
@@ -63,6 +67,13 @@ async function start() {
     if (!S.orgs.length) return onboarding(app, S.profile, start);
     S.org = S.orgs.find((o) => o.id === S.profile.current_org_id) || S.orgs[0];
     if (S.org.id !== S.profile.current_org_id) db.setCurrentOrg(S.user.id, S.org.id).catch(() => {});
+    // Signed up from a team plan on the landing page: set the workspace type (starts the trial).
+    const kind = sessionStorageTake('pp-kind');
+    if (kind && KINDS[kind] && S.org.kind === 'business' && S.org.role === 'owner') {
+      try { await db.setOrgProfile(S.org.id, { kind }); Object.assign(S, await db.loadMe(S.user.id)); S.org = S.orgs.find((o) => o.id === S.org.id) || S.orgs[0]; } catch { /* stays a business */ }
+    }
+    const connect = parts[0] === 'connect' ? null : sessionStorageTake('pp-connect');
+    if (connect) history.replaceState(null, '', '#/connect/' + connect);
     await loadData();
     S.unread = await db.unreadCount().catch(() => 0);
     if (!unsubscribe) unsubscribe = db.onNewNotification(S.user.id, (n) => { S.unread++; paintBadges(); toast(n.title, 'info'); });
@@ -82,9 +93,12 @@ async function loadData() {
 hooks.reload = async () => {
   try {
     const me = await db.loadMe(S.user.id);
+    const prevKind = S.org?.kind;
     Object.assign(S, { profile: me.profile, orgs: me.orgs, plans: me.plans, prefs: me.prefs });
     S.org = S.orgs.find((o) => o.id === S.org.id) || S.orgs[0];
     await loadData();
+    // Workspace type changed: the menu changes too.
+    if (prevKind !== S.org.kind) { forgetRequirement(); renderShell(); return; }
   } catch (e) { toastError(e); }
   forgetRequirement();
   renderPage();
@@ -92,14 +106,22 @@ hooks.reload = async () => {
 hooks.render = () => renderPage();
 
 // ---------------------------------------------------------------- shell
-const NAV = [
+const BASE_NAV = [
   ['', 'dashboard', ICON.home], ['businesses', 'businesses', ICON.building], ['vehicles', 'vehicles', ICON.car],
-  ['compliance', 'compliance', ICON.list], ['people', 'people', ICON.person], ['documents', 'documents', ICON.file], ['services', 'services', ICON.briefcase],
+  ['compliance', 'compliance', ICON.list], ['people', 'people', ICON.person], ['documents', 'documents', ICON.file],
 ];
-const MORE = [['notifications', 'notifications'], ['partners', 'partners'], ['costs', 'costs'], ['sharing', 'sharing'],
-  ['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings']];
+// Team workspaces (head office, firm, property, fleet) get their board right after the dashboard.
+let NAV = BASE_NAV;
+let MORE = [];
+function buildNav() {
+  const k = KINDS[S.org?.kind || 'business'];
+  NAV = k?.nav ? [BASE_NAV[0], ['network', k.nav, k.icon], ...BASE_NAV.slice(1)] : BASE_NAV;
+  MORE = [['notifications', 'notifications'], ['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'],
+    ...(k?.nav ? [] : [['network', 'team_tools']]), ['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings']];
+}
 
 function renderShell() {
+  buildNav();
   const name = [S.profile.first_name, S.profile.last_name].filter(Boolean).join(' ') || S.profile.email;
   app.innerHTML = String(html`
     <div class="shell">
@@ -156,7 +178,8 @@ async function renderPage() {
   if (!main || !S.data) return;
   const { parts, params } = route();
   const [a, b] = parts;
-  document.querySelectorAll('[data-nav]').forEach((n) => n.classList.toggle('active', (n.dataset.nav || '') === (a === 'help' ? 'services' : a || '')));
+  const navKey = ['partners', 'services', 'help'].includes(a) ? 'pros' : a || '';
+  document.querySelectorAll('[data-nav]').forEach((n) => n.classList.toggle('active', (n.dataset.nav || '') === navKey));
   paintBadges();
   banner();
   try {
@@ -167,8 +190,9 @@ async function renderPage() {
     else if (a === 'requirement') await requirementPage(main, b);
     else if (a === 'compliance') compliance(main, params);
     else if (a === 'documents') await documents(main);
-    else if (a === 'services' || a === 'help') (b === 'orders' && parts[2]) ? await order(main, parts[2]) : services(main, b && a === 'help' ? new URLSearchParams('req=' + b) : params);
-    else if (a === 'partners') await partners(main);
+    else if (a === 'network') await network(main);
+    else if (a === 'connect') await connectPage(main, b);
+    else if (['pros', 'partners', 'services', 'help'].includes(a)) await partners(main, params);
     else if (a === 'costs') await costs(main);
     else if (a === 'sharing') await shares(main);
     else if (a === 'notifications') await notifications(main);

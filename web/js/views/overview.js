@@ -1,6 +1,6 @@
 // Dashboard, Compliance (filterable list) and Document vault.
 import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
-import { S, on, hooks, canEdit, empty, serviceFor } from '../core.js';
+import { S, on, hooks, canEdit, empty } from '../core.js';
 import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
 import * as db from 'pp/data';
 
@@ -71,7 +71,6 @@ function brief(first, c, open) {
           <div class="btn-row">
             ${canEdit() && r.next_action ? html`<button class="btn ${r.next_action === 'renew' ? 'btn-primary' : 'btn-soft'} focus-go" data-act="req-next" data-id="${r.id}">${NEXT_ACTION[r.next_action]}</button>`
               : html`<a class="btn btn-primary focus-go" href="#/requirement/${r.id}">Open it</a>`}
-            ${when_(canEdit() && !r.open_request_id && serviceFor(r), html`<button class="btn btn-ghost" data-act="svc-for-req" data-id="${r.id}">Let PermitPal handle it</button>`)}
             ${when_(open.length > 1, html`<button class="btn btn-ghost" data-act="brief-skip">Skip for now</button>`)}
           </div>` : html`<div class="brief-date">Do this first</div><div class="all-good">${ICON.check} Nothing to do. You're all caught up.</div>`}
       </div>

@@ -10,11 +10,15 @@ const last = (a) => a[a.length - 1];
 const days = (iso) => Math.round((new Date(iso + 'T00:00:00Z') - new Date(today() + 'T00:00:00Z')) / 86400000);
 
 const user = { id: 'u1', email: 'sadie@test.ph' };
-const org = { id: 'o1', name: 'Aligned Solutions', plan_id: 'free', plan_expires_at: null, deleted_at: null, role: 'owner' };
+const org = { id: 'o1', name: 'Aligned Solutions', plan_id: 'free', plan_expires_at: null, deleted_at: null, role: 'owner', kind: 'business', trial_ends_at: null, required_types: [], contact_name: null, contact_email: null };
 const plans = [
   { id: 'free', name: 'Free', available: true, price_php_monthly: 0, max_members: null, max_locations_per_business: null, paid_channels: false, features: ['Unlimited businesses'] },
   { id: 'business', name: 'Business', price_php_monthly: null, max_members: 5, max_locations_per_business: 1, paid_channels: true, features: ['More'] },
-  { id: 'business_plus', name: 'Business Plus', price_php_monthly: null, max_members: 20, max_locations_per_business: null, paid_channels: true, features: ['Branches'] },
+  { id: 'business_plus', name: 'Business Plus', price_php_monthly: null, max_members: 20, max_locations_per_business: null, paid_channels: true, features: ['Branches'], available: false },
+  { id: 'fleet', name: 'Fleet', available: true, price_php_monthly: 1490, features: ['Fleet board: every vehicle\'s registration, CTPL, emission and inspection', 'Import vehicles from a spreadsheet', 'Export for your records', 'Everything in Free'] },
+  { id: 'firm', name: 'Accounting firm', available: true, price_php_monthly: 1990, features: ['Client board: every client\'s permits on one screen', 'One-click reminders to clients', 'Everything in Free'] },
+  { id: 'head_office', name: 'Head office', available: true, price_php_monthly: 4990, features: ['Branch board: every branch and franchisee on one screen', 'One-click reminders to branches', 'Everything in Free'] },
+  { id: 'property', name: 'Property', available: true, price_php_monthly: 9990, features: ['Tenant board: every tenant\'s permits on one screen', 'Download tenants\' shared copies', 'Everything in Free'] },
 ];
 const types = [
   { code: 'mayors_permit', name: "Mayor's / Business Permit", subject: 'business', expires: true, due_rule: 'jan20', per_location: true, help_text: 'Renew by Jan 20.' },
@@ -216,7 +220,12 @@ export const adminRequestDocs = async () => [];
 // Remaining actions: accepted in the demo so every button works.
 export const invitePreview = async () => ({ org_name: org.name, email: 'teammate@test.ph', role: 'member', invited_by: 'Sadie Luna', status: 'pending' });
 export const acceptInvite = async () => org.id;
-export const createOrg = async () => org.id;
+db.managed = [];
+export async function createOrg(name) {
+  const o = { id: uid(), name, kind: 'business', contact_name: null, contact_email: null, last_nudged_at: null, created_at: new Date().toISOString() };
+  db.managed.push(o);
+  return o.id;
+}
 export const renameOrg = async (id, name) => { org.name = name; };
 export const setMemberRole = async () => {};
 export const removeMember = async () => {};
@@ -352,8 +361,10 @@ export const adminSaveSetting = async (key, value) => { settings[key] = value; }
 
 // ---------------------------------------------------------------- sample partners and orders
 db.partners.push(
-  { id: 'p1', category: 'insurance', name: 'Sample Insurance Agency', description: 'Accredited CTPL and comprehensive car insurance.', offer: 'Free CTPL delivery', coverage: 'Metro Manila', website: '', type_codes: ['ctpl', 'comprehensive_insurance'], published: true, sort: 10, commission_terms: '10% of premium' },
-  { id: 'p2', category: 'pest_control', name: 'Sample Pest Control', description: 'Pest control certificates for sanitary permits.', offer: '', coverage: 'Cebu', website: '', type_codes: ['sanitary_permit'], published: true, sort: 20, commission_terms: '₱500 per job' },
+  { id: 'p1', category: 'liaison', name: 'Sample Liaison Services', description: 'Business permit renewals and new registrations for Metro Manila LGUs.', services: "Mayor's Permit renewal, barangay clearance, FSIC filing",
+    licence: 'DTI-registered liaison firm', cities: ['Makati City', 'Taguig City', 'Pasig City'], coverage: 'Metro Manila', website: '', type_codes: ['mayors_permit', 'barangay_clearance', 'fsic'], published: true, verified: true, sort: 10, lead_fee_php: 500, contact_email: 'leads@sample-liaison.ph' },
+  { id: 'p2', category: 'bookkeeping', name: 'Sample Bookkeeping Co.', description: 'Monthly bookkeeping, BIR filings and registration updates.', services: 'BIR registration updates, books of accounts',
+    licence: 'CPA, PRC-licensed', cities: ['Cebu City', 'Mandaue City'], coverage: 'Cebu', website: '', type_codes: ['bir_cor'], published: true, verified: false, sort: 20, lead_fee_php: 400 },
 );
 if (globalThis.PP_DEMO) {
   db.people.push({ id: 'pp1', org_id: org.id, full_name: 'Jun Reyes', role_title: 'Delivery driver', business_id: 'b2', deleted_at: null });
@@ -368,7 +379,7 @@ if (globalThis.PP_DEMO) {
   event(a, 'created', a.notes);
   event(a, 'quote', 'Quote sent: ₱3,300', true);
   db.notifications.push(
-    { id: 'n3', user_id: user.id, org_id: org.id, kind: 'help', title: 'Your FSIC quote is ready: ₱3,300', body: 'Mandaue warehouse', link: '#/services/orders/ord1', read_at: null, created_at: new Date(Date.now() - 2 * 3600e3).toISOString() },
+    { id: 'n3', user_id: user.id, org_id: org.id, kind: 'team', title: 'Kape Uno – IT Park Cebu connected', body: 'Their permit status now shows on your board.', link: '#/network', read_at: null, created_at: new Date(Date.now() - 2 * 3600e3).toISOString() },
     { id: 'n4', user_id: user.id, org_id: org.id, kind: 'system', title: 'CTPL Insurance renewed', body: 'Toyota Hilux', link: `#/requirement/${db.requirements.find((r) => r.vehicle_id === 'v2' && r.type_code === 'ctpl').id}`, read_at: 'now', created_at: new Date(Date.now() - 3 * 864e5).toISOString() });
 }
 if (globalThis.PP_DEMO) {
@@ -378,4 +389,58 @@ if (globalThis.PP_DEMO) {
     const r = db.requirements.find((x) => x.id === c.requirement_id);
     if (fee[r?.type_code] && c.expires_on) c.amount_paid = fee[r.type_code];
   }
+}
+
+// ---------------------------------------------------------------- team tools
+db.links = [];
+export const listPlans = async () => plans;
+export async function setOrgProfile(id, patch) {
+  const target = id === org.id ? org : db.managed.find((o) => o.id === id);
+  Object.assign(target, patch);
+  if (target === org && org.kind !== 'business' && !org.trial_ends_at) org.trial_ends_at = new Date(Date.now() + 30 * 864e5).toISOString();
+}
+const sampleItems = (spec) => spec.map(([code, status, days, city]) => ({ id: uid(), type_code: code, name: types.find((t) => t.code === code)?.name || ({ barangay_clearance: 'Barangay Business Clearance', sanitary_permit: 'Sanitary Permit' })[code] || code,
+  subject: 'business', subject_name: null, location: 'Main branch', city, status, expires_on: days == null ? null : addDays(days), days_left: days, on_file: status === 'compliant' }));
+export async function networkBoard() {
+  if (org.kind === 'business') return { locked: true };
+  const members = db.links.filter((l) => ['pending', 'active'].includes(l.status)).map((l) => ({ ...l, via: 'linked' }));
+  if (org.kind === 'firm') {
+    for (const o of db.managed) members.push({ link_id: null, org_id: o.id, relation: 'client', label: '', status: 'active', share_files: true, invited_email: o.contact_email, via: 'managed',
+      created_at: o.created_at, accepted_at: o.created_at, last_nudged_at: o.last_nudged_at, name: o.name, contact_name: o.contact_name, contact_email: o.contact_email, items: o.items || [] });
+  }
+  return { locked: false, kind: org.kind, members };
+}
+export async function linkInvite(owner, relation, email, label) {
+  const l = { link_id: uid(), org_id: null, relation, label: label || '', status: 'pending', share_files: false, invited_email: email, token: 'tok' + uid().slice(0, 8),
+    created_at: new Date().toISOString(), accepted_at: null, last_nudged_at: null, name: null, items: [] };
+  db.links.push(l);
+  return l.link_id;
+}
+export const linkToken = async (id) => db.links.find((l) => l.link_id === id).token;
+export const linkPreview = async (token) => { const l = db.links.find((x) => x.token === token); return l ? { owner_name: 'Sample Franchisor Inc.', owner_kind: 'head_office', relation: l.relation, label: l.label, status: l.status, required_types: [] } : null; };
+export async function linkAccept(token) { const l = db.links.find((x) => x.token === token); Object.assign(l, { status: 'active', accepted_at: new Date().toISOString() }); return l.link_id; }
+export async function linkDecline(token) { db.links.find((x) => x.token === token).status = 'declined'; }
+export async function linkEnd(id) { const l = db.links.find((x) => x.link_id === id); if (l) l.status = l.status === 'pending' ? 'declined' : 'ended'; }
+export async function linkSetSharing(id, share) { db.links.find((x) => x.link_id === id).share_files = share; }
+export async function linkSetLabel(id, label) { db.links.find((x) => x.link_id === id).label = label; }
+export const myConnections = async () => (globalThis.PP_DEMO ? [{ id: 'c1', owner_name: 'Ayala Malls (sample)', owner_kind: 'property', relation: 'tenant', label: 'G/F Unit 12', share_files: true, accepted_at: addDays(-40) }] : []);
+export const networkDocuments = async () => [{ path: 'x', file_name: 'mayors-permit-2026.pdf', requirement: "Mayor's / Business Permit", subject_name: null, expires_on: addDays(80) }];
+export async function networkNudge(owner, links, orgs) {
+  let n = 0;
+  for (const id of links) { const l = db.links.find((x) => x.link_id === id); if (l) { l.last_nudged_at = new Date().toISOString(); n++; } }
+  for (const id of orgs) { const o = db.managed.find((x) => x.id === id); if (o) { o.last_nudged_at = new Date().toISOString(); n++; } }
+  return n;
+}
+export const requestPlan = async () => {};
+export const adminOrgKinds = async () => [{ id: org.id, kind: org.kind, trial_ends_at: org.trial_ends_at }];
+if (globalThis.PP_DEMO) {
+  // The demo shows the head-office board: company branches plus connected franchisees.
+  Object.assign(org, { kind: 'head_office', trial_ends_at: new Date(Date.now() + 21 * 864e5).toISOString() });
+  const mk = (name, label, spec, extra = {}) => db.links.push({ link_id: uid(), org_id: uid(), relation: 'franchisee', label, status: 'active', share_files: !!extra.share,
+    invited_email: 'owner@' + name.toLowerCase().replace(/[^a-z]/g, '') + '.ph', token: 'tok' + uid().slice(0, 8), created_at: addDays(-60), accepted_at: addDays(-55), last_nudged_at: null, name, items: sampleItems(spec) });
+  mk('Kape Uno – SM North', 'QC-014', [['mayors_permit', 'action_required', -6, 'Quezon City'], ['barangay_clearance', 'compliant', 110, 'Quezon City'], ['fsic', 'renew_soon', 18, 'Quezon City'], ['sanitary_permit', 'compliant', 200, 'Quezon City'], ['bir_cor', 'compliant', null, 'Quezon City']], { share: true });
+  mk('Kape Uno – Ortigas', 'PSG-003', [['mayors_permit', 'compliant', 105, 'Pasig City'], ['barangay_clearance', 'compliant', 105, 'Pasig City'], ['fsic', 'compliant', 160, 'Pasig City'], ['sanitary_permit', 'needs_information', null, 'Pasig City'], ['bir_cor', 'compliant', null, 'Pasig City']]);
+  mk('Kape Uno – Alabang', 'MNL-021', [['mayors_permit', 'renew_soon', 24, 'Muntinlupa City'], ['barangay_clearance', 'renew_soon', 24, 'Muntinlupa City'], ['fsic', 'compliant', 90, 'Muntinlupa City'], ['sanitary_permit', 'compliant', 140, 'Muntinlupa City']]);
+  mk('Kape Uno – IT Park Cebu', 'CEB-002', [['mayors_permit', 'compliant', 104, 'Cebu City'], ['barangay_clearance', 'compliant', 104, 'Cebu City'], ['fsic', 'in_progress', 4, 'Cebu City'], ['sanitary_permit', 'compliant', 180, 'Cebu City'], ['bir_cor', 'compliant', null, 'Cebu City']], { share: true });
+  db.links.push({ link_id: uid(), org_id: null, relation: 'franchisee', label: 'DVO-001', status: 'pending', share_files: false, invited_email: 'owner@kapeuno-davao.ph', token: 'tokdavao', created_at: addDays(-2), name: null, items: [] });
 }

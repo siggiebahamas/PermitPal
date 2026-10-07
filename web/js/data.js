@@ -182,6 +182,7 @@ export const allCycles = async (orgId) =>
 const safeName = (name) => name.normalize('NFKD').replace(/[^\w.\-]+/g, '_').slice(-100) || 'file';
 const rand = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
+export const listPlans = async () => ok(await sb.from('plans').select('*').order('sort'));
 export const listServices = async () => ok(await sb.from('services').select('*').eq('active', true).order('sort'));
 export const requestService = async (f) => ok(await sb.rpc('request_service', {
   p_org: f.org_id, p_service: f.service_code, p_requirement: f.requirement_id || null, p_business: f.business_id || null,
@@ -230,7 +231,7 @@ export async function appSettings() {
 }
 
 // ---------------------------------------------------------------- partners & referrals
-export const listPartners = async () => ok(await sb.rpc('list_partners'));
+export const listPartners = async () => ok(await sb.rpc('list_professionals'));
 export const requestReferral = async (f) => ok(await sb.rpc('request_referral', {
   p_org: f.org_id, p_partner: f.partner_id, p_requirement: f.requirement_id || null, p_note: f.note || null,
   p_contact_method: f.contact_method || 'email', p_contact_value: f.contact_value || null,
@@ -317,6 +318,7 @@ export async function startCheckout(orgId, planId, months) {
 
 // ---------------------------------------------------------------- PermitPal staff console
 export const adminOrgs = async () => ok(await sb.rpc('admin_orgs'));
+export const adminOrgKinds = async () => ok(await sb.from('orgs').select('id, kind, trial_ends_at'));
 export const adminSetPlan = async (orgId, plan, expires) => ok(await sb.rpc('admin_set_plan', { p_org: orgId, p_plan: plan, p_expires: expires }));
 export const adminRequests = async () =>
   ok(await sb.from('assistance_requests').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
@@ -376,3 +378,19 @@ export async function staffFileUrl(path, download) {
   return data.url;
 }
 export const adminSaveSetting = async (key, value) => ok(await sb.from('app_settings').update({ value, updated_at: new Date().toISOString() }).eq('key', key));
+
+// ---------------------------------------------------------------- team tools (head office, firm, property, fleet)
+export const setOrgProfile = async (orgId, patch) => ok(await sb.from('orgs').update(patch).eq('id', orgId));
+export const networkBoard = async (orgId) => ok(await sb.rpc('network_board', { p_owner: orgId }));
+export const linkInvite = async (orgId, relation, email, label) => ok(await sb.rpc('link_invite', { p_owner: orgId, p_relation: relation, p_email: email, p_label: label || '' }));
+export const linkPreview = async (token) => ok(await sb.rpc('link_preview', { p_token: token }));
+export const linkAccept = async (token, memberOrg, share) => ok(await sb.rpc('link_accept', { p_token: token, p_member_org: memberOrg, p_share_files: !!share }));
+export const linkDecline = async (token) => ok(await sb.rpc('link_decline', { p_token: token }));
+export const linkEnd = async (id) => ok(await sb.rpc('link_end', { p_link: id }));
+export const linkSetSharing = async (id, share) => ok(await sb.rpc('link_set_sharing', { p_link: id, p_share: !!share }));
+export const linkSetLabel = async (id, label) => ok(await sb.rpc('link_set_label', { p_link: id, p_label: label }));
+export const linkToken = async (id) => ok(await sb.from('org_links').select('token').eq('id', id).single()).token;
+export const myConnections = async (orgId) => ok(await sb.rpc('my_connections', { p_org: orgId }));
+export const networkDocuments = async (owner, member) => ok(await sb.rpc('network_documents', { p_owner: owner, p_member: member }));
+export const networkNudge = async (owner, links, orgs, message) => ok(await sb.rpc('network_nudge', { p_owner: owner, p_links: links || [], p_orgs: orgs || [], p_message: message || null }));
+export const requestPlan = async (orgId, plan, note) => ok(await sb.rpc('request_plan', { p_org: orgId, p_plan: plan, p_note: note || null }));

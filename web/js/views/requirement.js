@@ -2,7 +2,6 @@
 // flows used everywhere else (add details, upload, renew, started renewing).
 import { html, fmtDate, fmtDateTime, timeAgo, fileSize, todayPH, openModal, confirmDialog, toast, toastError, formObject, when, peso } from '../util.js';
 import { S, on, go, reload, canEdit, reqById, typeOf, vehicle, memberName, empty, subjectHref } from '../core.js';
-import { serviceOffer } from './services.js';
 import { loadPartners, partnerSuggestions, penaltyNote } from './extras.js';
 import { STATUS, statusChip, dueText, subjectLabel, ICON } from '../components.js';
 import { suggestDue } from '../rules.js';
@@ -74,7 +73,6 @@ function page(r) {
 
     ${when(t?.help_text, html`<p class="help-text">${t?.help_text}</p>`)}
     ${['action_required', 'renew_soon'].includes(r.status) ? penaltyNote(r) : ''}
-    ${serviceOffer(r)}
 
     <section class="card">
       <div class="card-head"><h2>Current record</h2>

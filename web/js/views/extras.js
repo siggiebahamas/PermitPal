@@ -7,73 +7,102 @@ import * as db from 'pp/data';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// ================================================================ partners
+// ================================================================ licensed professionals
+// Firms that file and renew in person (liaison, accounting, fire safety...). Customers deal with
+// them directly; PermitPal only checks their licence, lists them, and sends them quote requests.
 export const PARTNER_CATEGORIES = {
-  insurance: 'Insurance (CTPL, car, business)', emission_testing: 'Emission testing', vehicle_inspection: 'Vehicle inspection (PMVIC)',
-  pest_control: 'Pest control', fire_safety: 'Fire extinguishers & fire safety', health_clinic: 'Health cards & medical exams',
-  notary: 'Notary', bookkeeping: 'Bookkeeping & BIR filing', other: 'Other services',
+  liaison: 'Permit & registration filing', bookkeeping: 'Accounting, bookkeeping & BIR', fire_safety: 'Fire safety & extinguishers',
+  pest_control: 'Pest control', health_clinic: 'Health cards & medical exams', emission_testing: 'Emission testing',
+  vehicle_inspection: 'Vehicle inspection (PMVIC)', insurance: 'Insurance agents', notary: 'Notary public', other: 'Other services',
 };
 let partnersCache = null;
 export const loadPartners = async () => (partnersCache ||= await db.listPartners().catch(() => []));
+let proCat = 'all';
+let proCity = 'all';
 
-export async function partners(el) {
+export async function partners(el, params = new URLSearchParams()) {
   el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   let list = [], mine = [];
   try { [list, mine] = await Promise.all([loadPartners(), db.myReferrals(S.org.id)]); } catch (e) { toastError(e); }
+  if (params.get('cat')) proCat = params.get('cat');
   const cats = Object.keys(PARTNER_CATEGORIES).filter((c) => list.some((p) => p.category === c));
+  const cities = [...new Set(list.flatMap((p) => p.cities || []))].sort();
+  const myCities = [...new Set(S.data.locations.map((l) => l.city).filter(Boolean))];
+  const shown = list.filter((p) => (proCat === 'all' || p.category === proCat) && (proCity === 'all' || !p.cities?.length || p.cities.includes(proCity)));
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Partners</h1><p class="muted">Trusted businesses for the things your permits need: insurance, emission tests, pest control, fire extinguishers and more.</p></div></div>
-    ${list.length ? cats.map((c) => html`<h3 class="section-label">${PARTNER_CATEGORIES[c]}</h3>
-      <div class="svc-grid">${list.filter((p) => p.category === c).map(partnerCard)}</div>`)
-      : empty("We're lining up trusted partners", "Partners for insurance, emission testing, pest control and fire safety will appear here. Need one now? Ask us through Services and we'll point you to someone reliable.",
-        html`<a class="btn btn-primary" href="#/services">Go to services</a>`)}
-    ${when(mine.length, html`<section class="card"><div class="card-head"><h2>Your introductions</h2></div>
-      ${mine.map((r) => { const p = list.find((x) => x.id === r.partner_id); return html`<div class="line"><span class="line-main"><b>${p?.name || 'Partner'}</b><small>${r.note || ''} · ${timeAgo(r.created_at)}</small></span>
-        <span class="chip ${r.status === 'converted' ? 'ok' : r.status === 'not_converted' ? 'needinfo' : 'progress'}">${{ requested: 'Requested', introduced: 'Introduced', converted: 'Done', not_converted: 'Closed' }[r.status]}</span></div>`; })}</section>`)}
-    <p class="muted small fineprint">PermitPal may earn a referral fee from partners. It never changes the price you pay, and you're free to use anyone you like.</p>`);
+    <div class="page-head"><div><h1>Find a professional</h1><p class="muted">Licensed firms that file and renew permits in person, so you don't have to queue. You deal with them directly.</p></div></div>
+    <section class="card promises pro-promises">
+      <div class="promise">${ICON.check}<div><b>Licence checked</b><span>Firms marked "Licence checked" showed us their business permit and professional licence.</span></div></div>
+      <div class="promise">${ICON.check}<div><b>Straight to them</b><span>Your request goes directly to the firm. They reply within 1 business day.</span></div></div>
+      <div class="promise">${ICON.check}<div><b>No obligation</b><span>Compare quotes, ask questions, and only hire who you trust.</span></div></div>
+    </section>
+    ${list.length ? html`<div class="filters pro-filters">
+        <select data-pro-cat aria-label="Service"><option value="all">All services</option>${cats.map((c) => html`<option value="${c}" ${proCat === c ? 'selected' : ''}>${PARTNER_CATEGORIES[c]}</option>`)}</select>
+        ${when(cities.length, html`<select data-pro-city aria-label="City"><option value="all">All cities</option>${cities.map((c) => html`<option value="${c}" ${proCity === c ? 'selected' : ''}>${c}${myCities.includes(c) ? ' (yours)' : ''}</option>`)}</select>`)}
+      </div>
+      ${shown.length ? html`<div class="svc-grid">${shown.map(proCard)}</div>` : html`<p class="muted">No firms match yet. Try "All cities".</p>`}`
+      : empty("We're onboarding licensed firms", 'Liaison firms, accountants and fire-safety providers in your area will appear here once their licences are checked.')}
+    ${when(mine.length, html`<section class="card"><div class="card-head"><h2>Your quote requests</h2></div>
+      ${mine.map((r) => { const p = list.find((x) => x.id === r.partner_id); return html`<div class="line"><span class="line-main"><b>${p?.name || 'Professional'}</b><small>${r.note || ''} · ${timeAgo(r.created_at)}</small></span>
+        <span class="chip ${r.status === 'converted' ? 'ok' : r.status === 'not_converted' ? 'needinfo' : 'progress'}">${{ requested: 'Sent', introduced: 'They replied', converted: 'Hired', not_converted: 'Closed' }[r.status] || 'Sent'}</span></div>`; })}</section>`)}
+    <p class="fineprint">Listed firms pay PermitPal for the quote requests we send them. It never changes their price, and you're free to choose anyone. PermitPal does not file anything with the government itself.</p>`);
 }
+document.addEventListener('change', (e) => {
+  if (e.target.matches('[data-pro-cat]')) { proCat = e.target.value; partners(document.getElementById('main')); }
+  if (e.target.matches('[data-pro-city]')) { proCity = e.target.value; partners(document.getElementById('main')); }
+});
 
-function partnerCard(p) {
+function proCard(p) {
   return html`<section class="card svc partner">
-    <div class="svc-top"><h2>${p.name}</h2>${when(p.offer, html`<span class="chip ok">${p.offer}</span>`)}</div>
+    <div class="svc-top"><h2>${p.name}</h2>${when(p.verified, html`<span class="chip ok pro-badge">${ICON.check} Licence checked</span>`)}</div>
+    <p class="muted small pro-cat">${PARTNER_CATEGORIES[p.category] || ''}${p.licence ? ' · ' + p.licence : ''}</p>
     <p class="svc-sum">${p.description}</p>
-    ${when(p.coverage, html`<p class="muted small">Serves: ${p.coverage}</p>`)}
+    ${when(p.services, html`<p class="small"><b>Handles:</b> ${p.services}</p>`)}
+    ${when((p.cities || []).length || p.coverage, html`<p class="muted small">Serves: ${(p.cities || []).join(', ') || p.coverage}</p>`)}
     <div class="svc-foot">${p.website ? html`<a class="small" href="${p.website}" target="_blank" rel="noopener">Website</a>` : html`<span></span>`}
-      ${when(canEdit(), html`<button class="btn btn-primary btn-sm" data-act="partner-intro" data-id="${p.id}">Get introduced</button>`)}</div>
+      ${when(canEdit(), html`<button class="btn btn-primary btn-sm" data-act="partner-intro" data-id="${p.id}">Request a quote</button>`)}</div>
   </section>`;
 }
 
 export function partnerIntro(partnerId, requirementId = null) {
   const p = (partnersCache || []).find((x) => x.id === partnerId);
   if (!p) return;
-  openModal(`Get introduced to ${p.name}`, html`
-    <p class="muted small">We'll pass your details to ${p.name} and they'll contact you. ${p.offer ? 'Mention PermitPal for: ' + p.offer + '.' : ''}</p>
-    <label class="field"><span>What do you need?</span><textarea name="note" rows="3" maxlength="1000" placeholder="e.g. CTPL for 2 vans, plates ending in 5 and 8"></textarea></label>
+  const r = requirementId ? S.data.reqs.find((x) => x.id === requirementId) : null;
+  openModal(`Request a quote from ${p.name}`, html`
+    ${when(r, html`<div class="quote-hint"><b>${r?.name}</b> <span class="muted">${r?.subject_name || ''}${r?.location_city ? ' · ' + r.location_city : ''}</span></div>`)}
+    <label class="field"><span>What do you need?</span><textarea name="note" rows="3" maxlength="1000" placeholder="${r ? 'e.g. Please renew this before the deadline. Documents are ready.' : 'e.g. Mayor\'s Permit renewal for 2 branches in Pasig'}"></textarea></label>
     <div class="grid2">
       <label class="field"><span>Best way to reach you</span><select name="contact_method"><option value="phone">Phone call / SMS</option><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="viber">Viber</option></select></label>
       <label class="field"><span>Mobile or email</span><input name="contact_value" value="${S.profile.phone || ''}" maxlength="120"></label>
-    </div>`, {
-    submitLabel: 'Send',
+    </div>
+    <p class="muted small">We'll send ${p.name} your name, business name, contact details${r ? ', this permit and its expiry date' : ''} and your message, nothing else. They'll contact you directly.</p>`, {
+    submitLabel: 'Send request',
     onSubmit: async (fd) => {
       const f = formObject(fd);
       let v = f.contact_value;
       if (f.contact_method === 'email') { if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) throw new Error('Please enter a valid email address.'); }
       else { v = normalizePhone(v); if (!v) throw new Error('Please enter a valid mobile number.'); }
       await db.requestReferral({ org_id: S.org.id, partner_id: p.id, requirement_id: requirementId, note: f.note, contact_method: f.contact_method, contact_value: v });
-      toast(`Sent. ${p.name} will contact you.`);
-      if (location.hash.startsWith('#/partners')) partners(document.getElementById('main'));
+      toast(`Sent. ${p.name} will contact you within 1 business day.`);
+      if (location.hash.startsWith('#/pros')) partners(document.getElementById('main'));
     },
   });
 }
 on('partner-intro', async (ds) => { await loadPartners(); partnerIntro(ds.id, ds.req || null); });
 
-// Partners whose services fit a requirement (shown on the requirement page).
+// Requirement page: firms who can file this permit for you.
 export function partnerSuggestions(r) {
-  const fit = (partnersCache || []).filter((p) => p.type_codes?.includes(r.type_code)).slice(0, 3);
-  if (!fit.length) return '';
-  return html`<section class="card"><div class="card-head"><div><h2>Partners who can help</h2><p class="card-sub">For what this permit needs</p></div></div>
-    ${fit.map((p) => html`<div class="line"><span class="line-main"><b>${p.name}</b><small>${PARTNER_CATEGORIES[p.category]}${p.offer ? ' · ' + p.offer : ''}</small></span>
-      ${when(canEdit(), html`<button class="btn btn-sm btn-soft" data-act="partner-intro" data-id="${p.id}" data-req="${r.id}">Get introduced</button>`)}</div>`)}</section>`;
+  const city = r.location_city;
+  const fits = (p) => (p.type_codes?.includes(r.type_code) || (p.category === 'liaison' && r.subject === 'business'))
+    && (!city || !p.cities?.length || p.cities.includes(city));
+  const fit = (partnersCache || []).filter(fits).slice(0, 3);
+  return html`<section class="card pro-help"><div class="card-head"><div><h2>Rather not queue for this?</h2>
+      <p class="card-sub">Licensed firms${city ? ' serving ' + city : ''} can file it for you. You deal with them directly.</p></div></div>
+    ${fit.length ? fit.map((p) => html`<div class="line"><span class="line-main"><b>${p.name}${p.verified ? html` <span class="chip ok pro-badge">${ICON.check} Licence checked</span>` : ''}</b>
+      <small>${PARTNER_CATEGORIES[p.category] || ''}${p.cities?.length ? ' · ' + p.cities.slice(0, 3).join(', ') : ''}</small></span>
+      ${when(canEdit(), html`<button class="btn btn-sm btn-soft" data-act="partner-intro" data-id="${p.id}" data-req="${r.id}">Request a quote</button>`)}</div>`)
+      : html`<p class="muted small">No listed firm for this yet. <a href="#/pros">See all professionals</a>.</p>`}
+  </section>`;
 }
 
 // ================================================================ costs & budget

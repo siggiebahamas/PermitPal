@@ -45,7 +45,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: BIR COR (never recorded) is NOT shown as compliant`,
     (await page.locator('.row.needinfo', { hasText: 'BIR Certificate' }).count()) > 0);
 
-  for (const h of ['#/businesses', '#/businesses/b1', '#/vehicles', '#/vehicles/v1', '#/compliance', '#/documents', '#/help', '#/services', '#/people', '#/partners', '#/costs', '#/sharing', '#/notifications', '#/history', '#/trash', '#/team', '#/settings', '#/settings/billing', '#/settings/workspace', '#/admin']) {
+  for (const h of ['#/businesses', '#/businesses/b1', '#/vehicles', '#/vehicles/v1', '#/compliance', '#/documents', '#/pros', '#/network', '#/people', '#/costs', '#/sharing', '#/notifications', '#/history', '#/trash', '#/team', '#/settings', '#/settings/billing', '#/settings/workspace', '#/admin']) {
     await go(h);
     await page.waitForSelector('main h1', { timeout: 5000 }).catch(() => {});
     const t = await page.textContent('main').catch(() => '');
@@ -87,31 +87,16 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check('new business has a starter checklist, none compliant',
       (await page.locator('#tab-body .row').count()) === 3 && (await page.locator('#tab-body .row.ok').count()) === 0);
 
-    // Done-for-you order: request -> quote -> accept -> pay; the permit shows in progress meanwhile.
-    await go('#/services');
-    await page.click('[data-act=svc-request][data-code=renew_ctpl]');
-    await page.waitForSelector('.modal select[name=target]');
+    // Find a professional: a quote request goes to the firm and shows under "Your quote requests".
+    await go('#/pros');
+    await page.click('[data-act=partner-intro][data-id=p1]');
+    await page.fill('.modal [name=note]', "Mayor's Permit renewal for 2 branches");
+    await page.selectOption('.modal [name=contact_method]', 'email');
+    await page.fill('.modal [name=contact_value]', 'sadie@test.ph');
     await page.click('.modal button[type=submit]');
-    await page.waitForSelector('main .stepper');
-    const orderHash = await page.evaluate(() => location.hash);
-    check('service request opens its order page', orderHash.startsWith('#/services/orders/'), orderHash);
-    await go('#/vehicles/v1');
-    check('requirement with open request shows in progress', (await page.locator('.row.progress', { hasText: 'CTPL' }).count()) === 1);
-    await go('#/admin');
-    await page.click('[data-act=admin-order]:has-text("CTPL")');
-    await page.fill('.admin-quote [name=fee]', '300');
-    await page.fill('.admin-quote [name=gov]', '610');
-    await page.click('.admin-quote button');
+    await page.waitForSelector('.modal', { state: 'detached' });
     await page.waitForTimeout(300);
-    await go(orderHash);
-    check('customer sees the quote total', (await page.textContent('.quote .qline.total')).includes('910'));
-    await page.click('[data-act=quote-accept]');
-    await page.click('.modal button[type=submit]');
-    await page.waitForSelector('.pay-form');
-    await page.fill('.pay-form [name=ref]', '1009 234');
-    await page.click('.pay-form button[type=submit]');
-    await page.waitForTimeout(400);
-    check('payment goes to checking', (await page.locator('text=checking your payment').count()) === 1);
+    check('quote request listed', (await page.locator('main .card', { hasText: 'Your quote requests' }).count()) === 1);
 
     // Import vehicles from a CSV: good rows go in, bad rows are shown and skipped.
     await go('#/vehicles');
@@ -133,18 +118,33 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('[data-modal-close]');
     check('share proof link listed', (await page.locator('main [data-act=share-copy]').count()) === 1);
 
-    // Staff opening a customer file is logged where the customer can see it.
-    await go('#/admin');
-    await page.waitForTimeout(300);
-    if (await page.locator('[data-act=admin-order]:has-text("CTPL")').count()) await page.click('[data-act=admin-order]:has-text("CTPL")');
-    await page.click('[data-act=admin-pay][data-ok="1"]');
-    await page.waitForTimeout(300);
-    await page.fill('.admin-refund [name=amount]', '100');
-    await page.fill('.admin-refund [name=reason]', 'Insurer charged less than quoted');
-    await page.click('.admin-refund button');
-    await page.waitForTimeout(300);
-    await go(orderHash);
-    check('customer sees the refund', (await page.textContent('main .kv')).includes('Insurer charged less'));
+    // Team tools: start a head-office trial, see own branches on the board, invite a franchisee.
+    await go('#/network');
+    await page.click('[data-act=nb-set-kind][data-kind=head_office]');
+    await page.click('.modal button[type=submit]');
+    await page.waitForSelector('main h1:has-text("Branches")');
+    check('head office board lists company branches', (await page.locator('.nb-table tbody tr').count()) >= 1);
+    check('menu shows Branches', (await page.locator('[data-nav=network]').count()) >= 1);
+    await page.click('[data-act=nb-add]');
+    await page.fill('.modal [name=email]', 'owner@franchisee.ph');
+    await page.fill('.modal [name=label]', 'QC-001');
+    await page.click('.modal button[type=submit]');
+    await page.waitForTimeout(400);
+    check('franchisee invite waits to connect', (await page.locator('main .card', { hasText: 'owner@franchisee.ph' }).count()) === 1);
+    // Switch the workspace to fleet: the fleet board shows every vehicle.
+    await go('#/settings/workspace');
+    await page.click('#kind-form input[value=fleet]');
+    await page.click('#kind-form button');
+    await page.waitForTimeout(500);
+    await go('#/network');
+    check('fleet board shows vehicles', (await page.locator('main h1:has-text("Fleet")').count()) === 1 && (await page.locator('.nb-table tbody tr').count()) >= 1);
+    await go('#/settings/billing');
+    check('plans page shows team plans with prices', (await page.locator('main', { hasText: '₱1,490' }).count()) === 1);
+    // Back to a single business for the rest of the tests.
+    await go('#/settings/workspace');
+    await page.click('#kind-form input[value=business]');
+    await page.click('#kind-form button');
+    await page.waitForTimeout(500);
 
     // Notifications: grouped by business, with a task button; ticking one off marks it done.
     await go('#/notifications');

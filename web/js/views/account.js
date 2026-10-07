@@ -7,6 +7,7 @@ import {
   S, on, reload, rerender, canEdit, isOrgAdmin, isOwner, memberName, empty, effectivePlan, ROLES, ENTITY_LABELS, business, vehicle, person,
 } from '../core.js';
 import { avatar } from '../components.js';
+import { KINDS, teamAccess, connectionsCard } from './network.js';
 import * as db from 'pp/data';
 
 // ================================================================ history
@@ -129,12 +130,14 @@ export async function settings(el, section) {
   const prefs = S.prefs || {};
   let channels = {};
   let log = [];
-  let access = [];
+  let conn = '';
+  let pay = {};
   try {
-    [channels, log, access] = await Promise.all([
+    [channels, log, conn, pay] = await Promise.all([
       db.channelStatus().catch(() => ({})),
       db.myDeliveryLog(S.user.id).catch(() => []),
-      section === 'workspace' ? db.staffAccessLog(S.org.id).catch(() => []) : [],
+      section === 'workspace' ? connectionsCard() : '',
+      section === 'billing' ? db.appSettings().catch(() => ({})) : {},
     ]);
   } catch { /* shown as empty */ }
   const toggle = (k, label, sub = '', disabled = false) => html`<label class="toggle ${disabled ? 'disabled' : ''}"><div><div>${label}</div>${when(sub, html`<div class="muted small">${sub}</div>`)}</div>
@@ -186,11 +189,7 @@ export async function settings(el, section) {
     </section>`)}
 
     ${when(section === 'billing', html`
-    <section class="card"><h2>Your plan</h2>
-      <p>PermitPal is <b>free</b> right now: no limits and no card needed.</p>
-      <ul>${(S.plans.find((pl) => pl.id === 'free')?.features || []).map((f) => html`<li>${f}</li>`)}</ul>
-      <p class="muted small">If paid plans are introduced later, you'll get plenty of notice and your data will never be locked or deleted.</p>
-    </section>`)}
+    ${billingSection(pay)}`)}
 
     ${when(section === 'workspace', html`
     <section class="card"><h2>Workspace</h2>
@@ -202,17 +201,18 @@ export async function settings(el, section) {
         <span class="muted small">Useful if you manage permits for several separate companies or clients.</span></p>
     </section>
 
+    <section class="card"><div class="card-head"><div><h2>What this workspace is for</h2><p class="card-sub">Team types add a board for everything you're responsible for. 30-day free trial.</p></div></div>
+      <form id="kind-form">${Object.entries(KINDS).map(([k, v]) => html`<label class="radio-card ${org.kind === k ? 'on' : ''}"><input type="radio" name="kind" value="${k}" ${org.kind === k ? 'checked' : ''} ${isOrgAdmin() ? '' : 'disabled'}>
+        <span><b>${v.title}</b><small>${k === 'business' ? 'Free. Track your own permits, vehicles and staff licences.' : v.pitch}</small></span></label>`)}
+        ${when(isOrgAdmin(), html`<button class="btn btn-primary">Save</button>`)}</form>
+    </section>
+
+    ${conn}
+
     <section class="card"><h2>Language</h2>
       <div class="btn-row"><button class="btn ${p.lang === 'en' ? 'btn-primary' : 'btn-ghost'}" data-act="lang" data-lang="en">English</button>
       <button class="btn ${p.lang === 'tl' ? 'btn-primary' : 'btn-ghost'}" data-act="lang" data-lang="tl">Tagalog</button></div>
       <p class="muted small">Tagalog covers the menus for now; more screens will follow.</p>
-    </section>
-
-    <section class="card" id="staff-access"><div class="card-head"><div><h2>Who at PermitPal opened your files</h2>
-      <p class="card-sub">PermitPal staff can only open a file while you have an open service request for it, and every open is listed here. It can't be edited or erased.</p></div></div>
-      ${access.length ? access.map((x) => html`<div class="line"><span class="line-main"><b>${x.file_name}</b>
-        <small>${x.staff_name} · ${fmtDateTime(x.created_at)} · ${x.reason}</small></span></div>`)
-        : html`<p class="muted">No one at PermitPal has opened your files.</p>`}
     </section>
 
     <section class="card"><h2>Your data</h2>
@@ -254,6 +254,16 @@ export async function settings(el, section) {
     if (!name) return;
     try { await db.renameOrg(org.id, name); S.org.name = name; await reload(); toast('Renamed.'); } catch (err) { toastError(err); }
   });
+  el.querySelector('#kind-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const kind = new FormData(e.target).get('kind');
+    if (!kind || kind === org.kind) return;
+    try {
+      await db.setOrgProfile(org.id, { kind });
+      await reload();
+      toast(kind === 'business' ? 'Back to a single business. Your data is unchanged.' : `${KINDS[kind].nav} is on. Find it in the menu.`);
+    } catch (err) { toastError(err); }
+  });
 }
 
 on('change-password', () => openModal('Change password', html`
@@ -277,3 +287,45 @@ on('org-delete', async () => {
 });
 on('org-undelete', async () => { try { await db.cancelOrgDeletion(S.org.id); await reload(); rerender(); toast('Deletion cancelled.'); } catch (e) { toastError(e); } });
 
+
+// ---------------------------------------------------------------- plans
+function billingSection(pay) {
+  const org = S.org;
+  const acc = teamAccess();
+  const k = KINDS[org.kind || 'business'];
+  const plan = S.plans.find((p) => p.id === k?.plan);
+  const teamPlans = ['fleet', 'firm', 'head_office', 'property'].map((id) => S.plans.find((p) => p.id === id)).filter(Boolean);
+  const status = org.kind === 'business' ? html`<p>This workspace is a <b>single business</b>: PermitPal is <b>free</b>, with no limits on businesses, vehicles or team members.</p>`
+    : acc.why === 'plan' ? html`<p>You're on the <b>${plan?.name}</b> plan${org.plan_expires_at ? html`, paid until <b>${fmtDate(org.plan_expires_at.slice(0, 10))}</b>` : ''}.</p>`
+    : acc.why === 'trial' ? html`<p>You're on a <b>free trial</b> of ${plan?.name}: ${plural(acc.days, 'day')} left. Choose the plan below to keep your board after the trial.</p>`
+    : acc.why === 'staff' ? html`<p>Staff access: team tools are on.</p>`
+    : html`<p>Your free trial of ${plan?.name} has ended. Your data is safe; choose the plan below to open your board again.</p>`;
+  const payBox = (p) => html`<div class="plan-pay">
+      ${pay.online_payments === 'on' && isOwner() ? html`<div class="btn-row"><select name="months" data-months="${p.id}"><option value="1">1 month</option><option value="3">3 months</option><option value="12">12 months</option></select>
+        <button class="btn btn-primary btn-sm" data-act="plan-checkout" data-plan="${p.id}">Pay online (GCash, Maya, card)</button></div>`
+      : html`${when(pay.gcash_number || pay.bank_account_number, html`<div class="paywiths">
+          ${when(pay.gcash_number, html`<div class="paywith"><b>GCash</b><span>${pay.gcash_number}${pay.gcash_name ? ' · ' + pay.gcash_name : ''}</span></div>`)}
+          ${when(pay.bank_account_number, html`<div class="paywith"><b>${pay.bank_name || 'Bank transfer'}</b><span>${pay.bank_account_number}${pay.bank_account_name ? ' · ' + pay.bank_account_name : ''}</span></div>`)}</div>`)}
+        <p class="muted small">${pay.payment_note || 'Pay the monthly amount, then press the button so we can activate your plan within 1 business day.'}</p>
+        ${when(isOrgAdmin(), html`<button class="btn btn-primary btn-sm" data-act="plan-request" data-plan="${p.id}">I've paid / activate ${p.name}</button>`)}`}
+    </div>`;
+  return html`<section class="card"><h2>Your plan</h2>${status}
+      ${org.kind !== 'business' && plan && acc.why !== 'plan' && acc.why !== 'staff' ? payBox(plan) : ''}</section>
+    <h3 class="section-label">Team plans</h3>
+    <div class="svc-grid">${teamPlans.map((p) => html`<section class="card svc ${p.id === k?.plan ? 'plan-current' : ''}">
+      <div class="svc-top"><h2>${p.name}</h2><div class="svc-price"><b>₱${Number(p.price_php_monthly).toLocaleString()}</b><small>per month</small></div></div>
+      <ul class="svc-inc">${p.features.map((f) => html`<li>${f}</li>`)}</ul>
+      <div class="svc-foot"><span class="muted small">30-day free trial</span>
+        ${p.id === k?.plan ? html`<span class="chip ok">Your plan</span>` : when(isOrgAdmin(), html`<button class="btn btn-sm btn-soft" data-act="nb-set-kind" data-kind="${p.id}">Start free trial</button>`)}</div>
+    </section>`)}</div>
+    <p class="fineprint">Single businesses stay free. Cancel anytime: your data is never locked or deleted, and you can always export it.</p>`;
+}
+on('plan-request', async (ds) => {
+  const p = S.plans.find((x) => x.id === ds.plan);
+  if (!(await confirmDialog(`Activate ${p.name}?`, "We'll match your payment and turn the plan on within 1 business day. You'll get a notification when it's active.", { confirmLabel: 'Send', danger: false }))) return;
+  try { await db.requestPlan(S.org.id, ds.plan); toast("Thanks! We'll confirm and activate your plan within 1 business day."); } catch (e) { toastError(e); }
+});
+on('plan-checkout', async (ds) => {
+  const months = Number(document.querySelector(`[data-months="${ds.plan}"]`)?.value || 1);
+  try { location.href = await db.startCheckout(S.org.id, ds.plan, months); } catch (e) { toastError(e); }
+});
