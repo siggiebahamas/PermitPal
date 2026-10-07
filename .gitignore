@@ -4,3 +4,4 @@ tests/ui/*.png
 .env
 web/demo.html
 web/demo/
+*.tmp.mjs
