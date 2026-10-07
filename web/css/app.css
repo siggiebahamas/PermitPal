@@ -755,3 +755,9 @@ tr.imp-bad td { background: var(--s-over-bg); }
   .sidebar .nav .badge { font-size: 11px; min-width: 18px; line-height: 16px; }
 }
 .more-menu a, .more-menu button { font-size: 16.5px; }
+/* phones: tab rows wrap into pills so every tab is visible (no hidden tabs off the right edge) */
+@media (max-width: 639px) {
+  .tabs { flex-wrap: wrap; overflow: visible; border-bottom: 0; gap: 6px; margin: 4px 0 14px; }
+  .tab { border: 1.5px solid var(--border); border-radius: 999px; padding: 8px 14px; background: var(--card); color: var(--text); min-height: 40px; }
+  .tab.active { background: var(--heading); border-color: var(--heading); color: #fff; }
+}

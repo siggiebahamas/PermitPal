@@ -75,7 +75,7 @@ if (globalThis.PP_DEMO) {
   db.locations.push({ id: 'l3', business_id: 'b2', name: 'Mandaue warehouse', city: 'Mandaue City', address: '', is_main: false, deleted_at: null });
   const mp = addReq('business', 'b2', 'l2', types[0], { reference_no: 'MP-2026-0810', expires_on: addDays(22) });
   addReq('business', 'b2', 'l2', types[1], { reference_no: 'COR-551204' });
-  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'BIR_2303.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 90000, created_at: new Date().toISOString(), deleted_at: null });
+  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'BIR_2303.pdf', storage_path: 'o1/demo/BIR_2303.pdf', mime_type: 'application/pdf', size_bytes: 90000, created_at: new Date().toISOString(), deleted_at: null });
   addReq('business', 'b2', 'l3', types[0], { reference_no: 'MP-2026-0911', expires_on: addDays(-12) });
   addReq('business', 'b2', 'l3', types[2]);
   db.requirements.forEach((r) => { if (r.business_id === 'b2') r.confidence = 'confirmed'; });
@@ -83,14 +83,14 @@ if (globalThis.PP_DEMO) {
   const v3 = { id: 'v3', org_id: org.id, make_model: 'Honda Click 125i', plate_no: '123 ABC', vehicle_type: 'Motorcycle', cr_no: '', mv_file_no: '', business_id: null, deleted_at: null };
   db.vehicles.push(v2, v3);
   addReq('vehicle', 'v2', null, types[3], { reference_no: 'OR-5521', expires_on: addDays(160) });
-  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'Hilux_OR.jpg', storage_path: 'x', mime_type: 'image/jpeg', size_bytes: 240000, created_at: new Date().toISOString(), deleted_at: null });
+  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'Hilux_OR.jpg', storage_path: 'o1/demo/Hilux_OR.jpg', mime_type: 'image/jpeg', size_bytes: 240000, created_at: new Date().toISOString(), deleted_at: null });
   addReq('vehicle', 'v2', null, types[4], { reference_no: 'CTPL-88', issuer: 'Malayan Insurance', expires_on: addDays(160) });
   addReq('vehicle', 'v3', null, types[3], { reference_no: 'OR-77', expires_on: addDays(5) });
   // A fuller year for the calendar strip.
   addReq('business', 'b2', 'l2', types[2], { reference_no: 'FSIC-C-221', expires_on: addDays(130) });
-  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'FSIC_Cebu.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 80000, created_at: new Date().toISOString(), deleted_at: null });
+  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'FSIC_Cebu.pdf', storage_path: 'o1/demo/FSIC_Cebu.pdf', mime_type: 'application/pdf', size_bytes: 80000, created_at: new Date().toISOString(), deleted_at: null });
   addReq('business', 'b1', 'l1', { code: 'sanitary_permit', name: 'Sanitary Permit', expires: true }, { reference_no: 'SP-88', expires_on: addDays(250) });
-  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'sanitary.pdf', storage_path: 'x', mime_type: 'application/pdf', size_bytes: 60000, created_at: new Date().toISOString(), deleted_at: null });
+  db.documents.push({ id: uid(), requirement_id: last(db.requirements).id, cycle_id: last(db.cycles).id, file_name: 'sanitary.pdf', storage_path: 'o1/demo/sanitary.pdf', mime_type: 'application/pdf', size_bytes: 60000, created_at: new Date().toISOString(), deleted_at: null });
   for (const [loc, biz] of [['l1', 'b1'], ['l2', 'b2'], ['l3', 'b2']]) addReq('business', biz, loc, { code: 'barangay_clearance', name: 'Barangay Business Clearance', expires: true }, { reference_no: 'BC-' + loc, expires_on: addDays(112) });
   addReq('vehicle', 'v3', null, types[4], { reference_no: 'CTPL-31', expires_on: addDays(5) });
   db.notifications.push({ id: 'n2', user_id: user.id, kind: 'due_soon', title: `${mp.name} expires in 22 days`, body: b.name, link: `#/requirement/${mp.id}`, read_at: null, created_at: new Date().toISOString() });
@@ -224,7 +224,31 @@ export async function uploadDocument({ requirementId, cycleId, file }) {
   log(`Uploaded "${file.name}" for ${r ? reqLabel(r) : 'a permit'}`, { entity: 'documents', action: 'uploaded', ...ids(r) });
   return d;
 }
-export const fileUrl = async () => 'data:application/pdf;base64,JVBERi0=';
+// Demo files: a real one-page PDF (or a picture for image files) so View, Download and the inspection pack work.
+function samplePdf(title) {
+  const text = `BT /F1 22 Tf 72 720 Td (${title.replace(/[()\\]/g, '')}) Tj 0 -34 Td /F1 13 Tf (PermitPal demo - sample document, nothing real is stored.) Tj ET`;
+  const objs = ['<</Type/Catalog/Pages 2 0 R>>', '<</Type/Pages/Kids[3 0 R]/Count 1>>',
+    '<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>',
+    `<</Length ${text.length}>>stream\n${text}\nendstream`, '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>'];
+  let out = '%PDF-1.4\n'; const offs = [];
+  objs.forEach((o, i) => { offs.push(out.length); out += `${i + 1} 0 obj${o}endobj\n`; });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offs.map((o) => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+  out += `trailer<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`;
+  return new Blob([out], { type: 'application/pdf' });
+}
+async function sampleImage(title) {
+  const c = document.createElement('canvas'); c.width = 900; c.height = 560;
+  const g = c.getContext('2d'); g.fillStyle = '#FFFEF9'; g.fillRect(0, 0, 900, 560); g.strokeStyle = '#1F2A44'; g.lineWidth = 6; g.strokeRect(20, 20, 860, 520);
+  g.fillStyle = '#1F2A44'; g.font = 'bold 40px sans-serif'; g.fillText(title.slice(0, 34), 60, 140);
+  g.font = '24px sans-serif'; g.fillStyle = '#4B5568'; g.fillText('PermitPal demo - sample document', 60, 200);
+  return new Promise((res) => c.toBlob(res, 'image/png'));
+}
+export async function fileUrl(path) {
+  const name = String(path || 'document.pdf').split('/').pop();
+  const blob = /\.(jpe?g|png|webp)$/i.test(name) ? await sampleImage(name) : samplePdf(name);
+  return URL.createObjectURL(blob);
+}
 export const orgDocuments = async () => db.documents.filter((d) => !d.deleted_at);
 export const allCycles = async () => db.cycles;
 export const cancelHelpRequest = async (id) => { const a = db.requests.find((x) => x.id === id); a.status = 'cancelled'; event(a, 'cancelled', 'You cancelled this request.'); };
@@ -456,11 +480,16 @@ export const linkToken = async (id) => db.links.find((l) => l.link_id === id).to
 export const linkPreview = async (token) => { const l = db.links.find((x) => x.token === token); return l ? { owner_name: 'Sample Franchisor Inc.', owner_kind: 'head_office', relation: l.relation, label: l.label, status: l.status, required_types: [] } : null; };
 export async function linkAccept(token) { const l = db.links.find((x) => x.token === token); Object.assign(l, { status: 'active', accepted_at: new Date().toISOString() }); return l.link_id; }
 export async function linkDecline(token) { db.links.find((x) => x.token === token).status = 'declined'; }
-export async function linkEnd(id) { const l = db.links.find((x) => x.link_id === id); if (l) l.status = l.status === 'pending' ? 'declined' : 'ended'; }
-export async function linkSetSharing(id, share) { db.links.find((x) => x.link_id === id).share_files = share; }
+export async function linkEnd(id) {
+  const l = db.links.find((x) => x.link_id === id); if (l) l.status = l.status === 'pending' ? 'declined' : 'ended';
+  const c = db.myConns.find((x) => x.id === id); if (c) c.status = 'ended';
+}
+export async function linkSetSharing(id, share) { const l = db.links.find((x) => x.link_id === id) || db.myConns.find((x) => x.id === id); if (!l) throw new Error('Connection not found.'); l.share_files = share; }
 export async function linkSetLabel(id, label) { db.links.find((x) => x.link_id === id).label = label; }
-export const myConnections = async () => (globalThis.PP_DEMO ? [{ id: 'c1', owner_name: 'Ayala Malls (sample)', owner_kind: 'property', relation: 'tenant', label: 'G/F Unit 12', share_files: true, accepted_at: addDays(-40) }] : []);
-export const networkDocuments = async () => [{ path: 'x', file_name: 'mayors-permit-2026.pdf', requirement: "Mayor's / Business Permit", subject_name: null, expires_on: addDays(80) }];
+// Companies this workspace is connected to (its franchisor, accountant, mall).
+db.myConns = globalThis.PP_DEMO ? [{ id: 'c1', owner_name: 'Ayala Malls (sample)', owner_kind: 'property', relation: 'tenant', label: 'G/F Unit 12', share_files: true, accepted_at: addDays(-40), status: 'active' }] : [];
+export const myConnections = async () => db.myConns.filter((c) => c.status === 'active').map(({ status, ...c }) => c);
+export const networkDocuments = async () => [{ path: 'o1/demo/mayors-permit-2026.pdf', file_name: 'mayors-permit-2026.pdf', requirement: "Mayor's / Business Permit", subject_name: null, expires_on: addDays(80) }];
 export async function networkNudge(owner, links, orgs) {
   let n = 0;
   for (const id of links) { const l = db.links.find((x) => x.link_id === id); if (l) { l.last_nudged_at = new Date().toISOString(); n++; } }

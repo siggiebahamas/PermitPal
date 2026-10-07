@@ -311,7 +311,12 @@ on('doc-view', async (ds) => {
   } catch (e) { toastError(e); }
 });
 on('doc-download', async (ds) => {
-  try { window.location.href = await db.fileUrl(ds.path, ds.name); } catch (e) { toastError(e); }
+  try {
+    // A link click, not a page change: the file downloads and PermitPal stays open.
+    const a = document.createElement('a');
+    a.href = await db.fileUrl(ds.path, ds.name); a.download = ds.name || ''; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) { toastError(e); }
 });
 on('doc-remove', async (ds) => {
   if (!(await confirmDialog(`Remove "${ds.name}"?`, 'The file is hidden from this record. It is kept safely and can be restored from Trash.', { confirmLabel: 'Remove' }))) return;

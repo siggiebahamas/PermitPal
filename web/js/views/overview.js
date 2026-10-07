@@ -80,6 +80,7 @@ on('brief-skip', () => { skip++; hooks.render(); });
 
 // ---------------------------------------------------------------- compliance
 const filters = { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', q: '' };
+let moreOpen = false; // "More filters" stays open until the user closes it
 
 export function compliance(el, params) {
   if (params.get('status')) filters.status = params.get('status');
@@ -120,7 +121,7 @@ export function compliance(el, params) {
         ${[['all', 'All', ''], ...Object.entries(STATUS).map(([k, s]) => [k, s.label, s.cls])].map(([k, label, cls]) => html`
           <button type="button" class="chip-btn ${cls} ${filters.status === k ? 'on' : ''}" data-act="filter-status" data-v="${k}" aria-pressed="${filters.status === k}">${label}${k === 'all' ? '' : html` <span>${byStatus[k] || 0}</span>`}</button>`)}
       </div>
-      <details class="more-filters" ${extra ? 'open' : ''}><summary>More filters${extra ? ` (${extra} on)` : ''}</summary>
+      <details class="more-filters" ${extra || moreOpen ? 'open' : ''}><summary>More filters${extra ? ` (${extra} on)` : ''}</summary>
         <div class="more-filters-body">
           <select name="subject">${opt('all', 'Businesses + vehicles', filters.subject)}${opt('business', 'Businesses', filters.subject)}${opt('vehicle', 'Vehicles', filters.subject)}</select>
           <select name="entity">${opt('all', 'All businesses & vehicles', filters.entity)}
@@ -142,6 +143,7 @@ export function compliance(el, params) {
     </section>`);
 
   const f = el.querySelector('#filters');
+  f.querySelector('.more-filters')?.addEventListener('toggle', (e) => { moreOpen = e.target.open; });
   f.addEventListener('change', (e) => { if (e.target.name) { filters[e.target.name] = e.target.value; if (e.target.name === 'subject') filters.entity = 'all'; compliance(el, new URLSearchParams()); } });
   let t;
   f.querySelector('[name=q]').addEventListener('input', (e) => {

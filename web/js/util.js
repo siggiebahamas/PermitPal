@@ -98,6 +98,14 @@ export function friendlyError(err) {
   if (err?.code === '23505' || /duplicate key/i.test(msg)) return 'That already exists here.';
   if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) return "Can't reach PermitPal right now. Check your internet connection and try again.";
   if (/JWT|refresh token/i.test(msg)) return 'Your session expired. Please log in again.';
+  // Database rule violations: say what to fix in plain words instead of showing the raw error.
+  if (err?.code === '23514' || /violates check constraint/i.test(msg)) {
+    return /email/i.test(msg) ? 'Please enter a valid email address.' : "Some of the details aren't in the right format. Please check what you entered.";
+  }
+  if (err?.code === '22001' || /value too long/i.test(msg)) return 'One of the entries is too long. Please shorten it.';
+  if (err?.code === '22007' || err?.code === '22008' || /invalid input syntax for type date|date\/time field value out of range/i.test(msg)) return 'Please enter a valid date.';
+  if (err?.code === '23502' || /null value in column/i.test(msg)) return 'Please fill in all the required details.';
+  if (err?.code === '23503' || /violates foreign key/i.test(msg)) return 'That item no longer exists. Refresh the page and try again.';
   return msg;
 }
 
