@@ -24,10 +24,10 @@ let unsubscribe = null;
 const T = {
   en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
         pros: 'Find a professional', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
-        notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact PermitPal' },
+        notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact PermitPal', tools: 'Tools', account: 'Account' },
   tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
         pros: 'Maghanap ng Propesyonal', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
-        notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang PermitPal' },
+        notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang PermitPal', tools: 'Mga Tool', account: 'Account' },
 };
 const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k] || k;
 
@@ -115,11 +115,15 @@ const BASE_NAV = [
 // Team workspaces (head office, firm, property, fleet) get their board right after the dashboard.
 let NAV = BASE_NAV;
 let MORE = [];
+let TOOLS = [];
+let ACCOUNT = [];
 function buildNav() {
   const k = KINDS[S.org?.kind || 'business'];
   NAV = k?.nav ? [BASE_NAV[0], ['network', k.nav, k.icon], ...BASE_NAV.slice(1)] : BASE_NAV;
-  MORE = [['notifications', 'notifications'], ['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'],
-    ...(k?.nav ? [] : [['network', 'team_tools']]), ['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings'], ['contact', 'contact']];
+  // Below Notifications the menu has two color-coded groups: Tools (pine) and Account (navy).
+  TOOLS = [['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'], ...(k?.nav ? [] : [['network', 'team_tools']])];
+  ACCOUNT = [['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings'], ['contact', 'contact']];
+  MORE = [['notifications', 'notifications'], ...TOOLS, ...ACCOUNT];
 }
 
 function renderShell() {
@@ -134,7 +138,10 @@ function renderShell() {
         <nav>${NAV.map(([p, k, ic]) => html`<a class="nav" href="#/${p}" data-nav="${p}">${ic}<span>${t(k)}</span></a>`)}</nav>
         <nav class="nav-secondary">
           <a class="nav" href="#/notifications" data-nav="notifications">${ICON.bell}<span>${t('notifications')}</span><b class="badge" data-badge></b></a>
-          ${MORE.slice(1).map(([p, k]) => html`<a class="nav small" href="#/${p}" data-nav="${p}"><span>${t(k)}</span></a>`)}
+          <div class="nav-group tools">${t('tools')}</div>
+          ${TOOLS.map(([p, k]) => html`<a class="nav small" href="#/${p}" data-nav="${p}"><span>${t(k)}</span></a>`)}
+          <div class="nav-group account">${t('account')}</div>
+          ${ACCOUNT.map(([p, k]) => html`<a class="nav small" href="#/${p}" data-nav="${p}"><span>${t(k)}</span></a>`)}
           ${isStaff() ? html`<a class="nav small" href="#/admin" data-nav="admin"><span>${t('admin')}</span></a>` : ''}
         </nav>
         <div class="me"><div class="me-name">${name}</div><div class="muted small">${S.org.role}</div>
@@ -242,7 +249,11 @@ on('sign-out', async () => { await db.auth.signOut(); S.data = null; location.ha
 on('more-menu', () => {
   import('./util.js').then(({ openModal }) => openModal(t('more'), html`<div class="more-menu">
     ${NAV.slice(4).map(([p, k, ic]) => html`<a href="#/${p}" data-close>${ic}<span>${t(k)}</span></a>`)}
-    ${MORE.map(([p, k]) => html`<a href="#/${p}" data-close><span>${t(k)}</span>${p === 'notifications' && S.unread ? html`<b class="badge">${S.unread}</b>` : ''}</a>`)}
+    <a href="#/notifications" data-close><span>${t('notifications')}</span>${S.unread ? html`<b class="badge">${S.unread}</b>` : ''}</a>
+    <div class="nav-group tools">${t('tools')}</div>
+    ${TOOLS.map(([p, k]) => html`<a href="#/${p}" data-close><span>${t(k)}</span></a>`)}
+    <div class="nav-group account">${t('account')}</div>
+    ${ACCOUNT.map(([p, k]) => html`<a href="#/${p}" data-close><span>${t(k)}</span></a>`)}
     ${isStaff() ? html`<a href="#/admin" data-close><span>${t('admin')}</span></a>` : ''}
     <button class="linklike" data-act="sign-out">${t('signout')}</button></div>`, {
     onOpen: (form) => form.querySelectorAll('[data-close]').forEach((l) => l.addEventListener('click', () => { document.getElementById('modal-root').innerHTML = ''; })),

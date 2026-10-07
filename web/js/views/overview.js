@@ -128,14 +128,14 @@ export function compliance(el, params) {
             ${businesses.map((b) => opt('business:' + b.id, b.name, filters.entity))}
             ${vehicles.map((v) => opt('vehicle:' + v.id, `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`, filters.entity))}</select>
           <select name="city">${opt('all', 'All locations', filters.city)}${cities.map((c) => opt(c, c, filters.city))}</select>
-          <select name="type">${opt('all', 'All requirement types', filters.type)}${types.map((t) => opt(t, t, filters.type))}</select>
+          <select name="type">${opt('all', 'All permit types', filters.type)}${types.map((t) => opt(t, t, filters.type))}</select>
           <select name="due">${opt('all', 'Any due date', filters.due)}${opt('overdue', 'Overdue', filters.due)}${opt('30', 'Next 30 days', filters.due)}${opt('90', 'Next 90 days', filters.due)}${opt('none', 'No expiry date yet', filters.due)}</select>
         </div>
       </details>
       ${when_(extra || filters.status !== 'all' || filters.q, html`<button class="btn btn-ghost btn-sm clear-btn" data-act="clear-filters">Clear filters</button>`)}
     </div>
     <section class="card list">
-      <div class="card-head"><div><h2>All requirements</h2><p class="card-sub">${plural(list.length, 'requirement')} · as of ${fmtDate(today)} (Philippine time)</p></div></div>
+      <div class="card-head"><div><h2>All permits</h2><p class="card-sub">${plural(list.length, 'permit')} · as of ${fmtDate(today)} (Philippine time)</p></div></div>
       ${list.length ? Object.keys(STATUS).map((k) => {
         const group = list.filter((r) => r.status === k);
         return group.length ? html`<div class="band ${STATUS[k].cls}"><span>${STATUS[k].label}</span><span>${group.length}</span></div>${group.map((r) => reqRow(r))}` : '';
@@ -161,7 +161,7 @@ on('clear-filters', () => { Object.assign(filters, { status: 'all', subject: 'al
 on('export-csv', async () => {
   try {
     const cycles = await db.allCycles(S.org.id);
-    const rows = [['Business / vehicle', 'Branch', 'City', 'Plate', 'Requirement', 'Status', 'Current reference no.', 'Issued', 'Expires', 'Files on current record', 'All records (reference - expiry)']];
+    const rows = [['Business / vehicle', 'Branch', 'City', 'Plate', 'Permit', 'Status', 'Current reference no.', 'Issued', 'Expires', 'Files on current record', 'All records (reference - expiry)']];
     for (const r of [...S.data.reqs].sort(byPriority)) {
       const hist = cycles.filter((c) => c.requirement_id === r.id).map((c) => `${c.reference_no || '-'} - ${c.expires_on || 'no expiry'}`).join(' | ');
       rows.push([r.subject_name, r.location_name || '', r.location_city || '', r.plate_no || '', r.name, STATUS[r.status].label,

@@ -93,12 +93,12 @@ export async function trashPage(el) {
   const any = Object.values(t).some((a) => a.length);
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Trash</h1><p class="muted">Nothing is ever lost: deleted items stay here and can be restored. They are only erased if the whole workspace is deleted.</p></div></div>
-    ${any ? '' : empty('Trash is empty', 'Deleted businesses, vehicles, requirements and files will appear here.')}
+    ${any ? '' : empty('Trash is empty', 'Deleted businesses, vehicles, permits and files will appear here.')}
     ${section('Businesses', 'businesses', t.businesses, (x) => x.name)}
     ${section('Branches', 'business_locations', t.locations, (x) => `${x.name} (${bizName(x.business_id)})`)}
     ${section('Vehicles', 'vehicles', t.vehicles, (x) => `${x.make_model}${x.plate_no ? ' · ' + x.plate_no : ''}`)}
     ${section('People', 'people', t.people || [], (x) => `${x.full_name}${x.role ? ' · ' + x.role : ''}`)}
-    ${section('Requirements', 'requirements', t.requirements, (x) => `${x.name} — ${x.business_id ? bizName(x.business_id) : x.vehicle_id ? vehicle(x.vehicle_id)?.make_model || 'a deleted vehicle' : person(x.person_id)?.full_name || 'a deleted person'}`)}
+    ${section('Permits', 'requirements', t.requirements, (x) => `${x.name} — ${x.business_id ? bizName(x.business_id) : x.vehicle_id ? vehicle(x.vehicle_id)?.make_model || 'a deleted vehicle' : person(x.person_id)?.full_name || 'a deleted person'}`)}
     ${section('Records', 'requirement_cycles', t.cycles, (x) => `${x.reference_no || 'Record'}${x.expires_on ? ' · expires ' + fmtDate(x.expires_on) : ''}`)}
     ${section('Files', 'documents', t.documents, (x) => x.file_name)}`);
 }

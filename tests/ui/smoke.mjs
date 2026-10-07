@@ -161,6 +161,10 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.keyboard.press('Escape');
     check('bell drop-down closes with Escape', (await page.locator('.bell-drop').count()) === 0);
 
+    // Menu: Notifications first, then the color-coded TOOLS and ACCOUNT groups.
+    const order = await page.evaluate(() => [...document.querySelectorAll('.sidebar .nav-secondary > *')].map((e) => e.classList.contains('nav-group') ? e.textContent.trim().toUpperCase() : e.dataset.nav));
+    check('menu: Notifications above TOOLS, then ACCOUNT', order[0] === 'notifications' && order[1] === 'TOOLS' && order.indexOf('ACCOUNT') > order.indexOf('sharing'), order.join(','));
+
     // History: the drop-down really filters (it used to show the same list whatever was picked).
     await go('#/history');
     const histAll = await page.locator('.hist-line').count();

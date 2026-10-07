@@ -761,3 +761,8 @@ tr.imp-bad td { background: var(--s-over-bg); }
   .tab { border: 1.5px solid var(--border); border-radius: 999px; padding: 8px 14px; background: var(--card); color: var(--text); min-height: 40px; }
   .tab.active { background: var(--heading); border-color: var(--heading); color: #fff; }
 }
+/* Menu below Notifications: color-coded group headings with a matching underline (Tools = pine, Account = navy) */
+.nav-group { font-size: 14px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; padding-bottom: 6px; border-bottom: 3px solid; margin: 16px 12px 6px; }
+.nav-group.tools { color: #1F6F5C; border-color: #1F6F5C; }
+.nav-group.account { color: #1F2A44; border-color: #1F2A44; }
+.more-menu .nav-group { margin: 18px 4px 2px; }

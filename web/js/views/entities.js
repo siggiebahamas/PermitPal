@@ -120,7 +120,7 @@ function addBusiness() {
       const id = await db.createBusiness(S.org.id, f);
       await reload();
       go(`#/businesses/${id}`);
-      toast(`${f.name} added with ${plural(reqsOf('business', id).length, 'requirement')} to confirm.`);
+      toast(`${f.name} added with ${plural(reqsOf('business', id).length, 'permit')} to check.`);
     },
   });
 }
@@ -142,7 +142,7 @@ export function businessDetail(el, id) {
         <button class="btn btn-ghost" data-act="share-open" data-scope="business" data-id="${id}">${ICON.share} Share proof</button>
         <a class="btn btn-ghost" href="#/pros">${ICON.briefcase} Find a professional</a></div></div>
     ${statTiles(c)}
-    <div class="tabs">${tabBtn('requirements', 'Requirements')}${tabBtn('branches', `Branches (${locs.length})`)}${tabBtn('documents', 'Documents')}${tabBtn('activity', 'Activity')}${tabBtn('details', 'Details')}</div>
+    <div class="tabs">${tabBtn('requirements', 'Permits')}${tabBtn('branches', `Branches (${locs.length})`)}${tabBtn('documents', 'Documents')}${tabBtn('activity', 'Activity')}${tabBtn('details', 'Details')}</div>
     <div id="tab-body"></div>`);
   const body = el.querySelector('#tab-body');
 
@@ -167,7 +167,7 @@ export function businessDetail(el, id) {
         <p class="muted small">Each branch needs its own Mayor's Permit, Barangay Clearance, BIR COR and FSIC. Adding a branch adds those automatically.
 </p>
         ${locs.map((l) => html`<div class="row"><div class="row-main"><div class="row-title">${l.name} ${l.is_main ? html`<span class="tag">Main</span>` : ''}</div>
-          <div class="row-sub">${[l.city, l.address].filter(Boolean).join(' · ') || 'No address'} · ${plural(reqs.filter((r) => r.location_id === l.id).length, 'requirement')}</div></div>
+          <div class="row-sub">${[l.city, l.address].filter(Boolean).join(' · ') || 'No address'} · ${plural(reqs.filter((r) => r.location_id === l.id).length, 'permit')}</div></div>
           ${when(canEdit(), html`<div class="row-side"><button class="btn btn-sm btn-ghost" data-act="loc-edit" data-id="${l.id}">Edit</button>
             ${when(!l.is_main, html`<button class="btn btn-sm btn-ghost danger" data-act="loc-delete" data-id="${l.id}">Delete</button>`)}</div>`)}</div>`)}
       </section>`);
@@ -232,9 +232,15 @@ on('req-add', (ds) => {
   const existing = reqsOf(subject, id);
   const locs = subject === 'business' ? locationsOf(id) : [];
   const types = S.data.types.filter((t) => t.subject === subject);
-  openModal(subject === 'person' ? 'Add a licence' : 'Add a requirement', html`
-    <label class="field"><span>Requirement</span><select name="type_code">
-      ${types.map((t) => html`<option value="${t.code}">${t.name}</option>`)}<option value="">Other (describe it)</option></select></label>
+  // Already tracked (for every branch, when it is a per-branch permit): shown but not selectable.
+  const tracked = (t) => (subject === 'business' && t.per_location && locs.length
+    ? locs.every((l) => existing.some((r) => r.type_code === t.code && r.location_id === l.id))
+    : existing.some((r) => r.type_code === t.code));
+  const firstFree = types.find((t) => !tracked(t));
+  openModal(subject === 'person' ? 'Add a licence' : 'Add a permit', html`
+    <label class="field"><span>${subject === 'person' ? 'Licence' : 'Permit'}</span><select name="type_code">
+      ${types.map((t) => html`<option value="${t.code}" ${tracked(t) ? 'disabled' : ''} ${t === firstFree ? 'selected' : ''}>${t.name}${tracked(t) ? ' (already added)' : ''}</option>`)}
+      <option value="" ${firstFree ? '' : 'selected'}>Other (describe it)</option></select></label>
     <label class="field other-name" hidden><span>What is it?</span><input name="name" maxlength="160" placeholder="${subject === 'vehicle' ? 'e.g. LTFRB franchise' : subject === 'person' ? 'e.g. Security guard license' : 'e.g. Signage permit'}"></label>
     ${when(locs.length, html`<label class="field"><span>For</span><select name="location_id">
       ${locs.map((l) => html`<option value="${l.id}">${l.name}${l.city ? ' · ' + l.city : ''}</option>`)}<option value="">Whole business (all branches)</option></select></label>`)}
@@ -249,7 +255,9 @@ on('req-add', (ds) => {
         form.querySelector('.other-expires').hidden = !!sel.value;
         form.querySelector('.type-help').textContent = t?.help_text || '';
         const locSel = form.querySelector('[name=location_id]');
-        if (locSel && t) locSel.value = t.per_location ? (locs[0]?.id || '') : '';
+        // per-branch permit: start on the first branch that does not have it yet
+        const free = locs.find((l) => !existing.some((r) => r.type_code === t?.code && r.location_id === l.id));
+        if (locSel && t) locSel.value = t.per_location ? (free?.id || locs[0]?.id || '') : '';
       };
       sel.addEventListener('change', upd);
       if (ds.type) sel.value = ds.type === 'other' ? '' : ds.type;
@@ -259,7 +267,7 @@ on('req-add', (ds) => {
     },
     onSubmit: async (fd) => {
       const f = formObject(fd);
-      if (!f.type_code && !f.name) throw new Error('Please describe the requirement.');
+      if (!f.type_code && !f.name) throw new Error('Please describe the permit.');
       const dup = existing.find((r) => (f.type_code ? r.type_code === f.type_code : r.name.toLowerCase() === f.name.toLowerCase())
         && (r.location_id || '') === (f.location_id || ''));
       if (dup) throw new Error(`"${dup.name}" is already tracked here.`);
@@ -365,11 +373,11 @@ export function vehicleDetail(el, id) {
         <button class="btn btn-ghost" data-act="share-open" data-scope="vehicle" data-id="${id}">${ICON.share} Share proof</button>
         <a class="btn btn-ghost" href="#/pros">${ICON.briefcase} Find a professional</a></div></div>
     ${statTiles(c)}
-    <div class="tabs">${tabBtn('requirements', 'Requirements')}${tabBtn('documents', 'Documents')}${tabBtn('activity', 'Activity')}${tabBtn('details', 'Details')}</div>
+    <div class="tabs">${tabBtn('requirements', 'Permits')}${tabBtn('documents', 'Documents')}${tabBtn('activity', 'Activity')}${tabBtn('details', 'Details')}</div>
     <div id="tab-body"></div>`);
   const body = el.querySelector('#tab-body');
   if (tab === 'requirements') {
-    body.innerHTML = String(html`<section class="card"><div class="card-head"><h2>Requirements</h2><span class="muted small">${plural(reqs.length, 'item')}</span></div>
+    body.innerHTML = String(html`<section class="card"><div class="card-head"><h2>Permits</h2><span class="muted small">${plural(reqs.length, 'item')}</span></div>
       ${reqs.map((r) => reqRow(r, { showSubject: false }))}
       ${when(canEdit(), html`<button class="line add" data-act="req-add" data-subject="vehicle" data-id="${id}"><span class="plus">+</span>Add a permit to this vehicle</button>`)}
       <div class="sheet-foot">${c.compliant} of ${c.total} compliant</div></section>

@@ -13,7 +13,7 @@ let loadingId = null;
 export async function render(el, id) {
   const r = reqById(id);
   if (!r) {
-    el.innerHTML = String(empty('Not found', 'This requirement was deleted or you no longer have access to it.',
+    el.innerHTML = String(empty('Not found', 'This permit was deleted or you no longer have access to it.',
       html`<a class="btn btn-primary" href="#/">Back to dashboard</a>`));
     return;
   }
@@ -114,7 +114,7 @@ function page(r) {
         : html`<p class="muted">No activity yet.</p>`}
     </section>
 
-    ${when(edit, html`<div class="danger-zone"><button class="btn btn-ghost danger" data-act="req-delete" data-id="${r.id}">Delete this requirement</button>
+    ${when(edit, html`<div class="danger-zone"><button class="btn btn-ghost danger" data-act="req-delete" data-id="${r.id}">Delete this permit</button>
       <span class="muted small">You can restore it from Trash.</span></div>`)}
   `;
 }

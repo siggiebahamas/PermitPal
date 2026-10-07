@@ -76,7 +76,7 @@ export const ROLES = {
 
 // Plain-language names for a few table names shown in History / Trash.
 export const ENTITY_LABELS = {
-  businesses: 'Business', business_locations: 'Branch', vehicles: 'Vehicle', people: 'Person', requirements: 'Requirement',
+  businesses: 'Business', business_locations: 'Branch', vehicles: 'Vehicle', people: 'Person', requirements: 'Permit',
   requirement_cycles: 'Record', documents: 'Document', assistance_requests: 'Service request', org_members: 'Team', orgs: 'Workspace',
 };
 
