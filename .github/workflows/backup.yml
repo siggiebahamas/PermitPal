@@ -12,11 +12,10 @@ name: Nightly backup
 #   BACKUP_PASSPHRASE          Long random passphrase. STORE IT SOMEWHERE SAFE: without it backups cannot be opened.
 # Optional (off-site copy, any S3-compatible storage such as Cloudflare R2 or Backblaze B2):
 #   BACKUP_S3_BUCKET, BACKUP_S3_ENDPOINT, BACKUP_S3_ACCESS_KEY, BACKUP_S3_SECRET_KEY
-# PAUSED until there is real customer data and the secrets above are set. To turn it back on,
-# put these two lines back under "on:":
-#   schedule:
-#     - cron: "30 18 * * *"
+# Runs nightly. Until the four required secrets are added it skips quietly (a notice, not a failure).
 on:
+  schedule:
+    - cron: "30 18 * * *"
   workflow_dispatch:
 
 permissions:
@@ -35,11 +34,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check secrets
+        id: secrets
         run: |
+          missing=""
           for v in SUPABASE_DB_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY BACKUP_PASSPHRASE; do
-            if [ -z "${!v}" ]; then echo "::error::Missing secret $v"; exit 1; fi
+            if [ -z "${!v}" ]; then missing="$missing $v"; fi
           done
+          if [ -n "$missing" ]; then
+            echo "::notice::Backup skipped: add these repository secrets to turn it on:$missing"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Dump the database (Postgres 17 client)
+        if: steps.secrets.outputs.ready == 'true'
         run: |
           mkdir -p backup
           docker run --rm -e PGURL="$SUPABASE_DB_URL" -v "$PWD/backup:/out" postgres:17 \
@@ -48,10 +56,13 @@ jobs:
                      --file=/out/database.dump && pg_restore --list /out/database.dump > /out/database.contents.txt'
           echo "Tables in dump: $(grep -c 'TABLE DATA' backup/database.contents.txt)"
       - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
         with: { node-version: 22 }
       - name: Download every stored file
+        if: steps.secrets.outputs.ready == 'true'
         run: node scripts/backup-files.mjs backup/files
       - name: Encrypt
+        if: steps.secrets.outputs.ready == 'true'
         run: |
           stamp=$(date -u +%Y-%m-%d)
           tar -czf - -C backup . | gpg --batch --yes --symmetric --cipher-algo AES256 \
@@ -59,12 +70,13 @@ jobs:
           ls -lh permitpal-backup-*.gpg
           rm -rf backup
       - uses: actions/upload-artifact@v4
+        if: steps.secrets.outputs.ready == 'true'
         with:
           name: permitpal-backup-${{ github.run_id }}
           path: permitpal-backup-*.gpg
           retention-days: 30
       - name: Copy off-site (optional)
-        if: ${{ env.BACKUP_S3_BUCKET != '' }}
+        if: ${{ steps.secrets.outputs.ready == 'true' && env.BACKUP_S3_BUCKET != '' }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_KEY }}

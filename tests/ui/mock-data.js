@@ -34,7 +34,14 @@ const types = [
 ];
 const db = { people: [], events: [], shares: [], referrals: [], partners: [], businesses: [], locations: [], vehicles: [], requirements: [], cycles: [], documents: [], requests: [], notifications: [], audit: [] };
 let seq = 0;
-const log = (summary, extra = {}) => db.audit.unshift({ id: ++seq, summary, action: 'created', actor_id: user.id, created_at: new Date().toISOString(), ...extra });
+// Mirrors the database's audit triggers: every change gets a type (entity), an action and a plain summary.
+let auditSeq = 1000;
+const log = (summary, extra = {}) => db.audit.unshift({ id: ++auditSeq, summary, action: 'created', entity: 'businesses', actor_id: user.id, created_at: new Date().toISOString(), ...extra });
+const reqLabel = (r) => {
+  const who = r.business_id ? db.businesses.find((b) => b.id === r.business_id)?.name : r.vehicle_id ? db.vehicles.find((v) => v.id === r.vehicle_id)?.make_model : db.people.find((p) => p.id === r.person_id)?.full_name;
+  return `${r.name}${who ? ' for ' + who : ''}`;
+};
+const ids = (r) => ({ business_id: r?.business_id || null, vehicle_id: r?.vehicle_id || null, requirement_id: r?.id || null });
 
 function addReq(subject, parent, loc, t, cycle) {
   const r = { id: uid(), org_id: org.id, subject, business_id: subject === 'business' ? parent : null, vehicle_id: subject === 'vehicle' ? parent : null, person_id: subject === 'person' ? parent : null,
@@ -57,7 +64,7 @@ function seed() {
   addReq('vehicle', v.id, null, types[3], { reference_no: 'OR-1', expires_on: addDays(10) });
   addReq('vehicle', v.id, null, types[4]);
   db.notifications.push({ id: 'n1', user_id: user.id, kind: 'overdue', title: `${mp.name} is 4 days overdue`, body: b.name, link: `#/requirement/${mp.id}`, read_at: null, created_at: new Date().toISOString() });
-  log('Added business "Corner <Bakery> & Co"', { business_id: b.id });
+  log('Added business "Corner <Bakery> & Co"', { entity: 'businesses', business_id: b.id });
 }
 seed();
 if (globalThis.PP_DEMO) {
@@ -142,14 +149,15 @@ export async function createBusiness(orgId, f) {
   const lid = uid();
   db.locations.push({ id: lid, business_id: id, name: 'Main branch', city: f.city, address: f.address, is_main: true, deleted_at: null });
   types.filter((t) => t.subject === 'business').forEach((t) => addReq('business', id, t.per_location ? lid : null, t));
-  log(`Added business "${f.name}"`, { business_id: id });
+  log(`Added business "${f.name}"`, { entity: 'businesses', business_id: id });
   return id;
 }
-export const updateBusiness = async (id, patch) => Object.assign(db.businesses.find((b) => b.id === id), patch);
+export const updateBusiness = async (id, patch) => { const b = Object.assign(db.businesses.find((x) => x.id === id), patch); log(`Updated details for business "${b.name}"`, { entity: 'businesses', action: 'updated', business_id: id }); return b; };
 export async function addLocation(bizId, f) {
   const id = uid();
   db.locations.push({ id, business_id: bizId, name: f.name, city: f.city, address: f.address, is_main: false, deleted_at: null });
   types.filter((t) => t.subject === 'business' && t.per_location).forEach((t) => addReq('business', bizId, id, t));
+  log(`Added branch "${f.name}" to ${db.businesses.find((b) => b.id === bizId)?.name || 'a business'}`, { entity: 'business_locations', business_id: bizId });
   return id;
 }
 export const updateLocation = async (id, patch) => Object.assign(db.locations.find((l) => l.id === id), patch);
@@ -158,36 +166,62 @@ export async function createVehicle(orgId, f) {
   db.vehicles.push({ id, org_id: orgId, make_model: f.make_model, plate_no: (f.plate_no || '').toUpperCase(), vehicle_type: f.vehicle_type, cr_no: f.cr_no || '', mv_file_no: '', business_id: null, deleted_at: null });
   const reg = addReq('vehicle', id, null, types[3], f.registration_expires ? { reference_no: f.or_no, expires_on: f.registration_expires } : null);
   const ctpl = addReq('vehicle', id, null, types[4], f.ctpl_expires ? { reference_no: f.ctpl_policy_no, issuer: f.ctpl_provider, expires_on: f.ctpl_expires } : null);
+  log(`Added vehicle ${f.make_model}${f.plate_no ? ' (' + String(f.plate_no).toUpperCase() + ')' : ''}`, { entity: 'vehicles', vehicle_id: id });
   return { vehicle_id: id, registration: { requirement_id: reg.id, cycle_id: db.cycles.find((c) => c.requirement_id === reg.id)?.id || null }, ctpl: { requirement_id: ctpl.id, cycle_id: db.cycles.find((c) => c.requirement_id === ctpl.id)?.id || null } };
 }
-export const updateVehicle = async (id, patch) => Object.assign(db.vehicles.find((v) => v.id === id), patch);
+export const updateVehicle = async (id, patch) => { const v = Object.assign(db.vehicles.find((x) => x.id === id), patch); log(`Updated details for vehicle ${v.make_model}`, { entity: 'vehicles', action: 'updated', vehicle_id: id }); return v; };
 const tableOf = { people: 'people', businesses: 'businesses', business_locations: 'locations', vehicles: 'vehicles', requirements: 'requirements', requirement_cycles: 'cycles', documents: 'documents' };
-export const softDelete = async (t, id) => { db[tableOf[t]].find((x) => x.id === id).deleted_at = new Date().toISOString(); };
-export const restore = async (t, id) => { db[tableOf[t]].find((x) => x.id === id).deleted_at = null; };
+function describe(t, x) {
+  if (t === 'businesses') return [`business "${x.name}"`, { business_id: x.id }];
+  if (t === 'business_locations') return [`branch "${x.name}"`, { business_id: x.business_id }];
+  if (t === 'vehicles') return [`vehicle ${x.make_model}`, { vehicle_id: x.id }];
+  if (t === 'people') return [x.full_name, {}];
+  if (t === 'requirements') return [reqLabel(x), ids(x)];
+  const r = db.requirements.find((q) => q.id === x.requirement_id);
+  if (t === 'requirement_cycles') return [`a past record of ${r ? reqLabel(r) : 'a permit'}`, ids(r)];
+  return [`file "${x.file_name}"${r ? ' from ' + reqLabel(r) : ''}`, ids(r)];
+}
+export const softDelete = async (t, id) => { const x = db[tableOf[t]].find((y) => y.id === id); x.deleted_at = new Date().toISOString(); const [d, e] = describe(t, x); log(`Deleted ${d}`, { entity: t, action: 'deleted', ...e }); };
+export const restore = async (t, id) => { const x = db[tableOf[t]].find((y) => y.id === id); x.deleted_at = null; const [d, e] = describe(t, x); log(`Restored ${d}`, { entity: t, action: 'restored', ...e }); };
 export async function addRequirement(f) {
   const t = types.find((x) => x.code === f.type_code) || { code: null, name: f.name, expires: f.expires ?? true };
   const r = addReq(f.subject, f.subject_id, f.location_id, t);
   r.confidence = 'confirmed';
+  log(`Added ${reqLabel(r)}`, { entity: 'requirements', ...ids(r) });
   return { requirement_id: r.id, cycle_id: null };
 }
-export const updateRequirement = async (id, patch) => Object.assign(db.requirements.find((r) => r.id === id), patch);
+export const updateRequirement = async (id, patch) => {
+  const r = db.requirements.find((x) => x.id === id); const started = !r.renewal_started_at && patch.renewal_started_at;
+  Object.assign(r, patch);
+  log(started ? `Started renewing ${reqLabel(r)}` : `Updated ${reqLabel(r)}`, { entity: 'requirements', action: 'updated', ...ids(r) });
+  return r;
+};
 export async function requirementDetail(id) {
   return { cycles: db.cycles.filter((c) => c.requirement_id === id && !c.deleted_at).sort((a, b) => b.seq - a.seq),
     documents: db.documents.filter((d) => d.requirement_id === id && !d.deleted_at), activity: db.audit.filter((a) => a.requirement_id === id) };
 }
 export async function saveCycle({ cycleId, requirementId, ...f }) {
-  if (cycleId) { Object.assign(db.cycles.find((c) => c.id === cycleId), f); return cycleId; }
+  if (cycleId) {
+    Object.assign(db.cycles.find((c) => c.id === cycleId), f);
+    const r0 = db.requirements.find((x) => x.id === requirementId);
+    log(`Updated the record for ${reqLabel(r0)}`, { entity: 'requirement_cycles', action: 'updated', ...ids(r0) });
+    return cycleId;
+  }
+  const prior = db.cycles.filter((c) => c.requirement_id === requirementId && !c.deleted_at).length;
   const id = uid();
   db.cycles.push({ id, requirement_id: requirementId, seq: ++seq, created_at: new Date().toISOString(), reference_no: f.reference_no, issuer: f.issuer, issued_on: f.issued_on, expires_on: f.expires_on, amount_paid: f.amount_paid ?? null });
   const r = db.requirements.find((x) => x.id === requirementId);
   r.renewal_started_at = null; r.confidence = 'confirmed';
-  log(`Recorded "${r.name}"`, { requirement_id: requirementId });
+  log(`${prior ? 'Renewed' : 'Recorded'} ${reqLabel(r)}${f.expires_on ? ' - expires ' + new Date(f.expires_on + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : ''}`,
+    { entity: 'requirement_cycles', action: prior ? 'renewed' : 'recorded', ...ids(r) });
   return id;
 }
 export const checkFile = (file) => (!file || !file.size ? 'Please choose a file.' : null);
 export async function uploadDocument({ requirementId, cycleId, file }) {
   const d = { id: uid(), requirement_id: requirementId, cycle_id: cycleId, file_name: file.name, storage_path: 'o1/' + file.name, mime_type: file.type, size_bytes: file.size, created_at: new Date().toISOString(), deleted_at: null };
   db.documents.push(d);
+  const r = db.requirements.find((x) => x.id === requirementId);
+  log(`Uploaded "${file.name}" for ${r ? reqLabel(r) : 'a permit'}`, { entity: 'documents', action: 'uploaded', ...ids(r) });
   return d;
 }
 export const fileUrl = async () => 'data:application/pdf;base64,JVBERi0=';
@@ -200,7 +234,9 @@ export const markAllRead = async () => db.notifications.forEach((n) => { n.read_
 export const deleteNotification = async (id) => { db.notifications = db.notifications.filter((n) => n.id !== id); };
 export const clearNotifications = async () => { db.notifications = []; };
 export const myDeliveryLog = async () => [{ id: 1, channel: 'email', subject: 'PermitPal: 2 items need attention', body_text: '', status: 'sent', created_at: new Date().toISOString() }];
-export const history = async () => db.audit;
+export const history = async (orgId, { before = null, entities = null, limit = 50 } = {}) => db.audit
+  .filter((a) => (!entities || entities.includes(a.entity)) && (!before || a.id < before))
+  .sort((a, b) => b.id - a.id).slice(0, limit);
 export const entityHistory = async () => db.audit;
 export async function trash() {
   const d = (a) => a.filter((x) => x.deleted_at);
@@ -242,10 +278,10 @@ export async function createPerson(orgId, f) {
   const x = { id: uid(), org_id: orgId, full_name: f.full_name, role_title: f.role_title || '', business_id: f.business_id || null, deleted_at: null };
   db.people.push(x);
   for (const code of f.types || []) addReq('person', x.id, null, types.find((t) => t.code === code));
-  log(`Added ${x.full_name}`);
+  log(`Added ${x.full_name}`, { entity: 'people' });
   return x.id;
 }
-export const updatePerson = async (id, patch) => Object.assign(db.people.find((x) => x.id === id), patch);
+export const updatePerson = async (id, patch) => { const p = Object.assign(db.people.find((x) => x.id === id), patch); log(`Updated details for ${p.full_name}`, { entity: 'people', action: 'updated' }); return p; };
 
 // ---------------------------------------------------------------- done-for-you orders
 const now = () => new Date().toISOString();
@@ -432,6 +468,15 @@ export async function networkNudge(owner, links, orgs) {
   return n;
 }
 export const requestPlan = async () => {};
+db.support = [];
+export async function contactSupport({ topic, message, name, email }) {
+  if (!String(message || '').trim()) throw new Error('Please write a message.');
+  if (globalThis.PP_LOGGED_OUT && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email || '')) throw new Error('Please enter a valid email address so we can reply.');
+  const row = { id: uid(), user_id: globalThis.PP_LOGGED_OUT ? null : user.id, topic, message, name: name || 'Sadie Luna', email: email || 'sadie@test.ph', status: 'open', created_at: new Date().toISOString(), orgs: { name: org.name } };
+  db.support.unshift(row); return row.id;
+}
+export const adminSupportMessages = async () => db.support;
+export async function adminSetSupportStatus(id, status) { db.support.find((x) => x.id === id).status = status; }
 export const adminOrgKinds = async () => [{ id: org.id, kind: org.kind, trial_ends_at: org.trial_ends_at }];
 if (globalThis.PP_DEMO) {
   // The demo shows the head-office board: company branches plus connected franchisees.
@@ -443,4 +488,36 @@ if (globalThis.PP_DEMO) {
   mk('Kape Uno – Alabang', 'MNL-021', [['mayors_permit', 'renew_soon', 24, 'Muntinlupa City'], ['barangay_clearance', 'renew_soon', 24, 'Muntinlupa City'], ['fsic', 'compliant', 90, 'Muntinlupa City'], ['sanitary_permit', 'compliant', 140, 'Muntinlupa City']]);
   mk('Kape Uno – IT Park Cebu', 'CEB-002', [['mayors_permit', 'compliant', 104, 'Cebu City'], ['barangay_clearance', 'compliant', 104, 'Cebu City'], ['fsic', 'in_progress', 4, 'Cebu City'], ['sanitary_permit', 'compliant', 180, 'Cebu City'], ['bir_cor', 'compliant', null, 'Cebu City']], { share: true });
   db.links.push({ link_id: uid(), org_id: null, relation: 'franchisee', label: 'DVO-001', status: 'pending', share_files: false, invited_email: 'owner@kapeuno-davao.ph', token: 'tokdavao', created_at: addDays(-2), name: null, items: [] });
+}
+// Test hook: load the app as a given workspace type (business, head_office, firm, property, fleet).
+if (globalThis.PP_KIND) Object.assign(org, { kind: globalThis.PP_KIND, trial_ends_at: globalThis.PP_KIND === 'business' ? null : new Date(Date.now() + 21 * 864e5).toISOString() });
+
+// Demo: a few weeks of realistic history so the History page and its filter have something to show.
+if (globalThis.PP_DEMO) {
+  const ago = (d, h = 10) => new Date(Date.now() - d * 864e5 - h * 3600e3).toISOString();
+  const req = (pred) => db.requirements.find(pred) || {};
+  const ctpl = req((r) => r.vehicle_id === 'v2' && r.type_code === 'ctpl');
+  const fsic = req((r) => r.business_id === 'b1' && r.type_code === 'fsic');
+  const mp2 = req((r) => r.business_id === 'b2' && r.type_code === 'mayors_permit');
+  const reg3 = req((r) => r.vehicle_id === 'v3' && r.type_code === 'lto_registration');
+  const past = [
+    [0, 2, 'documents', 'uploaded', `Uploaded "Hilux_OR.jpg" for ${reqLabel(req((r) => r.vehicle_id === 'v2' && r.type_code === 'lto_registration'))}`, ids(req((r) => r.vehicle_id === 'v2' && r.type_code === 'lto_registration'))],
+    [1, 4, 'requirement_cycles', 'renewed', `Renewed ${reqLabel(ctpl)} - expires Mar 16, 2027`, ids(ctpl)],
+    [1, 6, 'requirements', 'updated', `Started renewing ${reqLabel(req((r) => r.business_id === 'b2' && r.type_code === 'fsic'))}`, ids(req((r) => r.business_id === 'b2' && r.type_code === 'fsic'))],
+    [3, 1, 'documents', 'uploaded', `Uploaded "fsic.pdf" for ${reqLabel(fsic)}`, ids(fsic)],
+    [3, 3, 'requirement_cycles', 'recorded', `Recorded ${reqLabel(fsic)}`, ids(fsic)],
+    [5, 2, 'vehicles', 'created', 'Added vehicle Honda Click 125i (123 ABC)', { vehicle_id: 'v3' }],
+    [5, 3, 'requirement_cycles', 'recorded', `Recorded ${reqLabel(reg3)}`, ids(reg3)],
+    [8, 5, 'people', 'created', 'Added Jun Reyes', {}],
+    [9, 2, 'business_locations', 'created', 'Added branch "Mandaue warehouse" to Visayas Sari-Sari Distribution Co.', { business_id: 'b2' }],
+    [12, 4, 'documents', 'deleted', `Removed file "old-permit.pdf" from ${reqLabel(mp2)}`, ids(mp2)],
+    [12, 6, 'org_members', 'created', 'Mark Dela Cruz joined the team as member', {}],
+    [15, 3, 'businesses', 'created', 'Added business "Visayas Sari-Sari Distribution Co."', { business_id: 'b2' }],
+    [20, 2, 'orgs', 'updated', 'Renamed the workspace to "Aligned Solutions"', {}],
+  ];
+  const old = db.audit.splice(0).reverse(); // set-up entries: the oldest history
+  let n = 100;
+  old.forEach((a, i) => db.audit.push({ ...a, id: ++n, created_at: ago(26, 8 - i) }));
+  for (const [d, h, entity, action, summary, extra] of past.reverse()) db.audit.push({ id: ++n, entity, action, summary, actor_id: user.id, created_at: ago(d, h), ...extra });
+  db.audit.sort((a, b) => b.id - a.id);
 }

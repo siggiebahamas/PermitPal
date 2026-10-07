@@ -36,24 +36,27 @@ The database decides status in one place (`requirement_status`), using Philippin
 ## Go-live checklist (things only you can do)
 
 **Blockers (the site can't take real customers without these):**
-1. **Domain + email:** buy a domain (e.g. permitpal.ph), create a free [Resend](https://resend.com) account and verify the domain. Then:
+1. **Domain + email:** buy a `.com` domain (cheapest reliable: Cloudflare Registrar, about US$10.44/year at cost; a `.ph` costs about US$41-45/year). Create a free [Resend](https://resend.com) account and verify the domain. Then:
    - Supabase → Authentication → Emails → SMTP Settings: enter Resend's SMTP details. Until then, new customers can't confirm sign-up.
-   - Supabase → Edge Functions → Secrets: add `RESEND_API_KEY` and `EMAIL_FROM` (e.g. `PermitPal <hello@permitpal.ph>`). This turns on reminders, invitations, quote requests and team reminders.
+   - Supabase → Edge Functions → Secrets: add `RESEND_API_KEY` and `EMAIL_FROM` (e.g. `PermitPal <hello@yourdomain.com>`). This turns on reminders, invitations, quote requests, team reminders and Contact form emails.
    - Admin → Messages → "Send me a test email" to confirm it works.
-2. **Logins:** Supabase → Authentication → URL Configuration: Site URL `https://siggiebahamas.github.io/PermitPal/`, and add it to Redirect URLs.
-3. **Your admin account:** just sign up with the email set as the admin notification address and confirm it. It becomes staff automatically.
-4. **Backups:** add the repo secrets `SUPABASE_DB_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `BACKUP_PASSPHRASE`, then put the `schedule:` lines back in `.github/workflows/backup.yml` (they are paused). Keep the passphrase safe.
-5. **Register PermitPal as a business** (DTI, barangay, Mayor's Permit, BIR) before charging for team plans, so you can issue official receipts.
+2. **Logins:** Supabase → Authentication → URL Configuration: Site URL `https://siggiebahamas.github.io/PermitPal/` (or your domain once it points here), and add it to Redirect URLs. (Claude's Supabase connection cannot change Auth settings, so this one is a paste in the dashboard.)
+3. **Your admin account:** sign up with the email set as the admin notification address and confirm it. It becomes staff automatically.
+4. **Backups:** the nightly schedule is on and skips until these 4 repository secrets exist (GitHub → Settings → Secrets and variables → Actions):
+   `SUPABASE_DB_URL` (Supabase → Connect → Session pooler string, with your database password), `SUPABASE_URL` (`https://zeaiwvgktakbwnqpchbo.supabase.co`),
+   `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Project Settings → API keys → secret key), `BACKUP_PASSPHRASE` (any long random phrase; keep it in a password manager, backups can't be opened without it).
+   Then Actions → Nightly backup → Run workflow once to check it.
+5. **Register PermitPal as a business** (DTI, barangay, Mayor's Permit, BIR) before taking the first payment: business customers need an invoice.
 
 **Before charging:**
-6. **Plan payments:** Admin → Payment details: fill in GCash/bank details (shown when a customer chooses a plan). When they pay, set their plan in Admin → Workspaces & plans.
+6. **Plan payments:** GCash and UnionBank details are set (Admin → Payment details; change the account name there if it differs). When a customer pays, set their plan in Admin → Workspaces & plans.
 7. **Online checkout (optional):** add `PAYMONGO_SECRET_KEY` and `APP_URL` as Edge Function secrets, then tick "Pay online" in Admin → Payment details.
-8. **Professionals:** add real liaison firms and accountants in Admin → Professionals (their email receives quote requests). Tick "Licence checked" only after seeing their business permit and licence. Agree the per-request fee with each firm and bill monthly from Admin → Quote requests. The two sample firms exist only in the demo.
+8. **Professionals:** add real liaison firms and accountants in Admin → Professionals (their email receives quote requests). Tick "Licence checked" only after seeing their business permit and licence. Agree the per-request fee with each firm (they pay you) and bill monthly from Admin → Quote requests. The two sample firms exist only in the demo.
 9. **Prices:** team plan prices are ₱1,490 (Fleet), ₱1,990 (Accounting firm), ₱4,990 (Head office), ₱9,990 (Property). Validate them on sales calls; ask Claude to change them.
 
 **Legal:**
-10. Have a lawyer review `web/privacy.html` and `web/terms.html` once.
-11. **Data Privacy Act:** you are the Data Protection Officer until you name someone else. Add a dedicated privacy email to `web/privacy.html`. Registering with the National Privacy Commission becomes required once you hold sensitive data (like staff licence numbers) on 1,000 or more people, or have 250+ employees.
+10. Terms and Privacy Policy are published (`web/terms.html`, `web/privacy.html`). Privacy requests come through the Contact PermitPal form (Admin → Inbox).
+11. **Data Privacy Act:** you are the Data Protection Officer until you name someone else. Registering with the National Privacy Commission becomes required once you hold sensitive data (like staff licence numbers) on 1,000 or more people, or have 250+ employees.
 
 ## Running tests
 

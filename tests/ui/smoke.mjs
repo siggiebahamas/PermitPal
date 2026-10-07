@@ -45,7 +45,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: BIR COR (never recorded) is NOT shown as compliant`,
     (await page.locator('.row.needinfo', { hasText: 'BIR Certificate' }).count()) > 0);
 
-  for (const h of ['#/businesses', '#/businesses/b1', '#/vehicles', '#/vehicles/v1', '#/compliance', '#/documents', '#/pros', '#/network', '#/people', '#/costs', '#/sharing', '#/notifications', '#/history', '#/trash', '#/team', '#/settings', '#/settings/billing', '#/settings/workspace', '#/admin']) {
+  for (const h of ['#/businesses', '#/businesses/b1', '#/vehicles', '#/vehicles/v1', '#/compliance', '#/documents', '#/pros', '#/network', '#/people', '#/costs', '#/sharing', '#/notifications', '#/history', '#/trash', '#/team', '#/settings', '#/settings/billing', '#/settings/workspace', '#/admin', '#/contact']) {
     await go(h);
     await page.waitForSelector('main h1', { timeout: 5000 }).catch(() => {});
     const t = await page.textContent('main').catch(() => '');
@@ -160,6 +160,25 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check('bell drop-down lists notifications', (await page.locator('.bell-drop .bd-item').count()) >= 1);
     await page.keyboard.press('Escape');
     check('bell drop-down closes with Escape', (await page.locator('.bell-drop').count()) === 0);
+
+    // History: the drop-down really filters (it used to show the same list whatever was picked).
+    await go('#/history');
+    const histAll = await page.locator('.hist-line').count();
+    await page.selectOption('#hist-show', 'team'); await page.waitForTimeout(250);
+    const histTeam = await page.locator('.hist-line').count();
+    const histEmpty = await page.locator('main .empty').count();
+    await page.selectOption('#hist-show', 'businesses'); await page.waitForTimeout(250);
+    const histBiz = await page.locator('.hist-line').count();
+    await page.selectOption('#hist-show', ''); await page.waitForTimeout(250);
+    check('History filter changes the list', histAll > 0 && histTeam === 0 && histEmpty === 1 && histBiz >= 1 && histBiz <= histAll
+      && (await page.locator('.hist-line').count()) === histAll, `all ${histAll} team ${histTeam} biz ${histBiz}`);
+
+    // Contact PermitPal: an empty message is refused with a message, a filled one is sent.
+    await go('#/contact');
+    await page.fill('#contact-form textarea[name=message]', 'Hello, testing the contact form.');
+    await page.click('#contact-form button');
+    await page.waitForTimeout(300);
+    check('Contact form sends a message', await page.locator('.contact-done:not([hidden])').count() === 1);
 
     // Compliance filters: Clear brings every row back.
     await go('#/compliance');

@@ -6,7 +6,7 @@ import { S, on, rerender, empty } from '../core.js';
 import { PARTNER_CATEGORIES } from './extras.js';
 import * as db from 'pp/data';
 
-let tab = 'orgs';
+let tab = 'inbox';
 const KIND_NAMES = { business: 'Business', head_office: 'Head office', firm: 'Accounting firm', property: 'Property', fleet: 'Fleet' };
 
 export async function admin(el) {
@@ -19,11 +19,12 @@ export async function admin(el) {
     else if (tab === 'partners') body = partnersTab(await db.adminPartners());
     else if (tab === 'referrals') body = referralsTab(await db.adminReferrals());
     else if (tab === 'payments') body = settingsTab(await db.adminSettings());
+    else if (tab === 'inbox') body = inboxTab(await db.adminSupportMessages());
     else body = outboxTab(await db.adminOutbox(), await db.channelStatus().catch(() => ({})));
   } catch (e) { toastError(e); }
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>PermitPal admin</h1><p class="muted">Staff tools. Customers never see this page.</p></div></div>
-    <div class="tabs">${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${tabBtn('referrals', 'Quote requests')}
+    <div class="tabs">${tabBtn('inbox', 'Inbox')}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${tabBtn('referrals', 'Quote requests')}
       ${tabBtn('payments', 'Payment details')}${tabBtn('outbox', 'Messages')}</div>
     ${body}`);
   wire(el);
@@ -107,6 +108,24 @@ function settingsTab(st) {
     <label class="check"><input type="checkbox" name="online_payments" ${st.online_payments === 'on' ? 'checked' : ''}> Show "Pay online" (only after PayMongo keys are added to Supabase)</label>
     <button class="btn btn-primary">Save</button></form></section>`;
 }
+
+const TOPIC_NAMES = { question: 'Question', problem: 'Something is not working', billing: 'Plans & payment', privacy: 'Privacy / my data', other: 'Other' };
+function inboxTab(list) {
+  const open = list.filter((m) => m.status === 'open');
+  const row = (m) => html`<div class="inbox-item ${m.status}">
+    <div class="inbox-top"><b>${TOPIC_NAMES[m.topic] || m.topic}</b>${when(m.topic === 'privacy', html`<span class="chip progress">Privacy request</span>`)}
+      <span class="muted small">${timeAgo(m.created_at)}</span></div>
+    <div class="muted small">${m.name ? m.name + ' · ' : ''}<a href="mailto:${m.email}">${m.email}</a>${m.orgs?.name ? ' · ' + m.orgs.name : ''}${m.user_id ? '' : ' · no account'}</div>
+    <p class="inbox-msg">${m.message}</p>
+    <div class="btn-row"><a class="btn btn-sm btn-primary" href="mailto:${m.email}?subject=${encodeURIComponent('Re: your message to PermitPal')}">Reply by email</a>
+      <button class="btn btn-sm btn-ghost" data-act="admin-support-status" data-id="${m.id}" data-status="${m.status === 'open' ? 'closed' : 'open'}">${m.status === 'open' ? 'Mark done' : 'Reopen'}</button></div></div>`;
+  return html`<section class="card"><div class="card-head"><div><h2>Inbox</h2><p class="card-sub">Messages from the Contact PermitPal form. Each one is also emailed to you. Reply to privacy requests first.</p></div>
+      <span class="chip ${open.length ? 'progress' : 'ok'}">${open.length} open</span></div>
+    ${list.length ? list.map(row) : html`<p class="muted">No messages yet.</p>`}</section>`;
+}
+on('admin-support-status', async (ds) => {
+  try { await db.adminSetSupportStatus(ds.id, ds.status); toast(ds.status === 'closed' ? 'Marked done.' : 'Reopened.'); rerender(); } catch (e) { toastError(e); }
+});
 
 function outboxTab(list, channels = {}) {
   return html`<section class="card"><div class="card-head"><div><h2>Email reminders</h2>

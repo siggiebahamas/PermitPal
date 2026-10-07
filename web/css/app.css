@@ -198,7 +198,7 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .stat-n small { font-size: 16px; color: var(--muted); font-family: var(--font); }
 .stat-l { font-size: 14px; color: var(--heading); font-weight: 700; margin-top: 6px; }
 .stat.overdue { border-top-color: var(--s-over-mid); } .stat.overdue .stat-n { color: var(--s-over); }
-.stat.soon { border-top-color: var(--s-soon-mid); } .stat.soon .stat-n { color: var(--s-soon); }
+.stat.soon { border-top-color: var(--s-soon-mid); } .stat.soon .stat-n { color: #D8B000; } /* sunflower: lighter for the big numbers only; small text keeps the darker yellow */
 .stat.progress { border-top-color: var(--s-prog-mid); } .stat.progress .stat-n { color: var(--s-prog); }
 .stat.ok { border-top-color: var(--s-ok-mid); } .stat.ok .stat-n { color: var(--s-ok); }
 .stats .stat:last-child:nth-child(odd) { grid-column: span 2; }
@@ -714,3 +714,44 @@ tr.imp-bad td { background: var(--s-over-bg); }
   .nb-table tr.picked { background: #F6F9FE; }
 }
 .pro-badge::before { display: none; }
+/* contact form + admin inbox */
+.contact-card { max-width: 720px; }
+.contact-form textarea { width: 100%; resize: vertical; }
+.contact-public h1 { text-align: center; margin: 8px 0 6px; }
+.contact-done h2 { margin-top: 6px; }
+.inbox-item { padding: 14px 0; border-top: 1px solid var(--rule); }
+.inbox-item:first-of-type { border-top: 0; }
+.inbox-item.closed { opacity: .6; }
+.inbox-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.inbox-top .muted { margin-left: auto; }
+.inbox-msg { white-space: pre-wrap; margin: 8px 0 10px; }
+/* landing header on phones: keep Sign in + Get started on one line; "For teams" is further down the page anyway */
+@media (max-width: 560px) {
+  .lp-top { gap: 6px; }
+  .lp-top [data-scroll] { display: none; }
+  .lp-top .wordmark { font-size: 19px; }
+  .lp-top .brand img { width: 30px; height: 30px; }
+  .lp-top .btn-sm { padding: 7px 11px; }
+}
+/* History: one drop-down, changes grouped by day */
+.hist-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
+.hist-bar label { font-weight: 700; color: var(--heading); }
+.hist-bar select { width: auto; min-width: 220px; }
+.hist-bar .muted { font-size: 14.5px; }
+.hist-card .band.hist-day { font-size: 13px; }
+.hist-card .card-head + .band, .hist-card > .band:first-child { border-top: 0; margin-top: -18px; }
+.hist-line { padding-left: 46px; }
+.hist-line .line-main > a, .hist-line .line-main > span { color: var(--heading); font-weight: 650; font-size: 15.5px; line-height: 1.35; }
+.hist-line .line-main > a { color: var(--link); }
+.hist-line .line-main small { margin-top: 2px; }
+@media (max-width: 520px) { .hist-bar select { flex: 1; min-width: 0; } .hist-bar .muted { width: 100%; } }
+/* left menu: larger, easier to read */
+@media (min-width: 900px) {
+  .sidebar .nav { font-size: 16.5px; padding: 11px 12px; gap: 12px; }
+  .sidebar .nav svg { width: 21px; height: 21px; }
+  .sidebar .nav.small { padding: 10px 12px; }
+  .sidebar .org-name, .sidebar .org-switch { font-size: 15px; }
+  .sidebar .me-name { font-size: 16px; }
+  .sidebar .nav .badge { font-size: 11px; min-width: 18px; line-height: 16px; }
+}
+.more-menu a, .more-menu button { font-size: 16.5px; }

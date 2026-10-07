@@ -8,6 +8,7 @@ import { dashboard, compliance, documents } from './views/overview.js';
 import { businessList, businessDetail, vehicleList, vehicleDetail, personList, personDetail } from './views/entities.js';
 import { render as requirementPage, forget as forgetRequirement } from './views/requirement.js';
 import { network, connectPage, KINDS } from './views/network.js';
+import { contactPage } from './views/contact.js';
 import { partners, costs, shares } from './views/extras.js';
 import './views/import.js';
 import { landing } from './views/landing.js';
@@ -23,10 +24,10 @@ let unsubscribe = null;
 const T = {
   en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
         pros: 'Find a professional', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
-        notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More' },
+        notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact PermitPal' },
   tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
         pros: 'Maghanap ng Propesyonal', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
-        notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa' },
+        notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang PermitPal' },
 };
 const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k] || k;
 
@@ -51,6 +52,7 @@ async function start() {
     const kindParam = new URLSearchParams(location.hash.split('?')[1] || '').get('type');
     if (kindParam && KINDS[kindParam]) sessionStorageSet('pp-kind', kindParam);
     if (!parts[0] || parts[0] === 'welcome') return landing(app);
+    if (parts[0] === 'contact') return contactPage(app, { signedIn: false });
     const mode = ['signup', 'forgot'].includes(parts[0]) ? parts[0] : 'login';
     return authPage(app, mode);
   }
@@ -117,7 +119,7 @@ function buildNav() {
   const k = KINDS[S.org?.kind || 'business'];
   NAV = k?.nav ? [BASE_NAV[0], ['network', k.nav, k.icon], ...BASE_NAV.slice(1)] : BASE_NAV;
   MORE = [['notifications', 'notifications'], ['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'],
-    ...(k?.nav ? [] : [['network', 'team_tools']]), ['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings']];
+    ...(k?.nav ? [] : [['network', 'team_tools']]), ['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings'], ['contact', 'contact']];
 }
 
 function renderShell() {
@@ -193,6 +195,7 @@ async function renderPage() {
     else if (a === 'network') await network(main);
     else if (a === 'connect') await connectPage(main, b);
     else if (['pros', 'partners', 'services', 'help'].includes(a)) await partners(main, params);
+    else if (a === 'contact') contactPage(main, { signedIn: true });
     else if (a === 'costs') await costs(main);
     else if (a === 'sharing') await shares(main);
     else if (a === 'notifications') await notifications(main);

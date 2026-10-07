@@ -1,31 +1,79 @@
 // Notifications, History, Trash, Team, Settings (profile, reminders, workspace, billing, data).
 import {
   html, fmtDate, fmtDateTime, timeAgo, peso, plural, toast, toastError, confirmDialog, openModal, formObject, when,
-  normalizePhone,
+  normalizePhone, todayPH,
 } from '../util.js';
 import {
-  S, on, reload, rerender, canEdit, isOrgAdmin, isOwner, memberName, empty, effectivePlan, ROLES, ENTITY_LABELS, business, vehicle, person,
+  S, on, reload, rerender, canEdit, isOrgAdmin, isOwner, memberName, empty, effectivePlan, ROLES, business, vehicle, person,
 } from '../core.js';
 import { avatar } from '../components.js';
 import { KINDS, teamAccess, connectionsCard } from './network.js';
 import * as db from 'pp/data';
 
 // ================================================================ history
-let histEntity = '';
-export async function historyPage(el) {
-  el.innerHTML = String(html`<div class="loading">Loading…</div>`);
-  let items = [];
-  try { items = await db.history(S.org.id, { entity: histEntity || null, limit: 100 }); } catch (e) { toastError(e); }
-  el.innerHTML = String(html`
-    <div class="page-head"><div><h1>History</h1><p class="muted">Every change by anyone on the team, including deletions. Kept permanently.</p></div>
-      <select id="hist-filter"><option value="">Everything</option>${Object.entries(ENTITY_LABELS).map(([k, v]) => html`<option value="${k}" ${k === histEntity ? 'selected' : ''}>${v}</option>`)}</select></div>
-    ${items.length ? html`<div class="list">${items.map((a) => html`
-      <div class="hist"><span class="tag ${a.action === 'deleted' || a.action === 'removed' ? 'red' : a.action === 'restored' ? 'green' : ''}">${a.action}</span>
-        <div>${linkFor(a)}<div class="muted small">${memberName(a.actor_id)} · ${fmtDateTime(a.created_at)}</div></div></div>`)}</div>
-      <p class="muted small">Deleted something by mistake? <a href="#/trash">Restore it from Trash.</a></p>`
-      : empty('No history yet', 'Changes will show up here.')}`);
-  el.querySelector('#hist-filter').addEventListener('change', (e) => { histEntity = e.target.value; historyPage(el); });
+// One plain drop-down; each choice covers the record types people think of together.
+const HIST_SHOW = [
+  ['', 'Everything', null, 'changes'],
+  ['permits', 'Permits & renewals', ['requirements', 'requirement_cycles'], 'permit changes'],
+  ['files', 'Files', ['documents'], 'file changes'],
+  ['businesses', 'Businesses & branches', ['businesses', 'business_locations'], 'business changes'],
+  ['vehicles', 'Vehicles', ['vehicles'], 'vehicle changes'],
+  ['people', 'Staff', ['people'], 'staff changes'],
+  ['team', 'Team & workspace', ['org_members', 'orgs'], 'team changes'],
+];
+const HIST_PAGE = 100;
+let histShow = '';
+let histItems = [];
+let histMore = false;
+const phDay = (ts) => new Date(ts).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+const phTime = (ts) => new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' });
+function dayLabel(day) {
+  const today = todayPH();
+  const y = new Date(today + 'T00:00:00Z'); y.setUTCDate(y.getUTCDate() - 1);
+  if (day === today) return 'Today';
+  if (day === y.toISOString().slice(0, 10)) return 'Yesterday';
+  return new Date(day + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: day.slice(0, 4) === today.slice(0, 4) ? undefined : 'numeric', timeZone: 'UTC' });
 }
+async function loadHistory(append = false) {
+  const show = HIST_SHOW.find(([k]) => k === histShow) || HIST_SHOW[0];
+  const before = append && histItems.length ? histItems[histItems.length - 1].id : null;
+  const rows = await db.history(S.org.id, { entities: show[2], before, limit: HIST_PAGE });
+  histItems = append ? [...histItems, ...rows] : rows;
+  histMore = rows.length === HIST_PAGE;
+}
+export async function historyPage(el, { keep = false } = {}) {
+  if (!keep) {
+    el.innerHTML = String(html`<div class="loading">Loading…</div>`);
+    try { await loadHistory(); } catch (e) { toastError(e); histItems = []; histMore = false; }
+  }
+  const show = HIST_SHOW.find(([k]) => k === histShow) || HIST_SHOW[0];
+  const days = [];
+  for (const a of histItems) {
+    const d = phDay(a.created_at);
+    if (!days.length || days[days.length - 1].day !== d) days.push({ day: d, items: [] });
+    days[days.length - 1].items.push(a);
+  }
+  el.innerHTML = String(html`
+    <div class="page-head"><div><h1>History</h1><p class="muted">Every change anyone on your team made, including deletions. Kept permanently.</p></div></div>
+    <div class="hist-bar">
+      <label for="hist-show">Show</label>
+      <select id="hist-show">${HIST_SHOW.map(([k, label]) => html`<option value="${k}" ${k === histShow ? 'selected' : ''}>${label}</option>`)}</select>
+      <span class="muted">${histItems.length}${histMore ? '+' : ''} ${histItems.length === 1 ? show[3].replace(/s$/, '') : show[3]}</span>
+    </div>
+    ${histItems.length ? html`<section class="card hist-card">
+      ${days.map((g) => html`<div class="band hist-day"><span>${dayLabel(g.day)}</span><span>${g.items.length}</span></div>
+        ${g.items.map((a) => html`<div class="line hist-line"><span class="line-main">${linkFor(a)}<small>${memberName(a.actor_id)} · ${phTime(a.created_at)}</small></span></div>`)}`)}
+      <div class="sheet-foot">Deleted something by mistake? <a href="#/trash">Restore it from Trash.</a></div>
+    </section>
+    ${when(histMore, html`<button class="btn btn-ghost" data-act="hist-more">Show older changes</button>`)}`
+      : html`<section class="card">${empty(histShow ? `No ${show[3]} yet` : 'No history yet', histShow ? 'Pick "Everything" to see all changes.' : 'Changes will show up here.')}</section>`}`);
+  el.querySelector('#hist-show').addEventListener('change', (e) => { histShow = e.target.value; historyPage(el); });
+}
+on('hist-more', async (ds, btn) => {
+  btn.disabled = true; btn.textContent = 'Loading…';
+  try { await loadHistory(true); } catch (e) { toastError(e); }
+  historyPage(document.getElementById('main'), { keep: true });
+});
 function linkFor(a) {
   const href = a.requirement_id && S.data.reqs.some((r) => r.id === a.requirement_id) ? `#/requirement/${a.requirement_id}`
     : a.business_id && business(a.business_id) ? `#/businesses/${a.business_id}`

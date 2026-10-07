@@ -269,11 +269,11 @@ export const myDeliveryLog = async (userId) =>
     .eq('user_id', userId).order('created_at', { ascending: false }).limit(30));
 
 // ---------------------------------------------------------------- history & trash
-export async function history(orgId, { before = null, entity = null, limit = 50 } = {}) {
+export async function history(orgId, { before = null, entities = null, limit = 50 } = {}) {
   let q = sb.from('audit_log').select('id, entity, entity_id, action, summary, actor_id, business_id, vehicle_id, requirement_id, created_at')
     .eq('org_id', orgId).order('id', { ascending: false }).limit(limit);
   if (before) q = q.lt('id', before);
-  if (entity) q = q.eq('entity', entity);
+  if (entities?.length) q = q.in('entity', entities);
   return ok(await q);
 }
 export const entityHistory = async (column, id) =>
@@ -394,3 +394,11 @@ export const myConnections = async (orgId) => ok(await sb.rpc('my_connections', 
 export const networkDocuments = async (owner, member) => ok(await sb.rpc('network_documents', { p_owner: owner, p_member: member }));
 export const networkNudge = async (owner, links, orgs, message) => ok(await sb.rpc('network_nudge', { p_owner: owner, p_links: links || [], p_orgs: orgs || [], p_message: message || null }));
 export const requestPlan = async (orgId, plan, note) => ok(await sb.rpc('request_plan', { p_org: orgId, p_plan: plan, p_note: note || null }));
+
+// ---------------------------------------------------------------- contact PermitPal (works signed in or out)
+export const contactSupport = async ({ topic, message, name, email, orgId }) => ok(await sb.rpc('contact_support', {
+  p_topic: topic, p_message: message, p_name: name || null, p_email: email || null, p_org: orgId || null,
+}));
+export const adminSupportMessages = async () =>
+  ok(await sb.from('support_messages').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
+export const adminSetSupportStatus = async (id, status) => ok(await sb.from('support_messages').update({ status }).eq('id', id));

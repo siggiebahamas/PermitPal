@@ -146,6 +146,19 @@ export function openModal(title, body, opts = {}) {
     if (!opts.onSubmit) return close();
     const btn = form.querySelector('button[type=submit]');
     errBox.hidden = true;
+    // The form is novalidate (native bubbles look out of place), so check required fields here.
+    const visible = (el) => !el.disabled && !el.closest('[hidden]') && el.getClientRects().length > 0;
+    const missing = [...form.querySelectorAll('[required]')].filter((el) => visible(el) && (el.type === 'checkbox' ? !el.checked : !String(el.value || '').trim()));
+    const badEmail = [...form.querySelectorAll('input[type=email]')].find((el) => visible(el) && el.value.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(el.value.trim()));
+    if (missing.length || badEmail) {
+      const labelOf = (el) => (el.closest('label')?.querySelector('span')?.childNodes[0]?.textContent || el.getAttribute('aria-label') || el.name || '').trim();
+      errBox.textContent = missing.length
+        ? (missing[0].type === 'checkbox' ? `Please tick the box: “${(missing[0].closest('label')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 140)}”` : `Please fill in: ${missing.map(labelOf).filter(Boolean).join(', ')}.`)
+        : 'Please enter a valid email address.';
+      errBox.hidden = false;
+      (missing[0] || badEmail).focus();
+      return;
+    }
     btn.disabled = true;
     const label = btn.textContent;
     btn.textContent = 'Saving…';

@@ -59,7 +59,7 @@ export async function landing(app) {
       </section>
 
       <section class="lp-final"><h2>Start keeping track today</h2><div class="btn-row lp-cta"><a class="btn btn-primary" href="#/signup">Create your free account</a><a class="btn btn-ghost" href="demo/">See the demo</a></div></section>
-      <footer class="lp-foot"><span>© PermitPal</span><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="#/login">Sign in</a></footer>
+      <footer class="lp-foot"><span>© PermitPal</span><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="#/contact">Contact</a><a href="#/login">Sign in</a></footer>
     </div>`);
   app.querySelector('[data-scroll]')?.addEventListener('click', (e) => { e.preventDefault(); document.getElementById('teams')?.scrollIntoView({ behavior: 'smooth' }); });
 }
