@@ -12,9 +12,11 @@ name: Nightly backup
 #   BACKUP_PASSPHRASE          Long random passphrase. STORE IT SOMEWHERE SAFE: without it backups cannot be opened.
 # Optional (off-site copy, any S3-compatible storage such as Cloudflare R2 or Backblaze B2):
 #   BACKUP_S3_BUCKET, BACKUP_S3_ENDPOINT, BACKUP_S3_ACCESS_KEY, BACKUP_S3_SECRET_KEY
+# PAUSED until there is real customer data and the secrets above are set. To turn it back on,
+# put these two lines back under "on:":
+#   schedule:
+#     - cron: "30 18 * * *"
 on:
-  schedule:
-    - cron: "30 18 * * *"
   workflow_dispatch:
 
 permissions:
