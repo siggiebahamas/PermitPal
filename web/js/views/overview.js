@@ -105,6 +105,9 @@ export function compliance(el, params) {
     return true;
   }).sort(byPriority);
 
+  const byStatus = {};
+  for (const r of S.data.reqs) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+  const extra = ['subject', 'entity', 'city', 'type', 'due'].filter((k) => filters[k] !== 'all').length;
   const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Compliance</h1><p class="muted">Every permit and registration across your businesses and vehicles.</p></div>
@@ -113,15 +116,22 @@ export function compliance(el, params) {
         <button class="btn btn-ghost btn-sm" data-act="export-csv">Export CSV</button></div></div>
     <div class="filters" id="filters">
       <input type="search" name="q" placeholder="Search name, reference no., city…" value="${filters.q}">
-      <select name="status">${opt('all', 'All statuses', filters.status)}${Object.entries(STATUS).map(([k, s]) => opt(k, s.label, filters.status))}</select>
-      <select name="subject">${opt('all', 'Businesses + vehicles', filters.subject)}${opt('business', 'Businesses', filters.subject)}${opt('vehicle', 'Vehicles', filters.subject)}</select>
-      <select name="entity">${opt('all', 'All businesses & vehicles', filters.entity)}
-        ${businesses.map((b) => opt('business:' + b.id, b.name, filters.entity))}
-        ${vehicles.map((v) => opt('vehicle:' + v.id, `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`, filters.entity))}</select>
-      <select name="city">${opt('all', 'All locations', filters.city)}${cities.map((c) => opt(c, c, filters.city))}</select>
-      <select name="type">${opt('all', 'All requirement types', filters.type)}${types.map((t) => opt(t, t, filters.type))}</select>
-      <select name="due">${opt('all', 'Any due date', filters.due)}${opt('overdue', 'Overdue', filters.due)}${opt('30', 'Next 30 days', filters.due)}${opt('90', 'Next 90 days', filters.due)}${opt('none', 'No expiry date yet', filters.due)}</select>
-      <button class="btn btn-ghost btn-sm" data-act="clear-filters">Clear</button>
+      <div class="status-chips" role="group" aria-label="Show">
+        ${[['all', 'All', ''], ...Object.entries(STATUS).map(([k, s]) => [k, s.label, s.cls])].map(([k, label, cls]) => html`
+          <button type="button" class="chip-btn ${cls} ${filters.status === k ? 'on' : ''}" data-act="filter-status" data-v="${k}" aria-pressed="${filters.status === k}">${label}${k === 'all' ? '' : html` <span>${byStatus[k] || 0}</span>`}</button>`)}
+      </div>
+      <details class="more-filters" ${extra ? 'open' : ''}><summary>More filters${extra ? ` (${extra} on)` : ''}</summary>
+        <div class="more-filters-body">
+          <select name="subject">${opt('all', 'Businesses + vehicles', filters.subject)}${opt('business', 'Businesses', filters.subject)}${opt('vehicle', 'Vehicles', filters.subject)}</select>
+          <select name="entity">${opt('all', 'All businesses & vehicles', filters.entity)}
+            ${businesses.map((b) => opt('business:' + b.id, b.name, filters.entity))}
+            ${vehicles.map((v) => opt('vehicle:' + v.id, `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`, filters.entity))}</select>
+          <select name="city">${opt('all', 'All locations', filters.city)}${cities.map((c) => opt(c, c, filters.city))}</select>
+          <select name="type">${opt('all', 'All requirement types', filters.type)}${types.map((t) => opt(t, t, filters.type))}</select>
+          <select name="due">${opt('all', 'Any due date', filters.due)}${opt('overdue', 'Overdue', filters.due)}${opt('30', 'Next 30 days', filters.due)}${opt('90', 'Next 90 days', filters.due)}${opt('none', 'No expiry date yet', filters.due)}</select>
+        </div>
+      </details>
+      ${when_(extra || filters.status !== 'all' || filters.q, html`<button class="btn btn-ghost btn-sm clear-btn" data-act="clear-filters">Clear filters</button>`)}
     </div>
     <section class="card list">
       <div class="card-head"><div><h2>All requirements</h2><p class="card-sub">${plural(list.length, 'requirement')} · as of ${fmtDate(today)} (Philippine time)</p></div></div>
@@ -139,6 +149,7 @@ export function compliance(el, params) {
     t = setTimeout(() => { filters.q = e.target.value; compliance(el, new URLSearchParams()); el.querySelector('[name=q]').focus(); }, 250);
   });
 }
+on('filter-status', (d) => { filters.status = d.v; if (location.hash === '#/compliance') hooks.render(); else location.hash = '#/compliance'; });
 on('clear-filters', () => { Object.assign(filters, { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', q: '' });
   // Already on the page: redraw it (changing the hash to the same value fires no event).
   if (location.hash === '#/compliance') hooks.render(); else location.hash = '#/compliance';

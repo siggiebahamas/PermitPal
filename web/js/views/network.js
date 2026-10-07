@@ -145,6 +145,7 @@ function orgBoard(el, k, acc) {
             <option value="attention" ${filter === 'attention' ? 'selected' : ''}>Needs attention</option>
             <option value="missing" ${filter === 'missing' ? 'selected' : ''}>Missing details</option></select>
           ${when(isOrgAdmin(), html`<button class="btn btn-sm btn-primary" data-act="nb-nudge" ${picked.size ? '' : 'disabled'}>${ICON.bell} Send reminder${picked.size ? ` (${picked.size})` : ''}</button>`)}</div></div>
+      ${when(isOrgAdmin() && !picked.size, html`<p class="nb-tip">Tick the box next to a ${k.one} to send them a reminder.</p>`)}
       <div class="nb-scroll"><table class="nb-table">
         <thead><tr><th class="nb-pick"></th><th class="nb-name">${k.one[0].toUpperCase() + k.one.slice(1)}</th>${cols.map((c) => html`<th>${typeName(c)}</th>`)}<th>Other</th></tr></thead>
         <tbody>${shown.map((r) => {
@@ -154,8 +155,8 @@ function orgBoard(el, k, acc) {
           return html`<tr class="${picked.has(r.key) ? 'picked' : ''}">
             <td class="nb-pick">${when(isOrgAdmin() && canNudge && !nudgedToday, html`<input type="checkbox" data-nb-pick="${r.key}" ${picked.has(r.key) ? 'checked' : ''} aria-label="Select ${r.name}">`)}</td>
             <td class="nb-name"><button class="linklike" data-act="nb-open" data-key="${r.key}"><b>${r.name}</b></button><small>${r.sub}${nudgedToday ? ' · reminded today' : ''}</small></td>
-            ${cols.map((c) => html`<td>${cellHtml(cell(r.items.filter((i) => i.type_code === c)))}</td>`)}
-            <td>${other.length ? cellHtml(cell(other)) : html`<span class="nb-cell none"><b>—</b></span>`}</td></tr>`;
+            ${cols.map((c) => html`<td data-label="${typeName(c)}">${cellHtml(cell(r.items.filter((i) => i.type_code === c)))}</td>`)}
+            <td data-label="Other">${other.length ? cellHtml(cell(other)) : html`<span class="nb-cell none"><b>—</b></span>`}</td></tr>`;
         })}</tbody></table></div>
       ${when(!shown.length, html`<p class="muted">Nothing matches this filter.</p>`)}
     </section>` : html`<section class="card nb-empty">${k.icon}<div><h2>Add your first ${k.one}</h2>
@@ -205,7 +206,7 @@ function fleetBoard(el, k, acc) {
         <thead><tr><th class="nb-name">Vehicle</th>${cols.map((c) => html`<th>${typeName(c)}</th>`)}</tr></thead>
         <tbody>${rows.map(({ v, items }) => html`<tr>
           <td class="nb-name"><a href="#/vehicles/${v.id}"><b>${v.make_model}</b></a><small>${[v.plate_no, v.vehicle_type].filter(Boolean).join(' · ')}</small></td>
-          ${cols.map((c) => html`<td>${cellHtml(cell(items.filter((i) => i.type_code === c)))}</td>`)}</tr>`)}</tbody></table></div>
+          ${cols.map((c) => html`<td data-label="${typeName(c)}">${cellHtml(cell(items.filter((i) => i.type_code === c)))}</td>`)}</tr>`)}</tbody></table></div>
     </section>` : html`<section class="card nb-empty">${ICON.car}<div><h2>Bring in your fleet</h2>
       <p>Import every vehicle from a spreadsheet in one go, or add them one by one.</p>
       <div class="btn-row"><button class="btn btn-primary" data-act="veh-import">Import from spreadsheet</button><a class="btn btn-ghost" href="#/vehicles?add=1">Add a vehicle</a></div></div></section>`}

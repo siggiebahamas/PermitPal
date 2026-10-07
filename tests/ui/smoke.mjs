@@ -164,8 +164,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     // Compliance filters: Clear brings every row back.
     await go('#/compliance');
     const allRows = await page.locator('main .row').count();
-    await page.selectOption('#filters select[name=status]', 'action_required');
+    await page.click('[data-act=filter-status][data-v=action_required]');
     await page.waitForTimeout(250);
+    check('status chip narrows the compliance list', (await page.locator('main .row').count()) < allRows);
     await page.click('[data-act=clear-filters]');
     await page.waitForTimeout(250);
     check('Clear resets the compliance filters', (await page.locator('main .row').count()) === allRows);

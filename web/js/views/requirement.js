@@ -154,13 +154,15 @@ function dueFields(r, values = {}) {
   const t = typeOf(r.type_code);
   return html`
     <div class="grid2">
-      <label class="field"><span>Reference / permit no.</span><input name="reference_no" value="${values.reference_no || ''}" maxlength="100" placeholder="e.g. BP-2026-0442"></label>
-      <label class="field"><span>Issued by <small>(optional)</small></span><input name="issuer" value="${values.issuer || ''}" maxlength="120" placeholder="${r.subject === 'vehicle' && r.type_code === 'ctpl' ? 'Insurance company' : 'Office or agency'}"></label>
       <label class="field"><span>Issued on</span><input type="date" name="issued_on" value="${values.issued_on || ''}" max="${todayPH()}"></label>
       <label class="field expiry-field" ${r.expires ? '' : 'hidden'}><span>Expires on</span><input type="date" name="expires_on" value="${values.expires_on || ''}"></label>
-      <label class="field"><span>Amount paid <small>(₱, optional — for your budget)</small></span><input type="number" name="amount_paid" min="0" step="0.01" value="${values.amount_paid ?? ''}" placeholder="e.g. 4500"></label>
     </div>
     <div class="suggest" data-rule="${t?.due_rule || 'manual'}" hidden></div>
+    <div class="grid2">
+      <label class="field"><span>Reference / permit no. <small>(optional)</small></span><input name="reference_no" value="${values.reference_no || ''}" maxlength="100" placeholder="e.g. BP-2026-0442"></label>
+      <label class="field"><span>Issued by <small>(optional)</small></span><input name="issuer" value="${values.issuer || ''}" maxlength="120" placeholder="${r.subject === 'vehicle' && r.type_code === 'ctpl' ? 'Insurance company' : 'Office or agency'}"></label>
+      <label class="field"><span>Amount paid <small>(₱, optional — for your budget)</small></span><input type="number" name="amount_paid" min="0" step="0.01" value="${values.amount_paid ?? ''}" placeholder="e.g. 4500"></label>
+    </div>
     <label class="check"><input type="checkbox" name="no_expiry" ${r.expires ? '' : 'checked'}> This document does not expire</label>`;
 }
 

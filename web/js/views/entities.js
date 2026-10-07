@@ -138,7 +138,7 @@ export function businessDetail(el, id) {
   el.innerHTML = String(html`
     <a class="back" href="#/businesses">← Businesses</a>
     <div class="page-head"><div><h1>${b.name}</h1><p class="muted">${ACTIVITIES[b.activity]} · ${b.structure}${b.tin ? ' · TIN ' + b.tin : ''}</p></div>
-      <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="business" data-id="${id}">+ Requirement</button>`)}
+      <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="business" data-id="${id}">+ Add permit</button>`)}
         <button class="btn btn-ghost" data-act="share-open" data-scope="business" data-id="${id}">${ICON.share} Share proof</button>
         <a class="btn btn-ghost" href="#/pros">${ICON.briefcase} Find a professional</a></div></div>
     ${statTiles(c)}
@@ -361,7 +361,7 @@ export function vehicleDetail(el, id) {
     <div class="page-head"><div><h1>${v.make_model}</h1>
       <p class="muted">${v.plate_no || 'No plate'} · ${v.vehicle_type}${v.cr_no ? ' · CR ' + v.cr_no : ''}${v.business_id && business(v.business_id) ? ' · ' + business(v.business_id).name : ''}</p>
       ${when(s, html`<p class="small">LTO renewal window for this plate: <b>${s?.label}</b></p>`)}</div>
-      <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="vehicle" data-id="${id}">+ Requirement</button>`)}
+      <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="vehicle" data-id="${id}">+ Add permit</button>`)}
         <button class="btn btn-ghost" data-act="share-open" data-scope="vehicle" data-id="${id}">${ICON.share} Share proof</button>
         <a class="btn btn-ghost" href="#/pros">${ICON.briefcase} Find a professional</a></div></div>
     ${statTiles(c)}

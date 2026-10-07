@@ -108,7 +108,8 @@ export function dateTile(r) {
 // One requirement as a row. Clicking the row opens its page; the button does the next step.
 export function reqRow(r, { showSubject = true } = {}) {
   const s = STATUS[r.status];
-  const hint = r.confidence !== 'confirmed' ? html`<span class="tag">Please confirm</span>` : '';
+  // Only ask while nothing is on file yet: once a permit has a record, it clearly applies.
+  const hint = r.confidence !== 'confirmed' && !r.cycle_id ? html`<span class="tag" title="We think you need this permit. Open it to confirm or remove it.">Does this apply?</span>` : '';
   const btn = r.next_action && canEdit()
     ? html`<button class="btn btn-sm ${r.next_action === 'renew' ? 'btn-primary' : 'btn-soft'}" data-act="req-next" data-id="${r.id}">${NEXT_ACTION[r.next_action]}</button>`
     : r.status === 'compliant' ? html`<span class="ok-mark">${ICON.check}</span>` : '';
