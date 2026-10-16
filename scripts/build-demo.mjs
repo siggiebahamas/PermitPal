@@ -18,7 +18,7 @@ const logo = 'data:image/png;base64,' + fs.readFileSync('web/img/logo.png').toSt
 const fonts = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
   + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">';
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>PermitPal — demo</title>${fonts}<style>${css}
 .demo-flag{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:300;background:#1B2130;color:#fff;font-size:12px;font-weight:700;padding:4px 12px;border-radius:999px;opacity:.85;pointer-events:none;white-space:nowrap}
 @media (max-width:899px){.demo-flag{position:static;transform:none;display:block;border-radius:0;opacity:1;text-align:center;padding:5px 12px}}

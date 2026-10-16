@@ -26,6 +26,13 @@ export function businessList(el, params) {
 // Businesses list: one row per business, most urgent first. The dot is its status (the key sits on top),
 // the line under the name is the one permit to deal with next, coloured like the dot, and a box on the
 // right counts the days left (due soon) or days late (overdue). Tapping a row opens the business.
+// Square box with the days left (due soon, yellow) or days late (overdue, red); nothing for other statuses.
+function daysBox(r) {
+  const d = r.days_left;
+  if (r.status === 'renew_soon' && d !== null && d >= 0) return html`<span class="days-box soon">${d === 0 ? html`<b>Today</b><span>due</span>` : html`<b>${d}</b><span>${d === 1 ? 'day' : 'days'} left</span>`}</span>`;
+  if (r.status === 'action_required' && d !== null && d < 0) return html`<span class="days-box late"><b>${-d}</b><span>${d === -1 ? 'day' : 'days'} late</span></span>`;
+  return '';
+}
 const ROW_STATE = { action_required: 'overdue', renew_soon: 'soon', in_progress: 'progress', needs_information: 'needinfo', compliant: 'ok' };
 function businessRows(list) {
   const rows = list.map((b) => ({ b, top: reqsOf('business', b.id).sort(byPriority).find((r) => r.status !== 'compliant'), any: reqsOf('business', b.id).length }))
@@ -33,12 +40,6 @@ function businessRows(list) {
   const states = new Set(rows.map((r) => (r.top ? ROW_STATE[r.top.status] : 'ok')));
   const key = [['overdue', 'Overdue'], ['soon', html`Due soon <small>(next 30 days)</small>`], ['progress', 'In progress'], ['needinfo', 'Missing details'], ['ok', 'All set']]
     .filter(([k]) => ['overdue', 'soon', 'ok'].includes(k) || states.has(k));
-  const box = (r) => {
-    const d = r.days_left;
-    if (r.status === 'renew_soon' && d !== null && d >= 0) return html`<span class="days-box soon">${d === 0 ? html`<b>Today</b><span>due</span>` : html`<b>${d}</b><span>${d === 1 ? 'day' : 'days'} left</span>`}</span>`;
-    if (r.status === 'action_required' && d !== null && d < 0) return html`<span class="days-box late"><b>${-d}</b><span>${d === -1 ? 'day' : 'days'} late</span></span>`;
-    return '';
-  };
   return html`<section class="card blist">
     <div class="blist-head"><h2>Your businesses</h2><span>${plural(list.length, 'business', 'businesses')} · most urgent first</span></div>
     <div class="blist-key">${key.map(([k, label]) => html`<span><i class="bdot ${k}"></i>${label}</span>`)}</div>
@@ -47,7 +48,7 @@ function businessRows(list) {
       return html`<a class="brow" href="#/businesses/${b.id}"><i class="bdot ${st}"></i>
         <span class="brow-main"><span class="brow-name">${b.name}</span>
           <span class="brow-req ${top ? st : any ? 'ok' : 'none'}">${top ? shortName(top) : any ? 'All set' : 'No permits added yet'}</span></span>
-        ${top ? box(top) : ''}<span class="brow-chev">${ICON.chevron}</span></a>`;
+        ${top ? daysBox(top) : ''}<span class="brow-chev">${ICON.chevron}</span></a>`;
     })}
   </section>`;
 }
@@ -70,7 +71,7 @@ const entityCard = (subject) => (x) => {
       <div class="chips">${['action_required', 'renew_soon', 'in_progress', 'needs_information', 'compliant'].map((k) =>
         c[k] ? html`<span class="chip ${STATUS[k].cls}">${c[k]} ${STATUS[k].label.toLowerCase()}</span>` : '')}</div></div></a>
     ${reqs.map((r) => html`<a class="line" href="#/requirement/${r.id}"><span class="line-main"><b>${r.name}</b>${locs.length > 1 && r.location_id ? html`<small>${location_(r.location_id)?.name}</small>` : ''}</span>
-      <b class="due ${STATUS[r.status].cls}">${dueShort(r)}</b></a>`)}
+      ${daysBox(r) || html`<b class="due ${STATUS[r.status].cls}">${dueShort(r)}</b>`}</a>`)}
     ${when(canEdit(), html`<button class="line add" data-act="req-add" data-subject="${subject}" data-id="${x.id}"><span class="plus">+</span>Add a ${subject === 'person' ? 'licence' : 'permit'}</button>`)}
     <div class="sheet-foot">${c.compliant} of ${c.total} compliant${top ? html` · Next: <b>${top.name}</b> — <b class="due ${STATUS[top.status].cls}">${dueShort(top)}</b>` : ' · all clear'}</div>
   </section>`;

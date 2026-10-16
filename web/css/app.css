@@ -175,9 +175,12 @@ main { padding: 16px 16px 96px; max-width: 1080px; margin: 0 auto; outline: none
 .card-head + .line { border-top: 0; }
 a.line:hover, button.line:hover { background-color: var(--hover); }
 .line-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* narrow screens: buttons or chips on the right drop below the text rather than crush it */
+.line:has(> .btn-row, > .btn, > .chip) { flex-wrap: wrap; }
+.line:has(> .btn-row, > .btn, > .chip) > .line-main { flex: 1 1 140px; }
 .line-main b { color: var(--heading); font-weight: 700; font-size: 16px; }
 .line-main small { font-size: 14px; color: var(--muted); }
-.line .due { text-align: right; font-size: 15px; }
+.line .due { text-align: right; font-size: 15px; max-width: 50%; } /* long dates wrap instead of running into the permit name */
 button.line { background-color: transparent; border-left: 0; border-right: 0; border-bottom: 0; cursor: pointer; }
 .line.add { color: var(--brand); font-weight: 700; font-size: 15px; background-color: #FCFBF7; }
 .line.add:hover { background-color: #F3F6FD; }
