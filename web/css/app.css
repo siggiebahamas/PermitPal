@@ -18,9 +18,9 @@
   --gray: #8B95A7; --gray-ink: #5F6B7E;
   /* soft status set: pale tint (bg), deeper text (ink), mid tone (strips, meters) */
   --s-over-bg: #FCECEC; --s-over: #B8403F; --s-over-mid: #EFA3A2;
-  --s-soon-bg: #FFF5C4; --s-soon: #B08D00; --s-soon-mid: #F5D547; --s-soon-on: var(--s-soon);
+  --s-soon-bg: #FFF5C4; --s-soon: #7A5C00; --s-soon-mid: #F5D547; --s-soon-on: var(--s-soon);
   --s-prog-bg: #EAF0FC; --s-prog: #3461BD; --s-prog-mid: #9DB8EE;
-  --s-info-bg: #F1EFEB; --s-info: #5E6573; --s-info-mid: #C5C8CF;
+  --s-info-bg: #E4E7EC; --s-info: #1F2937; --s-info-mid: #C5C8CF;
   --s-ok-bg: #E8F4EC; --s-ok: #2A7650; --s-ok-mid: #98CFAF;
   --pin-biz-bg: #FFE4D6; --pin-biz: #B4380C; --pin-veh-bg: #E0EAFF; --pin-veh: #1B4DB5; --pin-ins-bg: #DDF5E7; --pin-ins: #15803D;
 }
@@ -214,7 +214,7 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .stat-n small { font-size: 16px; color: var(--muted); font-family: var(--font); }
 .stat-l { font-size: 14px; color: var(--heading); font-weight: 700; margin-top: 6px; }
 .stat.overdue { border-top-color: var(--s-over-mid); } .stat.overdue .stat-n { color: var(--s-over); }
-.stat.soon { border-top-color: var(--s-soon-mid); } .stat.soon .stat-n { color: #D8B000; } /* sunflower: lighter for the big numbers only; small text keeps the darker yellow */
+.stat.soon { border-top-color: var(--s-soon-mid); } .stat.soon .stat-n { color: #D8B000; } /* sunflower: lighter for the big numbers only; small text uses the darker gold so it stays readable */
 .stat.progress { border-top-color: var(--s-prog-mid); } .stat.progress .stat-n { color: var(--s-prog); }
 .stat.ok { border-top-color: var(--s-ok-mid); } .stat.ok .stat-n { color: var(--s-ok); }
 .stats .stat:last-child:nth-child(odd) { grid-column: span 2; }
@@ -321,8 +321,12 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .cards { display: grid; grid-template-columns: 1fr; gap: 12px; }
 @media (min-width: 700px) { .cards { grid-template-columns: 1fr 1fr; } }
 .entity { display: flex; flex-direction: column; margin-bottom: 0; }
-.entity-head { color: inherit; align-items: flex-start; }
-.entity-head:hover h2 { color: var(--brand); }
+/* vehicle / staff cards: white name on a charcoal band with an amber stripe, so each one is easy to spot */
+.entity-head { color: inherit; align-items: flex-start; background: #252A33; border-left: 6px solid #F2B33D; padding: 16px 18px 14px; }
+.entity-head h2 { font-size: 21px; font-weight: 800; color: #fff; }
+.entity-head:hover h2 { text-decoration: underline; text-underline-offset: 3px; }
+.entity-head .card-sub { color: #C9CED6; }
+.entity-head .plate { border-color: #fff; }
 .entity-head .chips { margin: 10px 0 2px; }
 .entity .sheet-foot { margin-top: auto; }
 .cards { align-items: start; }
