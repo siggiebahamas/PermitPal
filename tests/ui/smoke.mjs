@@ -82,6 +82,15 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   }
 
   if (label === 'phone') {
+    // Businesses list: one row per business, most urgent first, the overdue one shows its days-late box.
+    await go('#/businesses');
+    const bizRows = page.locator('.blist .brow');
+    check('businesses list: one row per business, overdue first with a days-late box',
+      (await bizRows.count()) >= 1 && (await bizRows.first().locator('.days-box.late').count()) === 1 && (await bizRows.first().locator('.brow-req.overdue').count()) === 1);
+    await bizRows.first().click();
+    await page.waitForTimeout(300);
+    check('tapping a business row opens that business', /^#\/businesses\/b\d/.test(await page.evaluate(() => location.hash)));
+
     // Renew the overdue Mayor's Permit without a new file -> must not become compliant (bug #2).
     await go('#/businesses/b1');
     await page.click('.row.overdue button:has-text("Renew")');
