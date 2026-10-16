@@ -321,12 +321,8 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .cards { display: grid; grid-template-columns: 1fr; gap: 12px; }
 @media (min-width: 700px) { .cards { grid-template-columns: 1fr 1fr; } }
 .entity { display: flex; flex-direction: column; margin-bottom: 0; }
-/* vehicle / staff cards: white name on a charcoal band with an amber stripe, so each one is easy to spot */
-.entity-head { color: inherit; align-items: flex-start; background: #252A33; border-left: 6px solid #F2B33D; padding: 16px 18px 14px; }
-.entity-head h2 { font-size: 21px; font-weight: 800; color: #fff; }
-.entity-head:hover h2 { text-decoration: underline; text-underline-offset: 3px; }
-.entity-head .card-sub { color: #C9CED6; }
-.entity-head .plate { border-color: #fff; }
+.entity-head { color: inherit; align-items: flex-start; }
+.entity-head:hover h2 { color: var(--brand); }
 .entity-head .chips { margin: 10px 0 2px; }
 .entity .sheet-foot { margin-top: auto; }
 .cards { align-items: start; }
@@ -833,7 +829,7 @@ tr.imp-bad td { background: var(--s-over-bg); }
 .days-box b { font-size: 20px; font-weight: 800; }
 .days-box span { font-size: 12.5px; font-weight: 600; margin-top: 3px; white-space: nowrap; }
 .days-box.soon { border-color: #F2D27A; background: #FFFBEA; } .days-box.soon b { color: #B98900; } .days-box.soon span { color: #8A6A10; }
-.days-box.late { border-color: var(--s-over-mid); background: #fff; } .days-box.late b { color: var(--s-over); } .days-box.late span { color: #8E3332; }
+.days-box.late { border-color: var(--s-over-mid); background: #FDEEEE; } .days-box.late b { color: var(--s-over); } .days-box.late span { color: #8E3332; }
 .brow-chev { flex: none; color: var(--muted); display: flex; }
 .brow-chev svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
 @media (max-width: 599px) {
