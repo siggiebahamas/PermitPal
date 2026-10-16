@@ -54,6 +54,17 @@ function businessRows(list) {
 }
 
 // One report sheet per vehicle / person: every permit on its own ruled line, status on the right.
+// Vehicle and staff cards start with a teal circle: the person's initials, or a car / motorcycle icon.
+function initials(name) {
+  const words = String(name || '').split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean);
+  while (words.length > 1 && /^(jr|sr|ii|iii|iv)$/i.test(words.at(-1))) words.pop(); // "José Rizal Jr." → JR
+  return words.length ? (words[0][0] + (words.length > 1 ? words.at(-1)[0] : '')).toUpperCase() : '';
+}
+function avatar(subject, x) {
+  if (subject === 'person') { const i = initials(x.full_name); return html`<span class="ava" aria-hidden="true">${i || ICON.person}</span>`; }
+  return html`<span class="ava" aria-hidden="true">${/^(Motorcycle|Tricycle)$/.test(x.vehicle_type) ? ICON.moto : ICON.car}</span>`;
+}
+
 const entityCard = (subject) => (x) => {
   const reqs = reqsOf(subject, x.id).sort(byPriority);
   const c = counts(reqs);
@@ -65,7 +76,7 @@ const entityCard = (subject) => (x) => {
     : subject === 'person' ? [x.role_title, x.business_id && business(x.business_id)?.name].filter(Boolean).join(' · ') || 'Staff member'
     : `${x.vehicle_type}${x.cr_no ? ' · CR ' + x.cr_no : ''}`;
   return html`<section class="card entity">
-    <a class="card-head entity-head" href="${href}"><div>
+    <a class="card-head entity-head" href="${href}"><div class="${subject === 'business' ? '' : 'with-ava'}">${subject === 'business' ? '' : avatar(subject, x)}
       <h2>${subject === 'business' ? x.name : subject === 'person' ? x.full_name : x.make_model}${subject === 'vehicle' && x.plate_no ? html` <span class="plate">${x.plate_no}</span>` : ''}</h2>
       <p class="card-sub">${meta}</p>
       <div class="chips">${['action_required', 'renew_soon', 'in_progress', 'needs_information', 'compliant'].map((k) =>

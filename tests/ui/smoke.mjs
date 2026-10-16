@@ -136,6 +136,10 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
 
     // Import vehicles from a CSV: good rows go in, bad rows are shown and skipped.
     await go('#/vehicles');
+    check('vehicle cards: each name has a teal circle with a vehicle icon', await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('main .card.entity')];
+      return cards.length > 0 && cards.every((c) => c.querySelector('.entity-head .ava svg'));
+    }));
     await page.click('[data-act=veh-import]');
     await page.setInputFiles('#imp-file', { name: 'fleet.csv', mimeType: 'text/csv', buffer: Buffer.from(
       'Make and model,Plate number,Type,Registration expires,CTPL expires\n"Mitsubishi L300, FB",ABC 1234,Van,3/10/2027,2027-03-10\nHonda Beat,XYZ 99,Spaceship,,\nIsuzu Elf,NGV 5588,Van,2027-01-05,\n') });
@@ -217,6 +221,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('.modal button[type=submit]');
     await page.waitForTimeout(500);
     check('removing a staff licence returns to that staff member', personHash.startsWith('#/people/') && (await page.evaluate(() => location.hash)) === personHash, personHash);
+    await go('#/people');
+    check('staff cards: the name has a teal circle with initials', await page.evaluate(() =>
+      [...document.querySelectorAll('main .card.entity')].some((c) => c.querySelector('h2')?.textContent.includes('Ana Cruz') && c.querySelector('.ava')?.textContent.trim() === 'AC')));
 
     // History: the drop-down really filters (it used to show the same list whatever was picked).
     await go('#/history');
