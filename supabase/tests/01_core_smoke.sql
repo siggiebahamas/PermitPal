@@ -67,18 +67,19 @@ select r.org_id, r.id, 'MP-2', private.today_ph() + 375 from public.requirements
 insert into t_results (step, ok, detail) select 'recording the renewal clears in_progress', status = 'needs_information' and renewal_started_at is null, status
   from public.requirement_status where type_code = 'mayors_permit' and business_id = (select biz from t_ids);
 
+-- Free mode (migration 20260929000700): no limits on businesses or branches.
 do $$ begin
   perform public.create_business((select org_a from t_ids), 'Second Biz', 'Corporation', 'retail', '', '');
-  insert into t_results (step, ok, detail) values ('Free plan blocks a 2nd business', false, 'was allowed');
+  insert into t_results (step, ok, detail) values ('free mode allows a 2nd business', true, 'allowed');
 exception when others then
-  insert into t_results (step, ok, detail) values ('Free plan blocks a 2nd business', sqlerrm like 'The Free plan includes 1 business.%', sqlerrm);
+  insert into t_results (step, ok, detail) values ('free mode allows a 2nd business', false, sqlerrm);
 end $$;
 
 do $$ begin
   perform public.add_location((select biz from t_ids), 'Cebu branch', 'Cebu City', '');
-  insert into t_results (step, ok, detail) values ('Free plan blocks a 2nd branch', false, 'was allowed');
+  insert into t_results (step, ok, detail) values ('free mode allows a 2nd branch', true, 'allowed');
 exception when others then
-  insert into t_results (step, ok, detail) values ('Free plan blocks a 2nd branch', sqlerrm like '%branch per business%', sqlerrm);
+  insert into t_results (step, ok, detail) values ('free mode allows a 2nd branch', false, sqlerrm);
 end $$;
 
 update t_ids set veh = public.create_vehicle(org_a, 'Isuzu Elf', 'ngv 5588', 'Van', 'CR-1', null, 'OR-1', private.today_ph() - 3, 'Malayan', 'POL-9', private.today_ph() + 45);
@@ -99,7 +100,7 @@ update public.businesses set deleted_at = now() where id = (select biz from t_id
 insert into t_results (step, ok, detail) select 'deleted business hides its requirements', count(*) = 0, count(*)::text
   from public.requirement_status where business_id = (select biz from t_ids);
 update public.businesses set deleted_at = null where id = (select biz from t_ids);
-insert into t_results (step, ok, detail) select 'restore brings them back', count(*) = 6, count(*)::text
+insert into t_results (step, ok, detail) select 'restore brings them back (6 business + 5 Cebu branch permits)', count(*) = 11, count(*)::text
   from public.requirement_status where business_id = (select biz from t_ids);
 
 insert into t_results (step, ok, detail) select 'History written by triggers', count(*) >= 8, string_agg(summary, ' | ' order by id)

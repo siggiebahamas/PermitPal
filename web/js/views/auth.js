@@ -3,10 +3,10 @@ import { html, toast, toastError, formObject, friendlyError, when } from '../uti
 import { GOOGLE_SIGN_IN } from '../config.js';
 import * as db from 'pp/data';
 
-const shell = (inner) => html`<div class="auth"><div class="auth-card">
+const shell = (inner) => html`<main class="auth"><div class="auth-card">
   <img class="auth-logo" src="img/logo.png" alt="">
   <div class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></div>
-  ${inner}</div></div>`;
+  ${inner}</div></main>`;
 
 export function authPage(el, mode, ctx = {}) {
   const invite = ctx.invite;

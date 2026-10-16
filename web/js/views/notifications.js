@@ -65,7 +65,7 @@ export async function notifications(el) {
             : html`<button class="ng-check" data-act="notif-done" data-id="${n.id}" title="Mark as done" aria-label="Mark as done"></button>`}
           <a class="ng-main" href="${n.link || '#/notifications'}" data-act="notif-open" data-id="${n.id}">
             <b>${n.title}</b><small>${n.body && n.body !== g.name ? n.body + ' · ' : ''}${timeAgo(n.created_at)}</small></a>
-          ${when(!n.read_at, html`<i class="ng-dot" aria-label="New"></i>`)}
+          ${when(!n.read_at, html`<i class="ng-dot" role="img" aria-label="New"></i>`)}
           ${when(!n.read_at, html`<span class="ng-act">${actionFor(n, e)}</span>`)}
           <button class="icon-btn ng-x" data-act="notif-delete" data-id="${n.id}" aria-label="Delete">✕</button>
         </div>`)}

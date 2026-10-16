@@ -4,7 +4,7 @@
 //   property     tenants who connect their workspace (and may share copies of their permits)
 //   fleet        every vehicle's registration, CTPL, emission test and inspection
 // Single businesses stay free; these tools come with a 30-day trial, then a paid plan.
-import { html, fmtDate, toast, toastError, when, plural, timeAgo, openModal, formObject, confirmDialog, download, toCsv } from '../util.js';
+import { html, fmtDate, toast, toastError, when, plural, timeAgo, openModal, formObject, confirmDialog, download, toCsv, todayPH } from '../util.js';
 import { S, on, go, reload, canEdit, isOrgAdmin, empty } from '../core.js';
 import { STATUS, ICON } from '../components.js';
 import * as db from 'pp/data';
@@ -184,7 +184,7 @@ function fleetBoard(el, k, acc) {
     .sort((a, b) => rowScore(a.items) - rowScore(b.items) || a.v.make_model.localeCompare(b.v.make_model));
   const off = rows.filter((r) => r.items.some((i) => i.status === 'action_required')).length;
   const soon = rows.filter((r) => !r.items.some((i) => i.status === 'action_required') && r.items.some((i) => i.status === 'renew_soon')).length;
-  const month = new Date().toISOString().slice(0, 7);
+  const month = todayPH().slice(0, 7); // Philippine month (UTC is still last month until 8am on the 1st)
   const thisMonth = S.data.reqs.filter((r) => r.vehicle_id && r.expires_on && r.expires_on.slice(0, 7) === month && r.status !== 'compliant');
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Fleet</h1><p class="muted">${k.sub}</p></div>
@@ -405,14 +405,14 @@ on('nb-export', () => {
       const items = S.data.reqs.filter((r) => r.vehicle_id === v.id);
       rows.push([v.make_model, v.plate_no || '', ...k.cols.map((c) => { const x = cell(items.filter((i) => i.type_code === c)); return x.status ? `${STATUS[x.status].label}${x.date ? ' ' + x.date : ''}` : 'Not tracked'; })]);
     }
-    return download(`fleet-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows));
+    return download(`fleet-${todayPH()}.csv`, toCsv(rows));
   }
   const cols = kind === 'property' && S.org.required_types?.length ? S.org.required_types : k.cols;
   const rows = [[k.one, 'Note', ...cols.map(typeName)]];
   for (const r of rowsFor(k).filter((x) => !x.pending)) {
     rows.push([r.name, r.member?.label || r.sub, ...cols.map((c) => { const x = cell(r.items.filter((i) => i.type_code === c)); return x.status ? `${STATUS[x.status].label}${x.date ? ' ' + x.date : ''}` : 'Not tracked'; })]);
   }
-  download(`${k.many}-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows));
+  download(`${k.many}-${todayPH()}.csv`, toCsv(rows));
 });
 
 // ================================================================ the invited business's side

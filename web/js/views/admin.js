@@ -1,7 +1,7 @@
 // PermitPal staff console: workspaces and plans (team tools revenue), listed professionals and the
 // quote requests (leads) sent to them, payment details for plans, and the email log.
 // Only accounts with profiles.is_platform_admin can load any of this (enforced in the database).
-import { html, fmtDate, fmtDateTime, timeAgo, toast, toastError, when, peso } from '../util.js';
+import { html, fmtDate, fmtDateTime, timeAgo, toast, toastError, when, peso, todayPH } from '../util.js';
 import { S, on, rerender, empty } from '../core.js';
 import { PARTNER_CATEGORIES } from './extras.js';
 import * as db from 'pp/data';
@@ -82,9 +82,10 @@ function partnersTab(list) {
 function referralsTab(list) {
   const c = (r) => (Array.isArray(r.referral_commissions) ? r.referral_commissions[0] : r.referral_commissions) || {};
   const sum = (st) => list.filter((r) => c(r).status === st).reduce((t, r) => t + Number(c(r).amount_php || 0), 0);
-  const month = new Date().toISOString().slice(0, 7);
+  const month = todayPH().slice(0, 7);
+  const phMonth = (ts) => new Date(ts).toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 7);
   return html`<div class="stats four">
-      <div class="stat progress"><div class="stat-n">${list.filter((r) => r.created_at.slice(0, 7) === month).length}</div><div class="stat-l">Requests this month</div></div>
+      <div class="stat progress"><div class="stat-n">${list.filter((r) => phMonth(r.created_at) === month).length}</div><div class="stat-l">Requests this month</div></div>
       <div class="stat soon"><div class="stat-n">${peso(sum('expected'))}</div><div class="stat-l">To bill</div></div>
       <div class="stat ok"><div class="stat-n">${peso(sum('earned'))}</div><div class="stat-l">Billed, not paid</div></div>
       <div class="stat ok"><div class="stat-n">${peso(sum('paid'))}</div><div class="stat-l">Received</div></div></div>
@@ -160,7 +161,7 @@ function wire(el) {
     row.type_codes = String(fd.get('type_codes') || '').split(',').map((x) => x.trim()).filter(Boolean);
     row.cities = String(fd.get('cities') || '').split(',').map((x) => x.trim()).filter(Boolean);
     const fee = fd.get('lead_fee_php');
-    row.lead_fee_php = fee === '' || fee == null ? null : Number(fee);
+    row.lead_fee_php = fee === '' || fee == null ? 0 : Number(fee); // blank = no fee (a blank fee used to break quote requests)
     row.published = fd.get('published') === 'on';
     row.verified = fd.get('verified') === 'on';
     await db.adminSavePartner(f.dataset.id || null, row);

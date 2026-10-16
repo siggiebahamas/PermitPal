@@ -11,7 +11,7 @@ const app = document.getElementById('app');
 const token = decodeURIComponent(location.hash.replace(/^#\/?/, '')).trim();
 
 function fail(msg) {
-  app.innerHTML = String(html`<div class="share-wrap"><section class="card"><div class="card-head"><h2>Compliance summary</h2></div>
+  app.innerHTML = String(html`<div class="share-wrap"><section class="card"><div class="card-head"><h1>Compliance summary</h1></div>
     <p class="share-msg">${msg}</p></section></div>`);
 }
 
@@ -34,7 +34,7 @@ async function main() {
     <header class="share-top"><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span>
       <button class="btn btn-ghost btn-sm no-print" id="print">Print or save as PDF</button></header>
     <section class="card">
-      <div class="card-head"><h2>${data.org_name}</h2></div>
+      <div class="card-head"><h1>${data.org_name}</h1></div>
       <p class="card-sub">${data.label || 'Compliance summary'} · as of ${fmtDate(data.as_of)}</p>
       <div class="share-counts">${counts.map(([s, n]) => html`<span class="chip ${STATUS[s][1]}">${n} ${STATUS[s][0]}</span>`)}</div>
       ${[...groups].map(([name, items]) => html`<h3 class="share-group">${name}</h3>

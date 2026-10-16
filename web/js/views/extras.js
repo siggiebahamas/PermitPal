@@ -59,7 +59,7 @@ function proCard(p) {
     <p class="svc-sum">${p.description}</p>
     ${when(p.services, html`<p class="small"><b>Handles:</b> ${p.services}</p>`)}
     ${when((p.cities || []).length || p.coverage, html`<p class="muted small">Serves: ${(p.cities || []).join(', ') || p.coverage}</p>`)}
-    <div class="svc-foot">${p.website ? html`<a class="small" href="${p.website}" target="_blank" rel="noopener">Website</a>` : html`<span></span>`}
+    <div class="svc-foot">${/^https:\/\//i.test(p.website || '') ? html`<a class="small" href="${p.website}" target="_blank" rel="noopener">Website</a>` : html`<span></span>`}
       ${when(canEdit(), html`<button class="btn btn-primary btn-sm" data-act="partner-intro" data-id="${p.id}">Request a quote</button>`)}</div>
   </section>`;
 }
@@ -236,7 +236,7 @@ export async function shares(el) {
 
     ${when(canEdit(), html`<section class="card proof-make">
       <div class="card-head"><div><h2>Create a link</h2></div></div>
-      <div class="proof-pick"><select id="proof-what">
+      <div class="proof-pick"><select id="proof-what" aria-label="What to share">
         <option value="org:">Everything in ${S.org.name}</option>
         ${when(businesses.length, html`<optgroup label="One business">${businesses.map((b) => html`<option value="business:${b.id}">${b.name}</option>`)}</optgroup>`)}
         ${when(vehicles.length, html`<optgroup label="One vehicle">${vehicles.map((v) => html`<option value="vehicle:${v.id}">${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}</option>`)}</optgroup>`)}

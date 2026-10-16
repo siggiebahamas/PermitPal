@@ -1,5 +1,5 @@
 // Building blocks shared across pages: status chips, requirement rows, stats.
-import { html, raw, fmtDate, plural } from './util.js';
+import { html, raw, fmtDate, plural, todayPH } from './util.js';
 import { S, canEdit, location_ } from './core.js';
 
 export const STATUS = {
@@ -104,7 +104,7 @@ export function dateTile(r) {
     return html`<div class="dtile ${s.cls}" title="${r.expires ? 'No expiry date on file' : 'Does not expire'}"><small>${r.expires ? 'Date' : 'No exp.'}</small><b>${r.expires ? '?' : '—'}</b></div>`;
   }
   const [y, m, d] = r.expires_on.split('-').map(Number);
-  const thisYear = String(new Date().getFullYear()) === String(y);
+  const thisYear = todayPH().slice(0, 4) === String(y); // Philippine year, wherever the phone is
   return html`<div class="dtile ${s.cls}" title="${fmtDate(r.expires_on)}"><small>${MON[m - 1]}${thisYear ? '' : " '" + String(y).slice(2)}</small><b>${d}</b></div>`;
 }
 

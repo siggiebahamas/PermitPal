@@ -124,19 +124,23 @@ export const toastError = (err) => toast(friendlyError(err), 'error');
 // openModal(title, bodyRaw, { onSubmit, submitLabel, danger, wide }) — body usually contains form fields.
 // onSubmit(formData, formEl) may return false (or throw) to keep the modal open.
 let closeOpen = null;
+let modalOpener = null; // the control that opened the current pop-up, so focus can go back to it
 // Close whatever pop-up is open. Called when the page changes (e.g. the phone's Back button),
 // so a pop-up never stays on screen over a different page.
 export const closeModal = () => closeOpen?.();
 export function openModal(title, body, opts = {}) {
   const root = document.getElementById('modal-root');
-  closeOpen?.(); // a new pop-up replaces the one before it
   const submit = opts.onSubmit
     ? html`<button type="submit" class="btn ${opts.danger ? 'btn-danger' : 'btn-primary'}">${opts.submitLabel || 'Save'}</button>`
     : '';
+  const active = document.activeElement;
+  const opener = root.contains(active) ? modalOpener : active; // a pop-up opened from a pop-up returns to the first opener
+  closeOpen?.(); // a new pop-up replaces the one before it
+  modalOpener = opener;
   root.innerHTML = String(html`
-    <div class="modal-overlay" data-modal-overlay>
-      <form class="modal ${opts.wide ? 'wide' : ''}" novalidate>
-        <div class="modal-head"><h3>${title}</h3><button type="button" class="icon-btn" data-modal-close aria-label="Close">✕</button></div>
+    <div class="modal-overlay" data-modal-overlay role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <form class="modal ${opts.wide ? 'wide' : ''}" novalidate tabindex="-1">
+        <div class="modal-head"><h3 id="modal-title">${title}</h3><button type="button" class="icon-btn" data-modal-close aria-label="Close">✕</button></div>
         <div class="modal-body">${body}</div>
         <div class="modal-error" hidden></div>
         <div class="modal-foot">
@@ -148,12 +152,25 @@ export function openModal(title, body, opts = {}) {
   const form = root.querySelector('form');
   const errBox = root.querySelector('.modal-error');
   const close = () => {
-    if (root.contains(form)) root.innerHTML = ''; // never clear a newer pop-up that replaced this one
+    const wasOpen = root.contains(form);
+    if (wasOpen) root.innerHTML = ''; // never clear a newer pop-up that replaced this one
     document.removeEventListener('keydown', onKey);
     if (closeOpen === close) closeOpen = null;
+    // back to the button that opened it (keyboard and screen-reader users keep their place)
+    if (wasOpen && opener?.isConnected && !root.contains(opener) && (document.activeElement === document.body || !document.activeElement)) opener.focus({ preventScroll: true });
   };
   closeOpen = close;
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const onKey = (e) => {
+    if (e.key === 'Escape') return close();
+    if (e.key !== 'Tab') return;
+    // keep Tab inside the pop-up
+    const items = [...form.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+      .filter((el) => el.getClientRects().length);
+    if (!items.length) return;
+    const i = items.indexOf(document.activeElement);
+    if (e.shiftKey && (i <= 0)) { e.preventDefault(); items[items.length - 1].focus(); }
+    else if (!e.shiftKey && (i === -1 || i === items.length - 1)) { e.preventDefault(); items[0].focus(); }
+  };
   document.addEventListener('keydown', onKey);
   root.querySelectorAll('[data-modal-close]').forEach((b) => b.addEventListener('click', close));
   root.querySelector('[data-modal-overlay]').addEventListener('mousedown', (e) => {
@@ -196,7 +213,8 @@ export function openModal(title, body, opts = {}) {
   // Touch screens: no automatic focus, so the phone keyboard doesn't cover the pop-up before it's read.
   // Elsewhere, don't move the cursor if the person already clicked into a field (typing would land in the wrong box).
   const touch = window.matchMedia?.('(pointer: coarse)').matches;
-  if (first && !opts.noAutofocus && !touch) setTimeout(() => { if (!form.contains(document.activeElement)) first.focus(); }, 30);
+  // Otherwise focus the pop-up itself, so screen readers announce it and Tab starts inside it.
+  setTimeout(() => { if (!form.contains(document.activeElement) && root.contains(form)) (first && !opts.noAutofocus && !touch ? first : form).focus({ preventScroll: true }); }, 30);
   return { close, form };
 }
 

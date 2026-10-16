@@ -13,6 +13,8 @@ insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, e
   ('44444444-4444-4444-4444-444444444444','00000000-0000-0000-0000-000000000000','authenticated','authenticated','staff@test.local','{"first_name":"Staff"}', now(), now(), now()),
   ('55555555-5555-5555-5555-555555555555','00000000-0000-0000-0000-000000000000','authenticated','authenticated','mate@test.local','{"first_name":"Mate"}', now(), now(), now());
 update public.profiles set is_platform_admin = true where id = '44444444-4444-4444-4444-444444444444';
+-- a fresh database has no founder address configured; the live one does
+update private.settings set value = 'founder@test.local' where key = 'admin_notify_emails';
 
 -- ---------------------------------------------------------------- owner sets up data
 select set_config('request.jwt.claims', '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}', true);
@@ -72,21 +74,22 @@ insert into t_results (step, ok, detail) select 'customer notified of update', c
 -- ---------------------------------------------------------------- invites & roles
 select set_config('request.jwt.claims', '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}', true);
 set local role authenticated;
+-- Free mode: no seat limit, so inviting a teammate works on the Free plan.
 do $$ begin
-  insert into public.org_invites (org_id, email, role) select org, 'mate@test.local', 'member' from t_ids;
-  insert into t_results (step, ok, detail) values ('Free plan blocks invites (1 seat)', false, 'was allowed');
+  insert into public.org_invites (org_id, email, role) select org, 'helper@test.local', 'member' from t_ids;
+  insert into t_results (step, ok, detail) values ('free mode allows invites (no seat limit)', true, 'allowed');
 exception when others then
-  insert into t_results (step, ok, detail) values ('Free plan blocks invites (1 seat)', sqlerrm like 'Your plan includes 1 team member%', sqlerrm);
+  insert into t_results (step, ok, detail) values ('free mode allows invites (no seat limit)', false, sqlerrm);
 end $$;
 reset role;
 update public.orgs set plan_id = 'business' where id = (select org from t_ids);
 select set_config('request.jwt.claims', '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}', true);
 set local role authenticated;
 insert into public.org_invites (org_id, email, role) select org, 'MATE@test.local', 'viewer' from t_ids;
-update t_ids set token = (select token from public.org_invites where org_id = (select org from t_ids));
+update t_ids set token = (select token from public.org_invites where org_id = (select org from t_ids) and lower(email) = 'mate@test.local');
 insert into t_results (step, ok, detail) select 'invite email queued', count(*) = 1, count(*)::text from t_ids where token is not null;
 reset role;
-insert into t_results (step, ok, detail) select 'invite email in outbox', count(*) = 1, string_agg(to_address, ',') from public.message_outbox where dedupe_key like 'invite:%';
+insert into t_results (step, ok, detail) select 'invite email in outbox', count(*) = 1, string_agg(to_address, ',') from public.message_outbox where dedupe_key like 'invite:%' and lower(to_address) = 'mate@test.local';
 
 select set_config('request.jwt.claims', '{"sub":"55555555-5555-5555-5555-555555555555","role":"authenticated"}', true);
 set local role authenticated;

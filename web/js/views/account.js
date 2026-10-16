@@ -57,7 +57,7 @@ export async function historyPage(el, { keep = false } = {}) {
     <div class="page-head"><div><h1>History</h1><p class="muted">Every change anyone on your team made, including deletions. Kept permanently.</p></div></div>
     <div class="hist-bar">
       <label for="hist-show">Show</label>
-      <select id="hist-show">${HIST_SHOW.map(([k, label]) => html`<option value="${k}" ${k === histShow ? 'selected' : ''}>${label}</option>`)}</select>
+      <select id="hist-show" aria-label="Show">${HIST_SHOW.map(([k, label]) => html`<option value="${k}" ${k === histShow ? 'selected' : ''}>${label}</option>`)}</select>
       <span class="muted">${histItems.length}${histMore ? '+' : ''} ${histItems.length === 1 ? show[3].replace(/s$/, '') : show[3]}</span>
     </div>
     ${histItems.length ? html`<section class="card hist-card">
@@ -128,7 +128,7 @@ export async function team(el) {
         return html`<div class="row"><div class="row-main member">${avatar(name, null, 34)}<div><div class="row-title">${name}${me ? ' (you)' : ''}</div>
           <div class="row-sub">${p.email}${p.role_title ? ' · ' + p.role_title : ''}</div></div></div>
           <div class="row-side">${canChange
-            ? html`<select data-member-role="${m.user_id}">${roleOptions(m.role, isOwner())}</select>
+            ? html`<select data-member-role="${m.user_id}" aria-label="Role">${roleOptions(m.role, isOwner())}</select>
                    <button class="btn btn-sm btn-ghost danger" data-act="member-remove" data-id="${m.user_id}" data-name="${name}">Remove</button>`
             : html`<span class="tag">${m.role}</span>${me && members.length > 1 ? html`<button class="btn btn-sm btn-ghost" data-act="member-leave">Leave</button>` : ''}`}</div></div>`;
       })}
@@ -139,10 +139,10 @@ export async function team(el) {
         ? html`<p class="muted">Your ${plan.name} plan includes ${plural(plan.max_members, 'person', 'people')}. <a href="#/settings/billing">Upgrade</a> to invite more.</p>`
         : html`<form id="invite-form" class="inline-form">
             <input type="email" name="email" required placeholder="name@company.ph">
-            <select name="role">${roleOptions('member', false)}</select>
+            <select name="role" aria-label="Role">${roleOptions('member', false)}</select>
             <button class="btn btn-primary">Send invite</button></form>
           <p class="muted small">They get an email with a link. ${seatsLeft !== null ? `${plural(seatsLeft, 'seat')} left on your plan.` : ''}</p>`}
-      ${when(pending.length, html`<h4>Pending invites</h4>${pending.map((i) => html`<div class="row"><div class="row-main"><div class="row-title">${i.email}</div>
+      ${when(pending.length, html`<h3 class="h4">Pending invites</h3>${pending.map((i) => html`<div class="row"><div class="row-main"><div class="row-title">${i.email}</div>
         <div class="row-sub">${i.role} · expires ${fmtDate(i.expires_at)}</div></div>
         <div class="row-side"><button class="btn btn-sm btn-ghost" data-act="invite-copy" data-token="${i.token}">Copy link</button>
         <button class="btn btn-sm btn-ghost danger" data-act="invite-revoke" data-id="${i.id}">Revoke</button></div></div>`)}`)}
@@ -214,7 +214,7 @@ export async function settings(el, section) {
     <section class="card"><h2>Reminders</h2>
       <p class="muted small">We remind you 30 days, 7 days and 1 day before something expires, then weekly while it's overdue. Times are Philippine time (about 7am).</p>
       ${toggle('email_enabled', 'Email', channels.email === false ? 'Email sending is being set up — reminders show here in the app meanwhile.' : p.email)}
-      <h4>What to remind me about</h4>
+      <h3 class="h4">What to remind me about</h3>
       ${toggle('business_alerts', 'Business permits')}
       ${toggle('vehicle_alerts', 'Vehicle registration and insurance')}
       ${toggle('remind_30', '30 days before')}${toggle('remind_7', '7 days before')}${toggle('remind_1', '1 day before')}
@@ -241,9 +241,9 @@ export async function settings(el, section) {
 
     ${when(section === 'workspace', html`
     <section class="card"><h2>Workspace</h2>
-      <form id="org-form" class="inline-form"><input name="name" maxlength="120" value="${org.name}" ${isOrgAdmin() ? '' : 'disabled'}>
+      <form id="org-form" class="inline-form"><input name="name" aria-label="Workspace name" maxlength="120" value="${org.name}" ${isOrgAdmin() ? '' : 'disabled'}>
         ${when(isOrgAdmin(), html`<button class="btn btn-primary">Rename</button>`)}</form>
-      ${when(S.orgs.length > 1, html`<h4>Switch workspace</h4>${S.orgs.map((o) => html`<div class="row"><div class="row-main"><div class="row-title">${o.name}</div><div class="row-sub">${o.role}</div></div>
+      ${when(S.orgs.length > 1, html`<h3 class="h4">Switch workspace</h3>${S.orgs.map((o) => html`<div class="row"><div class="row-main"><div class="row-title">${o.name}</div><div class="row-sub">${o.role}</div></div>
         <div class="row-side">${o.id === org.id ? html`<span class="tag">Current</span>` : html`<button class="btn btn-sm btn-soft" data-act="switch-org" data-id="${o.id}">Switch</button>`}</div></div>`)}`)}
       <p><button class="btn btn-ghost" data-act="new-org">+ Create another workspace</button>
         <span class="muted small">Useful if you manage permits for several separate companies or clients.</span></p>

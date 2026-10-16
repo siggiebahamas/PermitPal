@@ -568,3 +568,43 @@ if (globalThis.PP_EXTRA_BIZ) {
     });
   });
 }
+// Test hook (hostile-text check): every name a customer can type becomes HTML/script, Filipino letters, emoji,
+// quotes and one very long unbroken word, to prove it is shown as plain text and never breaks the layout.
+if (globalThis.PP_HOSTILE) {
+  const H = (s) => `<img src=x onerror="window.__xss=1">${s || ''} Ñiño 😀 "q" & <b>b</b> ${'W'.repeat(60)}`;
+  org.name = H('Org');
+  db.businesses.forEach((b) => { b.name = H(b.name); });
+  db.locations.forEach((l) => { l.name = H(l.name); l.city = H(l.city); l.address = H('addr'); });
+  db.vehicles.forEach((v) => { v.make_model = H(v.make_model); });
+  db.people.forEach((p) => { p.full_name = H(p.full_name); p.role_title = H(p.role_title); });
+  db.requirements.forEach((r) => { r.notes = H('note'); if (!types.some((t) => t.code === r.type_code)) r.name = H(r.name); });
+  db.cycles.forEach((c) => { c.reference_no = H(c.reference_no); c.issuer = H('issuer'); });
+  db.documents.forEach((d) => { d.file_name = H('file') + '.pdf'; });
+  db.notifications.forEach((n) => { n.title = H(n.title); n.body = H(n.body); });
+  db.audit.forEach((a) => { a.summary = H(a.summary); });
+}
+// Test hook (scale check): a 100-vehicle fleet, 25 businesses with 5 branches each and 50 staff: about 1,000 permits.
+if (globalThis.PP_SCALE) {
+  const of = (s) => types.filter((t) => t.subject === s);
+  const off = (i) => ((i * 37) % 420) - 60; // spread from 60 days overdue to a year ahead
+  for (let i = 0; i < 100; i++) {
+    const id = 'vs' + i;
+    db.vehicles.push({ id, org_id: org.id, make_model: ['Toyota Vios', 'Isuzu Traviz', 'Mitsubishi L300', 'Honda TMX'][i % 4] + ' #' + (i + 1), plate_no: 'NAB ' + (1000 + i),
+      vehicle_type: i % 4 === 3 ? 'Motorcycle' : 'Van', cr_no: 'CR' + i, mv_file_no: '', business_id: null, deleted_at: null });
+    of('vehicle').forEach((t, k) => addReq('vehicle', id, null, t, i % 9 === 0 && k ? null : { reference_no: 'S' + i + k, expires_on: addDays(off(i + k * 7)) }));
+  }
+  for (let i = 0; i < 25; i++) {
+    const id = 'bs' + i;
+    db.businesses.push({ id, org_id: org.id, name: 'Scale Store ' + (i + 1), activity: 'retail', structure: 'Corporation', tin: null, deleted_at: null });
+    for (let j = 0; j < 5; j++) {
+      const lid = `ls${i}_${j}`;
+      db.locations.push({ id: lid, business_id: id, name: j ? 'Branch ' + j : 'Main branch', city: ['Makati City', 'Cebu City', 'Davao City', 'Pasig City', 'Iloilo City'][j], address: '', is_main: !j, deleted_at: null });
+      of('business').forEach((t, k) => addReq('business', id, lid, t, (i + j + k) % 6 === 0 ? null : { reference_no: `B${i}-${j}-${k}`, expires_on: addDays(off(i * 5 + j + k * 3)) }));
+    }
+  }
+  for (let i = 0; i < 50; i++) {
+    const id = 'ps' + i;
+    db.people.push({ id, org_id: org.id, full_name: ['Ana', 'Ben', 'Carla', 'Dante', 'Ella'][i % 5] + ' Santos ' + (i + 1), role_title: 'Driver', business_id: null, deleted_at: null });
+    of('person').forEach((t, k) => addReq('person', id, null, t, { reference_no: 'P' + i + k, expires_on: addDays(off(i * 3 + k)) }));
+  }
+}

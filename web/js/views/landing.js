@@ -1,6 +1,6 @@
 // What a visitor sees before signing in: free tracking for every business, and the team tools
 // (head office, accounting firm, property, fleet) with their prices read live from the plans table.
-import { html, when } from '../util.js';
+import { html } from '../util.js';
 import { ICON } from '../components.js';
 import * as db from 'pp/data';
 
@@ -20,11 +20,10 @@ const TEAMS = [
 ];
 
 export async function landing(app) {
-  let plans = [];
-  try { plans = await db.listPlans(); } catch { /* the page still works without prices */ }
-  const price = (id) => plans.find((p) => p.id === id)?.price_php_monthly;
+  // Show the page at once; team prices fill in when they arrive (a slow or unreachable server never blocks the page).
+  const plansP = db.listPlans().catch(() => []);
   app.innerHTML = String(html`
-    <div class="landing">
+    <main class="landing">
       <header class="lp-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
         <div class="spacer"></div><a class="btn btn-ghost btn-sm" href="#teams" data-scroll>For teams</a><a class="btn btn-ghost btn-sm" href="#/login">Sign in</a><a class="btn btn-primary btn-sm" href="#/signup">Get started</a></header>
 
@@ -48,7 +47,7 @@ export async function landing(app) {
       <h2 class="lp-h2" id="teams">Responsible for more than one business?</h2>
       <p class="lp-sub">Team tools put everything you're accountable for on one board. 30-day free trial, no card needed.</p>
       <div class="lp-teams">${TEAMS.map(([id, ic, t, d]) => html`<section class="card lp-team">${ic}<h3>${t}</h3><p>${d}</p>
-        <div class="lp-team-foot">${when(price(id), html`<span><b>₱${Number(price(id) || 0).toLocaleString()}</b> <small>/ month</small></span>`)}
+        <div class="lp-team-foot"><span class="lp-price" data-plan="${id}"></span>
           <a class="btn btn-primary btn-sm" href="#/signup?type=${id}">Start free trial</a></div></section>`)}</div>
 
       <section class="card lp-trust">
@@ -59,6 +58,11 @@ export async function landing(app) {
 
       <section class="lp-final"><h2>Start keeping track today</h2><div class="btn-row lp-cta"><a class="btn btn-primary" href="#/signup">Create your free account</a><a class="btn btn-ghost" href="demo/">See the demo</a></div></section>
       <footer class="lp-foot"><span>© PermitPal</span><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="#/contact">Contact</a><a href="#/login">Sign in</a></footer>
-    </div>`);
+    </main>`);
   app.querySelector('[data-scroll]')?.addEventListener('click', (e) => { e.preventDefault(); document.getElementById('teams')?.scrollIntoView({ behavior: 'smooth' }); });
+  const plans = await plansP;
+  for (const el of app.querySelectorAll('.lp-price[data-plan]')) {
+    const v = plans.find((p) => p.id === el.dataset.plan)?.price_php_monthly;
+    if (v) el.innerHTML = String(html`<b>₱${Number(v).toLocaleString()}</b> <small>/ month</small>`);
+  }
 }

@@ -200,7 +200,8 @@ export async function documents(el) {
   const folder = (subject, id, title, icon, href) => {
     const list = reqs.filter((r) => (subject === 'business' ? r.business_id === id : subject === 'vehicle' ? r.vehicle_id === id : r.person_id === id)).sort(byPriority);
     if (!list.length) return '';
-    return html`<details class="folder" open><summary>${icon}<a href="${href}">${title}</a><span class="muted small">${list.filter((r) => r.document_count).length}/${list.length} on file</span></summary>
+    return html`<details class="folder" open><summary>${icon}<span class="folder-name">${title}</span><span class="muted small">${list.filter((r) => r.document_count).length}/${list.length} on file</span></summary>
+      <p class="folder-open"><a href="${href}">Open the ${subject === 'person' ? 'staff' : subject} page →</a></p>
       ${list.map((r) => {
         const files = docsCache.filter((d) => d.requirement_id === r.id && current.has(d.cycle_id) && d.cycle_id === r.cycle_id);
         const older = docsCache.filter((d) => d.requirement_id === r.id && d.cycle_id !== r.cycle_id).length;

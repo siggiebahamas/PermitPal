@@ -34,12 +34,12 @@ export function contactPage(el, { signedIn = !!S.user } = {}) {
   el.innerHTML = String(signedIn
     ? html`<div class="page-head"><div><h1>Contact PermitPal</h1><p class="muted">Questions, problems, plans and payment, or a request about your personal data.</p></div></div>
         <section class="card contact-card">${body}</section>`
-    : html`<div class="auth"><div class="auth-card contact-public">
+    : html`<main class="auth"><div class="auth-card contact-public">
         <a href="#/"><img class="auth-logo" src="img/logo.png" alt="PermitPal"></a>
         <h1>Contact PermitPal</h1>
         <p class="tagline">Questions, problems, or a request about your personal data. Our Data Protection Officer reads privacy messages.</p>
         ${body}
-        <p class="switch-auth"><a href="#/">Back to PermitPal</a></p></div></div>`);
+        <p class="switch-auth"><a href="#/">Back to PermitPal</a></p></div></main>`);
 
   const form = el.querySelector('#contact-form');
   form.addEventListener('submit', async (e) => {

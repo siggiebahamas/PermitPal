@@ -1,5 +1,5 @@
 // Boot, sign-in state, the page shell (sidebar, which is a slide-in menu on phones) and the router.
-import { html, toast, toastError, fmtDate, closeModal } from './util.js';
+import { html, toast, toastError, fmtDate, closeModal, friendlyError } from './util.js';
 import { S, actions, hooks, on, isStaff } from './core.js';
 import { ICON } from './components.js';
 import * as db from 'pp/data';
@@ -15,6 +15,11 @@ import { landing } from './views/landing.js';
 import { historyPage, trashPage, team, settings } from './views/account.js';
 import { notifications } from './views/notifications.js';
 import { admin } from './views/admin.js';
+
+// Never run inside another website's frame (a trick to make people click hidden buttons). GitHub Pages
+// cannot send the header that blocks this, so the page checks for itself; our own frames are fine.
+try { if (window.top !== window.self && window.top.location.origin !== location.origin) throw new Error(); }
+catch { document.documentElement.innerHTML = ''; throw new Error('PermitPal cannot be shown inside another website.'); }
 
 const app = document.getElementById('app');
 let recovery = false;
@@ -81,9 +86,9 @@ async function start() {
     if (!unsubscribe) unsubscribe = db.onNewNotification(S.user.id, (n) => { S.unread++; paintBadges(); toast(n.title, 'info'); });
     renderShell();
   } catch (e) {
-    app.innerHTML = String(html`<div class="auth"><div class="auth-card"><h2>Couldn't load PermitPal</h2><p class="tagline">${e.message}</p>
+    app.innerHTML = String(html`<main class="auth"><div class="auth-card"><h1 class="auth-title">Couldn't load PermitPal</h1><p class="tagline">${friendlyError(e)}</p>
       <button class="btn btn-primary btn-block" data-act="reload">Try again</button>
-      <button class="btn btn-ghost btn-block" data-act="sign-out">Sign out</button></div></div>`);
+      <button class="btn btn-ghost btn-block" data-act="sign-out">Sign out</button></div></main>`);
   }
 }
 
@@ -131,13 +136,14 @@ function renderShell() {
   const name = [S.profile.first_name, S.profile.last_name].filter(Boolean).join(' ') || S.profile.email;
   app.innerHTML = String(html`
     <div class="shell">
+      <button class="skip-link" data-act="skip-main">Skip to content</button>
       <aside class="sidebar" id="side-menu" aria-label="Menu">
         <div class="side-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
           <button class="icon-btn menu-close" data-act="menu-close" aria-label="Close menu">${ICON.close}</button></div>
         ${S.orgs.length > 1 ? html`<select class="org-switch" id="org-switch">${S.orgs.map((o) => html`<option value="${o.id}" ${o.id === S.org.id ? 'selected' : ''}>${o.name}</option>`)}</select>`
           : html`<div class="org-name">${S.org.name}</div>`}
-        <nav>${NAV.map(([p, k, ic]) => html`<a class="nav" href="#/${p}" data-nav="${p}">${ic}<span>${t(k)}</span></a>`)}</nav>
-        <nav class="nav-secondary">
+        <nav aria-label="Main">${NAV.map(([p, k, ic]) => html`<a class="nav" href="#/${p}" data-nav="${p}">${ic}<span>${t(k)}</span></a>`)}</nav>
+        <nav class="nav-secondary" aria-label="Notifications, tools and account">
           <a class="nav" href="#/notifications" data-nav="notifications">${ICON.bell}<span>${t('notifications')}</span><b class="badge" data-badge></b></a>
           <div class="nav-group tools">${t('tools')}</div>
           ${TOOLS.map(([p, k]) => html`<a class="nav small" href="#/${p}" data-nav="${p}"><span>${t(k)}</span></a>`)}
@@ -257,6 +263,7 @@ function setMenu(open) {
   if (open) setTimeout(() => document.querySelector('.sidebar .nav.active, .sidebar .nav')?.focus({ preventScroll: true }), 60);
 }
 on('menu-open', () => setMenu(true));
+on('skip-main', () => document.getElementById('main')?.focus());
 on('menu-close', () => setMenu(false));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.shell.menu-open')) setMenu(false); });
 // Tapping any link in the menu closes it, including the page you are already on.
