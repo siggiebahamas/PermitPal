@@ -141,7 +141,7 @@ export function businessDetail(el, id) {
       <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="business" data-id="${id}">+ Add permit</button>`)}
         <button class="btn btn-ghost" data-act="share-open" data-scope="business" data-id="${id}">${ICON.share} Share proof</button>
         <a class="btn btn-ghost" href="#/pros">${ICON.briefcase} Find a professional</a></div></div>
-    ${statTiles(c)}
+    ${statTiles(c, `business:${id}`)}
     <div class="tabs">${tabBtn('requirements', 'Permits')}${tabBtn('branches', `Branches (${locs.length})`)}${tabBtn('documents', 'Documents')}${tabBtn('activity', 'Activity')}${tabBtn('details', 'Details')}</div>
     <div id="tab-body"></div>`);
   const body = el.querySelector('#tab-body');
@@ -372,7 +372,7 @@ export function vehicleDetail(el, id) {
       <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="vehicle" data-id="${id}">+ Add permit</button>`)}
         <button class="btn btn-ghost" data-act="share-open" data-scope="vehicle" data-id="${id}">${ICON.share} Share proof</button>
         <a class="btn btn-ghost" href="#/pros">${ICON.briefcase} Find a professional</a></div></div>
-    ${statTiles(c)}
+    ${statTiles(c, `vehicle:${id}`)}
     <div class="tabs">${tabBtn('requirements', 'Permits')}${tabBtn('documents', 'Documents')}${tabBtn('activity', 'Activity')}${tabBtn('details', 'Details')}</div>
     <div id="tab-body"></div>`);
   const body = el.querySelector('#tab-body');
@@ -468,7 +468,7 @@ function addPerson() {
       <label class="field"><span>Works at <small>(optional)</small></span><select name="business_id"><option value="">—</option>${S.data.businesses.map((b) => html`<option value="${b.id}">${b.name}</option>`)}</select></label>
     </div>
     <h4>Which licences should we track?</h4>
-    ${types.map((t) => html`<label class="check"><input type="checkbox" name="types" value="${t.code}"> ${t.name} <small class="muted">· ${t.agency}</small></label>`)}
+    ${types.map((t) => html`<label class="check"><input type="checkbox" name="types" value="${t.code}"> <span>${t.name}${t.agency ? html` <small class="muted">· ${t.agency}</small>` : ''}</span></label>`)}
     <p class="muted small">You'll enter each expiry date from the card itself. You can add more later.</p>
     <label class="check"><input type="checkbox" name="consent" required> This person knows we'll keep their licence details in PermitPal to track renewals.</label>`, {
     submitLabel: 'Add person',
@@ -498,7 +498,7 @@ export function personDetail(el, id) {
       <p class="muted">${[p.role_title, p.business_id && business(p.business_id)?.name].filter(Boolean).join(' · ') || 'Staff member'}</p></div>
       <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="person" data-id="${id}">+ Licence</button>`)}
         <button class="btn btn-ghost" data-act="share-open" data-scope="person" data-id="${id}">${ICON.share} Share proof</button></div></div>
-    ${statTiles(c)}
+    ${statTiles(c, `person:${id}`)}
     <div class="tabs">${tabBtn('requirements', 'Licences')}${tabBtn('documents', 'Documents')}${tabBtn('details', 'Details')}</div>
     <div id="tab-body"></div>`);
   const body = el.querySelector('#tab-body');

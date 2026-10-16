@@ -54,6 +54,33 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`${label}: ${h} has no sideways scroll`, overflow <= 1, `overflow ${overflow}px`);
   }
 
+  // Menu: a slide-in drawer on phones (closed by default), a fixed sidebar on desktop.
+  if (label === 'phone') {
+    await go('#/');
+    const menuOpen = () => page.evaluate(() => document.querySelector('.shell').classList.contains('menu-open'));
+    check('phone: menu starts closed (page gets the full screen)', !(await menuOpen()) && (await page.locator('.sidebar').evaluate((e) => e.getBoundingClientRect().right)) <= 0);
+    await page.click('[data-act=menu-open]');
+    await page.waitForTimeout(350);
+    check('phone: ☰ opens the menu', (await menuOpen()) && (await page.locator('.sidebar a[data-nav=history]').isVisible()));
+    await page.click('.sidebar a[data-nav=history]');
+    await page.waitForTimeout(350);
+    check('phone: tapping a menu link opens the page and closes the menu', !(await menuOpen()) && (await page.textContent('main h1')).includes('History'));
+    await page.click('[data-act=menu-open]');
+    await page.waitForTimeout(350);
+    await page.click('.menu-close');
+    await page.waitForTimeout(350);
+    check('phone: ✕ closes the menu', !(await menuOpen()));
+    // Back button with a pop-up open: the pop-up must not stay on screen over the previous page.
+    await go('#/businesses/b1');
+    await page.click('main [data-act=req-add]');
+    await page.waitForSelector('#modal-root .modal');
+    await page.goBack();
+    await page.waitForTimeout(300);
+    check('phone: Back closes an open pop-up', (await page.locator('#modal-root .modal').count()) === 0 && (await page.textContent('main h1')).includes('History'));
+  } else {
+    check('desktop: sidebar always visible, no ☰ button', (await page.locator('.sidebar').isVisible()) && !(await page.locator('[data-act=menu-open]').isVisible()));
+  }
+
   if (label === 'phone') {
     // Renew the overdue Mayor's Permit without a new file -> must not become compliant (bug #2).
     await go('#/businesses/b1');
@@ -165,6 +192,23 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const order = await page.evaluate(() => [...document.querySelectorAll('.sidebar .nav-secondary > *')].map((e) => e.classList.contains('nav-group') ? e.textContent.trim().toUpperCase() : e.dataset.nav));
     check('menu: Notifications above TOOLS, then ACCOUNT', order[0] === 'notifications' && order[1] === 'TOOLS' && order.indexOf('ACCOUNT') > order.indexOf('sharing'), order.join(','));
 
+    // Removing a staff licence that doesn't apply returns to that staff member (it used to go to a missing vehicle page).
+    await go('#/people');
+    await page.click('main [data-act=person-add]');
+    await page.fill('.modal [name=full_name]', 'Ana Cruz');
+    await page.check('.modal [name=types]');
+    await page.check('.modal [name=consent]');
+    await page.click('.modal button[type=submit]');
+    await page.waitForTimeout(500);
+    const personHash = await page.evaluate(() => location.hash);
+    const licHref = await page.evaluate(() => document.querySelector('main [data-href^="#/requirement/"]')?.dataset.href || document.querySelector('main a[href^="#/requirement/"]')?.getAttribute('href'));
+    await go(licHref);
+    await page.click('main [data-act=req-delete]');
+    await page.waitForSelector('.modal');
+    await page.click('.modal button[type=submit]');
+    await page.waitForTimeout(500);
+    check('removing a staff licence returns to that staff member', personHash.startsWith('#/people/') && (await page.evaluate(() => location.hash)) === personHash, personHash);
+
     // History: the drop-down really filters (it used to show the same list whatever was picked).
     await go('#/history');
     const histAll = await page.locator('.hist-line').count();
@@ -193,6 +237,28 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('[data-act=clear-filters]');
     await page.waitForTimeout(250);
     check('Clear resets the compliance filters', (await page.locator('main .row').count()) === allRows);
+    // Search: pausing mid-word (the list redraws) must not move the cursor ("ma" + "yor" stays "mayor").
+    await page.click('main [name=q]');
+    await page.keyboard.type('ma', { delay: 30 });
+    await page.waitForTimeout(400);
+    await page.keyboard.type('yor', { delay: 30 });
+    await page.waitForTimeout(400);
+    check('typing in search with a pause keeps the words in order', (await page.inputValue('main [name=q]')) === 'mayor' && (await page.locator('main .row').count()) >= 1);
+    // A leftover search must not hide anything when you arrive from a number tile.
+    await go('#/');
+    const dashOverdue = Number((await page.textContent('main .stat.overdue .stat-n')).trim());
+    await page.click('main .stat.overdue');
+    await page.waitForTimeout(300);
+    check('dashboard "Overdue" tile shows exactly that many permits', (await page.locator('main .row').count()) === dashOverdue && (await page.inputValue('main [name=q]')) === '', `tile ${dashOverdue}`);
+    // Number tiles on a business page open the list for that business only, so the count matches.
+    await go('#/businesses/b1');
+    const bizOverdue = Number((await page.textContent('main .stat.overdue .stat-n')).trim());
+    await page.click('main .stat.overdue');
+    await page.waitForTimeout(300);
+    check('a business page tile opens only that business\'s permits', (await page.locator('main .row').count()) === bizOverdue
+      && (await page.inputValue('#filters [name=entity]')) === 'business:b1', `tile ${bizOverdue}`);
+    await page.click('[data-act=clear-filters]');
+    await page.waitForTimeout(250);
 
     // Delete and restore a vehicle.
     await go('#/vehicles/v1');

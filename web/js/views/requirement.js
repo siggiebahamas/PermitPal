@@ -52,13 +52,13 @@ function page(r) {
       <div class="head-side">${statusChip(r.status, '', 'lg')}</div>
     </div>
 
-    ${when(r.confidence !== 'confirmed', html`
+    ${when(r.confidence !== 'confirmed' && !r.cycle_id, html`
       <div class="banner info">
         <div><b>Does this apply to you?</b> PermitPal added this because businesses like yours usually need it
         (${r.confidence === 'likely' ? 'likely required' : 'needs checking'}). Confirm it or remove it.</div>
         ${when(edit, html`<div class="banner-actions">
           <button class="btn btn-sm btn-primary" data-act="req-confirm" data-id="${r.id}">Yes, it applies</button>
-          <button class="btn btn-sm btn-ghost" data-act="req-delete" data-id="${r.id}">Doesn't apply</button></div>`)}
+          <button class="btn btn-sm btn-ghost" data-act="req-delete" data-id="${r.id}" data-why="na">Doesn't apply</button></div>`)}
       </div>`)}
 
     ${when(r.status === 'in_progress', html`
@@ -288,15 +288,20 @@ on('req-notes', withReq((r) => {
     onSubmit: async (fd) => { await db.updateRequirement(r.id, { notes: fd.get('notes').trim() || null }); await afterChange('Notes saved.'); },
   });
 }));
-on('req-delete', withReq(async (r) => {
-  if (!(await confirmDialog(`Delete "${r.name}"?`, 'It stops being tracked and reminded. Its records and files are kept, and you can restore it from Trash.'))) return;
+on('req-delete', withReq(async (r, ds) => {
+  const notApplicable = ds.why === 'na';
+  const ok = notApplicable
+    ? await confirmDialog(`Remove "${r.name}" from your list?`, "You told us it doesn't apply, so we'll stop tracking it and stop reminders. You can bring it back from Trash anytime.", { confirmLabel: 'Remove', danger: false })
+    : await confirmDialog(`Delete "${r.name}"?`, 'It stops being tracked and reminded. Its records and files are kept, and you can restore it from Trash.');
+  if (!ok) return;
   try {
     await db.softDelete('requirements', r.id);
-    const back = r.subject === 'business' ? `#/businesses/${r.business_id}` : `#/vehicles/${r.vehicle_id}`;
+    // back to the business, vehicle or staff member it belonged to
+    const back = r.subject === 'business' ? `#/businesses/${r.business_id}` : r.subject === 'person' ? `#/people/${r.person_id}` : `#/vehicles/${r.vehicle_id}`;
     detail = null;
     await reload();
     go(back);
-    toast('Deleted. Restore it anytime from Trash.');
+    toast(notApplicable ? 'Removed. Restore it anytime from Trash.' : 'Deleted. Restore it anytime from Trash.');
   } catch (e) { toastError(e); }
 }));
 

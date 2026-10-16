@@ -123,8 +123,13 @@ export const toastError = (err) => toast(friendlyError(err), 'error');
 // ---------------------------------------------------------------- modals
 // openModal(title, bodyRaw, { onSubmit, submitLabel, danger, wide }) — body usually contains form fields.
 // onSubmit(formData, formEl) may return false (or throw) to keep the modal open.
+let closeOpen = null;
+// Close whatever pop-up is open. Called when the page changes (e.g. the phone's Back button),
+// so a pop-up never stays on screen over a different page.
+export const closeModal = () => closeOpen?.();
 export function openModal(title, body, opts = {}) {
   const root = document.getElementById('modal-root');
+  closeOpen?.(); // a new pop-up replaces the one before it
   const submit = opts.onSubmit
     ? html`<button type="submit" class="btn ${opts.danger ? 'btn-danger' : 'btn-primary'}">${opts.submitLabel || 'Save'}</button>`
     : '';
@@ -142,7 +147,12 @@ export function openModal(title, body, opts = {}) {
     </div>`);
   const form = root.querySelector('form');
   const errBox = root.querySelector('.modal-error');
-  const close = () => { root.innerHTML = ''; document.removeEventListener('keydown', onKey); };
+  const close = () => {
+    if (root.contains(form)) root.innerHTML = ''; // never clear a newer pop-up that replaced this one
+    document.removeEventListener('keydown', onKey);
+    if (closeOpen === close) closeOpen = null;
+  };
+  closeOpen = close;
   const onKey = (e) => { if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', onKey);
   root.querySelectorAll('[data-modal-close]').forEach((b) => b.addEventListener('click', close));
@@ -183,7 +193,10 @@ export function openModal(title, body, opts = {}) {
   });
   if (opts.onOpen) opts.onOpen(form);
   const first = form.querySelector('input:not([type=hidden]):not([type=checkbox]),select,textarea');
-  if (first && !opts.noAutofocus) setTimeout(() => first.focus(), 30);
+  // Touch screens: no automatic focus, so the phone keyboard doesn't cover the pop-up before it's read.
+  // Elsewhere, don't move the cursor if the person already clicked into a field (typing would land in the wrong box).
+  const touch = window.matchMedia?.('(pointer: coarse)').matches;
+  if (first && !opts.noAutofocus && !touch) setTimeout(() => { if (!form.contains(document.activeElement)) first.focus(); }, 30);
   return { close, form };
 }
 

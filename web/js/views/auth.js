@@ -17,6 +17,7 @@ export function authPage(el, mode, ctx = {}) {
 
   if (mode === 'signup') {
     el.innerHTML = String(shell(html`
+      <h1 class="auth-title">Create your free account</h1>
       <p class="tagline">Every permit and registration you're responsible for, in one place — with reminders before anything expires.</p>
       ${inviteNote}
       <form id="auth-form">
@@ -24,7 +25,7 @@ export function authPage(el, mode, ctx = {}) {
         <label class="field"><span>Last name</span><input name="last_name" maxlength="80" autocomplete="family-name"></label></div>
         <label class="field"><span>Email</span><input type="email" name="email" required autocomplete="email" value="${invite?.email || ''}"></label>
         <label class="field"><span>Password <small>(at least 8 characters)</small></span><input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
-        <label class="check"><input type="checkbox" name="consent" required> I agree to the <a href="terms.html" target="_blank">Terms</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>, and consent to PermitPal storing my business and vehicle documents.</label>
+        <label class="check"><input type="checkbox" name="consent" required> <span>I agree to the <a href="terms.html" target="_blank">Terms</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>, and consent to PermitPal storing my business and vehicle documents.</span></label>
         <div class="form-error" hidden></div>
         <button class="btn btn-primary btn-block">Create account</button>
       </form>
@@ -32,22 +33,24 @@ export function authPage(el, mode, ctx = {}) {
       <p class="switch-auth">Already have an account? <a href="#/login">Log in</a></p>`));
   } else if (mode === 'forgot') {
     el.innerHTML = String(shell(html`
+      <h1 class="auth-title">Reset your password</h1>
       <p class="tagline">Enter your email and we'll send a link to set a new password.</p>
       <form id="auth-form"><label class="field"><span>Email</span><input type="email" name="email" required autocomplete="email"></label>
         <div class="form-error" hidden></div><button class="btn btn-primary btn-block">Send reset link</button></form>
       <p class="switch-auth"><a href="#/login">Back to log in</a></p>`));
   } else if (mode === 'reset') {
     el.innerHTML = String(shell(html`
-      <p class="tagline">Choose a new password.</p>
+      <h1 class="auth-title">Choose a new password</h1>
       <form id="auth-form"><label class="field"><span>New password</span><input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
         <div class="form-error" hidden></div><button class="btn btn-primary btn-block">Save password</button></form>`));
   } else if (mode === 'check-email') {
-    el.innerHTML = String(shell(html`<h2>Check your email</h2>
+    el.innerHTML = String(shell(html`<h1 class="auth-title">Check your email</h1>
       <p class="tagline">We sent a confirmation link to <b>${ctx.email}</b>. Open it on this device to finish signing up. It can take a minute — check spam too.</p>
       <p class="switch-auth"><a href="#/login">Back to log in</a></p>`));
     return;
   } else {
     el.innerHTML = String(shell(html`
+      <h1 class="auth-title">Log in</h1>
       <p class="tagline">One place for every permit and registration you're responsible for.</p>
       ${inviteNote}
       <form id="auth-form">
@@ -106,7 +109,7 @@ export async function invitePage(el, token, loggedIn) {
   let inv = null;
   try { inv = await db.invitePreview(token); } catch (e) { toastError(e); }
   if (!inv || inv.status !== 'pending') {
-    el.innerHTML = String(shell(html`<h2>Invitation ${inv ? inv.status : 'not found'}</h2>
+    el.innerHTML = String(shell(html`<h1 class="auth-title">Invitation ${inv ? inv.status : 'not found'}</h1>
       <p class="tagline">${inv?.status === 'accepted' ? 'This invitation was already used.' : 'Ask the person who invited you for a new link.'}</p>
       <a class="btn btn-primary btn-block" href="#/">Go to PermitPal</a>`));
     return null;
@@ -118,7 +121,7 @@ export async function invitePage(el, token, loggedIn) {
 
 export function onboarding(el, profile, onDone) {
   el.innerHTML = String(shell(html`
-    <h2>Set up your workspace</h2>
+    <h1 class="auth-title">Set up your workspace</h1>
     <p class="tagline">A workspace holds your businesses, vehicles and team. Use your company name — you can add more businesses inside it.</p>
     <form id="ob-form">
       ${when(!profile.first_name, html`<label class="field"><span>Your first name</span><input name="first_name" required maxlength="80"></label>`)}

@@ -1,5 +1,5 @@
-// Boot, sign-in state, the page shell (sidebar + mobile tab bar) and the router.
-import { html, toast, toastError, fmtDate } from './util.js';
+// Boot, sign-in state, the page shell (sidebar, which is a slide-in menu on phones) and the router.
+import { html, toast, toastError, fmtDate, closeModal } from './util.js';
 import { S, actions, hooks, on, isStaff } from './core.js';
 import { ICON } from './components.js';
 import * as db from 'pp/data';
@@ -131,8 +131,9 @@ function renderShell() {
   const name = [S.profile.first_name, S.profile.last_name].filter(Boolean).join(' ') || S.profile.email;
   app.innerHTML = String(html`
     <div class="shell">
-      <aside class="sidebar">
-        <a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
+      <aside class="sidebar" id="side-menu" aria-label="Menu">
+        <div class="side-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
+          <button class="icon-btn menu-close" data-act="menu-close" aria-label="Close menu">${ICON.close}</button></div>
         ${S.orgs.length > 1 ? html`<select class="org-switch" id="org-switch">${S.orgs.map((o) => html`<option value="${o.id}" ${o.id === S.org.id ? 'selected' : ''}>${o.name}</option>`)}</select>`
           : html`<div class="org-name">${S.org.name}</div>`}
         <nav>${NAV.map(([p, k, ic]) => html`<a class="nav" href="#/${p}" data-nav="${p}">${ic}<span>${t(k)}</span></a>`)}</nav>
@@ -147,8 +148,10 @@ function renderShell() {
         <div class="me"><div class="me-name">${name}</div><div class="muted small">${S.org.role}</div>
           <button class="linklike small" data-act="sign-out">${t('signout')}</button></div>
       </aside>
+      <div class="menu-backdrop" data-act="menu-close"></div>
       <div class="main-col">
         <header class="topbar">
+          <button class="icon-btn menu-btn" data-act="menu-open" aria-label="Open menu" aria-controls="side-menu" aria-expanded="false">${ICON.menu}</button>
           <a class="brand mobile-only" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
           <div class="spacer"></div>
           <button class="icon-btn bell" data-act="bell-open" aria-label="Notifications" aria-haspopup="dialog">${ICON.bell}<b class="badge" data-badge></b></button>
@@ -156,10 +159,6 @@ function renderShell() {
         <div id="banner"></div>
         <main id="main" tabindex="-1"></main>
       </div>
-      <nav class="tabbar">
-        ${NAV.slice(0, 4).map(([p, k, ic]) => html`<a href="#/${p}" data-nav="${p}">${ic}<span>${t(k)}</span></a>`)}
-        <button data-act="more-menu">${ICON.more}<span>${t('more')}</span><b class="badge" data-badge></b></button>
-      </nav>
     </div>`);
   document.getElementById('org-switch')?.addEventListener('change', async (e) => {
     try { await db.setCurrentOrg(S.user.id, e.target.value); location.hash = '#/'; location.reload(); } catch (err) { toastError(err); }
@@ -220,6 +219,8 @@ async function renderPage() {
 
 let lastPath = '';
 window.addEventListener('hashchange', () => {
+  setMenu(false);
+  closeModal();
   const { parts } = route();
   if (!S.user || !S.data || ['login', 'signup', 'forgot', 'invite', 'reset', 'welcome'].includes(parts[0])) return start();
   const path = location.hash.split('?')[0];
@@ -246,19 +247,21 @@ document.addEventListener('keydown', (e) => {
 
 on('reload', () => location.reload());
 on('sign-out', async () => { await db.auth.signOut(); S.data = null; location.hash = '#/login'; start(); });
-on('more-menu', () => {
-  import('./util.js').then(({ openModal }) => openModal(t('more'), html`<div class="more-menu">
-    ${NAV.slice(4).map(([p, k, ic]) => html`<a href="#/${p}" data-close>${ic}<span>${t(k)}</span></a>`)}
-    <a href="#/notifications" data-close><span>${t('notifications')}</span>${S.unread ? html`<b class="badge">${S.unread}</b>` : ''}</a>
-    <div class="nav-group tools">${t('tools')}</div>
-    ${TOOLS.map(([p, k]) => html`<a href="#/${p}" data-close><span>${t(k)}</span></a>`)}
-    <div class="nav-group account">${t('account')}</div>
-    ${ACCOUNT.map(([p, k]) => html`<a href="#/${p}" data-close><span>${t(k)}</span></a>`)}
-    ${isStaff() ? html`<a href="#/admin" data-close><span>${t('admin')}</span></a>` : ''}
-    <button class="linklike" data-act="sign-out">${t('signout')}</button></div>`, {
-    onOpen: (form) => form.querySelectorAll('[data-close]').forEach((l) => l.addEventListener('click', () => { document.getElementById('modal-root').innerHTML = ''; })),
-  }));
-});
+// Phones: the side menu is a drawer, closed by default so the page gets the whole screen.
+function setMenu(open) {
+  const shell = document.querySelector('.shell');
+  if (!shell) return;
+  shell.classList.toggle('menu-open', open);
+  document.body.classList.toggle('menu-lock', open);
+  document.querySelector('[data-act=menu-open]')?.setAttribute('aria-expanded', String(open));
+  if (open) setTimeout(() => document.querySelector('.sidebar .nav.active, .sidebar .nav')?.focus({ preventScroll: true }), 60);
+}
+on('menu-open', () => setMenu(true));
+on('menu-close', () => setMenu(false));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.shell.menu-open')) setMenu(false); });
+// Tapping any link in the menu closes it, including the page you are already on.
+document.addEventListener('click', (e) => { if (e.target.closest('.sidebar a')) setMenu(false); }, true);
+matchMedia('(min-width: 900px)').addEventListener?.('change', (m) => { if (m.matches) setMenu(false); });
 
 // Keep data fresh when people come back to the tab (another teammate may have changed things).
 document.addEventListener('visibilitychange', async () => {

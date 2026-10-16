@@ -34,6 +34,8 @@ export const ICON = {
   help: raw('<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><circle cx="12" cy="17" r=".6"/></svg>'),
   bell: raw('<svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 3.5 1 5 1.5 5.8H4.5C5 14 6 12.5 6 9z"/><path d="M10 18.5a2 2 0 0 0 4 0"/></svg>'),
   more: raw('<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>'),
+  menu: raw('<svg viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>'),
+  close: raw('<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>'),
   upload: raw('<svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></svg>'),
   chevron: raw('<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>'),
 };
@@ -124,9 +126,11 @@ export function reqRow(r, { showSubject = true } = {}) {
     </div>`;
 }
 
-export function statTiles(c) {
+// scope ('business:<id>', 'vehicle:<id>', 'person:<id>'): on a record's own page, each tile opens
+// the list for that record only, so the number on the tile matches what you see.
+export function statTiles(c, scope = '') {
   const tile = (n, label, cls, filter) =>
-    html`<a class="stat ${cls}" href="#/compliance?status=${filter}"><div class="stat-n">${n}</div><div class="stat-l">${label}</div></a>`;
+    html`<a class="stat ${cls}" href="#/compliance?status=${filter}${scope ? `&entity=${scope}` : ''}"><div class="stat-n">${n}</div><div class="stat-l">${label}</div></a>`;
   return html`<div class="stats">
     ${tile(c.action_required, 'Overdue', 'overdue', 'action_required')}
     ${tile(c.renew_soon, 'Renew soon', 'soon', 'renew_soon')}

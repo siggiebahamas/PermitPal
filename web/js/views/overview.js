@@ -1,4 +1,4 @@
-// Dashboard, Compliance (filterable list) and Document vault.
+// Dashboard, Compliance (filterable list) and Documents.
 import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
 import { S, on, hooks, canEdit, empty } from '../core.js';
 import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
@@ -83,16 +83,23 @@ const filters = { status: 'all', subject: 'all', entity: 'all', city: 'all', typ
 let moreOpen = false; // "More filters" stays open until the user closes it
 
 export function compliance(el, params) {
-  if (params.get('status')) filters.status = params.get('status');
+  // Arriving from a number tile: show exactly that list (no leftover search or filters), then take the
+  // instruction out of the address so later redraws keep whatever the person changes on the page.
+  if (params.get('status') || params.get('entity')) {
+    Object.assign(filters, { status: params.get('status') || 'all', subject: 'all', entity: params.get('entity') || 'all', city: 'all', type: 'all', due: 'all', q: '' });
+    history.replaceState(null, '', '#/compliance');
+  }
   const { reqs, businesses, vehicles, locations } = S.data;
+  const people = S.data.people || [];
   const cities = [...new Set(locations.map((l) => l.city).filter(Boolean))].sort();
   const types = [...new Set(reqs.map((r) => r.name))].sort();
   const today = todayPH();
+  const entityOf = (r) => `${r.subject}:${r.subject === 'business' ? r.business_id : r.subject === 'vehicle' ? r.vehicle_id : r.person_id}`;
 
-  const list = reqs.filter((r) => {
-    if (filters.status !== 'all' && r.status !== filters.status) return false;
+  // Every filter except the status chips, so each chip's count matches the list it shows.
+  const base = reqs.filter((r) => {
     if (filters.subject !== 'all' && r.subject !== filters.subject) return false;
-    if (filters.entity !== 'all' && `${r.subject}:${r.business_id || r.vehicle_id}` !== filters.entity) return false;
+    if (filters.entity !== 'all' && entityOf(r) !== filters.entity) return false;
     if (filters.city !== 'all' && r.location_city !== filters.city) return false;
     if (filters.type !== 'all' && r.name !== filters.type) return false;
     if (filters.due === 'overdue' && !r.is_overdue) return false;
@@ -104,10 +111,11 @@ export function compliance(el, params) {
       if (!hay.includes(filters.q.toLowerCase())) return false;
     }
     return true;
-  }).sort(byPriority);
+  });
+  const list = base.filter((r) => filters.status === 'all' || r.status === filters.status).sort(byPriority);
 
   const byStatus = {};
-  for (const r of S.data.reqs) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+  for (const r of base) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
   const extra = ['subject', 'entity', 'city', 'type', 'due'].filter((k) => filters[k] !== 'all').length;
   const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
   el.innerHTML = String(html`
@@ -123,10 +131,11 @@ export function compliance(el, params) {
       </div>
       <details class="more-filters" ${extra || moreOpen ? 'open' : ''}><summary>More filters${extra ? ` (${extra} on)` : ''}</summary>
         <div class="more-filters-body">
-          <select name="subject">${opt('all', 'Businesses + vehicles', filters.subject)}${opt('business', 'Businesses', filters.subject)}${opt('vehicle', 'Vehicles', filters.subject)}</select>
-          <select name="entity">${opt('all', 'All businesses & vehicles', filters.entity)}
+          <select name="subject">${opt('all', people.length ? 'Businesses, vehicles & staff' : 'Businesses + vehicles', filters.subject)}${opt('business', 'Businesses', filters.subject)}${opt('vehicle', 'Vehicles', filters.subject)}${when_(people.length, opt('person', 'Staff licences', filters.subject))}</select>
+          <select name="entity">${opt('all', people.length ? 'All businesses, vehicles & staff' : 'All businesses & vehicles', filters.entity)}
             ${businesses.map((b) => opt('business:' + b.id, b.name, filters.entity))}
-            ${vehicles.map((v) => opt('vehicle:' + v.id, `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`, filters.entity))}</select>
+            ${vehicles.map((v) => opt('vehicle:' + v.id, `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`, filters.entity))}
+            ${people.map((p) => opt('person:' + p.id, p.full_name, filters.entity))}</select>
           <select name="city">${opt('all', 'All locations', filters.city)}${cities.map((c) => opt(c, c, filters.city))}</select>
           <select name="type">${opt('all', 'All permit types', filters.type)}${types.map((t) => opt(t, t, filters.type))}</select>
           <select name="due">${opt('all', 'Any due date', filters.due)}${opt('overdue', 'Overdue', filters.due)}${opt('30', 'Next 30 days', filters.due)}${opt('90', 'Next 90 days', filters.due)}${opt('none', 'No expiry date yet', filters.due)}</select>
@@ -148,7 +157,12 @@ export function compliance(el, params) {
   let t;
   f.querySelector('[name=q]').addEventListener('input', (e) => {
     clearTimeout(t);
-    t = setTimeout(() => { filters.q = e.target.value; compliance(el, new URLSearchParams()); el.querySelector('[name=q]').focus(); }, 250);
+    t = setTimeout(() => {
+      // The list redraws with a new search box: keep the cursor where it was so typing carries on normally.
+      const pos = e.target.selectionStart ?? e.target.value.length;
+      filters.q = e.target.value; compliance(el, new URLSearchParams());
+      const q = el.querySelector('[name=q]'); q.focus(); q.setSelectionRange(pos, pos);
+    }, 250);
   });
 }
 on('filter-status', (d) => { filters.status = d.v; if (location.hash === '#/compliance') hooks.render(); else location.hash = '#/compliance'; });
@@ -184,7 +198,7 @@ export async function documents(el) {
   const c = counts(reqs);
 
   const folder = (subject, id, title, icon, href) => {
-    const list = reqs.filter((r) => (subject === 'business' ? r.business_id === id : r.vehicle_id === id)).sort(byPriority);
+    const list = reqs.filter((r) => (subject === 'business' ? r.business_id === id : subject === 'vehicle' ? r.vehicle_id === id : r.person_id === id)).sort(byPriority);
     if (!list.length) return '';
     return html`<details class="folder" open><summary>${icon}<a href="${href}">${title}</a><span class="muted small">${list.filter((r) => r.document_count).length}/${list.length} on file</span></summary>
       ${list.map((r) => {
@@ -202,7 +216,7 @@ export async function documents(el) {
   };
 
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Document vault</h1><p class="muted">Proof of compliance for every business and vehicle, with past years kept on file.</p></div>
+    <div class="page-head"><div><h1>Documents</h1><p class="muted">Proof of compliance for every business, vehicle and staff licence, with past years kept on file.</p></div>
       <button class="btn btn-soft" data-act="inspection-pack" data-scope="org">${ICON.download} Inspection pack</button></div>
     <div class="stats four">
       <div class="stat ok"><div class="stat-n">${onFile}<small>/${needDoc.length}</small></div><div class="stat-l">On file</div></div>
@@ -213,6 +227,7 @@ export async function documents(el) {
     <p class="muted small">${plural(docsCache.length, 'file')} stored in total, including past permit periods.</p>
     ${S.data.businesses.map((b) => folder('business', b.id, b.name, ICON.building, `#/businesses/${b.id}`))}
     ${S.data.vehicles.map((v) => folder('vehicle', v.id, `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`, ICON.car, `#/vehicles/${v.id}`))}
+    ${(S.data.people || []).map((p) => folder('person', p.id, `${p.full_name}${p.role_title ? ' · ' + p.role_title : ''}`, ICON.person, `#/people/${p.id}`))}
     ${!reqs.length ? empty('No documents yet', 'Add a business or vehicle first.') : ''}`);
 }
 

@@ -21,6 +21,7 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PermitPal — demo</title>${fonts}<style>${css}
 .demo-flag{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:300;background:#1B2130;color:#fff;font-size:12px;font-weight:700;padding:4px 12px;border-radius:999px;opacity:.85;pointer-events:none;white-space:nowrap}
+@media (max-width:899px){.demo-flag{position:static;transform:none;display:block;border-radius:0;opacity:1;text-align:center;padding:5px 12px}}
 </style></head><body><div class="demo-flag">DEMO — sample data, nothing is saved</div>
 <div id="app"><div class="boot">Loading PermitPal…<span class="boot-slow">Taking too long? <a href="./">Reload the page</a>. If it keeps happening, update your browser or open this link in Chrome or Safari.</span></div></div><div id="modal-root"></div><div id="toast" class="toast" role="status"></div>
 <script>window.PP_DEMO=true;</script><script>${js.replace(/<\/script/g, '<\\/script').replaceAll('img/logo.png', logo)}</script></body></html>`;

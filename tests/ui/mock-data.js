@@ -28,9 +28,9 @@ const types = [
   { code: 'ctpl', name: 'CTPL Insurance', subject: 'vehicle', expires: true, due_rule: 'lto_plate', per_location: false },
   { code: 'emission_test', name: 'Emission Test', subject: 'vehicle', expires: true, due_rule: 'lto_plate', per_location: false, help_text: 'Needed before LTO renewal.' },
   { code: 'mvir', name: 'Motor Vehicle Inspection Report (MVIR)', subject: 'vehicle', expires: true, due_rule: 'lto_plate', per_location: false },
-  { code: 'drivers_license', name: "Driver's License", subject: 'person', expires: true, due_rule: 'manual', per_location: false, auto_add: false },
-  { code: 'health_certificate', name: 'Health Certificate', subject: 'person', expires: true, due_rule: 'annual', per_location: false, auto_add: false },
-  { code: 'nbi_clearance', name: 'NBI Clearance', subject: 'person', expires: true, due_rule: 'annual', per_location: false, auto_add: false },
+  { code: 'drivers_license', name: "Driver's License", subject: 'person', agency: 'LTO', expires: true, due_rule: 'manual', per_location: false, auto_add: false },
+  { code: 'health_certificate', name: 'Health Certificate', subject: 'person', agency: 'City or municipal health office', expires: true, due_rule: 'annual', per_location: false, auto_add: false },
+  { code: 'nbi_clearance', name: 'NBI Clearance', subject: 'person', agency: 'NBI', expires: true, due_rule: 'annual', per_location: false, auto_add: false },
 ];
 const db = { people: [], events: [], shares: [], referrals: [], partners: [], businesses: [], locations: [], vehicles: [], requirements: [], cycles: [], documents: [], requests: [], notifications: [], audit: [] };
 let seq = 0;
@@ -261,7 +261,8 @@ export const myDeliveryLog = async () => [{ id: 1, channel: 'email', subject: 'P
 export const history = async (orgId, { before = null, entities = null, limit = 50 } = {}) => db.audit
   .filter((a) => (!entities || entities.includes(a.entity)) && (!before || a.id < before))
   .sort((a, b) => b.id - a.id).slice(0, limit);
-export const entityHistory = async () => db.audit;
+// Like the real query: only this business's (or vehicle's) own changes.
+export const entityHistory = async (column, id) => db.audit.filter((a) => a[column] === id);
 export async function trash() {
   const d = (a) => a.filter((x) => x.deleted_at);
   return { people: d(db.people), businesses: d(db.businesses), locations: d(db.locations), vehicles: d(db.vehicles), requirements: d(db.requirements), cycles: d(db.cycles), documents: d(db.documents) };
@@ -439,7 +440,7 @@ if (globalThis.PP_DEMO) {
   event(a, 'created', a.notes);
   event(a, 'quote', 'Quote sent: ₱3,300', true);
   db.notifications.push(
-    { id: 'n3', user_id: user.id, org_id: org.id, kind: 'team', title: 'Kape Uno – IT Park Cebu connected', body: 'Their permit status now shows on your board.', link: '#/network', read_at: null, created_at: new Date(Date.now() - 2 * 3600e3).toISOString() },
+    { id: 'n3', user_id: user.id, org_id: org.id, kind: 'system', title: 'Your weekly summary: 3 overdue, 4 due within 30 days', body: 'Start with the Mayor\'s Permit for Visayas Sari-Sari Distribution Co.', link: '#/compliance', read_at: null, created_at: new Date(Date.now() - 2 * 3600e3).toISOString() },
     { id: 'n4', user_id: user.id, org_id: org.id, kind: 'system', title: 'CTPL Insurance renewed', body: 'Toyota Hilux', link: `#/requirement/${db.requirements.find((r) => r.vehicle_id === 'v2' && r.type_code === 'ctpl').id}`, read_at: 'now', created_at: new Date(Date.now() - 3 * 864e5).toISOString() });
 }
 if (globalThis.PP_DEMO) {
@@ -463,7 +464,8 @@ const sampleItems = (spec) => spec.map(([code, status, days, city]) => ({ id: ui
   subject: 'business', subject_name: null, location: 'Main branch', city, status, expires_on: days == null ? null : addDays(days), days_left: days, on_file: status === 'compliant' }));
 export async function networkBoard() {
   if (org.kind === 'business') return { locked: true };
-  const members = db.links.filter((l) => ['pending', 'active'].includes(l.status)).map((l) => ({ ...l, via: 'linked' }));
+  const rel = org.kind === 'firm' ? 'client' : org.kind === 'property' ? 'tenant' : 'franchisee';
+  const members = db.links.filter((l) => ['pending', 'active'].includes(l.status)).map((l) => ({ ...l, relation: rel, via: 'linked' }));
   if (org.kind === 'firm') {
     for (const o of db.managed) members.push({ link_id: null, org_id: o.id, relation: 'client', label: '', status: 'active', share_files: true, invited_email: o.contact_email, via: 'managed',
       created_at: o.created_at, accepted_at: o.created_at, last_nudged_at: o.last_nudged_at, name: o.name, contact_name: o.contact_name, contact_email: o.contact_email, items: o.items || [] });

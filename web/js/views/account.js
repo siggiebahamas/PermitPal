@@ -223,7 +223,7 @@ export async function settings(el, section) {
 
     <section class="card"><h2>Delivery log</h2>
       <p class="muted small">Proof of every reminder we sent you (or tried to).</p>
-      ${log.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>When</th><th>Channel</th><th>Message</th><th>Status</th></tr></thead><tbody>
+      ${log.length ? html`<div class="table-wrap"><table class="table log-table"><thead><tr><th>When</th><th>Channel</th><th>Message</th><th>Status</th></tr></thead><tbody>
         ${log.map((m) => html`<tr><td>${fmtDateTime(m.created_at)}</td><td>${m.channel}</td><td>${m.subject || m.body_text.slice(0, 80)}</td>
           <td><span class="tag ${m.status === 'sent' ? 'green' : m.status === 'failed' ? 'red' : ''}" title="${m.last_error || ''}">${m.status}</span></td></tr>`)}
       </tbody></table></div>` : html`<p class="muted">Nothing sent yet.</p>`}

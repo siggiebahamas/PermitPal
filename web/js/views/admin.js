@@ -70,7 +70,7 @@ function partnerForm(p = {}) {
     <label class="field"><span>What they handle <small>(shown)</small></span><input name="services" maxlength="600" value="${p.services || ''}" placeholder="Mayor's Permit renewal, barangay clearance, FSIC filing"></label>
     <label class="field"><span>Description</span><textarea name="description" rows="2" maxlength="600">${p.description || ''}</textarea></label>
     <div class="btn-row"><label class="check"><input type="checkbox" name="published" ${p.published ? 'checked' : ''}> Show to customers</label>
-      <label class="check"><input type="checkbox" name="verified" ${p.verified ? 'checked' : ''}> Licence checked <small class="muted">(only after seeing their permit and licence)</small></label>
+      <label class="check"><input type="checkbox" name="verified" ${p.verified ? 'checked' : ''}> <span>Licence checked <small class="muted">(only after seeing their permit and licence)</small></span></label>
       <button class="btn btn-sm btn-primary">${p.id ? 'Save' : 'Add professional'}</button></div></form>`;
 }
 function partnersTab(list) {

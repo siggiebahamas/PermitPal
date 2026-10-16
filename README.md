@@ -52,7 +52,7 @@ The database decides status in one place (`requirement_status`), using Philippin
 6. **Plan payments:** GCash and UnionBank details are set (Admin → Payment details; change the account name there if it differs). When a customer pays, set their plan in Admin → Workspaces & plans.
 7. **Online checkout (optional):** add `PAYMONGO_SECRET_KEY` and `APP_URL` as Edge Function secrets, then tick "Pay online" in Admin → Payment details.
 8. **Professionals:** add real liaison firms and accountants in Admin → Professionals (their email receives quote requests). Tick "Licence checked" only after seeing their business permit and licence. Agree the per-request fee with each firm (they pay you) and bill monthly from Admin → Quote requests. The two sample firms exist only in the demo.
-9. **Prices:** team plan prices are ₱1,490 (Fleet), ₱1,990 (Accounting firm), ₱4,990 (Head office), ₱9,990 (Property). Validate them on sales calls; ask Claude to change them.
+9. **Prices:** team plan prices are ₱1,490 (Fleet), ₱1,990 (Accounting firm), ₱9,990 (Property). (The Head office plan is switched off and no longer offered.) Validate them on sales calls; ask Claude to change them.
 
 **Legal:**
 10. Terms and Privacy Policy are published (`web/terms.html`, `web/privacy.html`). Privacy requests come through the Contact PermitPal form (Admin → Inbox).
