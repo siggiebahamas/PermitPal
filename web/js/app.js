@@ -17,6 +17,7 @@ import { historyPage, trashPage, team, settings } from './views/account.js';
 import { notifications } from './views/notifications.js';
 import { admin } from './views/admin.js';
 import { services, order } from './views/services.js';
+import { filings, forgetFilings } from './views/filings.js';
 
 // Never run inside another website's frame (a trick to make people click hidden buttons). GitHub Pages
 // cannot send the header that blocks this, so the page checks for itself; our own frames are fine.
@@ -30,10 +31,10 @@ let unsubscribe = null;
 
 const T = {
   en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
-        pros: 'Find a professional', services: 'Done for you', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
+        filings: 'Taxes & contributions', pros: 'Find a professional', services: 'Done for you', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
         notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact PermitPal', tools: 'Tools', account: 'Account' },
   tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
-        pros: 'Maghanap ng Propesyonal', services: 'Ipaasikaso sa amin', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
+        filings: 'Buwis at kontribusyon', pros: 'Maghanap ng Propesyonal', services: 'Ipaasikaso sa amin', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
         notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang PermitPal', tools: 'Mga Tool', account: 'Account' },
 };
 const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k] || k;
@@ -110,6 +111,7 @@ hooks.reload = async () => {
     const me = await db.loadMe(S.user.id);
     const prevKind = S.org?.kind;
     Object.assign(S, { profile: me.profile, orgs: me.orgs, plans: me.plans, prefs: me.prefs });
+    forgetFilings(); // businesses may have changed (added, renamed, deleted)
     S.org = S.orgs.find((o) => o.id === S.org.id) || S.orgs[0];
     await loadData();
     // Workspace type changed: the menu changes too.
@@ -132,7 +134,8 @@ let TOOLS = [];
 let ACCOUNT = [];
 function buildNav() {
   const k = KINDS[S.org?.kind || 'business'];
-  NAV = k?.nav ? [BASE_NAV[0], ['network', k.nav, k.icon], ...BASE_NAV.slice(1)] : BASE_NAV;
+  const base = has('filings') ? [...BASE_NAV.slice(0, 4), ['filings', 'filings', ICON.calendar], ...BASE_NAV.slice(4)] : BASE_NAV;
+  NAV = k?.nav ? [base[0], ['network', k.nav, k.icon], ...base.slice(1)] : base;
   // Below Notifications the menu has two color-coded groups: Tools (pine) and Account (navy).
   TOOLS = [...(has('services') ? [['services', 'services']] : []), ['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'], ...(k?.nav ? [] : [['network', 'team_tools']])];
   ACCOUNT = [['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings'], ['contact', 'contact']];
@@ -211,6 +214,7 @@ async function renderPage() {
     else if (a === 'people') b ? personDetail(main, b) : personList(main, params);
     else if (a === 'requirement') await requirementPage(main, b);
     else if (a === 'compliance') compliance(main, params);
+    else if (a === 'filings' && has('filings')) await filings(main);
     else if (a === 'documents') await documents(main);
     else if (a === 'network') await network(main);
     else if (a === 'connect') await connectPage(main, b);

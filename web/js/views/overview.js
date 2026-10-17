@@ -2,6 +2,7 @@
 import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
 import { S, on, hooks, canEdit, empty, has, memberName, serviceFor } from '../core.js';
 import { assignable, bulk, bulkBar } from './assign.js';
+import { filingsBrief } from './filings.js';
 import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
 import * as db from 'pp/data';
 
@@ -31,6 +32,7 @@ export function dashboard(el) {
       ${when_(open.length, html`<div class="sheet-foot">${plural(open.length, 'open item')} across your businesses and vehicles</div>`)}
     </section>
   `);
+  filingsBrief(el.querySelector('[data-filings-brief]'));
 }
 const when_ = (c, v) => (c ? v : '');
 
@@ -64,6 +66,7 @@ function brief(first, c, open) {
         <p class="brief-note">${c.compliant} of ${c.total} permits compliant${open.length ? html` · <a href="#/compliance">see all ${plural(open.length, 'open item')}</a>` : ''}</p>
         ${(() => { const mine = has('assign') ? open.filter((r) => r.assignee_id === S.user?.id).length : 0;
           return mine ? html`<p class="brief-note mine">${ICON.person} <a href="#/compliance?who=me">${plural(mine, 'open item')} handled by you</a></p>` : ''; })()}
+        <p class="brief-note mine" data-filings-brief hidden></p>
       </div>
       <div class="brief-focus">
         ${r ? html`

@@ -429,3 +429,19 @@ export const adminResolveError = async (id, resolved, note) => ok(await sb.rpc('
 // ---------------------------------------------------------------- who's handling it
 export const assignRequirements = async (ids, userId) => ok(await sb.rpc('assign_requirements', { p_ids: ids, p_assignee: userId || null }));
 export const setEscalation = async (orgId, days) => ok(await sb.rpc('set_escalation', { p_org: orgId, p_days: days || null }));
+
+// ---------------------------------------------------------------- tax and contribution deadlines
+let filingTypesCache = null;
+export const filingTypes = async () => (filingTypesCache ||= ok(await sb.from('filing_types').select('*').order('sort')));
+export const filingSetups = async (orgId) => ok(await sb.from('filing_setup').select('*').eq('org_id', orgId));
+export const filingCalendar = async (orgId, from, to) => ok(await sb.rpc('filing_calendar', { p_org: orgId, p_from: from, p_to: to }));
+export const saveFilingSetup = async (businessId, f) => ok(await sb.rpc('save_filing_setup', {
+  p_business: businessId, p_has_employees: !!f.has_employees, p_withholds: !!f.withholds, p_tax_type: f.tax_type,
+  p_philhealth_digit: f.philhealth_digit ?? null, p_pagibig_group: f.pagibig_group || null, p_annual_meeting: f.annual_meeting || null, p_paused: f.paused || [],
+}));
+export const removeFilingSetup = async (businessId) => ok(await sb.rpc('remove_filing_setup', { p_business: businessId }));
+export const markFiling = async (f) => ok(await sb.rpc('mark_filing', {
+  p_business: f.business_id, p_code: f.code, p_period: f.period_start, p_filed_on: f.filed_on,
+  p_reference: f.reference || null, p_amount: f.amount ?? null, p_note: f.note || null,
+}));
+export const unmarkFiling = async (id) => ok(await sb.rpc('unmark_filing', { p_id: id }));

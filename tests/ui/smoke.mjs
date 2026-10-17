@@ -451,6 +451,68 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.close();
 }
 
+// Taxes & contributions: set up a business, see the deadlines, mark one filed, undo it.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(350); };
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  check('filings: in the menu', (await page.locator('.sidebar a[data-nav=filings]').count()) === 1);
+  await go('#/filings');
+  check('filings: asks to set up each business first', (await page.locator('.setup-card .line', { hasText: 'Corner <Bakery> & Co' }).count()) === 1);
+  await page.click('.setup-card [data-act=filing-setup]'); await page.waitForTimeout(250);
+  check('filings: the 8% option is only for sole proprietors', (await page.locator('.modal input[name=tax_type][value=eight_percent]').count()) === 0);
+  check('filings: employer numbers stay hidden until "has employees"', await page.locator('.modal .q-employer').isHidden());
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(200);
+  check('filings: saving without answers says what is missing', /answer questions 1 to 3/i.test(await page.textContent('#modal-root .modal-error')));
+  await page.check('.modal input[name=has_employees][value=yes]');
+  await page.check('.modal input[name=tax_type][value=vat]');
+  await page.check('.modal input[name=withholds][value=yes]');
+  await page.waitForTimeout(150);
+  check('filings: employer numbers appear once "has employees" is ticked', await page.locator('.modal .q-employer').isVisible());
+  check('filings: Pag-IBIG group is suggested from the business name', (await page.inputValue('.modal select[name=pagibig_group]')) === 'A-D');
+  const before = (await page.textContent('.filing-preview h3')).trim();
+  await page.uncheck('.modal [data-track=sec_afs]'); await page.waitForTimeout(150);
+  const after = (await page.textContent('.filing-preview h3')).trim();
+  check('filings: the preview lists what will be tracked, and unticking one counts down', /We'll track 1[0-9] filings/.test(before) && Number(after.match(/\d+/)[0]) === Number(before.match(/\d+/)[0]) - 1, `${before} -> ${after}`);
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(500);
+  check('filings: saved, and the deadlines are listed', /deadlines are listed/.test(await page.textContent('#toast')) && (await page.locator('main .filing-row').count()) > 0);
+  check('filings: a turned-off filing is not listed', (await page.locator('main .filing-row', { hasText: 'Audited financial statements' }).count()) === 0);
+  const lateRows = await page.locator('main .card:has(h2:text-is("Late")) .filing-row').count();
+  check('filings: late ones are listed first with how many days late', lateRows > 0 && /days? late/.test(await page.textContent('main .card:has(h2:text-is("Late")) .chip')), String(lateRows));
+  check('filings: each row says the period and the business', /For (January|February|March|April|May|June|July|August|September|October|November|December) \d{4} · Corner <Bakery> & Co/.test(await page.textContent('main .filing-row')));
+  const firstTitle = await page.textContent('main .filing-row .row-title');
+  await page.locator('main .filing-row [data-act=filing-mark]').first().click(); await page.waitForTimeout(250);
+  check('filings: marking filed explains which filing and period', /for/.test(await page.textContent('.modal .muted.small')) && (await page.inputValue('.modal [name=filed_on]')).length === 10);
+  const due = await page.evaluate(() => document.querySelector('.modal .muted.small').textContent.match(/due (.*)$/)[1]);
+  await page.fill('.modal [name=reference]', 'PRN-0042');
+  await page.fill('.modal [name=amount]', '4250');
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(450);
+  check('filings: marked filed leaves the to-do list', /Marked filed/.test(await page.textContent('#toast')) && (await page.locator('main .card:has(h2:text-is("Late")) .filing-row').count()) === lateRows - 1, due);
+  await page.click('main .filing-filters [data-act=filing-view][data-v=filed]'); await page.waitForTimeout(300);
+  check('filings: the Filed list shows it with the reference and amount', (await page.locator('main .filing-row', { hasText: 'PRN-0042' }).count()) === 1 && /₱4,250/.test(await page.textContent('main .filing-row')));
+  check('filings: and how late it was', /days late/.test(await page.textContent('main .filed-line')));
+  await page.click('main .filing-row [data-act=filing-mark]'); await page.waitForTimeout(250);
+  await page.click('.modal [data-act=filing-unmark]'); await page.waitForTimeout(200);
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(450);
+  check('filings: removing the record puts it back on the to-do list', /back on the to-do list/.test(await page.textContent('#toast')) && (await page.locator('main .filing-row').count()) === 0);
+  await page.click('main .filing-filters [data-act=filing-view][data-v=todo]'); await page.waitForTimeout(300);
+  check('filings: ...where it is late again', (await page.locator('main .card:has(h2:text-is("Late")) .filing-row').count()) === lateRows);
+  await page.locator('main .filing-row [data-act=filing-mark]').first().click(); await page.waitForTimeout(250);
+  const tomorrow = await page.evaluate(() => { const d = new Date(new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 10) + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); });
+  await page.fill('.modal [name=filed_on]', tomorrow);
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(200);
+  check('filings: a date in the future is refused', /future/.test(await page.textContent('#modal-root .modal-error')));
+  await page.click('.modal [data-modal-close]'); await page.waitForTimeout(150);
+  await go('#/');
+  await page.waitForTimeout(300);
+  check('filings: the dashboard mentions late tax filings', /tax filings? late/.test(await page.textContent('[data-filings-brief]')) && await page.locator('[data-filings-brief]').isVisible());
+  check('filings: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
 // Error reporting: a crash in the browser is sent (scrubbed of personal details) and staff see it in Admin.
 {
   const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
@@ -489,7 +551,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   const mp = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit').id));
   for (const h of ['#/compliance', '#/businesses/b1', '#/team', '#/settings/workspace', '#/admin', '#/requirement/' + mp, '#/']) {
     await page.evaluate((x) => { location.hash = x; }, h); await page.waitForTimeout(250);
-    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors], [data-tab=orders], .checklist, .offer-inline, .lib-more, .focus-alt, .sidebar [data-nav=services], #staff-access').count()) seen.push(h);
+    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors], [data-tab=orders], .checklist, .offer-inline, .lib-more, .focus-alt, .sidebar [data-nav=services], .sidebar [data-nav=filings], [data-filings-brief]:not([hidden]), #staff-access').count()) seen.push(h);
   }
   check('features off: nothing new shows before the database is updated', seen.length === 0, seen.join(','));
   check('features off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));

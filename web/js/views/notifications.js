@@ -10,7 +10,9 @@ function entityOf(n) {
   let r = n.requirement_id ? reqById(n.requirement_id) : null;
   const m = /^#\/requirement\/([\w-]+)/.exec(n.link || '');
   if (!r && m) r = reqById(m[1]);
-  const order = null; // done-for-you orders were retired
+  const om = /^#\/services\/orders\/([\w-]+)/.exec(n.link || '');
+  const order = om ? (S.data?.requests || []).find((a) => a.id === om[1]) || null : null;
+  if (n.kind === 'filing' && (!n.org_id || n.org_id === S.org.id)) return { key: 'filings', name: 'Taxes & contributions', icon: ICON.calendar, href: '#/filings', r: null, order: null };
   const src = r || order;
   if (src?.business_id && business(src.business_id)) { const b = business(src.business_id); return { key: 'b:' + b.id, name: b.name, icon: ICON.building, href: '#/businesses/' + b.id, r, order }; }
   if (src?.vehicle_id && vehicle(src.vehicle_id)) { const v = vehicle(src.vehicle_id); return { key: 'v:' + v.id, name: v.make_model + (v.plate_no ? ' · ' + v.plate_no : ''), icon: ICON.car, href: '#/vehicles/' + v.id, r, order }; }
@@ -31,6 +33,7 @@ function actionFor(n, e) {
     const label = a.status === 'quoted' ? 'Review quote' : a.payment_status === 'awaiting_payment' ? 'Pay' : 'Open request';
     return html`<a class="btn btn-sm ${label === 'Open request' ? 'nb2' : 'nb1'}" href="#/services/orders/${a.id}" data-act="notif-open" data-id="${n.id}">${label}</a>`;
   }
+  if (n.kind === 'filing') return html`<a class="btn btn-sm nb1" href="#/filings" data-act="notif-open" data-id="${n.id}">See deadlines</a>`;
   return n.link ? html`<a class="btn btn-sm nb2" href="${n.link}" data-act="notif-open" data-id="${n.id}">Open</a>` : '';
 }
 

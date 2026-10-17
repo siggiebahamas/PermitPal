@@ -719,3 +719,105 @@ export async function setChecklistItem(reqId, item, done) {
   if (done) db.ticks.push({ requirement_id: reqId, round, item, done_by: user.id, done_at: now() });
   return round;
 }
+
+// ---------------------------------------------------------------- taxes & contributions (same rules as the database)
+const FILING_TYPES = [
+  ['bir_1601c', 'BIR', '1601-C', "Tax withheld from employees' pay", 'monthly', 'employer', 'next10_dec15', null, null],
+  ['bir_0619e', 'BIR', '0619-E', 'Tax withheld from rent and suppliers (monthly)', 'monthly', 'withholding', 'next10', [1, 2, 4, 5, 7, 8, 10, 11], null],
+  ['bir_1601eq', 'BIR', '1601-EQ', 'Tax withheld from rent and suppliers (quarterly return)', 'quarterly', 'withholding', 'q_next_last', null, null],
+  ['bir_2550q', 'BIR', '2550Q', 'Quarterly VAT return', 'quarterly', 'vat', 'q_25', null, null],
+  ['bir_2551q', 'BIR', '2551Q', 'Quarterly percentage tax', 'quarterly', 'percentage', 'q_25', null, null],
+  ['bir_1701q', 'BIR', '1701Q', 'Quarterly income tax (sole proprietor)', 'quarterly', 'individual', 'q_1701', null, [1, 2, 3]],
+  ['bir_1701', 'BIR', '1701 / 1701A', 'Yearly income tax (sole proprietor)', 'annual', 'individual', 'a_apr15', null, null],
+  ['bir_1702q', 'BIR', '1702Q', 'Quarterly income tax (corporation or partnership)', 'quarterly', 'corp', 'q_60', null, [1, 2, 3]],
+  ['bir_1702', 'BIR', '1702', 'Yearly income tax (corporation or partnership)', 'annual', 'corp', 'a_apr15', null, null],
+  ['bir_1604c', 'BIR', '1604-C', "Yearly summary of tax withheld from employees", 'annual', 'employer', 'a_jan31', null, null],
+  ['bir_1604e', 'BIR', '1604-E', 'Yearly summary of tax withheld from rent and suppliers', 'annual', 'withholding', 'a_mar1', null, null],
+  ['sss_contrib', 'SSS', 'Contributions', 'SSS contributions', 'monthly', 'employer', 'm_sss', null, null],
+  ['philhealth_contrib', 'PhilHealth', 'Premium', 'PhilHealth premium', 'monthly', 'employer', 'm_philhealth', null, null],
+  ['pagibig_contrib', 'Pag-IBIG', 'Contributions', 'Pag-IBIG contributions', 'monthly', 'employer', 'm_pagibig', null, null],
+  ['sec_afs', 'SEC', 'AFS', 'Audited financial statements', 'annual', 'corp', 'a_apr30', null, null],
+  ['sec_gis', 'SEC', 'GIS', 'General Information Sheet', 'annual', 'sec_gis', 'gis', null, null],
+].map(([code, agency, form, name, frequency, applies, rule, months, quarters], i) => ({ code, agency, form, name, frequency, applies, rule, months, quarters,
+  help_text: '', online_url: agency === 'SEC' ? 'https://efast.sec.gov.ph/' : agency === 'BIR' ? 'https://www.bir.gov.ph/' : null, online_label: agency + ' website', sort: i }));
+const iso = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10); // rolls over like Postgres date maths
+const lastDay = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+const pgGroup = (name) => { const l = String(name || '').replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase(); return l >= 'A' && l <= 'D' ? 'A-D' : l >= 'E' && l <= 'L' ? 'E-L' : l >= 'M' && l <= 'Q' ? 'M-Q' : 'R-Z'; };
+function filingDue(rule, y, m, s, name) {
+  switch (rule) {
+    case 'next10': return iso(y, m + 1, 10);
+    case 'next10_dec15': return m === 12 ? iso(y + 1, 1, 15) : iso(y, m + 1, 10);
+    case 'q_next_last': return iso(y, m + 4, 0);
+    case 'q_25': return iso(y, m + 3, 25);
+    case 'q_1701': return iso(y, m + 4, 15);
+    case 'q_60': return iso(y, m + 3, 60);
+    case 'a_apr15': return iso(y + 1, 4, 15);
+    case 'a_jan31': return iso(y + 1, 1, 31);
+    case 'a_mar1': return iso(y + 1, 3, 1);
+    case 'a_apr30': return iso(y + 1, 4, 30);
+    case 'm_sss': return iso(y, m + 2, 0);
+    case 'm_philhealth': return iso(y, m + 1, s.philhealth_digit >= 5 ? 20 : 15);
+    case 'm_pagibig': { const g = s.pagibig_group || pgGroup(name); return g === 'A-D' ? iso(y, m + 1, 14) : g === 'E-L' ? iso(y, m + 1, 19) : g === 'M-Q' ? iso(y, m + 1, 24) : iso(y, m + 2, 0); }
+    case 'gis': { if (!s.annual_meeting) return null; const [, mm, dd] = s.annual_meeting.split('-').map(Number); const d = new Date(Date.UTC(y, mm - 1, Math.min(dd, lastDay(y, mm)))); d.setUTCDate(d.getUTCDate() + 30); return d.toISOString().slice(0, 10); }
+    default: return null;
+  }
+}
+const fApplies = (t, s, b) => (t.applies === 'employer' && s.has_employees) || (t.applies === 'withholding' && s.withholds) || (t.applies === 'vat' && s.tax_type === 'vat')
+  || (t.applies === 'percentage' && s.tax_type === 'percentage') || (t.applies === 'individual' && b.structure === 'Sole Proprietorship')
+  || (t.applies === 'corp' && ['Corporation', 'Partnership'].includes(b.structure)) || (t.applies === 'sec_gis' && b.structure === 'Corporation' && !!s.annual_meeting);
+const periodLabel = (t, y, m) => (t.code === 'sec_gis' ? `${y} meeting` : t.frequency === 'monthly' ? `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][m - 1]} ${y}`
+  : t.frequency === 'quarterly' ? `Q${(m + 2) / 3} ${y}` : String(y));
+db.filingSetups = []; db.filingRecords = [];
+function obligations(from, to) {
+  const out = [];
+  for (const s of db.filingSetups) {
+    const b = db.businesses.find((x) => x.id === s.business_id && !x.deleted_at);
+    if (!b) continue;
+    const [fy, fm] = from.split('-').map(Number);
+    const [ty, tm] = to.split('-').map(Number);
+    for (const t of FILING_TYPES) {
+      if (!fApplies(t, s, b) || s.paused_codes.includes(t.code)) continue;
+      // every month from 16 months before the window to its end, like the database
+      for (let k = fy * 12 + fm - 1 - 16; k <= ty * 12 + tm - 1; k++) {
+        const y = Math.floor(k / 12); const m = (k % 12) + 1;
+        if (t.frequency === 'monthly' && t.months && !t.months.includes(m)) continue;
+        if (t.frequency === 'quarterly' && (![1, 4, 7, 10].includes(m) || (t.quarters && !t.quarters.includes((m + 2) / 3)))) continue;
+        if (t.frequency === 'annual' && m !== 1) continue;
+        const due = filingDue(t.rule, y, m, s, b.name);
+        if (!due || due < from || due > to) continue;
+        out.push({ org_id: org.id, business_id: b.id, business_name: b.name, code: t.code, period_start: iso(y, m, 1), period_label: periodLabel(t, y, m), due_on: due, tracking_from: s.tracking_from });
+      }
+    }
+  }
+  return out;
+}
+export const filingTypes = async () => FILING_TYPES.map((t) => ({ ...t }));
+export const filingSetups = async () => db.filingSetups.map((s) => ({ ...s }));
+export async function filingCalendar(orgId, from, to) {
+  return obligations(from, to).map((o) => {
+    const r = db.filingRecords.find((x) => x.business_id === o.business_id && x.code === o.code && x.period_start === o.period_start);
+    return { ...o, record_id: r?.id || null, filed_on: r?.filed_on || null, reference: r?.reference || null, amount: r?.amount ?? null, note: r?.note || null, filed_by: r?.filed_by || null };
+  }).filter((o) => o.due_on >= o.tracking_from || o.record_id).sort((a, b) => (a.due_on < b.due_on ? -1 : a.due_on > b.due_on ? 1 : 0));
+}
+export async function saveFilingSetup(bizId, f) {
+  if (!['vat', 'percentage', 'eight_percent', 'unsure'].includes(f.tax_type)) throw new Error('Choose how the business pays business tax.');
+  const old = db.filingSetups.find((s) => s.business_id === bizId);
+  const row = { business_id: bizId, org_id: org.id, has_employees: !!f.has_employees, withholds: !!f.withholds, tax_type: f.tax_type, philhealth_digit: f.philhealth_digit ?? null,
+    pagibig_group: f.pagibig_group || null, annual_meeting: f.annual_meeting || null, paused_codes: f.paused || [] };
+  if (old) Object.assign(old, row); else db.filingSetups.push({ ...row, tracking_from: addDays(-31), created_at: now() });
+}
+export async function removeFilingSetup(bizId) { db.filingSetups = db.filingSetups.filter((s) => s.business_id !== bizId); }
+export async function markFiling(f) {
+  if (f.filed_on > today()) throw new Error("The filing date can't be in the future.");
+  if (f.filed_on < f.period_start) throw new Error('The filing date is before the period it covers. Check the date.');
+  const ob = obligations(f.period_start, addDays(400)).find((o) => o.business_id === f.business_id && o.code === f.code && o.period_start === f.period_start);
+  if (!ob) throw new Error("That filing is not on this business's list. Refresh the page.");
+  let r = db.filingRecords.find((x) => x.business_id === f.business_id && x.code === f.code && x.period_start === f.period_start);
+  if (!r) db.filingRecords.push(r = { id: uid(), business_id: f.business_id, code: f.code, period_start: f.period_start });
+  Object.assign(r, { filed_on: f.filed_on, reference: (f.reference || '').trim() || null, amount: f.amount ?? null, note: f.note || null, filed_by: user.id });
+  const t = FILING_TYPES.find((x) => x.code === f.code);
+  log(`Filed ${['BIR', 'SEC'].includes(t.agency) ? t.agency + ' ' + t.form : t.name} for ${ob.period_label} (${ob.business_name})`, { entity: 'filing_records', action: 'recorded', business_id: f.business_id });
+  return r.id;
+}
+export async function unmarkFiling(id) { db.filingRecords = db.filingRecords.filter((r) => r.id !== id); }
+globalThis.__ppFilingDue = filingDue; // lets the browser tests compare dates
