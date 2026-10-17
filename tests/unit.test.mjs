@@ -210,3 +210,37 @@ test('import: clear messages for files that are not usable', () => {
   assert.match(checkImport('branches', [['Business name', 'Branch name']], CTX).error, /no rows/);
   assert.match(checkImport('vehicles', [['Make and model'], ...Array.from({ length: 501 }, () => ['x'])], CTX).error, /up to 500/);
 });
+
+// ---------------------------------------------------------------- reading a photo of a permit
+const { readDocument, findDates, findPlates, findReferences } = await import('../web/js/ocrparse.js');
+test('photo text: dates in every common format, with misread letters', () => {
+  const d = findDates('Issued on: January 12, 2O26\nValid until: 20 Jan 2027\nPrinted 2026-01-13\nDate 13/02/2026');
+  const by = Object.fromEntries(d.map((x) => [x.value, x.role]));
+  assert.equal(by['2026-01-12'], 'issued');
+  assert.equal(by['2027-01-20'], 'expires');
+  assert.ok('2026-01-13' in by && '2026-02-13' in by); // 13/02 can only be day first
+  assert.equal(findDates('Feb 30, 2027 and 31/04/2026').length, 0); // impossible dates are ignored
+});
+test("photo text: a Mayor's Permit", () => {
+  const text = `REPUBLIC OF THE PHILIPPINES\nCITY OF MAKATI\nBUSINESS PERMITS AND LICENSING OFFICE\nMAYOR'S PERMIT\nPermit No.: BP-2026-0442\nCORNER BAKERY CORP.\nDate Issued: January 15, 2026\nThis permit is valid until December 31, 2026`;
+  const r = readDocument(text, '2026-03-01');
+  assert.equal(r.kind, 'mayors_permit');
+  assert.equal(r.expires[0].value, '2026-12-31');
+  assert.equal(r.issued[0].value, '2026-01-15');
+  assert.equal(r.references[0].value, 'BP-2026-0442');
+});
+test('photo text: an LTO OR/CR with a plate', () => {
+  const text = `LAND TRANSPORTATION OFFICE\nOFFICIAL RECEIPT\nOR No. 1234567890\nPlate No. NGV 5588\nMV File No. 1301-00000123456\nValid Until: 08/21/2027`;
+  const r = readDocument(text, '2026-10-17');
+  assert.equal(r.plates[0].value, 'NGV 5588');
+  assert.equal(r.kind, 'lto_registration');
+  assert.equal(r.expires[0].value, '2027-08-21');
+  assert.ok(r.references.some((x) => x.value === '1234567890'));
+  assert.deepEqual(findPlates('PLATE 123 ABC motorcycle').map((p) => p.value), ['123 ABC']);
+  assert.deepEqual(findPlates('TIN 123 and BIR 456').map((p) => p.value), []); // agency names are not plates
+});
+test('photo text: expiry before issue is treated as a misread', () => {
+  const r = readDocument('Date issued: 2026-05-01\nValid until: 2026-04-01', '2026-06-01');
+  assert.equal(r.expires.length, 0);
+  assert.equal(findReferences('Permit No. 2026').length, 0); // a bare year is not a permit number
+});

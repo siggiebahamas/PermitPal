@@ -7,6 +7,7 @@ import {
 import { reqRow, statTiles, counts, byPriority, dueShort, shortName, ICON, STATUS } from '../components.js';
 import { plateSchedule, suggestDue } from '../rules.js';
 import * as db from 'pp/data';
+import { scanBox, wireScan } from './scan.js';
 
 const tabs = { business: 'requirements', vehicle: 'requirements', person: 'requirements' };
 const optionList = (items, cur) => items.map(([v, l]) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`);
@@ -368,6 +369,7 @@ export function vehicleList(el, params) {
 
 function addVehicle() {
   openModal('Add a vehicle', html`
+    ${scanBox()}
     <label class="field"><span>Make & model</span><input name="make_model" required maxlength="120" placeholder="e.g. Isuzu Elf NHR van"></label>
     <div class="grid2">
       <label class="field"><span>Plate number</span><input name="plate_no" maxlength="20" placeholder="e.g. NGV 5588"><small class="plate-hint"></small></label>
@@ -390,6 +392,7 @@ function addVehicle() {
     </div>`, {
     submitLabel: 'Add vehicle', wide: true,
     onOpen: (form) => {
+      wireScan(form, { fields: { plate_no: 'plate', or_no: 'reference', registration_expires: 'expires' }, attach: 'or_file', expect: 'lto_registration' });
       const plate = form.querySelector('[name=plate_no]');
       const hint = form.querySelector('.plate-hint');
       const sug = form.querySelector('.reg-suggest');

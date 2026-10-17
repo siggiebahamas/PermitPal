@@ -27,6 +27,7 @@ export const ICON = {
   peso: raw('<svg viewBox="0 0 24 24"><path d="M8 20V4h5a4.5 4.5 0 0 1 0 9H8M5 8h13M5 11h13"/></svg>'),
   grid: raw('<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>'),
   download: raw('<svg viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>'),
+  camera: raw('<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'),
   calendar: raw('<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>'),
   car: raw('<svg viewBox="0 0 24 24"><path d="M4 16v-4l1.7-4.2A2 2 0 0 1 7.5 6.5h9a2 2 0 0 1 1.8 1.3L20 12v4"/><path d="M4 16h16"/><circle cx="7.5" cy="17.5" r="1.4"/><circle cx="16.5" cy="17.5" r="1.4"/></svg>'),
   moto: raw('<svg viewBox="0 0 24 24"><circle cx="5.5" cy="16.5" r="3"/><circle cx="18.5" cy="16.5" r="3"/><path d="M5.5 16.5 9.5 10h4.5l4.5 6.5"/><path d="M14 10l-1.6-3.2H10M15.5 6.8h2.8"/></svg>'),

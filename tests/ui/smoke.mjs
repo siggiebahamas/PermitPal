@@ -3,12 +3,13 @@
 // Run: node tests/ui/smoke.mjs   (needs playwright; uses the preinstalled Chromium)
 import http from 'node:http';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+const types = { '.gz': 'application/gzip', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
   if (p === '/') p = '/index.html';
@@ -16,9 +17,13 @@ const server = http.createServer((req, res) => {
   if (!fs.existsSync(file)) { res.writeHead(404); return res.end(); }
   let body = fs.readFileSync(file);
   if (p === '/index.html') {
-    // Point the data layer at the mock; drop the CSP (it pins the import map's hash).
-    body = String(body).replace('"./js/data.js"', '"/__mock/mock-data.js"').replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, '')
+    // Point the data layer at the mock, and keep the real Content-Security-Policy so anything it would
+    // block on the live site fails here too (only the import map's pinned hash is updated to match).
+    body = String(body).replace('"./js/data.js"', '"/__mock/mock-data.js"')
       .replace(/<link[^>]+fonts\.(googleapis|gstatic)\.com[^>]*>/g, ''); // web fonts are cosmetic; tests run offline
+    const map = /<script type="importmap">([\s\S]*?)<\/script>/.exec(body)[1];
+    body = body.replace(/'sha256-[^']+'/, `'sha256-${crypto.createHash('sha256').update(map).digest('base64')}'`);
+    if (process.env.NO_CSP) body = body.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, '');
   }
   res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
   res.end(body);
@@ -561,6 +566,56 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.check('.date-choice input[value="1"]'); await page.waitForTimeout(150);
   check('import: choosing "day first" reads them again', /Apr 3, 2027/.test(await page.textContent('#imp-preview tbody')));
   check('import: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
+// Fill from a photo: the real reader (served from our site, under the real security policy) reads a
+// drawn permit, fills the empty boxes, attaches the photo, and saving waits for "I checked".
+{
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error' && !/favicon/.test(m.text())) errs.push(m.text()); });
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  const png = Buffer.from((await page.evaluate(() => {
+    const c = document.createElement('canvas'); c.width = 1400; c.height = 1000;
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#111';
+    g.font = 'bold 54px sans-serif'; g.fillText("MAYOR'S PERMIT", 380, 120);
+    g.font = '40px sans-serif';
+    ['CITY OF MAKATI', 'Business Permits and Licensing Office', 'Permit No.: BP-2026-0442', 'Business: CORNER BAKERY CORP.',
+     'Date Issued: January 15, 2026', 'Valid until: December 31, 2026'].forEach((t, i) => g.fillText(t, 120, 240 + i * 110));
+    return c.toDataURL('image/png').split(',')[1];
+  })), 'base64');
+  const mp = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b1').id));
+  await page.evaluate((id) => { location.hash = '#/requirement/' + id; }, mp); await page.waitForTimeout(400);
+  await page.locator('main [data-act=req-renew]').first().click();
+  await page.waitForSelector('.modal .scan-box');
+  await page.setInputFiles('.modal [data-scan-file]', { name: 'permit.png', mimeType: 'image/png', buffer: png });
+  const t0 = Date.now();
+  await page.waitForSelector('.modal .scan-result, .modal .scan-status .form-error', { timeout: 150000 });
+  const secs = Math.round((Date.now() - t0) / 1000);
+  check('photo: the reader runs on the device under the security policy', (await page.locator('.modal .scan-result').count()) === 1, (await page.textContent('.modal .scan-status')).slice(0, 160) + ` (${secs}s)`);
+  check('photo: fills the expiry, issue date and permit number', (await page.inputValue('.modal [name=expires_on]')) === '2026-12-31'
+    && (await page.inputValue('.modal [name=issued_on]')) === '2026-01-15' && (await page.inputValue('.modal [name=reference_no]')) === 'BP-2026-0442',
+    `${await page.inputValue('.modal [name=expires_on]')} ${await page.inputValue('.modal [name=issued_on]')} ${await page.inputValue('.modal [name=reference_no]')}`);
+  check('photo: filled boxes are highlighted', (await page.locator('.modal input.from-scan').count()) === 3);
+  check('photo: the photo is attached as the new document', await page.evaluate(() => document.querySelector('.modal input[type=file][name=file]').files.length === 1));
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(200);
+  check('photo: saving waits for "I checked these against the document"', /I checked the filled-in details/.test(await page.textContent('#modal-root .modal-error')));
+  await page.check('.modal [name=scan_ok]');
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(600);
+  check('photo: saved with the details from the photo', /BP-2026-0442/.test(await page.textContent('main .kv')) && /Dec 31, 2026/.test(await page.textContent('main .kv')));
+  // the wrong photo for a permit is called out
+  const fsic = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'fsic' && r.business_id === 'b1').id));
+  await page.evaluate((id) => { location.hash = '#/requirement/' + id; }, fsic); await page.waitForTimeout(400);
+  await page.locator('main [data-act=req-renew]').first().click();
+  await page.waitForSelector('.modal .scan-box');
+  await page.setInputFiles('.modal [data-scan-file]', { name: 'permit.png', mimeType: 'image/png', buffer: png });
+  await page.waitForSelector('.modal .scan-result, .modal .scan-status .form-error', { timeout: 150000 });
+  check('photo: a photo of a different permit gets "Is this the right photo?"', /Is this the right photo\?/.test(await page.textContent('.modal .scan-result')));
+  await page.click('.modal [data-modal-close]');
+  check('photo: no JavaScript or security-policy errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
 }
 

@@ -986,3 +986,18 @@ fieldset.q > small { display: block; margin-top: 2px; }
 .date-choice { display: block; border: 0; margin: 10px 0; }
 .date-choice legend { float: left; width: 100%; margin-bottom: 4px; }
 .date-choice .check { margin: 4px 0; }
+
+/* ---------- fill from a photo ---------- */
+.scan-box { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; margin: 0 0 14px; border: 1.5px dashed var(--border); border-radius: 12px; background: #F7F8FB; }
+.scan-box > small { flex: 1 1 220px; }
+.scan-box .btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+.scan-status { flex-basis: 100%; }
+.scan-status:empty { display: none; }
+.scan-progress { height: 8px; border-radius: 999px; background: var(--s-info-bg); overflow: hidden; margin: 6px 0 4px; }
+.scan-progress span { display: block; height: 100%; background: var(--brand); transition: width .2s; }
+.scan-result p { margin: 6px 0; font-size: 14.5px; }
+.scan-list { margin: 4px 0 8px; padding-left: 18px; font-size: 14.5px; }
+.scan-list li { margin: 4px 0; }
+.chip-btn.small { min-height: 30px; padding: 3px 10px; font-size: 13.5px; }
+.scan-ok { margin: 8px 0 0; font-weight: 700; }
+input.from-scan { background: #FFF6CC !important; border-color: #D8B000 !important; }

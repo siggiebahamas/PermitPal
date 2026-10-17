@@ -8,6 +8,7 @@ import { suggestDue } from '../rules.js';
 import { handledByLine } from './assign.js';
 import { checklistCard, watchChecklist } from './checklist.js';
 import { serviceOffer } from './services.js';
+import { scanBox, wireScan } from './scan.js';
 import * as db from 'pp/data';
 
 let detail = null;       // { id, cycles, documents, activity }
@@ -182,6 +183,8 @@ function dueFields(r, values = {}) {
     <label class="check"><input type="checkbox" name="no_expiry" ${r.expires ? '' : 'checked'}> This document does not expire</label>`;
 }
 
+const SCAN_FIELDS = { expires_on: 'expires', issued_on: 'issued', reference_no: 'reference' };
+
 // Live due-date suggestion from the library rule (shown, never applied silently).
 function wireSuggestion(form, r) {
   const box = form.querySelector('.suggest');
@@ -228,10 +231,11 @@ export function openEdit(r) {
   } : {};
   openModal(r.cycle_id ? `Edit details — ${r.name}` : `Add details — ${r.name}`, html`
     <p class="muted small">${subjectLabel(r)}. ${r.cycle_id ? 'Use this to correct the current record. To record a new permit period, use Renew instead.' : ''}</p>
+    ${scanBox()}
     ${dueFields(r, current)}
     ${when(!r.cycle_id, fileField())}`, {
     submitLabel: 'Save',
-    onOpen: (form) => wireSuggestion(form, r),
+    onOpen: (form) => { wireSuggestion(form, r); wireScan(form, { fields: SCAN_FIELDS, expect: r.type_code }); },
     onSubmit: async (fd) => {
       const f = formObject(fd);
       const problem = fd.get('file')?.size ? db.checkFile(fd.get('file')) : null;
@@ -245,10 +249,17 @@ export function openEdit(r) {
 export function openRenew(r) {
   openModal(`Record renewal — ${r.name}`, html`
     <p class="muted small">${subjectLabel(r)}. This adds the new permit period and keeps the old one (and its document) as history.</p>
-    ${dueFields(r, { issued_on: todayPH(), issuer: r.issuer })}
+    ${scanBox()}
+    ${dueFields(r, { issuer: r.issuer })}
     ${fileField('Copy of the NEW document', "Until you upload the new document, this stays marked 'Needs info' instead of Compliant.")}`, {
     submitLabel: 'Save renewal',
-    onOpen: (form) => wireSuggestion(form, r),
+    onOpen: (form) => {
+      wireSuggestion(form, r);
+      wireScan(form, { fields: SCAN_FIELDS, expect: r.type_code });
+      // Today as the issue date unless a photo says otherwise.
+      const issued = form.querySelector('[name=issued_on]');
+      if (!issued.value) { issued.value = todayPH(); issued.dataset.prefill = '1'; issued.dispatchEvent(new Event('input', { bubbles: true })); }
+    },
     onSubmit: async (fd) => {
       const f = formObject(fd);
       if (!f.no_expiry && !f.expires_on) throw new Error('Please enter the new expiry date.');
