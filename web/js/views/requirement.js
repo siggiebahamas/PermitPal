@@ -5,6 +5,7 @@ import { S, on, go, reload, canEdit, reqById, typeOf, vehicle, memberName, empty
 import { loadPartners, partnerSuggestions, penaltyNote } from './extras.js';
 import { STATUS, statusChip, dueText, subjectLabel, ICON } from '../components.js';
 import { suggestDue } from '../rules.js';
+import { handledByLine } from './assign.js';
 import * as db from 'pp/data';
 
 let detail = null;       // { id, cycles, documents, activity }
@@ -48,6 +49,7 @@ function page(r) {
         <h1>${r.name}</h1>
         <p class="due-line due ${STATUS[r.status].cls}">${dueText(r)}</p>
         ${when(t?.agency, html`<p class="agency">${t?.agency}</p>`)}
+        ${handledByLine(r)}
       </div>
       <div class="head-side">${statusChip(r.status, '', 'lg')}</div>
     </div>

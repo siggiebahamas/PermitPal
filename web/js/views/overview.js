@@ -1,6 +1,7 @@
 // Dashboard, Compliance (filterable list) and Documents.
 import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
-import { S, on, hooks, canEdit, empty } from '../core.js';
+import { S, on, hooks, canEdit, empty, has, memberName } from '../core.js';
+import { assignable, bulk, bulkBar } from './assign.js';
 import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
 import * as db from 'pp/data';
 
@@ -61,6 +62,8 @@ function brief(first, c, open) {
         <h1>${greeting()}, ${first}.</h1>
         <p class="brief-say">${say}</p>
         <p class="brief-note">${c.compliant} of ${c.total} permits compliant${open.length ? html` · <a href="#/compliance">see all ${plural(open.length, 'open item')}</a>` : ''}</p>
+        ${(() => { const mine = has('assign') ? open.filter((r) => r.assignee_id === S.user?.id).length : 0;
+          return mine ? html`<p class="brief-note mine">${ICON.person} <a href="#/compliance?who=me">${plural(mine, 'open item')} handled by you</a></p>` : ''; })()}
       </div>
       <div class="brief-focus">
         ${r ? html`
@@ -79,14 +82,15 @@ function brief(first, c, open) {
 on('brief-skip', () => { skip++; hooks.render(); });
 
 // ---------------------------------------------------------------- compliance
-const filters = { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', q: '' };
+const filters = { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', who: 'all', q: '' };
 let moreOpen = false; // "More filters" stays open until the user closes it
 
 export function compliance(el, params) {
   // Arriving from a number tile: show exactly that list (no leftover search or filters), then take the
   // instruction out of the address so later redraws keep whatever the person changes on the page.
-  if (params.get('status') || params.get('entity')) {
-    Object.assign(filters, { status: params.get('status') || 'all', subject: 'all', entity: params.get('entity') || 'all', city: 'all', type: 'all', due: 'all', q: '' });
+  if (params.get('status') || params.get('entity') || params.get('who')) {
+    Object.assign(filters, { status: params.get('status') || 'all', subject: 'all', entity: params.get('entity') || 'all', city: 'all', type: 'all', due: 'all',
+      who: has('assign') ? params.get('who') || 'all' : 'all', q: '' });
     history.replaceState(null, '', '#/compliance');
   }
   const { reqs, businesses, vehicles, locations } = S.data;
@@ -106,6 +110,9 @@ export function compliance(el, params) {
     if (filters.due === '30' && !(r.expires_on && r.days_left >= 0 && r.days_left <= 30)) return false;
     if (filters.due === '90' && !(r.expires_on && r.days_left >= 0 && r.days_left <= 90)) return false;
     if (filters.due === 'none' && (r.expires_on || !r.expires)) return false;
+    if (filters.who === 'me' && r.assignee_id !== S.user?.id) return false;
+    if (filters.who === 'nobody' && r.assignee_id) return false;
+    if (!['all', 'me', 'nobody'].includes(filters.who) && r.assignee_id !== filters.who) return false;
     if (filters.q) {
       const hay = `${r.name} ${subjectLabel(r)} ${r.reference_no || ''} ${r.location_city || ''}`.toLowerCase();
       if (!hay.includes(filters.q.toLowerCase())) return false;
@@ -116,13 +123,15 @@ export function compliance(el, params) {
 
   const byStatus = {};
   for (const r of base) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
-  const extra = ['subject', 'entity', 'city', 'type', 'due'].filter((k) => filters[k] !== 'all').length;
+  const extra = ['subject', 'entity', 'city', 'type', 'due', 'who'].filter((k) => filters[k] !== 'all').length;
+  const team = has('assign') ? assignable() : [];
   const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Compliance</h1><p class="muted">Every permit and registration across your businesses and vehicles.</p></div>
       <div class="btn-row"><button class="btn btn-ghost btn-sm" data-act="calendar-export">${ICON.calendar} Add to calendar</button>
         <button class="btn btn-ghost btn-sm" data-act="share-open" data-scope="org">${ICON.share} Share proof</button>
-        <button class="btn btn-ghost btn-sm" data-act="export-csv">Export CSV</button></div></div>
+        <button class="btn btn-ghost btn-sm" data-act="export-csv">Export CSV</button>
+        ${when_(has('assign') && canEdit() && list.length, html`<button class="btn btn-sm ${bulk.on ? 'btn-primary' : 'btn-ghost'}" data-act="bulk-toggle" aria-pressed="${bulk.on}">${ICON.person} ${bulk.on ? 'Choosing…' : 'Assign several'}</button>`)}</div></div>
     <div class="filters" id="filters">
       <input type="search" name="q" placeholder="Search name, reference no., city…" value="${filters.q}">
       <div class="status-chips" role="group" aria-label="Show">
@@ -138,6 +147,8 @@ export function compliance(el, params) {
             ${people.map((p) => opt('person:' + p.id, p.full_name, filters.entity))}</select>
           <select name="city">${opt('all', 'All locations', filters.city)}${cities.map((c) => opt(c, c, filters.city))}</select>
           <select name="type">${opt('all', 'All permit types', filters.type)}${types.map((t) => opt(t, t, filters.type))}</select>
+          ${when_(has('assign'), html`<select name="who" aria-label="Handled by">${opt('all', 'Handled by anyone', filters.who)}${opt('me', 'Handled by me', filters.who)}${opt('nobody', 'Handled by nobody', filters.who)}
+            ${team.filter((m) => m.user_id !== S.user?.id).map((m) => opt(m.user_id, 'Handled by ' + memberName(m.user_id), filters.who))}</select>`)}
           <select name="due">${opt('all', 'Any due date', filters.due)}${opt('overdue', 'Overdue', filters.due)}${opt('30', 'Next 30 days', filters.due)}${opt('90', 'Next 90 days', filters.due)}${opt('none', 'No expiry date yet', filters.due)}</select>
         </div>
       </details>
@@ -149,7 +160,8 @@ export function compliance(el, params) {
         const group = list.filter((r) => r.status === k);
         return group.length ? html`<div class="band ${STATUS[k].cls}"><span>${STATUS[k].label}</span><span>${group.length}</span></div>${group.map((r) => reqRow(r))}` : '';
       }) : empty('Nothing matches', 'Try clearing a filter.')}
-    </section>`);
+    </section>
+    ${bulkBar(list.map((r) => r.id))}`);
 
   const f = el.querySelector('#filters');
   f.querySelector('.more-filters')?.addEventListener('toggle', (e) => { moreOpen = e.target.open; });
@@ -166,7 +178,7 @@ export function compliance(el, params) {
   });
 }
 on('filter-status', (d) => { filters.status = d.v; if (location.hash === '#/compliance') hooks.render(); else location.hash = '#/compliance'; });
-on('clear-filters', () => { Object.assign(filters, { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', q: '' });
+on('clear-filters', () => { Object.assign(filters, { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', who: 'all', q: '' });
   // Already on the page: redraw it (changing the hash to the same value fires no event).
   if (location.hash === '#/compliance') hooks.render(); else location.hash = '#/compliance';
 });

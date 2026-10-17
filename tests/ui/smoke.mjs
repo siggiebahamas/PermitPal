@@ -31,6 +31,7 @@ const check = (name, cond, extra = '') => { results.push([cond ? 'PASS' : 'FAIL'
 
 for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 860 }]]) {
   const page = await browser.newPage({ viewport });
+  await page.addInitScript(() => { globalThis.PP_TEAM = true; }); // a teammate (Marco) and a viewer (Liza)
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -287,6 +288,49 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('[data-act=clear-filters]');
     await page.waitForTimeout(250);
 
+    // Who's handling it: pills, the "handled by" filter, assigning several at once, changing one, leaving the team.
+    await go('#/compliance');
+    check('compliance rows show who handles them', (await page.locator('main .row .who').count()) === 3, String(await page.locator('main .row .who').count()));
+    await go('#/compliance?who=me');
+    check('"handled by me" shows only my permits', (await page.locator('main .row').count()) === 1 && (await page.locator('main .row .who', { hasText: 'You' }).count()) === 1);
+    await page.click('[data-act=clear-filters]'); await page.waitForTimeout(250);
+    await go('#/compliance?who=nobody');
+    const nobodyBefore = await page.locator('main .row').count();
+    await page.click('[data-act=bulk-toggle]'); await page.waitForTimeout(250);
+    check('"Assign several" puts a tick box on every row', (await page.locator('main .row .row-pick input').count()) === nobodyBefore && nobodyBefore > 2);
+    check('Assign button waits until something is ticked', await page.locator('.bulk-bar [data-act=bulk-assign]').isDisabled());
+    await page.locator('main .row .row-pick input').nth(0).check();
+    await page.locator('main .row .row-pick input').nth(1).check();
+    check('the bar counts what is ticked', (await page.textContent('.bulk-bar b')).trim() === '2');
+    await page.click('.bulk-bar [data-act=bulk-assign]');
+    check('viewers are not offered as handlers', (await page.locator('.modal .pick', { hasText: 'Liza' }).count()) === 0 && (await page.locator('.modal .pick', { hasText: 'Marco Santos' }).count()) === 1);
+    check('the current handler (Nobody) is already chosen', await page.isChecked('.modal input[name=who][value=""]'));
+    await page.check('.modal input[name=who][value=u2]');
+    await page.click('.modal button[type=submit]'); await page.waitForTimeout(400);
+    check('assigning two says who and how many', /2 permits now handled by Marco Santos\. We let them know\./.test(await page.textContent('#toast')), await page.textContent('#toast'));
+    check('assigned permits leave the "handled by nobody" list and choosing ends', (await page.locator('main .row').count()) === nobodyBefore - 2 && (await page.locator('.bulk-bar').count()) === 0);
+    await page.click('[data-act=clear-filters]'); await page.waitForTimeout(250);
+    await go('#/compliance?who=u2');
+    const marcoRows = await page.locator('main .row').count();
+    check('Marco now handles 4', marcoRows === 4, String(marcoRows));
+    await page.locator('main .row').first().click(); await page.waitForTimeout(300);
+    check('a permit page says who handles it', /Handled by Marco Santos/.test(await page.textContent('main .handled')));
+    await page.click('main .handled [data-act=req-assign]');
+    await page.check('.modal input[name=who][value=""]');
+    await page.click('.modal button[type=submit]'); await page.waitForTimeout(400);
+    check('handing a permit back to nobody says everyone gets reminders', /Nobody is handling this yet/.test(await page.textContent('main .handled')));
+    await go('#/team');
+    check('team page shows how many permits each person handles', (await page.locator('main .row', { hasText: 'Marco Santos' }).locator('text=handles 3 permits').count()) === 1);
+    await page.click('main [data-act=member-remove][data-name="Marco Santos"]');
+    check('removing someone warns about the permits they handle', /They handle 3 permits/.test(await page.textContent('#modal-root')));
+    await page.click('.modal button[type=submit]'); await page.waitForTimeout(400);
+    await go('#/compliance');
+    check('after they leave, nothing shows them as handler', (await page.locator('main .row .who', { hasText: 'Marco' }).count()) === 0);
+    await go('#/settings/workspace');
+    await page.selectOption('#esc-days', '14');
+    await page.click('#esc-form button'); await page.waitForTimeout(300);
+    check('owner can change when they are alerted', /14 days/.test(await page.textContent('#toast')) || /Saved/.test(await page.textContent('#toast')), await page.textContent('#toast'));
+
     // Delete and restore a vehicle.
     await go('#/vehicles/v1');
     await page.click('button.tab:has-text("Details")');
@@ -310,6 +354,50 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.screenshot({ path: path.join(root, 'tests/ui/desktop-business.png'), fullPage: true });
   }
   check(`${label}: no JavaScript errors`, errors.length === 0, errors.slice(0, 3).join(' | '));
+  await page.close();
+}
+
+// Error reporting: a crash in the browser is sent (scrubbed of personal details) and staff see it in Admin.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await page.goto('http://localhost:4173/#/compliance');
+  await page.waitForSelector('main h1');
+  await page.evaluate(() => { setTimeout(() => { throw new Error('Boom for sadie@test.ph on 09171234567 order 12345678'); }, 0); });
+  await page.evaluate(() => { Promise.reject(new TypeError("Cannot read properties of undefined (reading 'x')")); });
+  await page.evaluate(() => { Promise.reject(new TypeError('Failed to fetch')); }); // a dropped connection is not a bug
+  await page.waitForTimeout(300);
+  const sent = await page.evaluate(() => globalThis.__ppMockErrors.map((e) => `${e.message} @ ${e.route}`));
+  check('errors: a crash is reported', sent.some((m) => m.startsWith('Boom for')), sent.join(' | '));
+  check('errors: emails, phone numbers and long numbers are removed', sent.some((m) => m.includes('[email]') && m.includes('[phone]') && m.includes('#')) && !sent.join().includes('sadie@'));
+  check('errors: an unhandled promise failure is reported', sent.some((m) => m.startsWith('TypeError: Cannot read')));
+  check('errors: a lost connection is not reported', !sent.some((m) => m.includes('Failed to fetch')));
+  check('errors: the page is recorded without ids', sent.every((m) => m.endsWith('@ #/compliance')));
+  await page.evaluate(() => { location.hash = '#/admin'; }); await page.waitForTimeout(300);
+  await page.click('[data-act=admin-tab][data-tab=errors]'); await page.waitForTimeout(300);
+  check('errors: staff see them in Admin > Errors', (await page.locator('main .err-row').count()) >= 2);
+  await page.locator('main [data-act=err-resolve]').first().click();
+  await page.fill('.modal [name=note]', 'fixed in test');
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(300);
+  await page.click('[data-act=err-filter][data-v=fixed]'); await page.waitForTimeout(300);
+  check('errors: marking one fixed moves it to Fixed', (await page.locator('main .err-row', { hasText: 'fixed in test' }).count()) === 1);
+  await page.close();
+}
+
+// A database without the newer changes: none of the new features show, and nothing breaks.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await page.addInitScript(() => { globalThis.PP_FEATURES = 'none'; globalThis.PP_TEAM = true; });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  const seen = [];
+  for (const h of ['#/compliance', '#/businesses/b1', '#/team', '#/settings/workspace', '#/admin']) {
+    await page.evaluate((x) => { location.hash = x; }, h); await page.waitForTimeout(250);
+    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors]').count()) seen.push(h);
+  }
+  check('features off: nothing new shows before the database is updated', seen.length === 0, seen.join(','));
+  check('features off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
 }
 

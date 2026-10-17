@@ -2,6 +2,7 @@
 import { html, toast, toastError, fmtDate, closeModal, friendlyError } from './util.js';
 import { S, actions, hooks, on, isStaff } from './core.js';
 import { ICON } from './components.js';
+import { initErrorReporting, reportError } from './errors.js';
 import * as db from 'pp/data';
 import { authPage, invitePage, onboarding, sessionStorageTake, sessionStorageSet } from './views/auth.js';
 import { dashboard, compliance, documents } from './views/overview.js';
@@ -43,7 +44,12 @@ function route() {
 }
 
 // ---------------------------------------------------------------- start / sign-in state
+// Newer features switch on only when the database has them (see app_features in the migrations).
+let featuresLoaded = null;
+const loadFeatures = () => (featuresLoaded ||= db.features().catch(() => ({})).then((f) => { S.features = f || {}; }));
+
 async function start() {
+  await loadFeatures();
   const session = await db.auth.session().catch(() => null);
   S.session = session;
   S.user = session?.user || null;
@@ -86,6 +92,7 @@ async function start() {
     if (!unsubscribe) unsubscribe = db.onNewNotification(S.user.id, (n) => { S.unread++; paintBadges(); toast(n.title, 'info'); });
     renderShell();
   } catch (e) {
+    reportError(e); // a lost connection is ignored by the reporter; anything else is a bug worth knowing about
     app.innerHTML = String(html`<main class="auth"><div class="auth-card"><h1 class="auth-title">Couldn't load PermitPal</h1><p class="tagline">${friendlyError(e)}</p>
       <button class="btn btn-primary btn-block" data-act="reload">Try again</button>
       <button class="btn btn-ghost btn-block" data-act="sign-out">Sign out</button></div></main>`);
@@ -219,7 +226,10 @@ async function renderPage() {
     else dashboard(main);
   } catch (e) {
     console.error(e);
-    main.innerHTML = String(html`<div class="empty"><div class="empty-title">Something went wrong on this page</div><p>${e.message}</p></div>`);
+    reportError(e); // PermitPal staff see this in Admin > Errors
+    main.innerHTML = String(html`<div class="empty"><div class="empty-title">Something went wrong on this page</div>
+      <p>${friendlyError(e)}</p><p class="muted small">We've been told about it automatically. Try again, or go back to the dashboard.</p>
+      <div class="btn-row"><button class="btn btn-primary" data-act="reload">Try again</button><a class="btn btn-ghost" href="#/">Dashboard</a></div></div>`);
   }
 }
 
@@ -286,4 +296,6 @@ db.auth.onChange((event) => {
 });
 window.addEventListener('pp-password-updated', () => { recovery = false; });
 
+// Errors in people's browsers are reported to PermitPal staff (scrubbed of personal details).
+initErrorReporting((r) => (S.features?.errors ? db.logClientError(r) : Promise.resolve()), () => ({ orgId: S.org?.id }));
 start();

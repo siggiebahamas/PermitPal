@@ -72,3 +72,18 @@ test('dates people type into spreadsheets', () => {
   assert.ok(parseDate('2/30/2027').error);                        // no Feb 30
   assert.ok(parseDate('next week').error);
 });
+
+test('error reports: personal details and codes are removed before sending', async () => {
+  const { scrub, routePattern } = await import('../web/js/errors.js');
+  assert.equal(scrub('Failed for juan.dela-cruz+1@gmail.com'), 'Failed for [email]');
+  assert.equal(scrub('call 0917 123 4567 or +639171234567'), 'call [phone] or [phone]');
+  assert.equal(scrub('row 3f2a9c1e-1b2c-4d5e-8f90-123456789abc missing'), 'row :id missing');
+  assert.equal(scrub('#/invite/abcDEF123xyz?x=1'), '#/invite/:code?x=1');
+  assert.equal(scrub('share.html#/k9Lm2PqR'), 'share.html#/:code');
+  assert.equal(scrub('?access_token=eyJabc.def&x=2'), '?access_token=:hidden&x=2');
+  assert.equal(scrub('order 12345678 failed at line 42'), 'order # failed at line 42');
+  assert.equal(scrub(null), '');
+  assert.equal(routePattern('#/vehicles/3f2a9c1e-1b2c-4d5e-8f90-123456789abc?tab=docs'), '#/vehicles/:id');
+  assert.equal(routePattern('#/businesses/b12'), '#/businesses/:id');
+  assert.equal(routePattern(''), '#/');
+});

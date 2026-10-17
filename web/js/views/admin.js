@@ -1,8 +1,8 @@
 // PermitPal staff console: workspaces and plans (team tools revenue), listed professionals and the
 // quote requests (leads) sent to them, payment details for plans, and the email log.
 // Only accounts with profiles.is_platform_admin can load any of this (enforced in the database).
-import { html, fmtDate, fmtDateTime, timeAgo, toast, toastError, when, peso, todayPH } from '../util.js';
-import { S, on, rerender, empty } from '../core.js';
+import { html, fmtDate, fmtDateTime, timeAgo, toast, toastError, when, peso, todayPH, openModal } from '../util.js';
+import { S, on, rerender, empty, has } from '../core.js';
 import { PARTNER_CATEGORIES } from './extras.js';
 import * as db from 'pp/data';
 
@@ -20,16 +20,47 @@ export async function admin(el) {
     else if (tab === 'referrals') body = referralsTab(await db.adminReferrals());
     else if (tab === 'payments') body = settingsTab(await db.adminSettings());
     else if (tab === 'inbox') body = inboxTab(await db.adminSupportMessages());
+    else if (tab === 'errors' && has('errors')) body = errorsTab(await db.adminErrors(errorsOpen), errorsOpen);
     else body = outboxTab(await db.adminOutbox(), await db.channelStatus().catch(() => ({})));
   } catch (e) { toastError(e); }
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>PermitPal admin</h1><p class="muted">Staff tools. Customers never see this page.</p></div></div>
     <div class="tabs">${tabBtn('inbox', 'Inbox')}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${tabBtn('referrals', 'Quote requests')}
-      ${tabBtn('payments', 'Payment details')}${tabBtn('outbox', 'Messages')}</div>
+      ${tabBtn('payments', 'Payment details')}${tabBtn('outbox', 'Messages')}${has('errors') ? tabBtn('errors', 'Errors') : ''}</div>
     ${body}`);
   wire(el);
 }
 on('admin-tab', (ds) => { tab = ds.tab; rerender(); });
+
+// ---------------------------------------------------------------- errors customers hit (from their browsers)
+let errorsOpen = true;
+const browserOf = (ua) => (!ua ? 'Unknown browser' : /iPhone|iPad/.test(ua) ? 'iPhone / iPad' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Other')
+  + (/Edg\//.test(ua || '') ? ' · Edge' : /Chrome\//.test(ua || '') ? ' · Chrome' : /Safari\//.test(ua || '') ? ' · Safari' : /Firefox\//.test(ua || '') ? ' · Firefox' : '');
+function errorsTab(list, open) {
+  return html`<section class="card">
+    <div class="card-head"><div><h2>${open ? 'Errors to look at' : 'Fixed errors'}</h2>
+      <p class="card-sub">Problems people hit in their browsers, grouped by kind. Personal details are removed before they are sent.</p></div>
+      <div class="btn-row"><button class="btn btn-sm ${open ? 'btn-primary' : 'btn-ghost'}" data-act="err-filter" data-v="open">Open</button>
+        <button class="btn btn-sm ${open ? 'btn-ghost' : 'btn-primary'}" data-act="err-filter" data-v="fixed">Fixed</button></div></div>
+    ${list.length ? list.map((e) => html`<div class="row err-row">
+      <div class="row-main"><div class="row-title">${e.message}</div>
+        <div class="row-sub">${e.route || 'unknown page'} · ${browserOf(e.user_agent)} · version ${e.app_version || '?'}</div>
+        <div class="row-sub">${e.count}× · ${e.users_affected} ${e.users_affected === 1 ? 'person' : 'people'} · first ${timeAgo(e.first_seen)} · last ${timeAgo(e.last_seen)}
+          ${e.resolved_at ? html` · fixed ${fmtDate(e.resolved_at.slice(0, 10))}${e.note ? ' — ' + e.note : ''}` : ''}</div>
+        ${when(e.stack, html`<details class="err-stack"><summary>Technical details</summary><pre>${e.stack}</pre></details>`)}</div>
+      <div class="row-side">${open
+        ? html`<button class="btn btn-sm btn-primary" data-act="err-resolve" data-id="${e.id}">Mark fixed</button>`
+        : html`<button class="btn btn-sm btn-ghost" data-act="err-reopen" data-id="${e.id}">Reopen</button>`}</div>
+    </div>`) : html`<p class="muted">${open ? 'No open errors. 🎉' : 'Nothing marked fixed yet.'}</p>`}
+  </section>`;
+}
+on('err-filter', (ds) => { errorsOpen = ds.v === 'open'; rerender(); });
+on('err-resolve', (ds) => openModal('Mark this error fixed', html`<p class="muted small">If it happens again after this, it shows up here as new.</p>
+  <label class="field"><span>Note <small>(optional, e.g. what was fixed)</small></span><input name="note" maxlength="500"></label>`, {
+  submitLabel: 'Mark fixed',
+  onSubmit: async (fd) => { await db.adminResolveError(Number(ds.id), true, fd.get('note')); toast('Marked fixed.'); rerender(); },
+}));
+on('err-reopen', async (ds) => { try { await db.adminResolveError(Number(ds.id), false); toast('Reopened.'); rerender(); } catch (e) { toastError(e); } });
 
 function orgsTab(list, kinds) {
   const k = Object.fromEntries((kinds || []).map((o) => [o.id, o]));

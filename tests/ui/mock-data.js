@@ -33,6 +33,7 @@ const types = [
   { code: 'nbi_clearance', name: 'NBI Clearance', subject: 'person', agency: 'NBI', expires: true, due_rule: 'annual', per_location: false, auto_add: false },
 ];
 const db = { people: [], events: [], shares: [], referrals: [], partners: [], businesses: [], locations: [], vehicles: [], requirements: [], cycles: [], documents: [], requests: [], notifications: [], audit: [] };
+db.members = [{ user_id: 'u1', role: 'owner', profile: { first_name: 'Sadie', last_name: 'Luna', email: 'sadie@test.ph' } }];
 let seq = 0;
 // Mirrors the database's audit triggers: every change gets a type (entity), an action and a plain summary.
 let auditSeq = 1000;
@@ -116,6 +117,7 @@ function statusRows() {
     return { ...r, subject_name: b?.name || v?.make_model || pp?.full_name, person_role: pp?.role_title || null, amount_paid: c?.amount_paid ?? null, plate_no: v?.plate_no || null, location_name: l?.name, location_city: l?.city, location_is_main: l?.is_main,
       cycle_id: c?.id || null, reference_no: c?.reference_no || null, issuer: c?.issuer || null, issued_on: c?.issued_on || null, expires_on: c?.expires_on || null,
       document_count: n, open_request_id: open?.id || null, days_left: dl, base_status: base, status: prog ? 'in_progress' : base,
+      assignee_id: r.assignee_id || null, assigned_at: r.assigned_at || null,
       is_overdue: dl !== null && dl < 0,
       next_action: prog ? 'record_renewal' : ['action_required', 'renew_soon'].includes(base) ? 'renew' : base === 'needs_information' ? ((r.expires && !c?.expires_on) || !c ? 'add_details' : 'upload') : null };
   });
@@ -137,7 +139,7 @@ export async function loadOrgData() {
     types, businesses: db.businesses.filter((b) => !b.deleted_at), locations: db.locations.filter((l) => !l.deleted_at),
     vehicles: db.vehicles.filter((v) => !v.deleted_at), people: db.people.filter((x) => !x.deleted_at), services: SERVICES,
     reqs: statusRows(), requests: db.requests.map((a) => ({ ...a })),
-    members: [{ user_id: user.id, role: 'owner', profile: { first_name: 'Sadie', last_name: 'Luna', email: user.email } }],
+    members: db.members.map((m) => ({ ...m, profile: { ...m.profile } })),
   };
 }
 export const setCurrentOrg = async () => {};
@@ -288,8 +290,10 @@ export async function createOrg(name) {
   return o.id;
 }
 export const renameOrg = async (id, name) => { org.name = name; };
-export const setMemberRole = async () => {};
-export const removeMember = async () => {};
+// Leaving the team (or becoming a viewer) hands their permits back to nobody, like the database does.
+const unassign = (userId) => db.requirements.forEach((r) => { if (r.assignee_id === userId) { r.assignee_id = null; r.assigned_at = null; } });
+export const setMemberRole = async (orgId, userId, role) => { const m = db.members.find((x) => x.user_id === userId); if (m) { m.role = role; if (role === 'viewer') unassign(userId); } };
+export const removeMember = async (orgId, userId) => { db.members = db.members.filter((x) => x.user_id !== userId); unassign(userId); };
 export const revokeInvite = async () => {};
 export const uploadAvatar = async () => null;
 export const avatarUrl = async () => null;
@@ -607,4 +611,52 @@ if (globalThis.PP_SCALE) {
     db.people.push({ id, org_id: org.id, full_name: ['Ana', 'Ben', 'Carla', 'Dante', 'Ella'][i % 5] + ' Santos ' + (i + 1), role_title: 'Driver', business_id: null, deleted_at: null });
     of('person').forEach((t, k) => addReq('person', id, null, t, { reference_no: 'P' + i + k, expires_on: addDays(off(i * 3 + k)) }));
   }
+}
+
+// ---------------------------------------------------------------- newer features (all switched on in the mock;
+// PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa'];
+export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries(ALL_FEATURES.map((f) => [f, true])));
+
+db.clientErrors = [];
+let errSeq = 0;
+export async function logClientError(r) {
+  const fp = (r.message || '').replace(/\d+/g, '#') + '|' + (r.route || '');
+  const open = db.clientErrors.find((e) => e.fp === fp && !e.resolved_at);
+  if (open) { open.count++; open.last_seen = new Date().toISOString(); return; }
+  db.clientErrors.unshift({ id: ++errSeq, fp, message: r.message, stack: r.stack, route: r.route, app_version: r.version, user_agent: r.agent,
+    count: 1, users_affected: 1, first_seen: new Date().toISOString(), last_seen: new Date().toISOString(), resolved_at: null, note: null });
+}
+if (globalThis.PP_DEMO) db.clientErrors.push({ id: ++errSeq, fp: 'demo', message: "TypeError: Cannot read properties of undefined (reading 'plate_no')", stack: 'at vehicleDetail (entities.js:412:20)',
+  route: '#/vehicles/:id', app_version: 'a1b2c3d', user_agent: 'Mozilla/5.0 (Linux; Android 14) Chrome/129.0', count: 7, users_affected: 3,
+  first_seen: new Date(Date.now() - 3 * 864e5).toISOString(), last_seen: new Date(Date.now() - 2 * 36e5).toISOString(), resolved_at: null, note: null });
+globalThis.__ppMockErrors = db.clientErrors; // lets the browser tests read what was reported
+export const adminErrors = async (open = true) => db.clientErrors.filter((e) => (open ? !e.resolved_at : !!e.resolved_at));
+export async function adminResolveError(id, resolved, note) {
+  const e = db.clientErrors.find((x) => x.id === id);
+  if (!e) return;
+  if (resolved) { e.resolved_at = new Date().toISOString(); e.note = note || null; }
+  else if (!db.clientErrors.some((x) => x.fp === e.fp && !x.resolved_at)) { e.resolved_at = null; }
+}
+
+// ---------------------------------------------------------------- who's handling it
+org.escalate_days = 7;
+if (globalThis.PP_DEMO || globalThis.PP_TEAM) {
+  db.members.push({ user_id: 'u2', role: 'member', profile: { first_name: 'Marco', last_name: 'Santos', email: 'marco@test.ph' } },
+    { user_id: 'u3', role: 'viewer', profile: { first_name: 'Liza', last_name: 'Reyes', email: 'liza@test.ph' } });
+  const pick = (code, biz) => db.requirements.find((r) => r.type_code === code && (!biz || r.business_id === biz));
+  for (const [r, who] of [[pick('mayors_permit', 'b2') || pick('mayors_permit', 'b1'), 'u2'], [pick('lto_registration'), 'u1'], [pick('fsic', 'b1'), 'u2']]) if (r) { r.assignee_id = who; r.assigned_at = new Date().toISOString(); }
+}
+export async function assignRequirements(ids, userId) {
+  if (userId && !db.members.some((m) => m.user_id === userId && m.role !== 'viewer')) throw new Error("That person isn't on this workspace's team, or can only view.");
+  let n = 0;
+  for (const id of ids) {
+    const r = db.requirements.find((x) => x.id === id && !x.deleted_at);
+    if (r && (r.assignee_id || null) !== (userId || null)) { r.assignee_id = userId || null; r.assigned_at = userId ? new Date().toISOString() : null; n++; }
+  }
+  return n;
+}
+export async function setEscalation(orgId, days) {
+  if (days != null && (days < 1 || days > 60)) throw new Error('Choose between 1 and 60 days.');
+  org.escalate_days = days ?? null;
 }

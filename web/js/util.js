@@ -1,4 +1,5 @@
 // Shared helpers: safe HTML templating, dates (Philippine time), formatting, toasts and modals.
+import { maybeReportShownError } from './errors.js';
 
 // ---------------------------------------------------------------- safe HTML
 // Every value interpolated into html`` is escaped unless it is itself html`` output (Raw).
@@ -118,7 +119,8 @@ export function toast(message, kind = 'ok') {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.className = 'toast'), kind === 'error' ? 6000 : 3000);
 }
-export const toastError = (err) => toast(friendlyError(err), 'error');
+// Shown to the customer; unexpected errors (bugs, not typing mistakes) are also reported to PermitPal staff.
+export const toastError = (err) => { maybeReportShownError(err); toast(friendlyError(err), 'error'); };
 
 // ---------------------------------------------------------------- modals
 // openModal(title, bodyRaw, { onSubmit, submitLabel, danger, wide }) — body usually contains form fields.

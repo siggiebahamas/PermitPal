@@ -1,6 +1,7 @@
 // Building blocks shared across pages: status chips, requirement rows, stats.
 import { html, raw, fmtDate, plural, todayPH } from './util.js';
 import { S, canEdit, location_ } from './core.js';
+import { whoPill, selectBox } from './views/assign.js';
 
 export const STATUS = {
   action_required: { label: 'Overdue', cls: 'overdue', order: 0 },
@@ -118,10 +119,10 @@ export function reqRow(r, { showSubject = true } = {}) {
     : r.status === 'compliant' ? html`<span class="ok-mark">${ICON.check}</span>` : '';
   return html`
     <div class="row ${s.cls}" data-href="#/requirement/${r.id}" tabindex="0">
-      ${dateTile(r)}
+      ${selectBox(r)}${dateTile(r)}
       <div class="row-main">
         <div class="row-title">${r.name} ${hint}</div>
-        <div class="row-sub">${showSubject ? html`<span>${subjectLabel(r)}</span><span class="sep"> · </span>` : ''}<b class="due ${s.cls}">${dueShort(r)}</b></div>
+        <div class="row-sub">${showSubject ? html`<span>${subjectLabel(r)}</span><span class="sep"> · </span>` : ''}<b class="due ${s.cls}">${dueShort(r)}</b>${whoPill(r)}</div>
       </div>
       <div class="row-side">${statusChip(r.status)}${btn}</div>
     </div>`;

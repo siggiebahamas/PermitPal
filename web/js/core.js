@@ -11,7 +11,10 @@ export const S = {
   plans: [],
   data: null,      // { types, services, businesses, locations, vehicles, people, reqs, requests, members }
   unread: 0,
+  features: {},   // newer features this database supports: { errors, assign, filings, ... }
 };
+// Is a newer feature switched on for this database?
+export const has = (name) => !!S.features?.[name];
 
 // Views register handlers for data-act="name" buttons/links; app.js dispatches clicks.
 export const actions = {};

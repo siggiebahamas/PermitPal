@@ -4,8 +4,9 @@ import {
   normalizePhone, todayPH,
 } from '../util.js';
 import {
-  S, on, reload, rerender, canEdit, isOrgAdmin, isOwner, memberName, empty, effectivePlan, ROLES, business, vehicle, person,
+  S, on, reload, rerender, canEdit, isOrgAdmin, isOwner, memberName, empty, effectivePlan, ROLES, business, vehicle, person, has,
 } from '../core.js';
+import { handledCount } from './assign.js';
 import { avatar } from '../components.js';
 import { KINDS, teamAccess, connectionsCard } from './network.js';
 import * as db from 'pp/data';
@@ -126,7 +127,8 @@ export async function team(el) {
         const me = m.user_id === S.user.id;
         const canChange = isOrgAdmin() && !me && (m.role !== 'owner' || isOwner());
         return html`<div class="row"><div class="row-main member">${avatar(name, null, 34)}<div><div class="row-title">${name}${me ? ' (you)' : ''}</div>
-          <div class="row-sub">${p.email}${p.role_title ? ' · ' + p.role_title : ''}</div></div></div>
+          <div class="row-sub">${p.email}${p.role_title ? ' · ' + p.role_title : ''}${has('assign') && handledCount(m.user_id)
+            ? html` · <a href="#/compliance?who=${m.user_id === S.user.id ? 'me' : m.user_id}">handles ${plural(handledCount(m.user_id), 'permit')}</a>` : ''}</div></div></div>
           <div class="row-side">${canChange
             ? html`<select data-member-role="${m.user_id}" aria-label="Role">${roleOptions(m.role, isOwner())}</select>
                    <button class="btn btn-sm btn-ghost danger" data-act="member-remove" data-id="${m.user_id}" data-name="${name}">Remove</button>`
@@ -149,6 +151,11 @@ export async function team(el) {
     </section>`)}`);
 
   el.querySelectorAll('[data-member-role]').forEach((s) => s.addEventListener('change', async () => {
+    // A viewer can't handle permits: say what happens to theirs before changing anything.
+    const n = has('assign') ? handledCount(s.dataset.memberRole) : 0;
+    if (s.value === 'viewer' && n && !(await confirmDialog('Make them a viewer?',
+      `They handle ${plural(n, 'permit')}. Viewers can only look, so ${n === 1 ? 'it goes' : 'those go'} back to "Nobody" and everyone on the team gets ${n === 1 ? 'its' : 'their'} reminders until you choose someone else.`,
+      { confirmLabel: 'Make viewer', danger: false }))) { rerender(); return; }
     try { await db.setMemberRole(S.org.id, s.dataset.memberRole, s.value); await reload(); toast('Role updated.'); } catch (e) { toastError(e); rerender(); }
   }));
   const form = el.querySelector('#invite-form');
@@ -164,7 +171,9 @@ on('invite-copy', async (ds) => {
 });
 on('invite-revoke', async (ds) => { try { await db.revokeInvite(ds.id); rerender(); toast('Invite revoked.'); } catch (e) { toastError(e); } });
 on('member-remove', async (ds) => {
-  if (!(await confirmDialog(`Remove ${ds.name}?`, 'They lose access to this workspace immediately. Their past changes stay in History.', { confirmLabel: 'Remove' }))) return;
+  const n = has('assign') ? handledCount(ds.id) : 0;
+  if (!(await confirmDialog(`Remove ${ds.name}?`, `They lose access to this workspace immediately. Their past changes stay in History.${n
+    ? ` They handle ${plural(n, 'permit')}: ${n === 1 ? 'it goes' : 'those go'} back to "Nobody", and everyone on the team gets ${n === 1 ? 'its' : 'their'} reminders until you choose someone else.` : ''}`, { confirmLabel: 'Remove' }))) return;
   try { await db.removeMember(S.org.id, ds.id); await reload(); toast('Removed.'); } catch (e) { toastError(e); }
 });
 on('member-leave', async () => {
@@ -249,6 +258,17 @@ export async function settings(el, section) {
         <span class="muted small">Useful if you manage permits for several separate companies or clients.</span></p>
     </section>
 
+    ${when(has('assign'), html`<section class="card"><h2>Alerts about permits other people handle</h2>
+      <p class="muted small">When you give a permit to a teammate, they get its reminders. Owners and admins also get an alert if they haven't started it in time,
+        and every week once it's overdue.</p>
+      <form id="esc-form" class="inline-form"><label class="sr-only" for="esc-days">Alert owners and admins</label>
+        <select id="esc-days" name="days" ${isOrgAdmin() ? '' : 'disabled'}>
+          ${[[3, '3 days before it is due'], [7, '7 days before it is due'], [14, '14 days before it is due'], [30, '30 days before it is due'], ['', 'Only once it is overdue']]
+            .map(([v, l]) => html`<option value="${v}" ${String(org.escalate_days ?? '') === String(v) ? 'selected' : ''}>${l}</option>`)}</select>
+        ${when(isOrgAdmin(), html`<button class="btn btn-primary">Save</button>`)}</form>
+      ${when(!isOrgAdmin(), html`<p class="muted small">Only owners and admins can change this.</p>`)}
+    </section>`)}
+
     <section class="card"><div class="card-head"><div><h2>What this workspace is for</h2><p class="card-sub">Team types add a board for everything you're responsible for. 30-day free trial.</p></div></div>
       <form id="kind-form">${Object.entries(KINDS).filter(([k, v]) => !v.hidden || org.kind === k).map(([k, v]) => html`<label class="radio-card ${org.kind === k ? 'on' : ''}"><input type="radio" name="kind" value="${k}" ${org.kind === k ? 'checked' : ''} ${isOrgAdmin() ? '' : 'disabled'}>
         <span><b>${v.title}</b><small>${k === 'business' ? 'Free. Track your own permits, vehicles and staff licences.' : v.pitch}</small></span></label>`)}
@@ -301,6 +321,15 @@ export async function settings(el, section) {
     const name = new FormData(of).get('name').trim();
     if (!name) return;
     try { await db.renameOrg(org.id, name); S.org.name = name; await reload(); toast('Renamed.'); } catch (err) { toastError(err); }
+  });
+  el.querySelector('#esc-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const days = Number(new FormData(e.target).get('days')) || null;
+    try {
+      await db.setEscalation(org.id, days);
+      S.org.escalate_days = days;
+      toast(days ? `Owners and admins are alerted ${plural(days, 'day')} before, if it isn't started.` : 'Owners and admins are alerted only once something is overdue.');
+    } catch (err) { toastError(err); }
   });
   el.querySelector('#kind-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();

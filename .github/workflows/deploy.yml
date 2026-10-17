@@ -29,6 +29,8 @@ jobs:
       - run: node tests/ui/smoke.mjs
         env:
           CHROMIUM: ""
+      - name: Stamp the version into error reports
+        run: sed -i "s/export const APP_VERSION = 'dev';/export const APP_VERSION = '${GITHUB_SHA::7}';/" web/js/config.js
       - run: node scripts/build-demo.mjs
       - run: touch web/.nojekyll
       - uses: peaceiris/actions-gh-pages@v4

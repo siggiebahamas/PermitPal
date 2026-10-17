@@ -402,3 +402,26 @@ export const contactSupport = async ({ topic, message, name, email, orgId }) => 
 export const adminSupportMessages = async () =>
   ok(await sb.from('support_messages').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
 export const adminSetSupportStatus = async (id, status) => ok(await sb.from('support_messages').update({ status }).eq('id', id));
+
+// ---------------------------------------------------------------- newer features (switched on per database)
+// Which newer features the database supports. An older database has no app_features(): nothing new shows.
+export async function features() {
+  const { data, error } = await sb.rpc('app_features');
+  if (error) return {};
+  return data || {};
+}
+
+// ---------------------------------------------------------------- error reports
+export const logClientError = async (r) => ok(await sb.rpc('log_client_error', {
+  p_message: r.message, p_stack: r.stack || null, p_route: r.route || null, p_version: r.version || null, p_agent: r.agent || null, p_org: r.orgId || null,
+}));
+export const adminErrors = async (open = true) => {
+  let q = sb.from('client_errors').select('*').order('last_seen', { ascending: false }).limit(200);
+  q = open ? q.is('resolved_at', null) : q.not('resolved_at', 'is', null);
+  return ok(await q);
+};
+export const adminResolveError = async (id, resolved, note) => ok(await sb.rpc('admin_resolve_error', { p_id: id, p_resolved: resolved, p_note: note || null }));
+
+// ---------------------------------------------------------------- who's handling it
+export const assignRequirements = async (ids, userId) => ok(await sb.rpc('assign_requirements', { p_ids: ids, p_assignee: userId || null }));
+export const setEscalation = async (orgId, days) => ok(await sb.rpc('set_escalation', { p_org: orgId, p_days: days || null }));
