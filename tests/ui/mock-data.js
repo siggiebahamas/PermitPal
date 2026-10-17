@@ -150,7 +150,7 @@ export async function createBusiness(orgId, f) {
   db.businesses.push({ id, org_id: orgId, name: f.name, activity: f.activity, structure: f.structure, tin: null, deleted_at: null });
   const lid = uid();
   db.locations.push({ id: lid, business_id: id, name: 'Main branch', city: f.city, address: f.address, is_main: true, deleted_at: null });
-  types.filter((t) => t.subject === 'business').forEach((t) => addReq('business', id, t.per_location ? lid : null, t));
+  types.filter((t) => t.subject === 'business' && t.auto_add !== false).forEach((t) => addReq('business', id, t.per_location ? lid : null, t));
   log(`Added business "${f.name}"`, { entity: 'businesses', business_id: id });
   return id;
 }
@@ -158,7 +158,7 @@ export const updateBusiness = async (id, patch) => { const b = Object.assign(db.
 export async function addLocation(bizId, f) {
   const id = uid();
   db.locations.push({ id, business_id: bizId, name: f.name, city: f.city, address: f.address, is_main: false, deleted_at: null });
-  types.filter((t) => t.subject === 'business' && t.per_location).forEach((t) => addReq('business', bizId, id, t));
+  types.filter((t) => t.subject === 'business' && t.per_location && t.auto_add !== false).forEach((t) => addReq('business', bizId, id, t));
   log(`Added branch "${f.name}" to ${db.businesses.find((b) => b.id === bizId)?.name || 'a business'}`, { entity: 'business_locations', business_id: bizId });
   return id;
 }
@@ -200,7 +200,8 @@ export const updateRequirement = async (id, patch) => {
 };
 export async function requirementDetail(id) {
   return { cycles: db.cycles.filter((c) => c.requirement_id === id && !c.deleted_at).sort((a, b) => b.seq - a.seq),
-    documents: db.documents.filter((d) => d.requirement_id === id && !d.deleted_at), activity: db.audit.filter((a) => a.requirement_id === id) };
+    documents: db.documents.filter((d) => d.requirement_id === id && !d.deleted_at), activity: db.audit.filter((a) => a.requirement_id === id),
+    ticks: (db.ticks || []).filter((t) => t.requirement_id === id).map((t) => ({ ...t })) };
 }
 export async function saveCycle({ cycleId, requirementId, ...f }) {
   if (cycleId) {
@@ -320,6 +321,12 @@ function event(a, kind, message, byStaff = false, file = null) {
 const settings = { gcash_name: 'PermitPal Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'PermitPal Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '' };
 export const listServices = async () => SERVICES;
 export async function requestService(f) {
+  // Same rules as the database: authorization ticked, one open request per permit, no flooding.
+  if (!f.consent) throw new Error('Please tick the box to confirm PermitPal may act for you on this request.');
+  if (f.requirement_id && db.requests.some((a) => a.requirement_id === f.requirement_id && !['completed', 'cancelled'].includes(a.status))) {
+    throw new Error('You already have an open request for this requirement.');
+  }
+  if (db.requests.filter((a) => !['completed', 'cancelled'].includes(a.status)).length >= 25) throw new Error('You have 25 open requests. Wait for some to finish, or cancel ones you no longer need.');
   const s = SERVICES.find((x) => x.code === f.service_code);
   const r = f.requirement_id ? statusRows().find((x) => x.id === f.requirement_id) : null;
   const subj = r?.subject_name || db.businesses.find((b) => b.id === f.business_id)?.name || db.vehicles.find((v) => v.id === f.vehicle_id)?.make_model
@@ -328,7 +335,7 @@ export async function requestService(f) {
     business_id: f.business_id || r?.business_id || null, vehicle_id: f.vehicle_id || r?.vehicle_id || null, person_id: f.person_id || r?.person_id || null,
     requirement_name: r?.name || s.name, subject_label: subj, notes: f.notes || null, rush: !!f.rush, contact_method: f.contact_method || 'email',
     contact_value: f.contact_value || null, docs_status: f.docs_status || 'not_sure', status: 'submitted', payment_status: 'unpaid',
-    due_on: r?.expires_on || null, created_at: now(), updated_at: now() };
+    due_on: r?.expires_on || null, created_at: now(), updated_at: now(), kind: f.kind || 'renew', consented_at: now() };
   db.requests.unshift(a);
   event(a, 'created', a.notes || 'Request sent');
   return a.id;
@@ -659,4 +666,56 @@ export async function assignRequirements(ids, userId) {
 export async function setEscalation(orgId, days) {
   if (days != null && (days < 1 || days > 60)) throw new Error('Choose between 1 and 60 days.');
   org.escalate_days = days ?? null;
+}
+
+
+// ---------------------------------------------------------------- fuller permit library + renewal checklists
+const T = (code) => types.find((t) => t.code === code);
+Object.assign(T('mayors_permit'), { category: 'local', depends_on: ['barangay_clearance'],
+  where_to_file: "Your city or municipal hall's Business Permits and Licensing Office (BPLO), or its online portal.",
+  validity_note: 'Valid for the calendar year. Most cities want it renewed by January 20.',
+  checklist: [{ k: 'brgy', t: 'Barangay Business Clearance for this year', dep: 'barangay_clearance' }, { k: 'prev', t: "Last year's Mayor's Permit and its official receipt" },
+    { k: 'sales', t: "Last year's gross sales or receipts", d: 'Usually copies of your BIR returns, or a sworn declaration of gross sales.' },
+    { k: 'ctc', t: 'Community Tax Certificate (cedula) for the business' }, { k: 'fire', t: 'Fire safety inspection (FSIC)', dep: 'fsic' },
+    { k: 'pay', t: 'Pay the assessed taxes and fees' }] });
+Object.assign(T('bir_cor'), { category: 'national', where_to_file: 'Your BIR Revenue District Office (RDO), or online through ORUS.',
+  online_url: 'https://orus.bir.gov.ph/', online_label: 'BIR ORUS (online registration and updates)', validity_note: 'Does not expire.',
+  checklist: [{ k: 'display', t: 'Display the COR (Form 2303) where customers can see it' }, { k: 'update', t: 'Moved or changed your name? File the update with BIR', u: 'https://orus.bir.gov.ph/' }] });
+Object.assign(T('fsic'), { category: 'safety', where_to_file: 'The Bureau of Fire Protection station for your city.', validity_note: 'Valid for one year from the date issued.',
+  checklist: [{ k: 'prev', t: "Last year's FSIC" }, { k: 'ready', t: 'Fire extinguishers refilled and tagged; exits clear and marked' }, { k: 'pay', t: 'Pay the fire code fee' }] });
+Object.assign(T('lto_registration'), { category: 'registration', where_to_file: 'Any LTO district office, or online in LTMS for plain renewals.', depends_on: ['ctpl', 'emission_test'],
+  online_url: 'https://portal.lto.gov.ph/', online_label: 'LTO LTMS portal', validity_note: 'Renew every year in the week set by your plate number.',
+  checklist: [{ k: 'ctpl', t: 'CTPL insurance for the coming year', dep: 'ctpl' }, { k: 'emission', t: 'Passed emission test', dep: 'emission_test' },
+    { k: 'orcr', t: 'Current OR/CR' }, { k: 'pay', t: 'Pay the registration fee', u: 'https://portal.lto.gov.ph/' }] });
+Object.assign(T('ctpl'), { category: 'registration', checklist: [{ k: 'buy', t: 'Buy CTPL for the next registration year' }] });
+Object.assign(T('emission_test'), { category: 'registration' });
+Object.assign(T('mvir'), { category: 'registration' });
+Object.assign(T('drivers_license'), { category: 'licence', online_url: 'https://portal.lto.gov.ph/', online_label: 'LTO LTMS portal',
+  validity_note: 'Valid for 5 years, or 10 years for drivers with no traffic violations.', checklist: [{ k: 'medical', t: 'Medical certificate from an LTO-accredited clinic' }, { k: 'pay', t: 'Pay the renewal fee' }] });
+Object.assign(T('health_certificate'), { category: 'clearance' });
+Object.assign(T('nbi_clearance'), { category: 'clearance', online_url: 'https://clearance.nbi.gov.ph/', online_label: 'NBI Clearance online' });
+types.push(
+  { code: 'barangay_clearance', name: 'Barangay Business Clearance', subject: 'business', expires: true, due_rule: 'jan20', per_location: true, auto_add: false, category: 'local',
+    checklist: [{ k: 'prev', t: "Last year's barangay clearance" }, { k: 'pay', t: 'Pay the barangay fee' }] },
+  { code: 'sanitary_permit', name: 'Sanitary Permit', subject: 'business', expires: true, due_rule: 'annual', per_location: true, auto_add: false, category: 'safety',
+    activities: ['restaurant', 'healthcare', 'school', 'manufacturing'], help_text: 'Required for businesses that handle food or health services.' },
+  { code: 'liquor_license', name: 'Liquor License', subject: 'business', expires: true, due_rule: 'jan20', per_location: true, auto_add: false, category: 'local',
+    activities: ['restaurant', 'retail'], help_text: 'If you sell or serve alcoholic drinks.' },
+  { code: 'dole_registration', name: 'DOLE Establishment Registration (Rule 1020)', subject: 'business', expires: false, due_rule: 'manual', per_location: true, auto_add: false, category: 'employer',
+    help_text: 'One-time registration for every business with at least one employee. Free.', online_url: 'https://reports.dole.gov.ph/', online_label: 'DOLE Establishment Report System',
+    checklist: [{ k: 'file', t: 'Register online', u: 'https://reports.dole.gov.ph/' }] },
+  { code: 'bmbe_certificate', name: 'BMBE Certificate of Authority', subject: 'business', expires: true, due_rule: 'years2', per_location: false, auto_add: false, category: 'national',
+    help_text: 'For micro businesses with assets up to ₱3 million: no income tax on the business while it is valid.' },
+  { code: 'police_clearance', name: 'National Police Clearance', subject: 'person', agency: 'PNP', expires: true, due_rule: 'months6', per_location: false, auto_add: false, category: 'clearance',
+    online_url: 'https://pnpclearance.ph/', online_label: 'PNP National Police Clearance System' },
+);
+db.ticks = [];
+export async function setChecklistItem(reqId, item, done) {
+  const r = statusRows().find((x) => x.id === reqId);
+  if (!r) throw new Error('Not allowed.');
+  if (!(T(r.type_code)?.checklist || []).some((i) => i.k === item)) throw new Error('That checklist item no longer exists. Refresh the page.');
+  const round = r.cycle_id ? String(r.cycle_id) : 'first';
+  db.ticks = db.ticks.filter((t) => !(t.requirement_id === reqId && t.round === round && t.item === item));
+  if (done) db.ticks.push({ requirement_id: reqId, round, item, done_by: user.id, done_at: now() });
+  return round;
 }

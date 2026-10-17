@@ -220,11 +220,11 @@ export function openModal(title, body, opts = {}) {
   return { close, form };
 }
 
-export function confirmDialog(title, message, { confirmLabel = 'Delete', danger = true } = {}) {
+export function confirmDialog(title, message, { confirmLabel = 'Delete', danger = true, cancelLabel } = {}) {
   return new Promise((resolve) => {
     let done = false;
     const m = openModal(title, html`<p class="muted">${message}</p>`, {
-      submitLabel: confirmLabel, danger, noAutofocus: true,
+      submitLabel: confirmLabel, danger, noAutofocus: true, cancelLabel,
       onSubmit: () => { done = true; resolve(true); },
     });
     const obs = new MutationObserver(() => {

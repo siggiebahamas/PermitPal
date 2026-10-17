@@ -1,9 +1,12 @@
-// PermitPal staff console: workspaces and plans (team tools revenue), listed professionals and the
-// quote requests (leads) sent to them, payment details for plans, and the email log.
+// PermitPal staff console: done-for-you orders (quote, payment, progress, finished permit) and their
+// prices, workspaces and plans (team tools revenue), listed professionals and the quote requests
+// (leads) sent to them, payment details, the email log and browser errors.
 // Only accounts with profiles.is_platform_admin can load any of this (enforced in the database).
-import { html, fmtDate, fmtDateTime, timeAgo, toast, toastError, when, peso, todayPH, openModal } from '../util.js';
+import { html, fmtDate, fmtDateTime, timeAgo, toast, toastError, when, peso, todayPH, openModal, plural, confirmDialog } from '../util.js';
 import { S, on, rerender, empty, has } from '../core.js';
 import { PARTNER_CATEGORIES } from './extras.js';
+import { ORDER_STATUS, PAYMENT_STATUS, KIND_LABEL } from './services.js';
+import { ICON } from '../components.js';
 import * as db from 'pp/data';
 
 let tab = 'inbox';
@@ -15,7 +18,9 @@ export async function admin(el) {
   const tabBtn = (k, l) => html`<button class="tab ${tab === k ? 'active' : ''}" data-act="admin-tab" data-tab="${k}">${l}</button>`;
   let body = '';
   try {
-    if (tab === 'orgs') { const [list, kinds] = await Promise.all([db.adminOrgs(), db.adminOrgKinds()]); body = orgsTab(list, kinds); }
+    if (tab === 'orders' && has('services')) body = await ordersTab();
+    else if (tab === 'services' && has('services')) body = servicesTab(await db.adminServices());
+    else if (tab === 'orgs') { const [list, kinds] = await Promise.all([db.adminOrgs(), db.adminOrgKinds()]); body = orgsTab(list, kinds); }
     else if (tab === 'partners') body = partnersTab(await db.adminPartners());
     else if (tab === 'referrals') body = referralsTab(await db.adminReferrals());
     else if (tab === 'payments') body = settingsTab(await db.adminSettings());
@@ -25,12 +30,161 @@ export async function admin(el) {
   } catch (e) { toastError(e); }
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>PermitPal admin</h1><p class="muted">Staff tools. Customers never see this page.</p></div></div>
-    <div class="tabs">${tabBtn('inbox', 'Inbox')}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${tabBtn('referrals', 'Quote requests')}
+    <div class="tabs">${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${tabBtn('services', 'Services & prices')}` : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${tabBtn('referrals', 'Quote requests')}
       ${tabBtn('payments', 'Payment details')}${tabBtn('outbox', 'Messages')}${has('errors') ? tabBtn('errors', 'Errors') : ''}</div>
     ${body}`);
   wire(el);
 }
-on('admin-tab', (ds) => { tab = ds.tab; rerender(); });
+on('admin-tab', (ds) => { tab = ds.tab; openOrder = null; rerender(); });
+
+// ---------------------------------------------------------------- done-for-you orders
+let openOrder = null;
+let ordersCache = [];
+const STAGES = [
+  ['New: send a quote', (a) => a.status === 'submitted'],
+  ['Payment to check', (a) => a.payment_status === 'pending_verification'],
+  ['Quoted: waiting for the customer', (a) => a.status === 'quoted'],
+  ['Accepted: waiting for payment', (a) => a.payment_status === 'awaiting_payment'],
+  ['In progress', (a) => !['submitted', 'quoted', 'completed', 'cancelled'].includes(a.status)],
+];
+async function ordersTab() {
+  ordersCache = (await db.adminRequests()).filter((a) => a.service_code);
+  const list = ordersCache;
+  if (openOrder) {
+    const a = list.find((x) => x.id === openOrder);
+    if (a) return orderDetail(a, await db.orderEvents(a.id));
+  }
+  const open = list.filter((a) => !['completed', 'cancelled'].includes(a.status));
+  const closed = list.filter((a) => ['completed', 'cancelled'].includes(a.status));
+  const earned = closed.filter((a) => a.status === 'completed' && ['paid', 'waived'].includes(a.payment_status)).reduce((t, a) => t + Number(a.quote_service_fee || 0), 0);
+  const line = (a) => html`<button class="line" data-act="admin-order" data-id="${a.id}"><span class="line-main"><b>${KIND_LABEL[a.kind] || 'Request'}: ${a.requirement_name} — ${a.subject_label}</b>
+    <small>${a.orgs?.name || ''} · ${timeAgo(a.created_at)}${a.rush ? ' · URGENT' : ''}${a.due_on ? ' · due ' + fmtDate(a.due_on) : ''}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
+    <span class="chip ${ORDER_STATUS[a.status]?.[1]}">${ORDER_STATUS[a.status]?.[0]}</span></button>`;
+  const used = new Set();
+  return html`
+    <div class="stats four">
+      <div class="stat soon"><div class="stat-n">${open.length}</div><div class="stat-l">Open orders</div></div>
+      <div class="stat overdue"><div class="stat-n">${open.filter((a) => a.status === 'submitted').length}</div><div class="stat-l">Need a quote</div></div>
+      <div class="stat progress"><div class="stat-n">${open.filter((a) => a.payment_status === 'pending_verification').length}</div><div class="stat-l">Payments to check</div></div>
+      <div class="stat ok"><div class="stat-n">${peso(earned)}</div><div class="stat-l">Service fees earned (done)</div></div>
+    </div>
+    ${STAGES.map(([title, test]) => {
+      const items = open.filter((a) => !used.has(a.id) && test(a));
+      items.forEach((a) => used.add(a.id));
+      return items.length ? html`<section class="card"><div class="card-head"><h2>${title}</h2><span class="muted small">${items.length}</span></div>${items.map(line)}</section>` : '';
+    })}
+    ${when(!open.length, empty('No open orders', 'New requests also arrive by email.'))}
+    ${when(closed.length, html`<details class="folder card"><summary>${plural(closed.length, 'closed order')}</summary>${closed.map(line)}</details>`)}`;
+}
+on('admin-order', (ds) => { openOrder = ds.id; rerender(); });
+on('admin-back', () => { openOrder = null; rerender(); });
+
+function orderDetail(a, events) {
+  const closed = ['completed', 'cancelled'].includes(a.status);
+  return html`
+    <button class="back linklike" data-act="admin-back">← All orders</button>
+    <section class="card">
+      <div class="card-head"><div><h2>${KIND_LABEL[a.kind] || 'Request'}: ${a.requirement_name} — ${a.subject_label}</h2><p class="card-sub">${a.orgs?.name} · ${a.service_code}${a.rush ? ' · URGENT' : ''}</p></div>
+        <span class="chip ${ORDER_STATUS[a.status]?.[1]}">${ORDER_STATUS[a.status]?.[0]}</span></div>
+      <dl class="kv">
+        <dt>Location</dt><dd>${a.location_label || '—'}</dd>
+        <dt>Deadline</dt><dd>${a.due_on ? fmtDate(a.due_on) : '—'}</dd>
+        <dt>Documents</dt><dd>${{ have: 'Uploaded in PermitPal', need: 'Customer needs to get them', not_sure: 'Not sure' }[a.docs_status] || '—'}</dd>
+        <dt>Contact</dt><dd>${a.contact_method}${a.contact_value ? ': ' + a.contact_value : ''}</dd>
+        <dt>Authorized</dt><dd>${a.consented_at ? fmtDateTime(a.consented_at) + ' (ticked in the app; get the signed letter before filing)' : 'No — ask for written authorization before doing anything'}</dd>
+        <dt>Notes</dt><dd class="pre">${a.notes || '—'}</dd>
+        <dt>Quote</dt><dd>${a.quote_php != null ? html`${peso(a.quote_php)} (fee ${peso(a.quote_service_fee)} + gov ${peso(a.quote_gov_fees)})` : '—'}</dd>
+        <dt>Payment</dt><dd>${PAYMENT_STATUS[a.payment_status]}${a.payment_method ? ' · ' + a.payment_method : ''}${a.payment_ref ? ' · ref ' + a.payment_ref : ''}</dd>
+        <dt>Received</dt><dd>${fmtDateTime(a.created_at)}</dd>
+      </dl>
+      ${when(!closed && a.requirement_id, html`<button class="btn btn-sm btn-ghost" data-act="admin-docs" data-id="${a.requirement_id}">Show customer's files</button>
+        <span class="muted small">Every file you open is shown to the customer.</span><div class="admin-docs" data-for="${a.requirement_id}"></div>`)}
+    </section>
+
+    ${when(['submitted', 'quoted', 'awaiting_customer'].includes(a.status) && !['paid', 'waived', 'pending_verification'].includes(a.payment_status), html`<section class="card"><h2>${a.quote_php != null ? 'Change the quote' : 'Send the quote'}</h2>
+      <form class="admin-quote" data-id="${a.id}"><div class="grid2">
+        <label class="field"><span>Service fee (₱)</span><input name="fee" type="number" min="0" step="0.01" required value="${a.quote_service_fee ?? ''}"></label>
+        <label class="field"><span>Government fees, estimate (₱)</span><input name="gov" type="number" min="0" step="0.01" value="${a.quote_gov_fees ?? ''}"></label></div>
+        <label class="field"><span>Note to the customer</span><textarea name="note" rows="2" maxlength="2000" placeholder="What's included, documents we need, how long it takes">${a.quote_note || ''}</textarea></label>
+        <button class="btn btn-primary">Send quote</button></form></section>`)}
+
+    ${when(a.payment_status === 'pending_verification', html`<section class="card"><h2>Check the payment</h2>
+      <p>Customer says they paid <b>${peso(a.quote_php)}</b> by ${a.payment_method}${a.payment_ref ? html`, reference <b>${a.payment_ref}</b>` : ''}. Find it in your GCash or bank app first.</p>
+      <div class="btn-row"><button class="btn btn-primary" data-act="admin-pay" data-id="${a.id}" data-ok="1">Payment received</button>
+        <button class="btn btn-ghost danger" data-act="admin-pay" data-id="${a.id}" data-ok="">Can't find it</button></div></section>`)}
+
+    ${when(!closed, html`<section class="card"><h2>Update the customer</h2>
+      <form class="admin-update" data-id="${a.id}"><div class="grid2">
+        <label class="field"><span>Status</span><select name="status"><option value="">Keep: ${ORDER_STATUS[a.status]?.[0]}</option>
+          ${['awaiting_customer', 'in_progress', 'completed', 'cancelled'].map((k) => html`<option value="${k}">${ORDER_STATUS[k][0]}</option>`)}</select></label>
+        <label class="field"><span>Who is filing <small>(internal)</small></span><input name="provider" maxlength="160" value="${a.provider_name || ''}"></label>
+        <label class="field"><span>Government fees actually paid (₱)</span><input name="gov" type="number" min="0" step="0.01" value="${a.gov_fees_actual ?? ''}"></label>
+        <label class="field"><span>Attach a file <small>(official receipt, photo)</small></span><input type="file" name="file" accept=".pdf,image/*"></label></div>
+        <label class="field"><span>Message</span><textarea name="message" rows="2" maxlength="2000" placeholder="e.g. Filed at Taguig BPLO today. Release expected Friday."></textarea></label>
+        <button class="btn btn-soft">Send update</button></form></section>`)}
+
+    ${when(!closed && a.requirement_id, html`<section class="card"><h2>Done: save the new permit to their account</h2>
+      <p class="muted small">This records the new permit on the customer's permit, attaches the file, and closes the order.</p>
+      <form class="admin-renewal" data-id="${a.id}"><div class="grid2">
+        <label class="field"><span>Reference / permit no.</span><input name="reference_no" maxlength="100" required></label>
+        <label class="field"><span>Issued by</span><input name="issuer" maxlength="120"></label>
+        <label class="field"><span>Issued on</span><input type="date" name="issued_on" max="${todayPH()}"></label>
+        <label class="field"><span>Expires on</span><input type="date" name="expires_on"></label>
+        <label class="field"><span>Government fees paid (₱)</span><input name="amount_paid" type="number" min="0" step="0.01"></label>
+        <label class="field"><span>The new permit (PDF or photo)</span><input type="file" name="file" accept=".pdf,image/*"></label></div>
+        <button class="btn btn-primary">Save permit & complete order</button></form></section>`)}
+
+    ${when(['paid', 'refunded'].includes(a.payment_status), html`<section class="card"><h2>Refund</h2>
+      <p class="muted small">Send the money back first (GCash or bank), then record it here. The customer sees it in their order.
+        Our promise: if we can't deliver, the service fee is refunded in full; if government fees were lower than quoted, refund the difference.</p>
+      <form class="admin-refund" data-id="${a.id}"><div class="grid2">
+        <label class="field"><span>Type</span><select name="kind"><option value="fee_difference">Government fees were lower</option><option value="partial">Partial refund</option><option value="full">Full refund (cancels the order)</option></select></label>
+        <label class="field"><span>Amount refunded (₱)</span><input name="amount" type="number" min="0.01" step="0.01" required></label>
+        <label class="field"><span>Sent by</span><input name="method" maxlength="60" placeholder="GCash / BPI"></label>
+        <label class="field"><span>Reference no.</span><input name="reference" maxlength="120"></label></div>
+        <label class="field"><span>Reason the customer will see</span><input name="reason" maxlength="500" required placeholder="e.g. The city's fee was ₱700 lower than our estimate."></label>
+        <button class="btn btn-soft">Record refund</button></form></section>`)}
+
+    <section class="card"><h2>Timeline</h2><ol class="timeline">${events.map((e) => html`<li class="${e.by_staff ? 'staff' : ''}"><div class="tl-dot"></div><div class="tl-body">
+      <div class="tl-head"><b>${e.by_staff ? 'PermitPal' : 'Customer'}</b><span class="muted small">${fmtDateTime(e.created_at)}</span></div>
+      ${when(e.message, html`<div class="pre">${e.message}</div>`)}
+      ${when(e.file_path, html`<button class="linklike doc-file" data-act="staff-file" data-path="${e.file_path}" data-name="${e.file_name || 'file'}">${ICON.file}${e.file_name || 'file'}</button>`)}</div></li>`)}</ol></section>`;
+}
+on('admin-pay', async (ds) => {
+  try {
+    await db.adminConfirmPayment(ds.id, !!ds.ok, ds.ok ? null : 'We could not find this payment. Please check the reference number and send it again.');
+    toast(ds.ok ? 'Payment confirmed. The customer was told work has started.' : 'Customer asked to check the payment.');
+    rerender();
+  } catch (e) { toastError(e); }
+});
+on('admin-docs', async (ds) => {
+  const box = document.querySelector(`.admin-docs[data-for="${ds.id}"]`);
+  try {
+    const docs = await db.adminRequestDocs(ds.id);
+    box.innerHTML = String(docs.length ? html`<div class="files">${docs.map((d) => html`<div class="file"><div class="file-main">${d.file_name}</div>
+      <button class="btn btn-sm btn-soft" data-act="staff-file" data-path="${d.storage_path}" data-name="${d.file_name}">Download</button></div>`)}</div>`
+      : html`<p class="muted small">No files uploaded for this permit.</p>`);
+  } catch (e) { toastError(e); }
+});
+on('staff-file', async (ds) => {
+  const w = window.open('about:blank', '_blank'); // open now so pop-up blockers allow it
+  try { const url = await db.staffFileUrl(ds.path, ds.name); if (w) w.location.href = url; else location.href = url; } catch (e) { w?.close(); toastError(e); }
+});
+
+// ---------------------------------------------------------------- services & prices
+function servicesTab(list) {
+  return html`<p class="muted small">These are the starting prices customers see. Every order still gets an exact quote from you.</p>
+    ${list.map((s) => html`<section class="card"><form class="admin-svc" data-code="${s.code}">
+      <div class="card-head"><h2>${s.name}</h2><label class="check"><input type="checkbox" name="active" ${s.active ? 'checked' : ''}> Offered</label></div>
+      <div class="grid2">
+        <label class="field"><span>Name</span><input name="name" maxlength="120" value="${s.name}" required></label>
+        <label class="field"><span>Starting price (₱) <small>blank = quoted</small></span><input name="price_from" type="number" min="0" step="1" value="${s.price_from ?? ''}"></label>
+        <label class="field"><span>Price unit</span><input name="price_unit" maxlength="60" value="${s.price_unit}"></label>
+        <label class="field"><span>Usual turnaround</span><input name="turnaround" maxlength="80" value="${s.turnaround}"></label></div>
+      <label class="field"><span>Summary</span><textarea name="summary" rows="2" maxlength="600">${s.summary}</textarea></label>
+      <label class="field"><span>What's included <small>(one per line)</small></span><textarea name="includes" rows="3">${(s.includes || []).join('\n')}</textarea></label>
+      <button class="btn btn-sm btn-soft">Save</button></form></section>`)}`;
+}
 
 // ---------------------------------------------------------------- errors customers hit (from their browsers)
 let errorsOpen = true;
@@ -184,6 +338,44 @@ function wire(el) {
     try { await fn(f, new FormData(f)); } catch (err) { toastError(err); }
     if (btn) btn.disabled = false;
   }));
+  const order = (f) => ordersCache.find((a) => a.id === f.dataset.id);
+  submit('.admin-quote', async (f, fd) => {
+    const fee = Number(fd.get('fee'));
+    const gov = Number(fd.get('gov') || 0);
+    if (!(fee >= 0) || !(gov >= 0)) throw new Error('Enter amounts of zero or more.');
+    await db.adminQuote(f.dataset.id, fee, gov, String(fd.get('note')).trim());
+    toast('Quote sent to the customer.'); rerender();
+  });
+  submit('.admin-update', async (f, fd) => {
+    const message = String(fd.get('message')).trim();
+    if (!fd.get('status') && !message && !fd.get('file')?.size && fd.get('gov') === '' && !String(fd.get('provider')).trim()) throw new Error('Nothing to send: choose a status, write a message or attach a file.');
+    if (fd.get('status') === 'cancelled' && !(await confirmDialog('Cancel this order?', 'The customer is told it was cancelled. Refund anything they paid separately.', { confirmLabel: 'Cancel order' }))) return;
+    await db.adminUpdateOrder(order(f), { status: fd.get('status'), message, file: fd.get('file'), govActual: fd.get('gov'), provider: String(fd.get('provider')).trim() });
+    toast('Update sent.'); rerender();
+  });
+  submit('.admin-refund', async (f, fd) => {
+    const v = Object.fromEntries(fd.entries());
+    if (v.kind === 'full' && !(await confirmDialog('Record a full refund?', 'This also cancels the order.', { confirmLabel: 'Record full refund' }))) return;
+    await db.adminRefund(f.dataset.id, v);
+    toast('Refund recorded. The customer can see it in their order.'); rerender();
+  });
+  submit('.admin-renewal', async (f, fd) => {
+    const v = Object.fromEntries(fd.entries());
+    if (v.expires_on && v.issued_on && v.expires_on < v.issued_on) throw new Error('The expiry date is before the issue date.');
+    if (!(await confirmDialog('Save the permit and complete the order?', `Reference ${v.reference_no}${v.expires_on ? ', valid until ' + fmtDate(v.expires_on) : ', no expiry date'}. The customer's permit is updated straight away.`, { confirmLabel: 'Save and complete', danger: false }))) return;
+    await db.adminRecordRenewal(order(f), v, fd.get('file'));
+    toast("Saved to the customer's account. Order completed."); openOrder = null; rerender();
+  });
+  submit('.admin-svc', async (f, fd) => {
+    const price = fd.get('price_from');
+    const name = String(fd.get('name')).trim();
+    if (!name) throw new Error('The service needs a name.');
+    await db.adminSaveService(f.dataset.code, {
+      name, price_from: price === '' ? null : Number(price), price_unit: String(fd.get('price_unit')).trim(), turnaround: String(fd.get('turnaround')).trim(),
+      summary: String(fd.get('summary')).trim(), includes: String(fd.get('includes')).split('\n').map((x) => x.trim()).filter(Boolean), active: fd.get('active') === 'on',
+    });
+    toast('Saved. Customers see the new price on their next visit.');
+  });
   submit('.admin-partner', async (f, fd) => {
     const row = Object.fromEntries(['name', 'category', 'licence', 'website', 'contact_name', 'contact_phone', 'contact_email', 'commission_terms', 'description', 'services'].map((k) => [k, String(fd.get(k) || '').trim()]));
     if (!row.name) throw new Error('Enter the firm name.');

@@ -357,6 +357,100 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.close();
 }
 
+// Renewal checklist, the fuller permit library, and the done-for-you service from request to finished permit.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(300); };
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  const mpId = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b1').id));
+  await go('#/requirement/' + mpId);
+  check('checklist: open on an overdue permit, with where to file', await page.locator('details.checklist[open]').count() === 1 && /BPLO/.test(await page.textContent('.checklist .ck-facts')));
+  check('checklist: "do these first" offers to add the missing barangay clearance', (await page.locator('.ck-dep.missing', { hasText: 'Barangay Business Clearance' }).locator('[data-act=req-add]').count()) === 1);
+  check('checklist: a step tracked elsewhere shows its live status', /In PermitPal: Compliant until/.test(await page.textContent('.ck-list')));
+  check('checklist: starts at 0 ready', (await page.textContent('.ck-count')).includes('0 of 6'));
+  check('checklist: the "already filed?" hint waits for a tick', await page.locator('[data-ck-hint]').isHidden());
+  await page.check('[data-ck=prev]'); await page.waitForTimeout(250);
+  check('checklist: ticking counts and says who ticked it', (await page.textContent('.ck-count')).includes('1 of 6') && /Ticked by you/.test(await page.textContent('.ck-list li.done')));
+  check('checklist: after a tick, it reminds you to mark the renewal started', await page.locator('[data-ck-hint]').isVisible());
+  await go('#/'); await go('#/requirement/' + mpId);
+  check('checklist: ticks are still there after leaving the page', await page.isChecked('[data-ck=prev]') && (await page.textContent('.ck-count')).includes('1 of 6'));
+  await page.uncheck('[data-ck=prev]'); await page.waitForTimeout(250);
+  check('checklist: unticking counts down', (await page.textContent('.ck-count')).includes('0 of 6'));
+  const ltoId = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'lto_registration').id));
+  await go('#/requirement/' + ltoId);
+  const ext = page.locator('.checklist .ck-facts a.ext-link').first();
+  check('checklist: official portal link opens safely in a new tab', (await ext.getAttribute('href')) === 'https://portal.lto.gov.ph/' && (await ext.getAttribute('target')) === '_blank' && /noopener/.test(await ext.getAttribute('rel')));
+
+  // The library, grouped, with the ones made for this kind of business first.
+  await go('#/businesses/b1');
+  check('library: "Often needed for" a restaurant lists the liquor license', (await page.locator('.lib-group', { hasText: 'Often needed for Restaurant' }).count()) === 1
+    && (await page.locator('.suggest-list button[data-type=liquor_license]').count()) === 1);
+  check('library: the rest is grouped by category', (await page.locator('.lib-more .lib-group', { hasText: 'Employer registrations' }).count()) === 1);
+
+  // Done for you: menu, catalog, asking for a quote.
+  check('done for you: in the menu', (await page.locator('.sidebar a[data-nav=services]').count()) === 1);
+  await go('#/requirement/' + mpId);
+  check('done for you: offered on the permit page with the starting price', /Have PermitPal renew it for you/.test(await page.textContent('.checklist .offer-inline')) && /₱2,500/.test(await page.textContent('.checklist .offer-inline')));
+  await page.click('.checklist .offer-inline [data-act=svc-for-req]');
+  check('done for you: the quote form picks this permit and "renew"', (await page.inputValue('.modal select[name=target]')) === mpId && await page.isChecked('.modal input[name=kind][value=renew]'));
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(200);
+  check('done for you: no request without the authorization tick', /Please tick the box/.test(await page.textContent('#modal-root .modal-error')) && (await page.locator('#modal-root .modal').count()) === 1);
+  await page.check('.modal input[name=consent]');
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(500);
+  const orderHash = await page.evaluate(() => location.hash);
+  check('done for you: sent straight to the request, waiting for a quote', /^#\/services\/orders\//.test(orderHash) && /preparing your exact quote/i.test(await page.textContent('main')));
+  check('done for you: the progress steps start at "Request sent"', (await page.textContent('.stepper li.now')).includes('Request sent'));
+  await page.click('[data-act=auth-letter]');
+  check('done for you: the authorization letter names the business and permit', /Corner <Bakery> & Co/.test(await page.textContent('.letter')) && /Mayor's \/ Business Permit/.test(await page.textContent('.letter')));
+  await page.click('.modal [data-modal-close]'); await page.waitForTimeout(150);
+  await go('#/requirement/' + mpId);
+  check('done for you: the permit now says PermitPal is handling it', /PermitPal is handling this/.test(await page.textContent('main .banner.progress')) && (await page.locator('.checklist .offer-inline', { hasText: 'Open request' }).count()) === 1);
+  await page.click('.checklist .offer-inline a'); await page.waitForTimeout(300);
+  check('done for you: "Open request" goes back to the same request', (await page.evaluate(() => location.hash)) === orderHash);
+
+  // Staff: quote it.
+  await go('#/admin');
+  await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
+  check('admin: the new request waits under "send a quote"', (await page.locator('main .card', { hasText: 'New: send a quote' }).locator('.line', { hasText: "Renewal: Mayor's" }).count()) === 1);
+  await page.locator('main .line', { hasText: "Renewal: Mayor's" }).click(); await page.waitForTimeout(300);
+  check('admin: shows when the customer authorized it', /ticked in the app/.test(await page.textContent('main .kv')));
+  await page.fill('.admin-quote [name=fee]', '2500'); await page.fill('.admin-quote [name=gov]', '4200');
+  await page.click('.admin-quote button'); await page.waitForTimeout(300);
+
+  // Customer: accept, pay.
+  await go(orderHash);
+  check('order: the quote adds up', (await page.textContent('.qline.total')).includes('6,700'));
+  await page.click('[data-act=quote-accept]'); await page.click('.modal button[type=submit]'); await page.waitForTimeout(400);
+  check('order: after accepting, payment details show', (await page.locator('.pay-form').count()) === 1 && /0917 000 0000/.test(await page.textContent('.paywiths')));
+  await page.click('.pay-form button[type=submit]'); await page.waitForTimeout(200);
+  check('order: "I\'ve paid" needs a reference or a screenshot', /reference number or a screenshot/.test(await page.textContent('#toast')));
+  await page.fill('.pay-form [name=ref]', '1009 234 567890');
+  await page.click('.pay-form button[type=submit]'); await page.waitForTimeout(400);
+  check('order: then it says the payment is being checked', /checking your payment/i.test(await page.textContent('main')));
+
+  // Staff: confirm, finish with the new permit.
+  await go('#/admin');
+  await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
+  check('admin: the payment waits under "Payment to check"', (await page.locator('main .card', { hasText: 'Payment to check' }).locator('.line').count()) === 1);
+  await page.locator('main .line', { hasText: "Renewal: Mayor's" }).click(); await page.waitForTimeout(300);
+  await page.click('[data-act=admin-pay][data-ok="1"]'); await page.waitForTimeout(300);
+  await page.fill('.admin-renewal [name=reference_no]', 'MP-2027-0001');
+  await page.fill('.admin-renewal [name=expires_on]', '2027-12-31');
+  await page.click('.admin-renewal button'); await page.click('.modal button[type=submit]'); await page.waitForTimeout(400);
+  await go(orderHash);
+  check('order: done, and the new permit is linked', /Done\./.test(await page.textContent('main .banner')) && (await page.locator('.stepper li.done').count()) === 5);
+  await go('#/requirement/' + mpId);
+  check('order: the permit now shows the new record and a fresh checklist', /MP-2027-0001/.test(await page.textContent('main .kv')) && (await page.textContent('.ck-count')).includes('0 of 6'));
+  await go('#/services');
+  check('done for you page: lists the request as completed', (await page.locator('main .line', { hasText: 'Completed' }).count()) === 1);
+  check('done for you page: every service has a "Get a quote" button', (await page.locator('.svc-grid .svc').count()) === (await page.locator('.svc-grid [data-act=svc-request]').count()));
+  check('done for you: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
 // Error reporting: a crash in the browser is sent (scrubbed of personal details) and staff see it in Admin.
 {
   const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
@@ -392,9 +486,10 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.goto('http://localhost:4173/');
   await page.waitForSelector('main h1');
   const seen = [];
-  for (const h of ['#/compliance', '#/businesses/b1', '#/team', '#/settings/workspace', '#/admin']) {
+  const mp = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit').id));
+  for (const h of ['#/compliance', '#/businesses/b1', '#/team', '#/settings/workspace', '#/admin', '#/requirement/' + mp, '#/']) {
     await page.evaluate((x) => { location.hash = x; }, h); await page.waitForTimeout(250);
-    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors]').count()) seen.push(h);
+    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors], [data-tab=orders], .checklist, .offer-inline, .lib-more, .focus-alt, .sidebar [data-nav=services], #staff-access').count()) seen.push(h);
   }
   check('features off: nothing new shows before the database is updated', seen.length === 0, seen.join(','));
   check('features off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));

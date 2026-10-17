@@ -54,6 +54,15 @@ export function suggestDue(rule, ctx = {}) {
     case 'years5':
       if (!issued) return null;
       return { date: addYears(issued, 5), note: 'Valid for 5 years from registration.' };
+    case 'years2':
+      if (!issued) return null;
+      return { date: addYears(issued, 2), note: 'Valid for 2 years from the issue date. Check the date printed on the certificate.' };
+    case 'months6': {
+      if (!issued) return null;
+      const d = parseISO(issued);
+      const m = d.getUTCMonth() + 6; // 0-based month plus six
+      return { date: isoOf(d.getUTCFullYear() + Math.floor(m / 12), (m % 12) + 1, d.getUTCDate()), note: 'Usually valid for 6 months. Check the date printed on it.' };
+    }
     case 'lto_plate': {
       const s = plateSchedule(ctx.plate);
       if (!s) return null;

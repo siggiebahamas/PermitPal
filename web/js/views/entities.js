@@ -1,8 +1,8 @@
 // Businesses (with branches) and vehicles: lists, detail pages, add/edit/delete.
 import { html, openModal, confirmDialog, toast, toastError, formObject, when, plural, timeAgo, fmtDate, fileSize, todayPH } from '../util.js';
 import {
-  S, on, go, reload, rerender, canEdit, isOrgAdmin, business, vehicle, person, location_, locationsOf, reqsOf, typeOf, memberName,
-  empty, ACTIVITIES, STRUCTURES, VEHICLE_TYPES,
+  S, on, go, reload, rerender, canEdit, isOrgAdmin, has, business, vehicle, person, location_, locationsOf, reqsOf, typeOf, memberName,
+  empty, ACTIVITIES, STRUCTURES, VEHICLE_TYPES, CATEGORY_NAMES,
 } from '../core.js';
 import { reqRow, statTiles, counts, byPriority, dueShort, shortName, ICON, STATUS } from '../components.js';
 import { plateSchedule, suggestDue } from '../rules.js';
@@ -120,11 +120,38 @@ function timeline(subject, list) {
   </section>`;
 }
 
+// Group library permits by category, in a fixed, sensible order.
+function byCategory(types) {
+  const groups = new Map();
+  for (const k of Object.keys(CATEGORY_NAMES)) groups.set(k, []);
+  for (const t of types) (groups.get(t.category) || groups.get('other')).push(t);
+  return [...groups].filter(([, list]) => list.length);
+}
+const addLine = (subject, id, t) => html`<button class="line add" data-act="req-add" data-subject="${subject}" data-id="${id}" data-type="${t.code}"><span class="plus">+</span>
+  <span class="line-main"><b>${t.name}</b>${t.help_text ? html`<small>${t.help_text}</small>` : ''}</span></button>`;
+
 // Permits this business / vehicle doesn't track yet, one tap to add.
 function suggestions(subject, id) {
   if (!canEdit()) return '';
   const have = new Set(reqsOf(subject, id).map((r) => r.type_code).filter(Boolean));
   const types = S.data.types.filter((t) => t.subject === subject && !have.has(t.code));
+  if (has('library2')) {
+    // Ones made for this kind of business first; the rest of the library, grouped, one tap away.
+    const b = subject === 'business' ? business(id) : null;
+    const fits = (t) => b && ((t.activities && t.activities.includes(b.activity)) || (t.structures && t.structures.includes(b.structure)));
+    const top = types.filter(fits);
+    const rest = types.filter((t) => !fits(t));
+    return html`<section class="card">
+      <div class="card-head"><div><h2>Add more ${subject === 'person' ? 'licences' : 'permits'}</h2>
+        <p class="card-sub">Tap one to start tracking it. Not sure if you need it? Its page explains who needs it.</p></div></div>
+      ${when(top.length, html`<h3 class="h4 lib-group">Often needed for ${ACTIVITIES[b?.activity] || 'businesses like yours'}</h3><div class="suggest-list">${top.map((t) => addLine(subject, id, t))}</div>`)}
+      <details class="lib-more" ${top.length ? '' : 'open'}><summary>${top.length ? 'More' : 'All'} ${subject === 'person' ? 'licences' : 'permits'} (${rest.length})</summary>
+        ${byCategory(rest).map(([cat, list]) => html`<h3 class="h4 lib-group">${CATEGORY_NAMES[cat]}</h3><div class="suggest-list">${list.map((t) => addLine(subject, id, t))}</div>`)}
+      </details>
+      <div class="suggest-list"><button class="line add" data-act="req-add" data-subject="${subject}" data-id="${id}" data-type="other"><span class="plus">+</span>
+        <span class="line-main"><b>Something else</b><small>Any permit, license or certificate not on the list</small></span></button></div>
+    </section>`;
+  }
   return html`<section class="card">
     <div class="card-head"><div><h2>Add more ${subject === 'person' ? 'licences' : 'permits'}</h2><p class="card-sub">${subject === 'person' ? 'Licences and clearances staff often need' : `Other permits ${subject === 'business' ? 'businesses' : 'vehicles'} often need`}. Tap one to add it.</p></div></div>
     <div class="suggest-list">
@@ -280,7 +307,9 @@ on('req-add', (ds) => {
   const firstFree = types.find((t) => !tracked(t));
   openModal(subject === 'person' ? 'Add a licence' : 'Add a permit', html`
     <label class="field"><span>${subject === 'person' ? 'Licence' : 'Permit'}</span><select name="type_code">
-      ${types.map((t) => html`<option value="${t.code}" ${tracked(t) ? 'disabled' : ''} ${t === firstFree ? 'selected' : ''}>${t.name}${tracked(t) ? ' (already added)' : ''}</option>`)}
+      ${has('library2')
+        ? byCategory(types).map(([cat, list]) => html`<optgroup label="${CATEGORY_NAMES[cat]}">${list.map((t) => html`<option value="${t.code}" ${tracked(t) ? 'disabled' : ''} ${t === firstFree ? 'selected' : ''}>${t.name}${tracked(t) ? ' (already added)' : ''}</option>`)}</optgroup>`)
+        : types.map((t) => html`<option value="${t.code}" ${tracked(t) ? 'disabled' : ''} ${t === firstFree ? 'selected' : ''}>${t.name}${tracked(t) ? ' (already added)' : ''}</option>`)}
       <option value="" ${firstFree ? '' : 'selected'}>Other (describe it)</option></select></label>
     <label class="field other-name" hidden><span>What is it?</span><input name="name" maxlength="160" placeholder="${subject === 'vehicle' ? 'e.g. LTFRB franchise' : subject === 'person' ? 'e.g. Security guard license' : 'e.g. Signage permit'}"></label>
     ${when(locs.length, html`<label class="field"><span>For</span><select name="location_id">

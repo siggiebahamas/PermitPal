@@ -87,3 +87,13 @@ test('error reports: personal details and codes are removed before sending', asy
   assert.equal(routePattern('#/businesses/b12'), '#/businesses/:id');
   assert.equal(routePattern(''), '#/');
 });
+
+test('2-year and 6-month rules (month ends are handled)', () => {
+  assert.equal(suggestDue('years2', { issuedOn: '2026-03-15' }).date, '2028-03-15');
+  assert.equal(suggestDue('years2', { issuedOn: '2024-02-29' }).date, '2026-02-28');
+  assert.equal(suggestDue('years2', {}), null);
+  assert.equal(suggestDue('months6', { issuedOn: '2026-01-15' }).date, '2026-07-15');
+  assert.equal(suggestDue('months6', { issuedOn: '2026-08-31' }).date, '2027-02-28');
+  assert.equal(suggestDue('months6', { issuedOn: '2026-12-01' }).date, '2027-06-01');
+  assert.equal(suggestDue('months6', {}), null);
+});

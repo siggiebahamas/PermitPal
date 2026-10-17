@@ -1,6 +1,6 @@
 // Boot, sign-in state, the page shell (sidebar, which is a slide-in menu on phones) and the router.
 import { html, toast, toastError, fmtDate, closeModal, friendlyError } from './util.js';
-import { S, actions, hooks, on, isStaff } from './core.js';
+import { S, actions, hooks, on, isStaff, has } from './core.js';
 import { ICON } from './components.js';
 import { initErrorReporting, reportError } from './errors.js';
 import * as db from 'pp/data';
@@ -16,6 +16,7 @@ import { landing } from './views/landing.js';
 import { historyPage, trashPage, team, settings } from './views/account.js';
 import { notifications } from './views/notifications.js';
 import { admin } from './views/admin.js';
+import { services, order } from './views/services.js';
 
 // Never run inside another website's frame (a trick to make people click hidden buttons). GitHub Pages
 // cannot send the header that blocks this, so the page checks for itself; our own frames are fine.
@@ -29,10 +30,10 @@ let unsubscribe = null;
 
 const T = {
   en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
-        pros: 'Find a professional', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
+        pros: 'Find a professional', services: 'Done for you', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
         notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact PermitPal', tools: 'Tools', account: 'Account' },
   tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
-        pros: 'Maghanap ng Propesyonal', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
+        pros: 'Maghanap ng Propesyonal', services: 'Ipaasikaso sa amin', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
         notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang PermitPal', tools: 'Mga Tool', account: 'Account' },
 };
 const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k] || k;
@@ -133,7 +134,7 @@ function buildNav() {
   const k = KINDS[S.org?.kind || 'business'];
   NAV = k?.nav ? [BASE_NAV[0], ['network', k.nav, k.icon], ...BASE_NAV.slice(1)] : BASE_NAV;
   // Below Notifications the menu has two color-coded groups: Tools (pine) and Account (navy).
-  TOOLS = [['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'], ...(k?.nav ? [] : [['network', 'team_tools']])];
+  TOOLS = [...(has('services') ? [['services', 'services']] : []), ['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'], ...(k?.nav ? [] : [['network', 'team_tools']])];
   ACCOUNT = [['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings'], ['contact', 'contact']];
   MORE = [['notifications', 'notifications'], ...TOOLS, ...ACCOUNT];
 }
@@ -199,7 +200,7 @@ async function renderPage() {
   if (!main || !S.data) return;
   const { parts, params } = route();
   const [a, b] = parts;
-  const navKey = ['partners', 'services', 'help'].includes(a) ? 'pros' : a || '';
+  const navKey = a === 'services' && has('services') ? 'services' : ['partners', 'services', 'help'].includes(a) ? 'pros' : a || '';
   document.querySelectorAll('[data-nav]').forEach((n) => n.classList.toggle('active', (n.dataset.nav || '') === navKey));
   paintBadges();
   banner();
@@ -213,6 +214,7 @@ async function renderPage() {
     else if (a === 'documents') await documents(main);
     else if (a === 'network') await network(main);
     else if (a === 'connect') await connectPage(main, b);
+    else if (a === 'services' && has('services')) b === 'orders' && parts[2] ? await order(main, parts[2]) : services(main, params);
     else if (['pros', 'partners', 'services', 'help'].includes(a)) await partners(main, params);
     else if (a === 'contact') contactPage(main, { signedIn: true });
     else if (a === 'costs') await costs(main);

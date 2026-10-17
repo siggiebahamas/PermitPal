@@ -119,14 +119,17 @@ export const addRequirement = async (f) => ok(await sb.rpc('add_requirement', {
 }));
 export const updateRequirement = async (id, patch) => ok(await sb.from('requirements').update(patch).eq('id', id));
 
-export async function requirementDetail(reqId) {
-  const [cycles, documents, activity] = await Promise.all([
+export async function requirementDetail(reqId, { checklist = false } = {}) {
+  const [cycles, documents, activity, ticks] = await Promise.all([
     sb.from('requirement_cycles').select('*').eq('requirement_id', reqId).is('deleted_at', null).order('seq', { ascending: false }).then(ok),
     sb.from('documents').select('*').eq('requirement_id', reqId).is('deleted_at', null).order('created_at', { ascending: false }).then(ok),
     sb.from('audit_log').select('id, summary, action, actor_id, created_at').eq('requirement_id', reqId).order('created_at', { ascending: false }).limit(30).then(ok),
+    checklist ? sb.from('checklist_progress').select('round, item, done_by, done_at').eq('requirement_id', reqId).then(ok) : [],
   ]);
-  return { cycles, documents, activity };
+  return { cycles, documents, activity, ticks };
 }
+// Tick or untick a renewal checklist item; returns the permit period it was saved against.
+export const setChecklistItem = async (reqId, item, done) => ok(await sb.rpc('set_checklist_item', { p_req: reqId, p_item: item, p_done: !!done }));
 
 // Record a new permit period (renewal / first record) or correct the current one.
 export async function saveCycle({ cycleId, orgId, requirementId, reference_no, issuer, issued_on, expires_on, amount_paid }) {
@@ -188,6 +191,7 @@ export const requestService = async (f) => ok(await sb.rpc('request_service', {
   p_org: f.org_id, p_service: f.service_code, p_requirement: f.requirement_id || null, p_business: f.business_id || null,
   p_vehicle: f.vehicle_id || null, p_person: f.person_id || null, p_notes: f.notes || null, p_rush: !!f.rush,
   p_contact_method: f.contact_method || 'email', p_contact_value: f.contact_value || null, p_docs_status: f.docs_status || 'not_sure',
+  p_kind: f.kind || 'renew', p_consent: !!f.consent,
 }));
 export const cancelHelpRequest = async (id) => ok(await sb.from('assistance_requests').update({ status: 'cancelled' }).eq('id', id));
 export const orderRefunds = async (reqId) =>

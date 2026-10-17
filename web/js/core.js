@@ -69,6 +69,12 @@ export const ACTIVITIES = {
   school: 'School / training', logistics: 'Logistics / delivery', other: 'Other',
 };
 export const STRUCTURES = ['Sole Proprietorship', 'Partnership', 'Corporation', 'Cooperative', 'Other'];
+// How the permit library is grouped when people browse it.
+export const CATEGORY_NAMES = {
+  local: 'City and barangay', national: 'National registrations', safety: 'Safety and health', employer: 'Employer registrations',
+  industry: 'Industry licences', registration: 'Registration and insurance', for_hire: 'For-hire vehicles',
+  licence: 'IDs and licences', clearance: 'Clearances and health', other: 'Other',
+};
 export const VEHICLE_TYPES = ['Sedan', 'SUV', 'Van', 'Pickup', 'Truck', 'Motorcycle', 'Tricycle', 'Bus', 'Other'];
 export const ROLES = {
   owner: 'Owner — everything, including billing',

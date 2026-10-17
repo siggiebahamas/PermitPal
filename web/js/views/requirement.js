@@ -1,11 +1,13 @@
 // A single requirement: its current record, files, past records and history — plus the
 // flows used everywhere else (add details, upload, renew, started renewing).
 import { html, fmtDate, fmtDateTime, timeAgo, fileSize, todayPH, openModal, confirmDialog, toast, toastError, formObject, when, peso } from '../util.js';
-import { S, on, go, reload, canEdit, reqById, typeOf, vehicle, memberName, empty, subjectHref } from '../core.js';
+import { S, on, go, reload, canEdit, has, reqById, typeOf, vehicle, memberName, empty, subjectHref } from '../core.js';
 import { loadPartners, partnerSuggestions, penaltyNote } from './extras.js';
 import { STATUS, statusChip, dueText, subjectLabel, ICON } from '../components.js';
 import { suggestDue } from '../rules.js';
 import { handledByLine } from './assign.js';
+import { checklistCard, watchChecklist } from './checklist.js';
+import { serviceOffer } from './services.js';
 import * as db from 'pp/data';
 
 let detail = null;       // { id, cycles, documents, activity }
@@ -23,7 +25,7 @@ export async function render(el, id) {
     if (loadingId === id) return;
     loadingId = id;
     try {
-      const [d] = await Promise.all([db.requirementDetail(id), loadPartners()]);
+      const [d] = await Promise.all([db.requirementDetail(id, { checklist: has('library2') }), loadPartners()]);
       detail = { id, ...d };
     } catch (e) { toastError(e); }
     loadingId = null;
@@ -33,6 +35,17 @@ export async function render(el, id) {
 }
 
 export function forget() { detail = null; }
+// Keep this page's copy of the checklist ticks current, and refresh if the permit changed underneath.
+watchChecklist({
+  ticked: (reqId, item, done) => {
+    if (!detail || detail.id !== reqId) return;
+    const r = reqById(reqId);
+    const round = r?.cycle_id ? String(r.cycle_id) : 'first';
+    detail.ticks = (detail.ticks || []).filter((t) => !(t.round === round && t.item === item));
+    if (done) detail.ticks.push({ round, item, done_by: S.user?.id, done_at: new Date().toISOString() });
+  },
+  changed: () => { detail = null; reload(); },
+});
 
 function page(r) {
   const t = typeOf(r.type_code);
@@ -65,7 +78,7 @@ function page(r) {
 
     ${when(r.status === 'in_progress', html`
       <div class="banner progress">
-        <div>${r.open_request_id ? 'PermitPal is helping with this renewal.' : 'You marked this renewal as started.'}
+        <div>${r.open_request_id ? html`PermitPal is handling this.${has('services') ? html` <a href="#/services/orders/${r.open_request_id}">Follow the request</a>.` : ''}` : 'You marked this renewal as started.'}
         ${r.is_overdue ? ' It is past its expiry date, so finish it soon.' : ''} When you have the new permit, record it here.</div>
         ${when(edit, html`<div class="banner-actions">
           <button class="btn btn-sm btn-primary" data-act="req-renew" data-id="${r.id}">Record renewal</button>
@@ -92,6 +105,7 @@ function page(r) {
       ${when(edit && r.expires && r.status !== 'in_progress' && r.status !== 'compliant', html`
         <button class="btn btn-ghost" data-act="req-start-renewal" data-id="${r.id}">I've started the renewal</button>`)}
     </div>
+    ${checklistCard(r, detail.ticks || [], { offer: serviceOffer(r, { compact: true }) }) || serviceOffer(r)}
     ${partnerSuggestions(r)}
 
     ${when(past.length, html`

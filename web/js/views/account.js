@@ -189,12 +189,14 @@ export async function settings(el, section) {
   let log = [];
   let conn = '';
   let pay = {};
+  let access = [];
   try {
-    [channels, log, conn, pay] = await Promise.all([
+    [channels, log, conn, pay, access] = await Promise.all([
       db.channelStatus().catch(() => ({})),
       db.myDeliveryLog(S.user.id).catch(() => []),
       section === 'workspace' ? connectionsCard() : '',
       section === 'billing' ? db.appSettings().catch(() => ({})) : {},
+      section === 'workspace' && has('services') ? db.staffAccessLog(S.org.id).catch(() => []) : [],
     ]);
   } catch { /* shown as empty */ }
   const toggle = (k, label, sub = '', disabled = false) => html`<label class="toggle ${disabled ? 'disabled' : ''}"><div><div>${label}</div>${when(sub, html`<div class="muted small">${sub}</div>`)}</div>
@@ -282,6 +284,13 @@ export async function settings(el, section) {
       <button class="btn ${p.lang === 'tl' ? 'btn-primary' : 'btn-ghost'}" data-act="lang" data-lang="tl">Tagalog</button></div>
       <p class="muted small">Tagalog covers the menus for now; more screens will follow.</p>
     </section>
+
+    ${when(has('services'), html`<section class="card" id="staff-access"><div class="card-head"><div><h2>Who at PermitPal opened your files</h2>
+      <p class="card-sub">PermitPal staff can only open a permit's files while you have an open done-for-you request for it, and every open is listed here. It can't be edited or erased.</p></div></div>
+      ${access.length ? access.map((x) => html`<div class="line"><span class="line-main"><b>${x.file_name}</b>
+        <small>${x.staff_name} · ${fmtDateTime(x.created_at)} · ${x.reason}</small></span></div>`)
+        : html`<p class="muted">No one at PermitPal has opened your files.</p>`}
+    </section>`)}
 
     <section class="card"><h2>Your data</h2>
       <p class="muted small">Download everything you track as a spreadsheet, anytime. PermitPal backs up the database and every uploaded file every night, encrypted, and keeps past permit periods forever.</p>

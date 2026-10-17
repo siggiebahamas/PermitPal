@@ -1,6 +1,6 @@
 // Dashboard, Compliance (filterable list) and Documents.
 import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
-import { S, on, hooks, canEdit, empty, has, memberName } from '../core.js';
+import { S, on, hooks, canEdit, empty, has, memberName, serviceFor } from '../core.js';
 import { assignable, bulk, bulkBar } from './assign.js';
 import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
 import * as db from 'pp/data';
@@ -75,7 +75,9 @@ function brief(first, c, open) {
             ${canEdit() && r.next_action ? html`<button class="btn ${r.next_action === 'renew' ? 'btn-primary' : 'btn-soft'} focus-go" data-act="req-next" data-id="${r.id}">${NEXT_ACTION[r.next_action]}</button>`
               : html`<a class="btn btn-primary focus-go" href="#/requirement/${r.id}">Open it</a>`}
             ${when_(open.length > 1, html`<button class="btn btn-ghost" data-act="brief-skip">Skip for now</button>`)}
-          </div>` : html`<div class="brief-date">Do this first</div><div class="all-good">${ICON.check} Nothing to do. You're all caught up.</div>`}
+          </div>
+          ${when_(has('services') && canEdit() && !r.open_request_id && ['action_required', 'renew_soon'].includes(r.status) && serviceFor(r),
+            html`<p class="focus-alt">No time? <button class="linklike" data-act="svc-for-req" data-id="${r.id}">Have PermitPal ${r.cycle_id ? 'renew' : 'get'} it for you</button></p>`)}` : html`<div class="brief-date">Do this first</div><div class="all-good">${ICON.check} Nothing to do. You're all caught up.</div>`}
       </div>
     </section>`;
 }
