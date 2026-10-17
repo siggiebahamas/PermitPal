@@ -187,10 +187,11 @@ export const softDelete = async (t, id) => { const x = db[tableOf[t]].find((y) =
 export const restore = async (t, id) => { const x = db[tableOf[t]].find((y) => y.id === id); x.deleted_at = null; const [d, e] = describe(t, x); log(`Restored ${d}`, { entity: t, action: 'restored', ...e }); };
 export async function addRequirement(f) {
   const t = types.find((x) => x.code === f.type_code) || { code: null, name: f.name, expires: f.expires ?? true };
-  const r = addReq(f.subject, f.subject_id, f.location_id, t);
+  const hasRecord = f.reference_no || f.issuer || f.issued_on || f.expires_on;
+  const r = addReq(f.subject, f.subject_id, f.location_id || null, t, hasRecord ? { reference_no: f.reference_no || null, issuer: f.issuer || null, issued_on: f.issued_on || null, expires_on: f.expires_on || null } : null);
   r.confidence = 'confirmed';
   log(`Added ${reqLabel(r)}`, { entity: 'requirements', ...ids(r) });
-  return { requirement_id: r.id, cycle_id: null };
+  return { requirement_id: r.id, cycle_id: hasRecord ? last(db.cycles).id : null };
 }
 export const updateRequirement = async (id, patch) => {
   const r = db.requirements.find((x) => x.id === id); const started = !r.renewal_started_at && patch.renewal_started_at;

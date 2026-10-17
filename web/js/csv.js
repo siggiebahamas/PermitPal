@@ -23,9 +23,9 @@ const iso = (y, m, d) => {
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? dt.toISOString().slice(0, 10) : null;
 };
-// Accepts 2027-03-10, 3/10/2027 (month first, as Excel exports in the Philippines), 10/3/2027 when
-// the first number can only be a day, and "Mar 10, 2027". Returns { value } or { error }.
-export function parseDate(raw) {
+// Accepts 2027-03-10, 3/10/2027 (month first, as Excel exports in the Philippines, or day first when
+// asked), 10/3/2027 when the first number can only be a day, and "Mar 10, 2027". Returns { value } or { error }.
+export function parseDate(raw, { dayFirst = false } = {}) {
   const s = String(raw || '').trim();
   if (!s) return { value: null };
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
@@ -34,7 +34,7 @@ export function parseDate(raw) {
   if (m) {
     let [a, b, y] = [+m[1], +m[2], +m[3]];
     if (y < 100) y += 2000;
-    return ok(a > 12 ? iso(y, b, a) : iso(y, a, b), s);
+    return ok(a > 12 || (dayFirst && b <= 12) ? iso(y, b, a) : iso(y, a, b), s);
   }
   m = s.match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})$/);
   if (m && MONTHS.includes(m[1].toLowerCase())) return ok(iso(+m[3], MONTHS.indexOf(m[1].toLowerCase()) + 1, +m[2]), s);
@@ -44,3 +44,9 @@ export function parseDate(raw) {
   function ok(v, orig) { return v ? { value: v } : { error: `"${orig}" is not a real date.` }; }
 }
 
+
+// 03/04/2027 could be March 4 or 3 April: true when both numbers could be the month.
+export function isAmbiguousDate(raw) {
+  const m = String(raw || '').trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/);
+  return !!m && +m[1] <= 12 && +m[2] <= 12 && +m[1] !== +m[2];
+}

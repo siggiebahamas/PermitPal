@@ -133,7 +133,8 @@ export function compliance(el, params) {
   const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Compliance</h1><p class="muted">Every permit and registration across your businesses and vehicles.</p></div>
-      <div class="btn-row"><button class="btn btn-ghost btn-sm" data-act="calendar-export">${ICON.calendar} Add to calendar</button>
+      <div class="btn-row">${when_(canEdit(), html`<button class="btn btn-ghost btn-sm" data-act="imp-open" data-kind="permits">${ICON.upload} Import permit records</button>`)}
+        <button class="btn btn-ghost btn-sm" data-act="calendar-export">${ICON.calendar} Add to calendar</button>
         <button class="btn btn-ghost btn-sm" data-act="share-open" data-scope="org">${ICON.share} Share proof</button>
         <button class="btn btn-ghost btn-sm" data-act="export-csv">Export CSV</button>
         ${when_(has('assign') && canEdit() && list.length, html`<button class="btn btn-sm ${bulk.on ? 'btn-primary' : 'btn-ghost'}" data-act="bulk-toggle" aria-pressed="${bulk.on}">${ICON.person} ${bulk.on ? 'Choosing…' : 'Assign several'}</button>`)}</div></div>

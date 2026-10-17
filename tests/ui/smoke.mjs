@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
   if (p === '/') p = '/index.html';
@@ -510,6 +510,57 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.waitForTimeout(300);
   check('filings: the dashboard mentions late tax filings', /tax filings? late/.test(await page.textContent('[data-filings-brief]')) && await page.locator('[data-filings-brief]').isVisible());
   check('filings: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
+// Spreadsheet import: businesses from CSV (with guesses explained), permit records from Excel.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(300); };
+  await page.goto('http://localhost:4173/#/businesses');
+  await page.waitForSelector('main h1');
+  await page.click('main [data-act=imp-open][data-kind=businesses]');
+  check('import: opens on the right kind', (await page.inputValue('#imp-kind')) === 'businesses');
+  await page.setInputFiles('#imp-file', { name: 'list.csv', mimeType: 'text/csv', buffer: Buffer.from(
+    'Our businesses\nBusiness name,Industry,Structure,City\nLola Nena Bakeshop,Bakery,,Quezon City\nCorner <Bakery> & Co,,,\nMabuhay Trading Inc.,Wholesale,,Pasig\n') });
+  await page.waitForSelector('.import-sum');
+  check('import: finds the headings under a title row and counts what is ready', /2 businesses ready/.test(await page.textContent('.import-sum')) && (await page.locator('tr.imp-bad').count()) === 1);
+  check('import: says what it guessed', (await page.locator('tr.imp-note .imp-notes', { hasText: 'set to Corporation because of the name' }).count()) === 1);
+  check('import: the button says how many', /Import 2 businesses/.test(await page.textContent('.modal button[type=submit]')));
+  await page.click('.modal button[type=submit]');
+  await page.waitForSelector('#modal-root .modal', { state: 'detached' });
+  check('import: the businesses are added with their permit lists', (await page.locator('main', { hasText: 'Lola Nena Bakeshop' }).count()) === 1 && /2 businesses imported/.test(await page.textContent('#toast')));
+
+  await go('#/compliance');
+  await page.click('main [data-act=imp-open][data-kind=permits]');
+  await page.setInputFiles('#imp-file', path.join(root, 'tests/ui/fixtures/permits.xlsx'));
+  await page.waitForSelector('.import-sum');
+  check('import: Excel files work, and the sheet with the right columns is picked', (await page.inputValue('#imp-sheet-pick')) === '1' && /2 permit records ready/.test(await page.textContent('.import-sum')));
+  check('import: Excel dates come through as dates', /Jan 20, 2027/.test(await page.textContent('#imp-preview tbody')) && /Apr 30, 2027/.test(await page.textContent('#imp-preview tbody')));
+  check('import: newer records are saved as renewals', (await page.locator('.imp-notes', { hasText: 'Saved as the newest record' }).count()) === 2);
+  await page.click('.modal button[type=submit]');
+  await page.waitForSelector('#modal-root .modal', { state: 'detached' });
+  const mp = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b1')));
+  check('import: the permit now has the new number and date', mp.reference_no === 'BP-2027-77' && mp.expires_on === '2027-01-20', `${mp.reference_no} ${mp.expires_on}`);
+  await page.click('main [data-act=imp-open][data-kind=permits]');
+  await page.setInputFiles('#imp-file', path.join(root, 'tests/ui/fixtures/permits.xlsx'));
+  await page.waitForSelector('.import-sum');
+  check('import: importing the same file again changes nothing', /0 permit records ready/.test(await page.textContent('.import-sum')) && /2 already up to date/.test(await page.textContent('.import-sum'))
+    && await page.locator('.modal button[type=submit]').isDisabled());
+  await page.click('.modal [data-modal-close]');
+  await page.click('main [data-act=imp-open][data-kind=permits]');
+  await page.setInputFiles('#imp-file', { name: 'old.xls', mimeType: 'application/vnd.ms-excel', buffer: Buffer.from('xx') });
+  await page.waitForTimeout(200);
+  check('import: old .xls files get a clear "save as .xlsx" message', /save it as \.xlsx or CSV/.test(await page.textContent('#imp-preview')));
+  await page.selectOption('#imp-kind', 'vehicles');
+  await page.setInputFiles('#imp-file', { name: 'v.csv', mimeType: 'text/csv', buffer: Buffer.from('Make and model,Registration expires\nL300,03/04/2027\n') });
+  await page.waitForSelector('.import-sum');
+  check('import: ambiguous dates ask which way to read them', (await page.locator('.date-choice').count()) === 1 && /Mar 4, 2027/.test(await page.textContent('#imp-preview tbody')));
+  await page.check('.date-choice input[value="1"]'); await page.waitForTimeout(150);
+  check('import: choosing "day first" reads them again', /Apr 3, 2027/.test(await page.textContent('#imp-preview tbody')));
+  check('import: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
 }
 

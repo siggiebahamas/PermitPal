@@ -16,10 +16,11 @@ export function businessList(el, params) {
   const list = S.data.businesses;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Businesses</h1><p class="muted">Every business, branch and the permits each one needs.</p></div>
-      ${when(canEdit(), html`<button class="btn btn-primary" data-act="biz-add">+ Add business</button>`)}</div>
+      ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-ghost" data-act="imp-open" data-kind="businesses">${ICON.upload} Import from spreadsheet</button>
+        <button class="btn btn-primary" data-act="biz-add">+ Add business</button></div>`)}</div>
     ${list.length ? html`${timeline('business', list)}${businessRows(list)}`
       : empty('No businesses yet', "Add one and we'll build its permit checklist for you.",
-        when(canEdit(), html`<button class="btn btn-primary" data-act="biz-add">Add a business</button>`))}`);
+        when(canEdit(), html`<div class="btn-row"><button class="btn btn-primary" data-act="biz-add">Add a business</button><button class="btn btn-ghost" data-act="imp-open" data-kind="businesses">Import from spreadsheet</button></div>`))}`);
   if (params.get('add') && canEdit()) { history.replaceState(null, '', '#/businesses'); addBusiness(); }
 }
 
@@ -231,7 +232,8 @@ export function businessDetail(el, id) {
   } else if (tab === 'branches') {
     body.innerHTML = String(html`
       <section class="card"><div class="card-head"><h2>Branches</h2>
-        ${when(canEdit(), html`<button class="btn btn-sm btn-primary" data-act="loc-add" data-id="${id}">+ Add branch</button>`)}</div>
+        ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-sm btn-ghost" data-act="imp-open" data-kind="branches">${ICON.upload} Import branches</button>
+          <button class="btn btn-sm btn-primary" data-act="loc-add" data-id="${id}">+ Add branch</button></div>`)}</div>
         <p class="muted small">Each branch needs its own Mayor's Permit, Barangay Clearance, BIR COR and FSIC. Adding a branch adds those automatically.
 </p>
         ${locs.map((l) => html`<div class="row"><div class="row-main"><div class="row-title">${l.name} ${l.is_main ? html`<span class="tag">Main</span>` : ''}</div>
@@ -522,10 +524,11 @@ export function personList(el, params) {
   const list = S.data.people || [];
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>People</h1><p class="muted">Driver's licenses, PRC licenses, health cards and clearances your staff need.</p></div>
-      ${when(canEdit(), html`<button class="btn btn-primary" data-act="person-add">+ Add person</button>`)}</div>
+      ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-ghost" data-act="imp-open" data-kind="staff">${ICON.upload} Import from spreadsheet</button>
+        <button class="btn btn-primary" data-act="person-add">+ Add person</button></div>`)}</div>
     ${list.length ? html`${timeline('person', list)}<h3 class="section-label">Your people</h3><div class="cards">${list.map(entityCard('person'))}</div>`
       : empty('No people yet', 'Add drivers, cooks, pharmacists and other staff whose licences must stay valid.',
-        when(canEdit(), html`<button class="btn btn-primary" data-act="person-add">Add a person</button>`))}`);
+        when(canEdit(), html`<div class="btn-row"><button class="btn btn-primary" data-act="person-add">Add a person</button><button class="btn btn-ghost" data-act="imp-open" data-kind="staff">Import from spreadsheet</button></div>`))}`);
   if (params.get('add') && canEdit()) { history.replaceState(null, '', '#/people'); addPerson(); }
 }
 

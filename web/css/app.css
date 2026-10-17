@@ -978,3 +978,11 @@ fieldset.q > small { display: block; margin-top: 2px; }
 .preview-list li .check { margin: 4px 0; }
 .late-note { margin: 4px 0 10px; }
 @media (max-width: 599px) { .filing-row .row-side { width: 100%; justify-content: flex-start; } }
+
+/* ---------- spreadsheet import ---------- */
+.import-table tr.imp-note td { background: #FFFBEA; }
+.import-table tr.imp-same td { color: var(--muted); }
+.imp-notes { display: block; margin-top: 4px; font-size: 13.5px; color: #6B5300; font-weight: 600; max-width: 380px; }
+.date-choice { display: block; border: 0; margin: 10px 0; }
+.date-choice legend { float: left; width: 100%; margin-bottom: 4px; }
+.date-choice .check { margin: 4px 0; }

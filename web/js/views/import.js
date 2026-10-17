@@ -1,129 +1,163 @@
-// Bring in a whole fleet from a spreadsheet (CSV saved from Excel or Google Sheets).
-// Every row is checked and shown before anything is saved, so nothing gets in by accident.
-import { html, fmtDate, toast, openModal, download, toCsv, when, plural } from '../util.js';
-import { S, on, reload, VEHICLE_TYPES } from '../core.js';
+// Bring in businesses, branches, vehicles, staff or permit records from a spreadsheet (Excel .xlsx or
+// CSV from Excel or Google Sheets). Every row is checked and shown before anything is saved: what will
+// go in, what will be skipped and why, and any guesses we made, so nothing gets in by accident.
+import { html, fmtDate, toast, openModal, download, toCsv, when, plural, todayPH } from '../util.js';
+import { S, on, reload } from '../core.js';
 import * as db from 'pp/data';
-import { parseCsv, parseDate } from '../csv.js';
+import { parseCsv } from '../csv.js';
+import { openWorkbook, canReadExcel } from '../xlsx.js';
+import { KINDS, checkImport, templateRows } from '../importer.js';
 
-const COLS = [
-  ['make_model', 'Make and model', 'Toyota Hilux'],
-  ['plate_no', 'Plate number', 'NBC 4417'],
-  ['vehicle_type', 'Type', 'Pickup'],
-  ['cr_no', 'CR number', ''],
-  ['or_no', 'OR number', 'OR-5521'],
-  ['registration_expires', 'Registration expires', '2027-03-10'],
-  ['ctpl_provider', 'CTPL provider', 'Malayan Insurance'],
-  ['ctpl_policy_no', 'CTPL policy number', ''],
-  ['ctpl_expires', 'CTPL expires', '2027-03-10'],
-];
-const MAX_ROWS = 500;
+const ctx = () => ({ businesses: S.data.businesses, locations: S.data.locations, vehicles: S.data.vehicles, people: S.data.people || [],
+  reqs: S.data.reqs, types: S.data.types, today: todayPH() });
 
-const norm = (h) => h.toLowerCase().replace(/[^a-z]/g, '');
-// Matches a header to a column even if it's worded a little differently.
-const ALIASES = {
-  make_model: ['makeandmodel', 'makemodel', 'vehicle', 'model', 'make', 'unit'],
-  plate_no: ['platenumber', 'plateno', 'plate', 'platenum'],
-  vehicle_type: ['type', 'vehicletype', 'kind'],
-  cr_no: ['crnumber', 'crno', 'cr'],
-  or_no: ['ornumber', 'orno', 'or'],
-  registration_expires: ['registrationexpires', 'registrationexpiry', 'registrationexpiration', 'regexpiry', 'ltoexpiry', 'registrationvaliduntil', 'registration'],
-  ctpl_provider: ['ctplprovider', 'insurer', 'insuranceprovider', 'insurancecompany'],
-  ctpl_policy_no: ['ctplpolicynumber', 'policynumber', 'policyno', 'cocnumber', 'coc'],
-  ctpl_expires: ['ctplexpires', 'ctplexpiry', 'ctplexpiration', 'insuranceexpiry', 'ctpl'],
-};
-
-export function checkRows(rows) {
-  if (!rows.length) return { error: 'The file is empty.' };
-  const header = rows[0].map(norm);
-  const idx = {};
-  for (const [k] of COLS) {
-    const i = header.findIndex((h) => ALIASES[k].includes(h));
-    if (i >= 0) idx[k] = i;
-  }
-  if (idx.make_model == null) return { error: 'We could not find a "Make and model" column. Start from our template.' };
-  const body = rows.slice(1);
-  if (body.length > MAX_ROWS) return { error: `That's ${body.length} rows. Import up to ${MAX_ROWS} at a time.` };
-  const known = new Set(S.data.vehicles.map((v) => (v.plate_no || '').replace(/\s/g, '').toUpperCase()).filter(Boolean));
-  const seen = new Set();
-  const out = body.map((r, n) => {
-    const get = (k) => (idx[k] == null ? '' : String(r[idx[k]] ?? '').trim());
-    const f = { make_model: get('make_model').slice(0, 120), plate_no: get('plate_no').toUpperCase().slice(0, 20), cr_no: get('cr_no').slice(0, 40),
-      or_no: get('or_no').slice(0, 100), ctpl_provider: get('ctpl_provider').slice(0, 120), ctpl_policy_no: get('ctpl_policy_no').slice(0, 100) };
-    const problems = [];
-    if (!f.make_model) problems.push('Make and model is missing');
-    const t = get('vehicle_type');
-    const SYN = { car: 'Sedan', hatchback: 'Sedan', auv: 'SUV', jeep: 'SUV', mpv: 'Van', minivan: 'Van', 'pick-up': 'Pickup', 'pick up': 'Pickup',
-      scooter: 'Motorcycle', motorbike: 'Motorcycle', motor: 'Motorcycle', trike: 'Tricycle', 'l300': 'Van', lorry: 'Truck', 'wing van': 'Truck' };
-    f.vehicle_type = VEHICLE_TYPES.find((x) => x.toLowerCase() === t.toLowerCase()) || SYN[t.toLowerCase()] || (t ? null : 'Other');
-    if (!f.vehicle_type) { problems.push(`Type "${t}" isn't one of: ${VEHICLE_TYPES.join(', ')}`); }
-    for (const k of ['registration_expires', 'ctpl_expires']) {
-      const d = parseDate(get(k));
-      if (d.error) problems.push(d.error); else f[k] = d.value;
+// How each kind is saved, one row at a time, using the same steps as adding by hand.
+const SAVE = {
+  async businesses(f) {
+    const id = await db.createBusiness(S.org.id, f);
+    if (f.tin) await db.updateBusiness(id, { tin: f.tin });
+  },
+  branches: (f) => db.addLocation(f.business_id, f),
+  vehicles: (f) => db.createVehicle(S.org.id, f),
+  async staff(f) {
+    const id = await db.createPerson(S.org.id, { full_name: f.full_name, role_title: f.role_title, business_id: f.business_id || null, types: [] });
+    for (const l of f.licences) await db.addRequirement({ subject: 'person', subject_id: id, type_code: l.type_code, reference_no: l.reference_no, expires_on: l.expires_on });
+  },
+  async permits(f) {
+    if (f.action === 'add') {
+      return db.addRequirement({ subject: f.subject, subject_id: f.subject_id, location_id: f.location_id || null, type_code: f.type_code || null,
+        name: f.type_code ? null : f.name, expires: f.type_code ? null : f.expires, reference_no: f.reference_no, issued_on: f.issued_on, expires_on: f.expires_on });
     }
-    const key = f.plate_no.replace(/\s/g, '');
-    if (key && known.has(key)) problems.push('Already in PermitPal');
-    else if (key && seen.has(key)) problems.push('Same plate appears twice in the file');
-    if (key) seen.add(key);
-    return { line: n + 2, f, problems };
-  });
-  return { rows: out, missing: COLS.filter(([k]) => idx[k] == null).map(([, l]) => l) };
-}
+    if (f.action === 'update') {
+      return db.saveCycle({ cycleId: f.cycle_id, orgId: S.org.id, requirementId: f.requirement_id, reference_no: f.reference_no, ...f.keep });
+    }
+    return db.saveCycle({ cycleId: null, orgId: S.org.id, requirementId: f.requirement_id, reference_no: f.reference_no, issued_on: f.issued_on, expires_on: f.expires_on });
+  },
+};
+const FILE_NAMES = { businesses: 'businesses', branches: 'branches', vehicles: 'vehicles', staff: 'staff', permits: 'permit-records' };
 
-on('veh-import', () => {
-  let checked = null;
-  openModal('Import vehicles from a spreadsheet', html`
+export function openImport(kind = 'vehicles') {
+  let rows = null;      // raw rows from the file
+  let checked = null;   // result of checkImport
+  let book = null;      // the open Excel workbook, if any
+  let dayFirst = false;
+  openModal('Import from a spreadsheet', html`
+    <label class="field"><span>What are you importing?</span><select name="kind" id="imp-kind">
+      ${Object.entries(KINDS).map(([k, K]) => html`<option value="${k}" ${k === kind ? 'selected' : ''}>${K.label}</option>`)}</select>
+      <small class="muted" id="imp-unit">${KINDS[kind].unit}</small></label>
     <ol class="import-steps">
       <li><b>Get the template</b> <button type="button" class="btn btn-sm btn-soft" id="imp-template">Download template</button>
-        <span class="muted small">Open it in Excel or Google Sheets. One vehicle per row. Dates like 2027-03-10.</span></li>
-      <li><b>Save it as CSV</b> <span class="muted small">Excel: File → Save As → CSV. Google Sheets: File → Download → CSV.</span></li>
-      <li><b>Choose the file</b> <input type="file" id="imp-file" accept=".csv,text/csv"></li>
+        <span class="muted small">Open it in Excel or Google Sheets and fill in one row each. Your own sheet works too if its headings are similar.</span></li>
+      <li><b>Choose the file</b> <input type="file" id="imp-file" accept=".xlsx,.csv,.txt,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        <span class="muted small">Excel (.xlsx) or CSV.${canReadExcel() ? '' : ' This browser can only read CSV: in Excel use File → Save As → CSV.'}</span></li>
     </ol>
+    <div id="imp-sheet"></div>
+    <div id="imp-dates"></div>
     <div id="imp-preview"></div>`, {
     wide: true, submitLabel: 'Import',
     onOpen: (form) => {
       const btn = form.querySelector('button[type=submit]');
+      const box = form.querySelector('#imp-preview');
+      const kindSel = form.querySelector('#imp-kind');
+      const cur = () => kindSel.value;
       btn.disabled = true;
+      const showError = (msg) => { checked = null; btn.disabled = true; btn.textContent = 'Import'; box.innerHTML = String(html`<p class="form-error" role="alert">${msg}</p>`); };
+
+      const render = () => {
+        if (!rows) { box.innerHTML = ''; btn.disabled = true; btn.textContent = 'Import'; form.querySelector('#imp-dates').innerHTML = ''; return; }
+        const K = KINDS[cur()];
+        const res = checkImport(cur(), rows, ctx(), { dayFirst });
+        if (res.error) return showError(res.error);
+        checked = res;
+        // Dates like 03/04/2027 can be read two ways: say how we read them, and let them flip it.
+        form.querySelector('#imp-dates').innerHTML = res.ambiguous ? String(html`<fieldset class="banner warn date-choice"><legend><b>Your file has dates like 03/04/2027.</b> Which does it mean?</legend>
+          <label class="check"><input type="radio" name="dayfirst" value="0" ${dayFirst ? '' : 'checked'}><span>Month first: 03/04/2027 is <b>March 4</b></span></label>
+          <label class="check"><input type="radio" name="dayfirst" value="1" ${dayFirst ? 'checked' : ''}><span>Day first: 03/04/2027 is <b>3 April</b></span></label></fieldset>`) : '';
+        const good = res.rows.filter((r) => !r.problems.length && r.f.action !== 'skip');
+        const same = res.rows.filter((r) => !r.problems.length && r.f.action === 'skip');
+        const bad = res.rows.filter((r) => r.problems.length);
+        const noted = good.filter((r) => r.notes.length);
+        btn.disabled = !good.length;
+        btn.textContent = good.length ? `Import ${plural(good.length, K.one, K.many)}` : 'Import';
+        const cell = (v, i) => ((K.dates || []).includes(i) ? (v ? fmtDate(v) : '—') : v);
+        box.innerHTML = String(html`
+          <p class="import-sum" role="status"><b>${plural(good.length, K.one, K.many)} ready.</b>
+            ${when(bad.length, html` <span class="due overdue">${bad.length} will be skipped; fix ${bad.length === 1 ? 'it' : 'them'} in your file and import again (rows already in are skipped automatically).</span>`)}
+            ${when(same.length, html` <span class="muted">${same.length} already up to date.</span>`)}
+            ${when(noted.length, html` <span class="due soon">${plural(noted.length, 'row')} with a note: read ${noted.length === 1 ? 'it' : 'them'} before importing.</span>`)}
+            ${when(res.missing.length, html`<br><span class="muted small">Not in your file (fine to leave out): ${res.missing.join(', ')}.</span>`)}</p>
+          ${when(K.dates, html`<p class="muted small">Check the dates below read the way you meant before importing.</p>`)}
+          <div class="table-wrap"><table class="table import-table"><thead><tr><th>Row</th>${K.head.map((h) => html`<th>${h}</th>`)}<th>Result</th></tr></thead><tbody>
+          ${res.rows.map((r) => html`<tr class="${r.problems.length ? 'imp-bad' : r.f.action === 'skip' ? 'imp-same' : r.notes.length ? 'imp-note' : ''}"><td>${r.line}</td>
+            ${r.show.map((v, i) => html`<td>${cell(v, i)}</td>`)}
+            <td>${r.problems.length ? html`<span class="due overdue">${r.problems.join('. ')}</span>`
+              : html`<span class="due ${r.f.action === 'skip' ? 'needinfo' : 'ok'}">${r.f.action === 'skip' ? 'Skip' : 'OK'}</span>${r.notes.length ? html`<small class="imp-notes">${r.notes.join(' ')}</small>` : ''}`}</td></tr>`)}
+          </tbody></table></div>`);
+      };
+
+      const loadSheet = async (i) => {
+        try { rows = await book.read(i); render(); } catch (e) { rows = null; showError(e.message); }
+      };
+      kindSel.addEventListener('change', () => { form.querySelector('#imp-unit').textContent = KINDS[cur()].unit; render(); });
+      form.addEventListener('change', (e) => {
+        if (e.target.name === 'dayfirst') { dayFirst = e.target.value === '1'; render(); }
+        if (e.target.id === 'imp-sheet-pick') loadSheet(Number(e.target.value));
+      });
       form.querySelector('#imp-template').addEventListener('click', () =>
-        download('permitpal-vehicles-template.csv', toCsv([COLS.map((c) => c[1]), COLS.map((c) => c[2])])));
+        download(`permitpal-${FILE_NAMES[cur()]}-template.csv`, toCsv(templateRows(cur(), S.data.types))));
       form.querySelector('#imp-file').addEventListener('change', async (e) => {
         const file = e.target.files[0];
-        const box = form.querySelector('#imp-preview');
-        checked = null; btn.disabled = true;
-        if (!file) { box.innerHTML = ''; return; }
-        if (file.size > 2 * 1024 * 1024) { box.innerHTML = String(html`<p class="form-error">That file is too big. Keep it under 2 MB.</p>`); return; }
-        const res = checkRows(parseCsv(await file.text()));
-        if (res.error) { box.innerHTML = String(html`<p class="form-error">${res.error}</p>`); return; }
-        checked = res;
-        const good = res.rows.filter((r) => !r.problems.length);
-        btn.disabled = !good.length;
-        btn.textContent = good.length ? `Import ${plural(good.length, 'vehicle')}` : 'Import';
-        box.innerHTML = String(html`
-          <p class="import-sum"><b>${plural(good.length, 'vehicle')} ready.</b> ${when(res.rows.length - good.length, html`<span class="due overdue">${res.rows.length - good.length} will be skipped; fix them and import again.</span>`)}
-            ${when(res.missing.length, html`<br><span class="muted small">Not in your file (fine to leave out): ${res.missing.join(', ')}.</span>`)}</p>
-          <p class="muted small">Check the dates below read the way you meant before importing.</p>
-          <div class="table-wrap"><table class="table"><thead><tr><th>Row</th><th>Vehicle</th><th>Plate</th><th>Registration expires</th><th>CTPL expires</th><th></th></tr></thead><tbody>
-          ${res.rows.map((r) => html`<tr class="${r.problems.length ? 'imp-bad' : ''}"><td>${r.line}</td><td>${r.f.make_model || '—'}</td><td>${r.f.plate_no || '—'}</td>
-            <td>${r.f.registration_expires ? fmtDate(r.f.registration_expires) : '—'}</td><td>${r.f.ctpl_expires ? fmtDate(r.f.ctpl_expires) : '—'}</td>
-            <td>${r.problems.length ? html`<span class="due overdue">${r.problems.join('. ')}</span>` : html`<span class="due ok">OK</span>`}</td></tr>`)}
-          </tbody></table></div>`);
+        rows = null; book = null; checked = null; dayFirst = false;
+        form.querySelector('#imp-sheet').innerHTML = '';
+        if (!file) return render();
+        if (file.size > 5 * 1024 * 1024) return showError('That file is too big. Keep it under 5 MB (split it into smaller files).');
+        const name = file.name.toLowerCase();
+        box.innerHTML = String(html`<p class="muted">Reading ${file.name}…</p>`);
+        try {
+          if (name.endsWith('.xls')) return showError('That is an old Excel file (.xls). Open it in Excel and save it as .xlsx or CSV, then choose it again.');
+          if (name.endsWith('.xlsx') || file.type.includes('spreadsheetml')) {
+            book = await openWorkbook(file);
+            // Start on the first sheet that has the right columns (a notes or cover sheet often comes first).
+            let start = 0;
+            for (let i = 0; i < Math.min(book.sheets.length, 10); i++) {
+              const res = checkImport(cur(), await book.read(i), ctx());
+              if (!res.error || !/couldn't find/.test(res.error)) { start = i; break; }
+            }
+            if (book.sheets.length > 1) {
+              form.querySelector('#imp-sheet').innerHTML = String(html`<label class="field"><span>Which sheet?</span><select id="imp-sheet-pick">
+                ${book.sheets.map((s, i) => html`<option value="${i}" ${i === start ? 'selected' : ''}>${s}</option>`)}</select></label>`);
+            }
+            return loadSheet(start);
+          }
+          const text = await file.text();
+          if (/^PK/.test(text)) return showError('This looks like an Excel file with the wrong name. Rename it to end in .xlsx, or save it as CSV.');
+          rows = parseCsv(text);
+          render();
+        } catch (err) { showError(err.message || 'We could not read that file.'); }
       });
     },
     onSubmit: async (fd, form) => {
-      const good = checked?.rows.filter((r) => !r.problems.length) || [];
-      if (!good.length) throw new Error('Choose a file with at least one good row.');
+      const kindNow = form.querySelector('#imp-kind').value;
+      const K = KINDS[kindNow];
+      const good = checked?.rows.filter((r) => !r.problems.length && r.f.action !== 'skip') || [];
+      if (!good.length) throw new Error('Choose a file with at least one row that is ready.');
       const btn = form.querySelector('button[type=submit]');
+      form.querySelectorAll('input, select').forEach((x) => { x.disabled = true; }); // no changes halfway through
       const failed = [];
       for (let i = 0; i < good.length; i++) {
         btn.textContent = `Importing ${i + 1} of ${good.length}…`;
-        try { await db.createVehicle(S.org.id, good[i].f); } catch (e) { failed.push(`Row ${good[i].line}: ${e.message}`); }
+        try { await SAVE[kindNow](good[i].f); } catch (e) { failed.push(`Row ${good[i].line}: ${e.message}`); }
       }
       await reload();
       if (failed.length) {
-        form.querySelector('#imp-preview').innerHTML = String(html`<p class="form-error">${good.length - failed.length} imported. These didn't go in:</p><ul class="small">${failed.map((x) => html`<li>${x}</li>`)}</ul>`);
+        form.querySelector('#imp-preview').innerHTML = String(html`<p class="form-error" role="alert">${plural(good.length - failed.length, K.one, K.many)} imported. These didn't go in:</p>
+          <ul class="small">${failed.map((x) => html`<li>${x}</li>`)}</ul><p class="muted small">Fix those rows and import the file again: rows already in PermitPal are skipped.</p>`);
         btn.textContent = 'Done'; btn.disabled = true;
         return false;
       }
-      toast(`${plural(good.length, 'vehicle')} imported. Check each card for anything still missing.`);
+      toast(`${plural(good.length, K.one, K.many)} imported.${kindNow === 'businesses' || kindNow === 'vehicles' ? ' Each one has its permit list; check them for anything still missing.' : ''}`);
     },
   });
-});
+}
+on('veh-import', () => openImport('vehicles'));
+on('imp-open', (ds) => openImport(ds.kind || 'vehicles'));
