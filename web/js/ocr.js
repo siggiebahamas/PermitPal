@@ -1,7 +1,11 @@
 // Reading the text on a photo, entirely on this device (Tesseract, served from our own site): the photo
 // is never uploaded just to be read. The reader (about 7 MB) loads the first time someone uses it and is
 // kept by the browser after that.
-const BASE = new URL('../vendor/tesseract/', import.meta.url).href.replace(/\/$/, '');
+// web/js/ocr.js → web/vendor/tesseract. The demo is one bundled page in web/demo/, where the module has no
+// URL of its own, so it goes from the page instead (web/demo/ → web/vendor/tesseract).
+const BASE = (() => {
+  try { return new URL('../vendor/tesseract/', import.meta.url).href.replace(/\/$/, ''); } catch { return new URL('../vendor/tesseract', location.href).href; }
+})();
 const MAX_SIDE = 2000;     // bigger photos are slower and no more accurate
 const TIME_LIMIT = 120000; // give up after 2 minutes rather than spin forever
 
