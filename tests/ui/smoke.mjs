@@ -653,6 +653,61 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.close();
 }
 
+// Two-step login: turning it on, the code screen at sign-in, a workspace that requires it, lost phone.
+{
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto('http://localhost:4173/#/settings');
+  await page.waitForSelector('#mfa-section [data-act]');
+  check('two-step: off by default, with a plain explanation', /stolen or guessed password/.test(await page.textContent('#mfa-section')));
+  await page.click('#mfa-section [data-act=mfa-on]'); await page.waitForSelector('.modal .qr img');
+  check('two-step: shows a QR code and the key, grouped for typing', /JBSW Y3DP/.test(await page.textContent('.modal .secret')));
+  await page.fill('.modal [name=code]', '111111'); await page.click('.modal button[type=submit]'); await page.waitForTimeout(200);
+  check('two-step: a wrong code explains what to check', /Codes change every 30 seconds/.test(await page.textContent('#modal-root .modal-error')));
+  await page.fill('.modal [name=code]', '123 456'); await page.click('.modal button[type=submit]'); await page.waitForTimeout(400);
+  check('two-step: turned on, and it suggests a second device', /On\./.test(await page.textContent('#mfa-section')) && /Add a second device/.test(await page.textContent('#mfa-section')));
+  await page.click('#mfa-section [data-act=mfa-add]'); await page.waitForSelector('.modal .qr img');
+  await page.click('.modal [data-modal-close]'); await page.waitForTimeout(300);
+  check('two-step: closing a half-finished setup leaves no extra device behind', (await page.locator('#mfa-section [data-act=mfa-remove]').count()) === 1);
+  await page.evaluate(() => { location.hash = '#/settings/workspace'; }); await page.waitForTimeout(400);
+  await page.locator('label.toggle:has([data-act-change=require-mfa])').click(); await page.waitForTimeout(250);
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(400);
+  check('two-step: the owner can require it for the workspace', await page.isChecked('[data-act-change=require-mfa]') && /Everyone now needs two-step login/.test(await page.textContent('#toast')));
+  await page.close();
+
+  // signing in when it is on
+  const p2 = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  p2.on('pageerror', (e) => errs.push(e.message));
+  await p2.addInitScript(() => { globalThis.PP_MFA_ON = true; });
+  await p2.goto('http://localhost:4173/');
+  await p2.waitForSelector('#mfa-form');
+  check('two-step: after the password, it asks for the code', /6-digit code/.test(await p2.textContent('.auth-card')) && (await p2.locator('.sidebar').count()) === 0);
+  await p2.fill('#mfa-form [name=code]', '12345'); await p2.click('#mfa-form button'); await p2.waitForTimeout(150);
+  check('two-step: a short code is caught before sending', /Type the 6-digit code/.test(await p2.textContent('#mfa-form .form-error')));
+  await p2.fill('#mfa-form [name=code]', '654321'); await p2.click('#mfa-form button'); await p2.waitForTimeout(300);
+  check('two-step: a wrong code explains what to check', /didn't work/.test(await p2.textContent('#mfa-form .form-error')));
+  check('two-step: "lost your phone" explains the way back in', /confirm it's really you/.test(await p2.textContent('details.lost')));
+  await p2.fill('#mfa-form [name=code]', '123456'); await p2.click('#mfa-form button');
+  await p2.waitForSelector('main h1');
+  check('two-step: the right code opens the app', (await p2.locator('.sidebar').count()) === 1);
+  await p2.close();
+
+  // a workspace that requires it, for someone who hasn't set it up
+  const p3 = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  p3.on('pageerror', (e) => errs.push(e.message));
+  await p3.addInitScript(() => { globalThis.PP_LOCKED = true; });
+  await p3.goto('http://localhost:4173/');
+  await p3.waitForSelector('[data-act=mfa-setup-now]');
+  check('two-step: a workspace that requires it says so, by name', /Secure Co<\/b> requires two-step login|Secure Co requires two-step login/.test(await p3.innerHTML('.auth-card')));
+  await p3.click('[data-act=mfa-setup-now]'); await p3.waitForSelector('.modal .qr img');
+  await p3.fill('.modal [name=code]', '123456'); await p3.click('.modal button[type=submit]');
+  await p3.waitForSelector('main h1');
+  check('two-step: once set up, the app opens', (await p3.locator('.sidebar').count()) === 1);
+  await p3.close();
+  check('two-step: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+}
+
 // Error reporting: a crash in the browser is sent (scrubbed of personal details) and staff see it in Admin.
 {
   const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
@@ -691,7 +746,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   const mp = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit').id));
   for (const h of ['#/compliance', '#/businesses/b1', '#/team', '#/settings', '#/settings/workspace', '#/admin', '#/requirement/' + mp, '#/']) {
     await page.evaluate((x) => { location.hash = x; }, h); await page.waitForTimeout(250);
-    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors], [data-tab=orders], .checklist, .offer-inline, .lib-more, .focus-alt, .sidebar [data-nav=services], .sidebar [data-nav=filings], [data-filings-brief]:not([hidden]), #staff-access, #sms').count()) seen.push(h);
+    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors], [data-tab=orders], .checklist, .offer-inline, .lib-more, .focus-alt, .sidebar [data-nav=services], .sidebar [data-nav=filings], [data-filings-brief]:not([hidden]), #staff-access, #sms, #mfa-section, [data-act-change=require-mfa]').count()) seen.push(h);
   }
   check('features off: nothing new shows before the database is updated', seen.length === 0, seen.join(','));
   check('features off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));

@@ -847,3 +847,36 @@ export async function confirmPhoneCode(code) {
 export async function removePhone() { Object.assign(me, { phone: null, phone_verified_at: null }); myPrefs.sms_enabled = false; }
 
 if (globalThis.PP_PLAN) org.plan_id = globalThis.PP_PLAN; // test hook: a workspace on a paid plan
+
+// ---------------------------------------------------------------- two-step login (the test's code is always 123456)
+org.require_mfa = false;
+const mfaState = { aal: 'aal1', factors: globalThis.PP_MFA_ON ? [{ id: 'f-old', friendly_name: 'Phone (Jan 5, 2026)', factor_type: 'totp', status: 'verified', created_at: '2026-01-05T00:00:00Z' }] : [] };
+const QR = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#fff"/><rect x="1" y="1" width="3" height="3"/><rect x="6" y="1" width="3" height="3"/><rect x="1" y="6" width="3" height="3"/></svg>');
+export const mfa = {
+  aal: async () => ({ currentLevel: mfaState.aal, nextLevel: mfaState.factors.some((f) => f.status === 'verified') ? 'aal2' : 'aal1' }),
+  factors: async () => ({ all: mfaState.factors.map((f) => ({ ...f })), totp: mfaState.factors.filter((f) => f.status === 'verified').map((f) => ({ ...f })) }),
+  async enroll(name) {
+    if (mfaState.factors.some((f) => f.friendly_name === name)) throw new Error(`A factor with the friendly name "${name}" for this user already exists`);
+    const f = { id: uid(), friendly_name: name, factor_type: 'totp', status: 'unverified', created_at: new Date().toISOString() };
+    mfaState.factors.push(f);
+    return { id: f.id, type: 'totp', totp: { qr_code: QR, secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP', uri: 'otpauth://totp/PermitPal' } };
+  },
+  async verify(factorId, code) {
+    const f = mfaState.factors.find((x) => x.id === factorId);
+    if (!f || String(code) !== '123456') throw new Error('Invalid TOTP code entered');
+    f.status = 'verified'; mfaState.aal = 'aal2';
+    return {};
+  },
+  async unenroll(factorId) {
+    const f = mfaState.factors.find((x) => x.id === factorId);
+    if (f?.status === 'verified' && mfaState.aal !== 'aal2') throw new Error('AAL2 required to unenroll verified factor');
+    mfaState.factors = mfaState.factors.filter((x) => x.id !== factorId);
+    if (!mfaState.factors.some((x) => x.status === 'verified')) mfaState.aal = 'aal1';
+  },
+};
+export const lockedOrgs = async () => (globalThis.PP_LOCKED && mfaState.aal !== 'aal2' ? [{ id: 'o2', name: 'Secure Co' }] : []);
+export async function setRequireMfa(orgId, on) {
+  if (on && mfaState.aal !== 'aal2') throw new Error('Turn on two-step login for yourself first (Settings → Two-step login), then try again.');
+  org.require_mfa = !!on;
+}
+export const adminResetMfa = async () => 1;

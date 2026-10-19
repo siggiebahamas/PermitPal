@@ -1007,3 +1007,17 @@ input.from-scan { background: #FFF6CC !important; border-color: #D8B000 !importa
 .sms-form input[name=code] { font-size: 24px; letter-spacing: .3em; max-width: 220px; font-variant-numeric: tabular-nums; }
 .sms-verified { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sms-verified svg { width: 18px; height: 18px; stroke: var(--s-ok); fill: none; stroke-width: 2.6; }
+
+/* ---------- two-step login ---------- */
+input.otp { font-size: 26px; letter-spacing: .35em; text-align: center; font-variant-numeric: tabular-nums; max-width: 260px; }
+.auth-card input.otp { max-width: none; }
+.mfa-steps { padding-left: 20px; margin: 0; }
+.mfa-steps li { margin: 0 0 14px; }
+.mfa-steps .otp { display: block; margin-top: 6px; }
+.qr { margin: 10px 0 6px; }
+.qr img { display: block; width: 200px; height: 200px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 8px; }
+code.secret { font-size: 15px; font-weight: 700; color: var(--heading); word-break: break-all; }
+.auth-card details.lost { margin: 14px 0 6px; font-size: 14.5px; }
+.auth-card details.lost summary { cursor: pointer; font-weight: 700; color: var(--brand); }
+.mfa-on { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mfa-on svg { width: 18px; height: 18px; stroke: var(--s-ok); fill: none; stroke-width: 2.6; }

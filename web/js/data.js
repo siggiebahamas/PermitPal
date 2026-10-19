@@ -450,3 +450,15 @@ export const unmarkFiling = async (id) => ok(await sb.rpc('unmark_filing', { p_i
 export const startPhoneVerification = async (phone) => ok(await sb.rpc('start_phone_verification', { p_phone: phone }));
 export const confirmPhoneCode = async (code) => ok(await sb.rpc('confirm_phone_code', { p_code: code }));
 export const removePhone = async () => ok(await sb.rpc('remove_phone'));
+
+// ---------------------------------------------------------------- two-step login (Supabase Auth TOTP)
+export const mfa = {
+  aal: async () => ok(await sb.auth.mfa.getAuthenticatorAssuranceLevel()),
+  factors: async () => ok(await sb.auth.mfa.listFactors()),
+  enroll: async (name) => ok(await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: name })),
+  verify: async (factorId, code) => ok(await sb.auth.mfa.challengeAndVerify({ factorId, code })),
+  unenroll: async (factorId) => ok(await sb.auth.mfa.unenroll({ factorId })),
+};
+export const lockedOrgs = async () => ok(await sb.rpc('my_locked_orgs'));
+export const setRequireMfa = async (orgId, on) => ok(await sb.rpc('set_require_mfa', { p_org: orgId, p_on: !!on }));
+export const adminResetMfa = async (email, reason) => ok(await sb.rpc('admin_reset_mfa', { p_email: email, p_reason: reason }));

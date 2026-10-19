@@ -9,6 +9,7 @@ import {
 import { handledCount } from './assign.js';
 import { avatar, ICON } from '../components.js';
 import { KINDS, teamAccess, connectionsCard } from './network.js';
+import { mfaSection, requireCard } from './mfa.js';
 import * as db from 'pp/data';
 
 // ================================================================ history
@@ -232,6 +233,7 @@ export async function settings(el, section) {
       ${toggle('weekly_digest', 'Monday summary email')}
     </section>
     ${when(has('sms'), smsSection(channels))}
+    ${when(has('mfa'), html`<section class="card" id="mfa-section"><h2>Two-step login</h2><p class="muted">Loading…</p></section>`)}
 
     <section class="card"><h2>Delivery log</h2>
       <p class="muted small">Proof of every reminder we sent you (or tried to).</p>
@@ -252,6 +254,7 @@ export async function settings(el, section) {
     ${billingSection(pay)}`)}
 
     ${when(section === 'workspace', html`
+    ${requireCard()}
     <section class="card"><h2>Workspace</h2>
       <form id="org-form" class="inline-form"><input name="name" aria-label="Workspace name" maxlength="120" value="${org.name}" ${isOrgAdmin() ? '' : 'disabled'}>
         ${when(isOrgAdmin(), html`<button class="btn btn-primary">Rename</button>`)}</form>
@@ -306,6 +309,7 @@ export async function settings(el, section) {
   `);
 
   el.querySelectorAll('.subnav a').forEach((a) => { if (a.getAttribute('href') === location.hash.split('?')[0]) a.classList.add('active'); });
+  mfaSection(el.querySelector('#mfa-section'));
   el.querySelectorAll('[data-pref]').forEach((i) => i.addEventListener('change', async () => {
     try { await db.updatePrefs(S.user.id, { [i.dataset.pref]: i.checked }); S.prefs[i.dataset.pref] = i.checked; toast('Saved.'); } catch (e) { i.checked = !i.checked; toastError(e); }
   }));

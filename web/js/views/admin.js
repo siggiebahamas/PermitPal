@@ -309,7 +309,14 @@ function inboxTab(list) {
       <button class="btn btn-sm btn-ghost" data-act="admin-support-status" data-id="${m.id}" data-status="${m.status === 'open' ? 'closed' : 'open'}">${m.status === 'open' ? 'Mark done' : 'Reopen'}</button></div></div>`;
   return html`<section class="card"><div class="card-head"><div><h2>Inbox</h2><p class="card-sub">Messages from the Contact PermitPal form. Each one is also emailed to you. Reply to privacy requests first.</p></div>
       <span class="chip ${open.length ? 'progress' : 'ok'}">${open.length} open</span></div>
-    ${list.length ? list.map(row) : html`<p class="muted">No messages yet.</p>`}</section>`;
+    ${list.length ? list.map(row) : html`<p class="muted">No messages yet.</p>`}</section>
+  ${when(has('mfa'), html`<section class="card"><h2>Lost phone: turn off someone's two-step login</h2>
+    <p class="muted small">Only after you have confirmed it's really them (for example a video call where they show an ID matching their profile, or a reply from the email they sign in with). They are told by email straight away, and every reset is logged.</p>
+    <form class="admin-mfa"><div class="grid2">
+      <label class="field"><span>Their sign-in email</span><input name="email" type="email" required maxlength="200"></label>
+      <label class="field"><span>How you confirmed who they are</span><input name="reason" required minlength="10" maxlength="500" placeholder="e.g. Video call, ID matched profile name"></label></div>
+      <label class="check"><input type="checkbox" name="sure" required> <span>I confirmed this request came from the account owner</span></label>
+      <button class="btn btn-ghost danger">Turn off their two-step login</button></form></section>`)}`;
 }
 on('admin-support-status', async (ds) => {
   try { await db.adminSetSupportStatus(ds.id, ds.status); toast(ds.status === 'closed' ? 'Marked done.' : 'Reopened.'); rerender(); } catch (e) { toastError(e); }
@@ -377,6 +384,14 @@ function wire(el) {
       summary: String(fd.get('summary')).trim(), includes: String(fd.get('includes')).split('\n').map((x) => x.trim()).filter(Boolean), active: fd.get('active') === 'on',
     });
     toast('Saved. Customers see the new price on their next visit.');
+  });
+  submit('.admin-mfa', async (f, fd) => {
+    const email = String(fd.get('email') || '').trim(), reason = String(fd.get('reason') || '').trim();
+    if (!fd.get('sure')) throw new Error('Tick the box once you have confirmed who they are.');
+    if (!(await confirmDialog(`Turn off two-step login for ${email}?`, 'They can then sign in with just their password until they set it up again.', { confirmLabel: 'Turn it off' }))) return;
+    const n = await db.adminResetMfa(email, reason);
+    f.reset();
+    toast(n ? `Removed ${plural(n, 'device')}. They have been told by email.` : 'They had no two-step login set up. Nothing changed.');
   });
   submit('.admin-partner', async (f, fd) => {
     const row = Object.fromEntries(['name', 'category', 'licence', 'website', 'contact_name', 'contact_phone', 'contact_email', 'commission_terms', 'description', 'services'].map((k) => [k, String(fd.get(k) || '').trim()]));

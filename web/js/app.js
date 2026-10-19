@@ -18,6 +18,7 @@ import { notifications } from './views/notifications.js';
 import { admin } from './views/admin.js';
 import { services, order } from './views/services.js';
 import { filings, forgetFilings } from './views/filings.js';
+import { mfaChallenge, mfaRequired } from './views/mfa.js';
 
 // Never run inside another website's frame (a trick to make people click hidden buttons). GitHub Pages
 // cannot send the header that blocks this, so the page checks for itself; our own frames are fine.
@@ -26,6 +27,7 @@ catch { document.documentElement.innerHTML = ''; throw new Error('PermitPal cann
 
 const app = document.getElementById('app');
 let recovery = false;
+let mfaSkipped = false; // "Not now" on the two-step login set-up screen, for this visit
 let lastLoad = 0;
 let unsubscribe = null;
 
@@ -70,6 +72,11 @@ async function start() {
     return authPage(app, mode);
   }
   if (recovery || parts[0] === 'reset') return authPage(app, 'reset');
+  // Two-step login: a password alone isn't enough once it's on.
+  if (has('mfa')) {
+    const a = await db.mfa.aal().catch(() => null);
+    if (a?.nextLevel === 'aal2' && a.currentLevel !== 'aal2') return mfaChallenge(app, start);
+  }
 
   try {
     // Accept a pending invitation (from the link, or remembered through sign-up).
@@ -79,6 +86,11 @@ async function start() {
       history.replaceState(null, '', '#/');
     }
     Object.assign(S, await db.loadMe(S.user.id));
+    // A workspace that requires two-step login stays closed until it's set up (it can't be bypassed: the database enforces it).
+    if (has('mfa') && !mfaSkipped) {
+      const locked = await db.lockedOrgs().catch(() => []);
+      if (locked.length) return mfaRequired(app, locked, { onDone: start, onSkip: S.orgs.length ? () => { mfaSkipped = true; start(); } : null });
+    }
     if (!S.orgs.length) return onboarding(app, S.profile, start);
     S.org = S.orgs.find((o) => o.id === S.profile.current_org_id) || S.orgs[0];
     if (S.org.id !== S.profile.current_org_id) db.setCurrentOrg(S.user.id, S.org.id).catch(() => {});
