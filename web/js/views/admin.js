@@ -8,17 +8,26 @@ import { PARTNER_CATEGORIES } from './extras.js';
 import { ORDER_STATUS, PAYMENT_STATUS, KIND_LABEL } from './services.js';
 import { ICON } from '../components.js';
 import * as db from 'pp/data';
+import { moneyTab } from './admin-money.js';
+import { careTab } from './admin-care.js';
+import { partnersTab as partnersTab2, billingTab } from './admin-partners.js';
 
-let tab = 'inbox';
+let tab = null; // Money first once the revenue features are on, else the Inbox
 const KIND_NAMES = { business: 'Business', head_office: 'Head office', firm: 'Accounting firm', property: 'Property', fleet: 'Fleet' };
 
 export async function admin(el) {
   if (!S.profile?.is_platform_admin) { el.innerHTML = String(empty('Staff only', 'This page is for the PermitPal team.')); return; }
   el.innerHTML = String(html`<div class="loading">Loading…</div>`);
+  const rev = has('revenue');
+  tab ||= rev ? 'money' : 'inbox';
   const tabBtn = (k, l) => html`<button class="tab ${tab === k ? 'active' : ''}" data-act="admin-tab" data-tab="${k}">${l}</button>`;
   let body = '';
   try {
-    if (tab === 'orders' && has('services')) body = await ordersTab();
+    if (tab === 'money' && rev) body = await moneyTab((t) => { tab = t; openOrder = null; rerender(); });
+    else if (tab === 'care' && rev) body = await careTab();
+    else if (tab === 'billing' && rev) body = await billingTab();
+    else if (tab === 'partners' && rev) body = await partnersTab2();
+    else if (tab === 'orders' && has('services')) body = await ordersTab();
     else if (tab === 'services' && has('services')) body = servicesTab(await db.adminServices());
     else if (tab === 'orgs') { const [list, kinds] = await Promise.all([db.adminOrgs(), db.adminOrgKinds()]); body = orgsTab(list, kinds); }
     else if (tab === 'partners') body = partnersTab(await db.adminPartners());
@@ -30,7 +39,7 @@ export async function admin(el) {
   } catch (e) { toastError(e); }
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>PermitPal admin</h1><p class="muted">Staff tools. Customers never see this page.</p></div></div>
-    <div class="tabs">${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${tabBtn('services', 'Services & prices')}` : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${tabBtn('referrals', 'Quote requests')}
+    <div class="tabs">${rev ? tabBtn('money', 'Money') : ''}${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${rev ? tabBtn('care', 'Care') : ''}${tabBtn('services', 'Services & prices')}` : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${rev ? tabBtn('billing', 'Partner billing') : tabBtn('referrals', 'Quote requests')}
       ${tabBtn('payments', 'Payment details')}${tabBtn('outbox', 'Messages')}${has('errors') ? tabBtn('errors', 'Errors') : ''}</div>
     ${body}`);
   wire(el);
@@ -48,7 +57,7 @@ const STAGES = [
   ['In progress', (a) => !['submitted', 'quoted', 'completed', 'cancelled'].includes(a.status)],
 ];
 async function ordersTab() {
-  ordersCache = (await db.adminRequests()).filter((a) => a.service_code);
+  ordersCache = (await db.adminRequests(has('revenue'))).filter((a) => a.service_code || a.care_plan_id);
   const list = ordersCache;
   if (openOrder) {
     const a = list.find((x) => x.id === openOrder);
@@ -58,7 +67,7 @@ async function ordersTab() {
   const closed = list.filter((a) => ['completed', 'cancelled'].includes(a.status));
   const earned = closed.filter((a) => a.status === 'completed' && ['paid', 'waived'].includes(a.payment_status)).reduce((t, a) => t + Number(a.quote_service_fee || 0), 0);
   const line = (a) => html`<button class="line" data-act="admin-order" data-id="${a.id}"><span class="line-main"><b>${KIND_LABEL[a.kind] || 'Request'}: ${a.requirement_name} — ${a.subject_label}</b>
-    <small>${a.orgs?.name || ''} · ${timeAgo(a.created_at)}${a.rush ? ' · URGENT' : ''}${a.due_on ? ' · due ' + fmtDate(a.due_on) : ''}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
+    <small>${a.orgs?.name || ''} · ${timeAgo(a.created_at)}${a.rush ? ' · URGENT' : ''}${a.care_plan_id ? (a.created_by ? ' · CARE PLUS (included)' : ' · CARE') : ''}${a.batch_id ? ' · several at once' : ''}${a.due_on ? ' · due ' + fmtDate(a.due_on) : ''}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
     <span class="chip ${ORDER_STATUS[a.status]?.[1]}">${ORDER_STATUS[a.status]?.[0]}</span></button>`;
   const used = new Set();
   return html`
@@ -81,6 +90,11 @@ on('admin-back', () => { openOrder = null; rerender(); });
 
 function orderDetail(a, events) {
   const closed = ['completed', 'cancelled'].includes(a.status);
+  const rev = has('revenue');
+  const svc = (S.data?.services || []).find((x) => x.code === a.service_code);
+  const care = rev && a.care_plan_id;
+  const steps = rev ? svc?.steps || [] : [];
+  const paid = ['paid', 'waived'].includes(a.payment_status);
   return html`
     <button class="back linklike" data-act="admin-back">← All orders</button>
     <section class="card">
@@ -96,6 +110,8 @@ function orderDetail(a, events) {
         <dt>Quote</dt><dd>${a.quote_php != null ? html`${peso(a.quote_php)} (fee ${peso(a.quote_service_fee)} + gov ${peso(a.quote_gov_fees)})` : '—'}</dd>
         <dt>Payment</dt><dd>${PAYMENT_STATUS[a.payment_status]}${a.payment_method ? ' · ' + a.payment_method : ''}${a.payment_ref ? ' · ref ' + a.payment_ref : ''}</dd>
         <dt>Received</dt><dd>${fmtDateTime(a.created_at)}</dd>
+        ${when(care, html`<dt>Care</dt><dd>${a.created_by ? 'Walk-through included in Care Plus: quote ₱0 service fee.' : 'Started by Year-round care: our fee is covered. Quote the government fees only (₱0 service fee).'}</dd>`)}
+        ${when(rev && paid, html`<dt>BIR invoice no.</dt><dd><form class="inline-form inv-form" data-kind="order" data-id="${a.id}"><input name="no" maxlength="60" value="${a.bir_invoice_no || ''}" aria-label="BIR invoice number" placeholder="Add after you issue it"><button class="btn btn-sm btn-ghost">Save</button></form></dd>`)}
       </dl>
       ${when(!closed && a.requirement_id, html`<button class="btn btn-sm btn-ghost" data-act="admin-docs" data-id="${a.requirement_id}">Show customer's files</button>
         <span class="muted small">Every file you open is shown to the customer.</span><div class="admin-docs" data-for="${a.requirement_id}"></div>`)}
@@ -103,8 +119,10 @@ function orderDetail(a, events) {
 
     ${when(['submitted', 'quoted', 'awaiting_customer'].includes(a.status) && !['paid', 'waived', 'pending_verification'].includes(a.payment_status), html`<section class="card"><h2>${a.quote_php != null ? 'Change the quote' : 'Send the quote'}</h2>
       <form class="admin-quote" data-id="${a.id}"><div class="grid2">
-        <label class="field"><span>Service fee (₱)</span><input name="fee" type="number" min="0" step="0.01" required value="${a.quote_service_fee ?? ''}"></label>
+        <label class="field"><span>Service fee (₱)</span><input name="fee" type="number" min="0" step="0.01" required value="${a.quote_service_fee ?? (care ? 0 : '')}"></label>
+        ${when(rev && a.rush, html`<label class="field"><span>Rush fee (₱) <small>(they asked for it urgent)</small></span><input name="rush" type="number" min="0" step="0.01" value="${Number(a.quote_rush_fee) || (svc?.rush_fee ?? '')}"></label>`)}
         <label class="field"><span>Government fees, estimate (₱)</span><input name="gov" type="number" min="0" step="0.01" value="${a.quote_gov_fees ?? ''}"></label></div>
+        ${when(care && !a.created_by, html`<p class="muted small">If the government fees are within the ${peso(a.orgs?.care_gov_preapproval_php || 0)} they pre-approved, the quote is accepted for them automatically.</p>`)}
         <label class="field"><span>Note to the customer</span><textarea name="note" rows="2" maxlength="2000" placeholder="What's included, documents we need, how long it takes">${a.quote_note || ''}</textarea></label>
         <button class="btn btn-primary">Send quote</button></form></section>`)}
 
@@ -113,6 +131,14 @@ function orderDetail(a, events) {
       <div class="btn-row"><button class="btn btn-primary" data-act="admin-pay" data-id="${a.id}" data-ok="1">Payment received</button>
         <button class="btn btn-ghost danger" data-act="admin-pay" data-id="${a.id}" data-ok="">Can't find it</button></div></section>`)}
 
+    ${when(steps.length && !closed, html`<section class="card"><h2>Steps</h2><p class="muted small">Tick off steps as you finish them: the customer sees each one.</p>
+      <form class="admin-steps" data-id="${a.id}"><ol class="job-steps">${steps.map((t, i) => html`<li class="${i < (a.steps_done || 0) ? 'done' : ''}"><label class="check"><input type="radio" name="done" value="${i + 1}" ${a.steps_done === i + 1 ? 'checked' : ''}><span>${t}</span></label></li>`)}</ol>
+        <label class="check"><input type="radio" name="done" value="0" ${!a.steps_done ? 'checked' : ''}><span>None done yet</span></label>
+        <button class="btn btn-sm btn-soft">Save progress</button></form></section>`)}
+    ${when(rev && svc?.needs_access && !closed, html`<section class="card"><h2>Their workspace</h2>
+      ${a.staff_access ? html`<p class="muted small">The customer agreed to give you temporary access. You join as a plain member; it ends automatically when you mark this order completed.</p>
+        <button class="btn btn-sm ${paid ? 'btn-primary' : 'btn-soft'}" data-act="admin-join" data-id="${a.id}" ${paid ? '' : 'disabled'}>${paid ? 'Join their workspace' : 'Join (after payment)'}</button>`
+      : html`<p class="muted small">They haven't agreed to access yet (they do it when accepting the quote).</p>`}</section>`)}
     ${when(!closed, html`<section class="card"><h2>Update the customer</h2>
       <form class="admin-update" data-id="${a.id}"><div class="grid2">
         <label class="field"><span>Status</span><select name="status"><option value="">Keep: ${ORDER_STATUS[a.status]?.[0]}</option>
@@ -227,14 +253,15 @@ function orgsTab(list, kinds) {
       <div class="stat progress"><div class="stat-n">${paying.length}</div><div class="stat-l">Paying workspaces</div></div>
       <div class="stat soon"><div class="stat-n">${trials.length}</div><div class="stat-l">On free trial</div></div>
       <div class="stat"><div class="stat-n">${list.filter((o) => !o.deleted_at).length}</div><div class="stat-l">All workspaces</div></div></div>
-    <section class="card"><p class="muted small">After a customer pays for a plan, set it here (leave "until" blank for no end date).</p>
+    <section class="card"><p class="muted small">${has('revenue') ? 'When a customer pays for a plan, use "Record a payment": it extends the plan and counts in Money. "Set" changes the plan without recording money (for trials and fixes).' : 'After a customer pays for a plan, set it here (leave "until" blank for no end date).'}</p>
     <div class="table-wrap"><table class="table"><thead><tr><th>Workspace</th><th>Type</th><th>Owner</th><th>Size</th><th>Trial</th><th>Plan</th></tr></thead><tbody>
     ${list.map((o) => html`<tr class="${o.deleted_at ? 'muted' : ''}"><td>${o.name}${o.deleted_at ? ' (deleting)' : ''}</td>
       <td>${KIND_NAMES[k[o.id]?.kind || 'business']}</td>
       <td>${o.owner_email || '—'}</td><td>${o.businesses} biz · ${o.vehicles} veh · ${o.members} ppl</td>
       <td>${k[o.id]?.trial_ends_at ? (k[o.id].trial_ends_at > now ? 'until ' + fmtDate(k[o.id].trial_ends_at.slice(0, 10)) : 'ended') : '—'}</td>
-      <td><form class="inline-form plan-form" data-id="${o.id}"><select name="plan">${S.plans.filter((p) => p.available !== false || p.id === o.plan_id).map((p) => html`<option value="${p.id}" ${p.id === o.plan_id ? 'selected' : ''}>${p.name}</option>`)}</select>
-        <input type="date" name="until" value="${o.plan_expires_at ? o.plan_expires_at.slice(0, 10) : ''}" title="Until"><button class="btn btn-sm btn-soft">Set</button></form></td></tr>`)}
+      <td><form class="inline-form plan-form" data-id="${o.id}"><select name="plan" aria-label="Plan for ${o.name}">${S.plans.filter((p) => p.available !== false || p.id === o.plan_id).map((p) => html`<option value="${p.id}" ${p.id === o.plan_id ? 'selected' : ''}>${p.name}</option>`)}</select>
+        <input type="date" name="until" value="${o.plan_expires_at ? o.plan_expires_at.slice(0, 10) : ''}" title="Until" aria-label="Plan until"><button class="btn btn-sm btn-soft">Set</button></form>
+        ${when(has('revenue') && !o.deleted_at, html`<button class="linklike small" data-act="plan-pay" data-id="${o.id}" data-name="${o.name}">Record a payment</button>`)}</td></tr>`)}
     </tbody></table></div></section>`;
 }
 
@@ -351,8 +378,9 @@ function wire(el) {
   submit('.admin-quote', async (f, fd) => {
     const fee = Number(fd.get('fee'));
     const gov = Number(fd.get('gov') || 0);
-    if (!(fee >= 0) || !(gov >= 0)) throw new Error('Enter amounts of zero or more.');
-    await db.adminQuote(f.dataset.id, fee, gov, String(fd.get('note')).trim());
+    const rush = Number(fd.get('rush') || 0);
+    if (!(fee >= 0) || !(gov >= 0) || !(rush >= 0)) throw new Error('Enter amounts of zero or more.');
+    await db.adminQuote(f.dataset.id, fee, gov, String(fd.get('note')).trim(), rush);
     toast('Quote sent to the customer.'); rerender();
   });
   submit('.admin-update', async (f, fd) => {
@@ -393,7 +421,11 @@ function wire(el) {
     f.reset();
     toast(n ? `Removed ${plural(n, 'device')}. They have been told by email.` : 'They had no two-step login set up. Nothing changed.');
   });
-  submit('.admin-partner', async (f, fd) => {
+  submit('.admin-steps', async (f, fd) => {
+    await db.adminOrderStep(f.dataset.id, Number(fd.get('done') || 0));
+    toast('Progress saved. The customer can see it.'); rerender();
+  });
+  if (!has('revenue')) submit('.admin-partner', async (f, fd) => {
     const row = Object.fromEntries(['name', 'category', 'licence', 'website', 'contact_name', 'contact_phone', 'contact_email', 'commission_terms', 'description', 'services'].map((k) => [k, String(fd.get(k) || '').trim()]));
     if (!row.name) throw new Error('Enter the firm name.');
     if (row.website && !/^https:\/\//.test(row.website)) throw new Error('The website must start with https://');
@@ -407,7 +439,7 @@ function wire(el) {
     await db.adminSavePartner(f.dataset.id || null, row);
     toast('Saved.'); rerender();
   });
-  submit('.admin-ref', async (f, fd) => {
+  if (!has('revenue')) submit('.admin-ref', async (f, fd) => {
     await db.adminSaveReferral(f.dataset.id, fd.get('status'));
     const cs = fd.get('cstatus');
     await db.adminSaveCommission(f.dataset.id, { amount_php: Number(fd.get('amount') || 0), status: cs, paid_at: cs === 'paid' ? new Date().toISOString() : null });
@@ -430,6 +462,29 @@ function wire(el) {
     try { await db.adminSetPlan(f.dataset.id, fd.get('plan'), until ? new Date(until + 'T23:59:59+08:00').toISOString() : null); toast('Plan updated.'); } catch (err) { toastError(err); }
   }));
 }
+
+on('admin-join', async (ds) => {
+  if (!(await confirmDialog('Join their workspace?', 'You become a team member there until this order is completed. The owner is told, and every change you make shows in their History.', { confirmLabel: 'Join', danger: false }))) return;
+  try { await db.adminJoinWorkspace(ds.id); toast('Joined. Switch to their workspace from the menu (reload the page first).'); rerender(); } catch (e) { toastError(e); }
+});
+on('plan-pay', (ds) => openModal(`Record a team plan payment: ${ds.name}`, html`<p class="muted small">After the customer pays by GCash or bank transfer. This records the payment (for Money) and extends their plan.</p>
+  <div class="grid2"><label class="field"><span>Plan</span><select name="plan">${S.plans.filter((p) => Number(p.price_php_monthly) > 0 && p.available !== false).map((p) => html`<option value="${p.id}" data-price="${p.price_php_monthly}">${p.name} (${peso(p.price_php_monthly)}/month)</option>`)}</select></label>
+  <label class="field"><span>Months paid</span><input name="months" type="number" min="1" max="12" value="1" required></label>
+  <label class="field"><span>Amount received (₱)</span><input name="amount" type="number" min="1" step="0.01" required></label>
+  <label class="field"><span>Paid by</span><input name="method" maxlength="60" placeholder="GCash / BPI"></label>
+  <label class="field"><span>Reference no.</span><input name="ref" maxlength="120"></label>
+  <label class="field"><span>BIR invoice number</span><input name="invoice_no" maxlength="60"></label></div>`, {
+  submitLabel: 'Record payment',
+  onOpen: (form) => {
+    const fill = () => { const o = form.plan.selectedOptions[0]; if (o) form.amount.value = Number(o.dataset.price) * Number(form.months.value || 1); };
+    form.plan.addEventListener('change', fill); form.months.addEventListener('input', fill); fill();
+  },
+  onSubmit: async (fd) => {
+    const v = Object.fromEntries(fd.entries());
+    await db.adminRecordPlanPayment({ org_id: ds.id, plan: v.plan, months: Number(v.months), amount: Number(v.amount), method: v.method, ref: v.ref, invoice_no: v.invoice_no });
+    toast('Payment recorded and plan extended. The owner was told.'); rerender();
+  },
+}));
 
 on('admin-test-email', async () => {
   try { await db.adminTestEmail(); toast('Test email queued. Check your inbox, then the list below for its status.'); rerender(); } catch (e) { toastError(e); }

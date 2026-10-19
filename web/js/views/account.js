@@ -113,6 +113,13 @@ export async function team(el) {
   el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   let pending = [];
   if (isOrgAdmin()) { try { pending = await db.invites(S.org.id); } catch (e) { toastError(e); } }
+  // Who is on the team right now (someone may have joined or left since the app loaded, including PermitPal for a set-up job).
+  try {
+    const [members, care] = await Promise.all([db.loadMembers(S.org.id), has('revenue') ? db.loadCare(S.org.id) : null]);
+    S.data.members = members;
+    if (care) S.data.care = care;
+  } catch { /* show what we have */ }
+  if (!location.hash.startsWith('#/team')) return;
   const plan = effectivePlan();
   const members = S.data.members;
   const seatsLeft = plan?.max_members == null ? null : plan.max_members - members.length - pending.length;
@@ -127,7 +134,9 @@ export async function team(el) {
         const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email;
         const me = m.user_id === S.user.id;
         const canChange = isOrgAdmin() && !me && (m.role !== 'owner' || isOwner());
-        return html`<div class="row"><div class="row-main member">${avatar(name, null, 34)}<div><div class="row-title">${name}${me ? ' (you)' : ''}</div>
+        const staff = has('revenue') ? (S.data.care?.staff || []).find((x) => x.user_id === m.user_id) : null;
+        return html`<div class="row"><div class="row-main member">${avatar(name, null, 34)}<div><div class="row-title">${name}${me ? ' (you)' : ''}${staff ? html` <span class="tag staff-tag">PermitPal</span>` : ''}</div>
+          ${staff ? html`<div class="row-sub">Temporary access for "<a href="#/services/orders/${staff.request_id}">${staff.requirement_name}</a>". Ends automatically when that job is done.</div>` : ''}
           <div class="row-sub">${p.email}${p.role_title ? ' · ' + p.role_title : ''}${has('assign') && handledCount(m.user_id)
             ? html` · <a href="#/compliance?who=${m.user_id === S.user.id ? 'me' : m.user_id}">handles ${plural(handledCount(m.user_id), 'permit')}</a>` : ''}</div></div></div>
           <div class="row-side">${canChange
@@ -232,6 +241,9 @@ export async function settings(el, section) {
       ${toggle('remind_30', '30 days before')}${toggle('remind_7', '7 days before')}${toggle('remind_1', '1 day before')}
       ${toggle('weekly_digest', 'Monday summary email')}
     </section>
+    ${when(has('revenue'), html`<section class="card"><h2>Suggestions</h2>
+      <label class="toggle"><div><div>Show partner firms on renewal checklists</div><div class="muted small">At most one licensed firm on a checklist step, labelled "Partner". Firms pay PermitPal to be listed there.</div></div>
+        <input type="checkbox" data-profile-pref="show_partner_offers" ${p.show_partner_offers !== false ? 'checked' : ''}><span class="switch"></span></label></section>`)}
     ${when(has('sms'), smsSection(channels))}
     ${when(has('mfa'), html`<section class="card" id="mfa-section"><h2>Two-step login</h2><p class="muted">Loading…</p></section>`)}
 
@@ -310,6 +322,9 @@ export async function settings(el, section) {
 
   el.querySelectorAll('.subnav a').forEach((a) => { if (a.getAttribute('href') === location.hash.split('?')[0]) a.classList.add('active'); });
   mfaSection(el.querySelector('#mfa-section'));
+  el.querySelectorAll('[data-profile-pref]').forEach((i) => i.addEventListener('change', async () => {
+    try { await db.updateProfile(S.user.id, { [i.dataset.profilePref]: i.checked }); S.profile[i.dataset.profilePref] = i.checked; toast('Saved.'); } catch (e) { i.checked = !i.checked; toastError(e); }
+  }));
   el.querySelectorAll('[data-pref]').forEach((i) => i.addEventListener('change', async () => {
     try { await db.updatePrefs(S.user.id, { [i.dataset.pref]: i.checked }); S.prefs[i.dataset.pref] = i.checked; toast('Saved.'); } catch (e) { i.checked = !i.checked; toastError(e); }
   }));

@@ -734,6 +734,296 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.close();
 }
 
+// ---------------------------------------------------------------- the three ways PermitPal earns
+// 1) Year-round care: from a branch card to an active plan, as the customer and as staff.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(350); };
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  check('care: "Year-round care" is in the menu', (await page.locator('.sidebar a[data-nav=care]').count()) === 1);
+  await go('#/care');
+  check('care: the page explains it and shows both levels with prices', /We start each renewal for you/.test(await page.textContent('main')) && (await page.locator('.care-tier').count()) === 4
+    && /₱1,500/.test(await page.textContent('.care-tiers')) && /₱2,000/.test(await page.textContent('.care-tiers')));
+  await go('#/businesses/b1');
+  const offer = page.locator('main .care-line');
+  check('care: each branch card has one quiet line offering it', (await offer.count()) === 1 && /handle this branch all year/.test(await offer.textContent()) && /₱1,500\/month/.test(await offer.textContent()));
+  await offer.click(); await page.waitForTimeout(350);
+  check('care: the line opens the start page with that branch ticked', (await page.evaluate(() => location.hash)).startsWith('#/care/start') && await page.isChecked('[name=pick][value="location:l1"]'));
+  const total = async () => (await page.textContent('[data-care-total]')).replace(/\s+/g, ' ');
+  check('care: the total shows straight away (Care, monthly)', /Total per month\s*₱1,500/.test(await total()), await total());
+  await page.check('[name=level][value=plus]'); await page.check('[name=pick][value="vehicle:v1"]'); await page.waitForTimeout(100);
+  check('care: Care Plus for a branch and a vehicle adds up', /₱2,000/.test(await total()) && /₱400/.test(await total()) && /Total per month\s*₱2,400/.test(await total()), await total());
+  await page.check('[name=billing][value=yearly]'); await page.waitForTimeout(100);
+  check('care: yearly shows the yearly price', /Total per year\s*₱24,000/.test(await total()) && (await page.textContent('.care-total .btn-block')).includes('₱24,000'), await total());
+  await page.check('[name=billing][value=monthly]');
+  await page.click('.care-total .btn-block'); await page.waitForTimeout(200);
+  check('care: nothing starts without the authorization tick', /tick the box/i.test(await page.textContent('.care-form .form-error')));
+  await page.check('.care-form [name=consent]');
+  await page.click('.care-total .btn-block'); await page.waitForTimeout(700);
+  check('care: starting goes to the plan with the first bill open to pay', (await page.evaluate(() => location.hash)) === '#/care' && /Pay bill C-/.test(await page.textContent('#modal-root')) && /₱2,400/.test(await page.textContent('#modal-root .quote-hint')));
+  check('care: payment details are shown in the bill', /0917 000 0000/.test(await page.textContent('#modal-root .paywiths')));
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(200);
+  check('care: "I\'ve paid" needs a reference or screenshot', /reference number or a screenshot/.test(await page.textContent('#modal-root .modal-error')));
+  await page.fill('#modal-root [name=ref]', 'GC 1234 5678'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+  check('care: after paying, it says the payment is being checked', /checking your payment/i.test(await page.textContent('main')) && (await page.locator('main .care-row .chip', { hasText: 'Waiting for payment' }).count()) === 2);
+  // staff confirm
+  await go('#/admin');
+  check('admin: Money is the first tab', (await page.locator('.tabs .tab').first().textContent()).trim() === 'Money' && (await page.locator('.tabs .tab.active').textContent()).trim() === 'Money');
+  check('admin: Money says what needs you (a payment to confirm)', (await page.locator('main .todo', { hasText: 'Payments to confirm' }).count()) === 1);
+  await page.locator('main .todo', { hasText: 'Payments to confirm' }).locator('button').click(); await page.waitForTimeout(400);
+  check('admin: "Open" goes to the Care tab', (await page.locator('.tabs .tab.active').textContent()).trim() === 'Care' && (await page.locator('main .card', { hasText: 'Payments to confirm' }).count()) === 1);
+  await page.click('main [data-act=care-confirm]'); await page.waitForTimeout(200);
+  await page.fill('#modal-root [name=no]', 'INV-0042'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+  check('admin: confirming starts the plans', (await page.locator('main table .chip', { hasText: 'Active' }).count()) === 2);
+  await go('#/care');
+  check('care: the customer sees both active, with "Paid until"', (await page.locator('main .care-row .chip', { hasText: 'Active' }).count()) === 2 && /Paid until/.test(await page.textContent('main .care-row')));
+  check('care: the bill shows as paid', (await page.locator('main table .chip', { hasText: 'Paid' }).count()) === 1);
+  // the permit page says care covers it, and doesn't also try to sell a one-off renewal
+  const mp = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b1').id));
+  await go('#/requirement/' + mp);
+  check('care: a covered permit says so, with no extra sales offer', /Covered by Year-round care/.test(await page.textContent('main .care-note')) && (await page.locator('main [data-act=svc-for-req]').count()) === 0);
+  await go('#/businesses/b1');
+  check('care: the branch card now says it\'s covered', /Year-round care/.test(await page.textContent('main .care-line.on')) && /Active/.test(await page.textContent('main .care-line.on')));
+  // cancel runs to the end of what's paid, and can be undone
+  await go('#/care');
+  await page.locator('main .care-row', { hasText: 'Isuzu Elf' }).locator('[data-act=care-cancel]').click(); await page.waitForTimeout(200);
+  check('care: cancelling explains it runs to the end of what\'s paid', /keeps running until/.test(await page.textContent('#modal-root')));
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+  check('care: a cancelled plan shows when it ends, with "Keep it"', (await page.locator('main .care-row', { hasText: 'Isuzu Elf' }).locator('[data-act=care-resume]').count()) === 1 && /Ends/.test(await page.textContent('main .care-row:has-text("Isuzu Elf")')));
+  await page.locator('main .care-row', { hasText: 'Isuzu Elf' }).locator('[data-act=care-resume]').click(); await page.waitForTimeout(400);
+  check('care: "Keep it" undoes the cancellation', (await page.locator('main .care-row', { hasText: 'Isuzu Elf' }).locator('[data-act=care-cancel]').count()) === 1);
+  await page.fill('main .care-pre [name=amount]', '5000'); await page.click('main .care-pre button'); await page.waitForTimeout(400);
+  check('care: government-fee pre-approval saves', /up to ₱5,000/.test(await page.textContent('#toast')));
+  await page.click('main [data-act=care-claim]'); await page.waitForTimeout(250);
+  await page.fill('#modal-root [name=penalty]', '2500'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(250);
+  check('care: a guarantee claim needs the official receipt', /Please fill in|official receipt/.test(await page.textContent('#modal-root .modal-error')));
+  await page.click('#modal-root [data-modal-close]');
+  check('care: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
+// 2) One-time jobs: rush fee shown up front, several permits at once, "set up my account" with visible access, steps.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(350); };
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  await go('#/services');
+  check('jobs: the catalog shows Year-round care first and no old "plan" cards', (await page.locator('main .care-teaser').count()) === 1 && (await page.locator('main .svc h2', { hasText: 'Year-round care:' }).count()) === 0);
+  check('jobs: "Set up my account for me" is in the catalog', (await page.locator('main .svc', { hasText: 'Set up my account for me' }).count()) === 1);
+  check('jobs: rush prices are shown on the cards', /Urgent\? \+₱1,000/.test(await page.textContent('main .svc:has-text("Mayor\'s / Business Permit renewal")')));
+  const many = page.locator('main [data-act=svc-bulk]');
+  check('jobs: "Renew N for me" appears when several permits are due', (await many.count()) === 1 && /Renew \d+ for me/.test(await many.textContent()));
+  await many.click(); await page.waitForTimeout(300);
+  const ticked = await page.locator('#modal-root [name=req]:checked').count();
+  check('jobs: overdue and due-within-30-days are ticked for you', ticked >= 2, String(ticked));
+  check('jobs: the estimate updates as you tick', /permits · our fees from about ₱/.test(await page.textContent('#modal-root [data-bulk-sum]')));
+  await page.check('#modal-root [name=rush]');
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(250);
+  check('jobs: several at once still needs the authorization tick', /Please tick the box/.test(await page.textContent('#modal-root .modal-error')));
+  await page.check('#modal-root [name=consent]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
+  check('jobs: one request per permit, all listed', /You'll get \d+ quotes/.test(await page.textContent('#toast')) && (await page.locator('main .line', { hasText: 'Preparing your quote' }).count()) >= ticked);
+  // staff quote one of them with the rush fee
+  await go('#/admin');
+  await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
+  check('admin: several-at-once requests are labelled', (await page.locator('main .line', { hasText: 'several at once' }).count()) >= 2);
+  await page.locator('main .line', { hasText: "Renewal: Mayor's" }).first().click(); await page.waitForTimeout(300);
+  check('admin: urgent requests get a rush fee field, filled with the catalog rush fee', (await page.inputValue('.admin-quote [name=rush]')) === '1000');
+  await page.fill('.admin-quote [name=fee]', '2500'); await page.fill('.admin-quote [name=gov]', '4200'); await page.click('.admin-quote button'); await page.waitForTimeout(400);
+  await go('#/services');
+  await page.locator('main .line', { hasText: "Mayor's" }).first().click(); await page.waitForTimeout(700); // the order page loads it fresh
+  check('jobs: the quote shows the rush fee as its own line, and the total adds up', /Rush fee/.test(await page.textContent('.card.quote')) && (await page.textContent('.qline.total')).includes('7,700'));
+  // set up my account for me
+  await go('#/services');
+  await page.locator('main .svc', { hasText: 'Set up my account for me' }).locator('[data-act=svc-request]').click(); await page.waitForTimeout(250);
+  check('jobs: the set-up request says PermitPal joins the workspace until done', /joins your workspace as a team member until the job is done/.test(await page.textContent('#modal-root')));
+  await page.check('#modal-root [name=consent]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
+  const setupHash = await page.evaluate(() => location.hash);
+  await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
+  await page.locator('main .line', { hasText: 'Set up my account for me' }).click(); await page.waitForTimeout(300);
+  check('admin: the set-up job shows the "join their workspace" card, waiting for consent', /haven't agreed to access yet/.test(await page.textContent('main')));
+  await page.fill('.admin-quote [name=fee]', '2000'); await page.click('.admin-quote button'); await page.waitForTimeout(400);
+  await go(setupHash);
+  await page.click('[data-act=quote-accept]'); await page.waitForTimeout(200);
+  check('jobs: accepting a set-up quote needs the access tick first', /Tick the box to let PermitPal join/.test(await page.textContent('#toast')) && (await page.locator('#modal-root .modal').count()) === 0);
+  await page.check('[data-access-ok]'); await page.click('[data-act=quote-accept]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+  await page.fill('.pay-form [name=ref]', 'GC-9'); await page.click('.pay-form button[type=submit]'); await page.waitForTimeout(400);
+  await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
+  await page.locator('main .line', { hasText: 'Set up my account for me' }).click(); await page.waitForTimeout(300);
+  await page.click('[data-act=admin-pay][data-ok="1"]'); await page.waitForTimeout(400);
+  await page.click('[data-act=admin-join]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+  await page.check('.admin-steps [name=done][value="2"]'); await page.click('.admin-steps button'); await page.waitForTimeout(400);
+  await go('#/team');
+  check('jobs: the team page shows PermitPal with why and until when', (await page.locator('main .staff-tag').count()) === 1 && /Ends automatically when that job is done/.test(await page.textContent('main')));
+  await go(setupHash);
+  check('jobs: the order shows the access and the steps done', /PermitPal has access to/.test(await page.textContent('main')) && /2 of 5 done/.test(await page.textContent('main .job-steps').then(() => page.textContent('main'))) && (await page.locator('main .job-steps li.done').count()) === 2);
+  await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
+  await page.locator('main .line', { hasText: 'Set up my account for me' }).click(); await page.waitForTimeout(300);
+  await page.selectOption('.admin-update [name=status]', 'completed'); await page.click('.admin-update button'); await page.waitForTimeout(400);
+  await go('#/team');
+  check('jobs: finishing the job ends PermitPal\'s access', (await page.locator('main .staff-tag').count()) === 0);
+  check('jobs: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
+// 3) Fees from firms, inside the app: one quiet, labelled line on a checklist step; can be switched off.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(400); };
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  const fsic = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'fsic' && r.business_id === 'b1').id));
+  await go('#/requirement/' + fsic);
+  if (!(await page.locator('.checklist[open]').count())) { await page.click('.checklist summary'); await page.waitForTimeout(250); }
+  const line = page.locator('.ck-list li', { hasText: 'Fire extinguishers' }).locator('.ck-partner');
+  check('partners: one line on the matching step, labelled "Partner"', (await page.locator('.ck-partner').count()) === 1 && (await line.count()) === 1 && /Partner/.test(await line.locator('.ck-partner-tag').textContent()));
+  check('partners: it is quiet (small grey text, no colors or images)', await line.evaluate((e) => parseFloat(getComputedStyle(e).fontSize) <= 14 && !e.querySelector('img')));
+  check('partners: our own walk-through is offered on the inspection step', /Book a pre-inspection walk-through/.test(await page.textContent('.ck-list li:has-text("Have someone at the site") .ck-offer')));
+  await line.locator('[data-act=placement-why]').click(); await page.waitForTimeout(200);
+  check('partners: "Why this?" says the firm pays and it doesn\'t change their price', /pays PermitPal/.test(await page.textContent('#modal-root')) && /never changes the firm's price/.test(await page.textContent('#modal-root')));
+  await page.click('#modal-root [data-modal-close]');
+  await line.locator('[data-act=placement-quote]').click(); await page.waitForTimeout(300);
+  check('partners: "Request a quote" asks first and says what is shared', /Request a quote from Metro Fire Safety/.test(await page.textContent('#modal-root')) && /nothing else/.test(await page.textContent('#modal-root')));
+  await page.fill('#modal-root [name=contact_value]', '0917 123 4567'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+  check('partners: the request is sent', /Sent\./.test(await page.textContent('#toast')));
+  const stats = await page.evaluate(async () => (await import('/__mock/mock-data.js')).adminPlacementStats());
+  check('partners: the line counted one view, one click and one request', stats[0]?.views === 1 && stats[0]?.clicks === 1 && stats[0]?.leads === 1, JSON.stringify(stats));
+  await go('#/settings');
+  await page.locator('[data-profile-pref=show_partner_offers]').evaluate((e) => e.click()); await page.waitForTimeout(300);
+  await go('#/requirement/' + fsic);
+  if (!(await page.locator('.checklist[open]').count())) { await page.click('.checklist summary'); await page.waitForTimeout(250); }
+  check('partners: switched off in Settings, the line is gone', (await page.locator('.ck-partner').count()) === 0);
+  check('partners: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
+// 4) Firms apply to be listed (no account).
+{
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.addInitScript(() => { globalThis.PP_LOGGED_OUT = true; });
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('.landing');
+  check('apply: the public page has a quiet "For service providers" link', (await page.locator('.lp-foot a[href="#/list-your-firm"]').count()) === 1);
+  await page.click('.lp-foot a[href="#/list-your-firm"]'); await page.waitForTimeout(400);
+  check('apply: the page says how it works and what it costs them', /You pay for what you get/.test(await page.textContent('main')) && /No setup fee/.test(await page.textContent('main')));
+  await page.click('#apply-form button'); await page.waitForTimeout(200);
+  check('apply: empty form says what is missing', /firm's name/.test(await page.textContent('#apply-form .form-error')));
+  await page.fill('#apply-form [name=name]', 'Makati Fire Safety'); await page.selectOption('#apply-form [name=category]', 'fire_safety');
+  await page.fill('#apply-form [name=contact_name]', 'Ana Cruz'); await page.fill('#apply-form [name=email]', 'ana@makatifire.ph');
+  await page.fill('#apply-form [name=website]', 'makatifire.ph'); await page.click('#apply-form button'); await page.waitForTimeout(200);
+  check('apply: a website without https:// is caught', /https:\/\//.test(await page.textContent('#apply-form .form-error')));
+  await page.fill('#apply-form [name=website]', ''); await page.click('#apply-form button'); await page.waitForTimeout(400);
+  check('apply: sent, with a clear next step', /Thanks, we got it/.test(await page.textContent('main')) && /3 business days/.test(await page.textContent('main')));
+  check('apply: no sideways scroll on a phone', (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1);
+  check('apply: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
+// 5) Staff: Money (five views), Partner billing, Professionals, a team plan payment. Uses the demo's year of history.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  await page.addInitScript(() => { globalThis.PP_DEMO = true; });
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(400); };
+  const view = async (v) => { await page.click(`[data-act=money-view][data-v=${v}]`); await page.waitForTimeout(350); };
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  await go('#/admin');
+  check('money: Today lists what needs doing, with counts', (await page.locator('main .todo').count()) >= 3 && /Firms asking to be listed/.test(await page.textContent('main')));
+  const missBefore = await page.locator('#money-invoices tbody tr').count();
+  check('money: payments without a BIR invoice number are listed', missBefore >= 1, String(missBefore));
+  await page.fill('#money-invoices tbody tr:first-child [name=no]', 'INV-9001'); await page.click('#money-invoices tbody tr:first-child button'); await page.waitForTimeout(500);
+  check('money: typing the invoice number takes it off the list', (await page.locator('#money-invoices tbody tr').count()) === missBefore - 1);
+  await view('month');
+  check('money: This month shows the total, the goal and each stream', /Collected in/.test(await page.textContent('main .money-hero')) && (await page.locator('main .goal-bar').count()) === 1 && (await page.locator('main .money-stat').count()) === 4);
+  check('money: government money held is shown apart, as not yours', /Not yours to spend/.test(await page.textContent('main')));
+  await view('trend');
+  check('money: Trend draws 12 months, stacked by stream, with a legend and the numbers', (await page.locator('svg.trend .col').count()) === 12 && (await page.locator('main .legend > span').count()) === 4 && (await page.locator('main .num-table tbody tr').count()) === 12);
+  const tall = await page.evaluate(() => Math.max(...[...document.querySelectorAll('svg.trend .col')].map((g) => g.getBBox().height)));
+  check('money: the year has real columns (not empty)', tall > 40, String(tall));
+  await page.focus('svg.trend .col:last-of-type'); await page.waitForTimeout(150);
+  check('money: a column explains itself on focus (keyboard) or hover', !(await page.locator('.chart-tip').isHidden()) && /One-time jobs/.test(await page.textContent('.chart-tip')));
+  await view('pipeline');
+  check('money: Pipeline shows money on its way, by lane and age', (await page.locator('main .lane').count()) === 5 && /Money on its way/.test(await page.textContent('main')));
+  await view('ledger');
+  const rows = await page.locator('main table.ledger tbody tr').count();
+  check('money: Ledger lists every line', rows > 50, String(rows));
+  await page.selectOption('main [data-ledger=stream]', 'care'); await page.waitForTimeout(400);
+  check('money: the ledger filters by stream', (await page.locator('main table.ledger tbody tr').count()) < rows && !(await page.textContent('main table.ledger tbody')).includes('One-time jobs'));
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=ledger-csv]')]);
+  const csv = fs.readFileSync(await dl.path(), 'utf8');
+  check('money: the CSV has the invoice number column for the bookkeeper', /BIR invoice no\./.test(csv.split('\n')[0]) && csv.split('\n').length > 5);
+  // Partner billing: make and settle a statement
+  await page.click('[data-act=admin-tab][data-tab=billing]'); await page.waitForTimeout(400);
+  check('billing: each firm\'s unbilled total is shown', /Not billed yet/.test(await page.textContent('main')) && (await page.locator('main [data-act=stmt-new]').count()) >= 1);
+  await page.locator('main [data-act=stmt-new]').first().click(); await page.waitForTimeout(250);
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+  const sent = page.locator('main .row', { hasText: 'Sent' }).first();
+  check('billing: the statement is made and listed as sent', (await sent.count()) === 1);
+  await sent.locator('[data-act=stmt-paid]').click(); await page.waitForTimeout(250);
+  await page.fill('#modal-root [name=method]', 'BPI'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+  check('billing: marking it paid', /Marked paid/.test(await page.textContent('#toast')));
+  // Professionals: application, fee model, checklist line stats
+  await page.click('[data-act=admin-tab][data-tab=partners]'); await page.waitForTimeout(400);
+  check('partners admin: checklist lines show honest counts', /41 people saw it/.test(await page.textContent('main')) && /6 opened it/.test(await page.textContent('main')));
+  await page.locator('main [data-act=app-list]').click(); await page.waitForTimeout(400);
+  check('partners admin: an application becomes a hidden draft listing', (await page.locator('main .card', { hasText: 'Cebu Pest Busters' }).locator('.chip', { hasText: 'Hidden' }).count()) === 1);
+  const form = page.locator('main .card', { hasText: 'Cebu Pest Busters' }).locator('form.admin-partner');
+  await form.locator('[name=fee_model]').selectOption('monthly'); await page.waitForTimeout(100);
+  check('partners admin: choosing "Flat monthly listing" shows only that fee box', await form.locator('[data-fee=monthly]').isVisible() && await form.locator('[data-fee=per_lead]').isHidden());
+  await form.locator('[name=category]').selectOption('insurance'); await page.waitForTimeout(100);
+  check('partners admin: insurers get the Insurance Code note', await form.locator('[data-ins-note]').isVisible());
+  // a team plan paid by GCash
+  await page.click('[data-act=admin-tab][data-tab=orgs]'); await page.waitForTimeout(400);
+  await page.locator('main [data-act=plan-pay]').first().click(); await page.waitForTimeout(250);
+  check('plans: the payment form fills the amount from the plan', Number(await page.inputValue('#modal-root [name=amount]')) > 0);
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+  check('plans: the payment is recorded', /Payment recorded/.test(await page.textContent('#toast')));
+  await page.click('[data-act=admin-tab][data-tab=care]'); await page.waitForTimeout(400);
+  check('care admin: lists plans from every workspace and the prices', (await page.locator('main table tbody tr').count()) >= 6 && (await page.locator('main form.admin-tier').count()) === 4);
+  check('money/admin: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
+// 6) Phones: the new pages fit a small screen.
+{
+  const page = await browser.newPage({ viewport: { width: 360, height: 760 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.addInitScript(() => { globalThis.PP_DEMO = true; });
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  const bad = [];
+  for (const h of ['#/care', '#/care/start', '#/services', '#/services/orders/ord2', '#/businesses/b2', '#/admin']) {
+    await page.evaluate((x) => { location.hash = x; }, h); await page.waitForTimeout(450);
+    const o = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    if (o > 1) bad.push(`${h} ${o}px`);
+  }
+  for (const v of ['month', 'trend', 'pipeline', 'ledger']) {
+    await page.click(`[data-act=money-view][data-v=${v}]`); await page.waitForTimeout(350);
+    const o = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    if (o > 1) bad.push(`money ${v} ${o}px`);
+  }
+  check('phone: the new pages have no sideways scroll at 360px', bad.length === 0, bad.join(', '));
+  await page.evaluate(() => { location.hash = '#/services/orders/ord2'; }); await page.waitForTimeout(450);
+  check('care renewal order: says the plan started it and the fee is covered', /covered by your care plan/.test(await page.textContent('main .card.quote')) && /Year-round care/.test(await page.textContent('main .page-head')));
+  check('phone: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
 // A database without the newer changes: none of the new features show, and nothing breaks.
 {
   const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
@@ -746,7 +1036,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   const mp = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit').id));
   for (const h of ['#/compliance', '#/businesses/b1', '#/team', '#/settings', '#/settings/workspace', '#/admin', '#/requirement/' + mp, '#/']) {
     await page.evaluate((x) => { location.hash = x; }, h); await page.waitForTimeout(250);
-    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors], [data-tab=orders], .checklist, .offer-inline, .lib-more, .focus-alt, .sidebar [data-nav=services], .sidebar [data-nav=filings], [data-filings-brief]:not([hidden]), #staff-access, #sms, #mfa-section, [data-act-change=require-mfa]').count()) seen.push(h);
+    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors], [data-tab=orders], .checklist, .offer-inline, .lib-more, .focus-alt, .sidebar [data-nav=services], .sidebar [data-nav=filings], [data-filings-brief]:not([hidden]), #staff-access, #sms, #mfa-section, [data-act-change=require-mfa], .sidebar [data-nav=care], [data-tab=money], [data-tab=care], [data-tab=billing], .care-line, .care-note, .care-teaser, .nudge, [data-act=svc-bulk], .ck-partner, .ck-offer, [data-profile-pref], a[href="#/list-your-firm"]').count()) seen.push(h);
   }
   check('features off: nothing new shows before the database is updated', seen.length === 0, seen.join(','));
   check('features off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));

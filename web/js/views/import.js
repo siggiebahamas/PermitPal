@@ -51,6 +51,7 @@ export function openImport(kind = 'vehicles') {
       <li><b>Choose the file</b> <input type="file" id="imp-file" aria-label="Spreadsheet file (Excel or CSV)" accept=".xlsx,.csv,.txt,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
         <span class="muted small">Excel (.xlsx) or CSV.${canReadExcel() ? '' : ' This browser can only read CSV: in Excel use File → Save As → CSV.'}</span></li>
     </ol>
+    ${S.features?.revenue && (S.data.services || []).some((x) => x.code === 'setup_from_paper') ? html`<p class="muted small">Rather not do this yourself? <button type="button" class="linklike" data-act="svc-request" data-code="setup_from_paper">Have PermitPal set it up for you</button>.</p>` : ''}
     <div id="imp-sheet"></div>
     <div id="imp-dates"></div>
     <div id="imp-preview"></div>`, {

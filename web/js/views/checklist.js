@@ -2,9 +2,10 @@
 // it stays valid, and the permits that have to be done first (with their live status). Ticks belong to
 // the current permit period, so recording the renewal starts a clean checklist for next time.
 // Everything is written as general guidance: the city or agency has the final say.
-import { html, fmtDate, toast, toastError, when, plural } from '../util.js';
-import { S, canEdit, has, typeOf, memberName, reqById } from '../core.js';
+import { html, fmtDate, toast, toastError, when, plural, peso } from '../util.js';
+import { S, canEdit, has, typeOf, memberName, reqById, coverOf, tierOf } from '../core.js';
 import { STATUS, statusChip } from '../components.js';
+import { placementFor, placementLine } from './extras.js';
 import * as db from 'pp/data';
 
 // Permits for the same business branch (or the whole business), vehicle or person, by type.
@@ -66,13 +67,28 @@ export function checklistCard(r, ticks = [], { offer = '' } = {}) {
             ${dep ? html`<small class="ck-dep-status">In PermitPal: ${STATUS[dep.status]?.label || dep.status}${dep.status === 'compliant' && dep.expires_on ? ` until ${fmtDate(dep.expires_on)}` : ''}</small>` : ''}
             ${tick ? html`<small class="ck-who">Ticked by ${tick.done_by === S.user?.id ? 'you' : memberName(tick.done_by)}, ${fmtDate(String(tick.done_at).slice(0, 10))}</small>` : ''}
           </span></label>
-          ${when(i.u, html`<span class="ck-link">${external(i.u, 'Open')}</span>`)}</li>`;
+          ${when(i.u, html`<span class="ck-link">${external(i.u, 'Open')}</span>`)}
+          ${i.k === 'inspect' ? walkthroughLine(r) : ''}
+          ${(() => { const p = placementFor(r, i.k); return p ? placementLine(p, r) : ''; })()}</li>`;
       })}</ul>`)}
+    ${(() => { const p = placementFor(r, null); return p ? placementLine(p, r) : ''; })()}
     ${when(edit && r.expires && !['in_progress', 'compliant'].includes(r.status), html`<p class="ck-hint" data-ck-hint ${doneCount ? '' : 'hidden'}>
       Filed it already? Tap <b>I've started the renewal</b> above, so your team isn't alerted that it hasn't started.</p>`)}
     ${when(!edit, html`<p class="muted small">You can view this checklist. Only people who can edit can tick items.</p>`)}
     ${offer}
   </details>`;
+}
+
+// Our own walk-through, on the "inspection" step: one line, and free when Care Plus includes it.
+function walkthroughLine(r) {
+  if (!has('revenue') || !canEdit() || r.open_request_id) return '';
+  const s = (S.data?.services || []).find((x) => x.visit && x.type_codes.includes(r.type_code));
+  if (!s) return '';
+  const p = coverOf(r);
+  const incl = p && p.status === 'active' && tierOf(p.tier)?.walkthroughs > 0;
+  return html`<div class="ck-offer">${incl ? 'Included in your Care Plus plan:' : 'Want to pass the first time?'}
+    <button type="button" class="linklike" data-act="svc-request" data-code="${s.code}" data-req="${r.id}">Book a pre-inspection walk-through</button>
+    ${incl ? '' : html`<small class="muted">${s.price_from != null ? 'from ' + peso(s.price_from) : ''}</small>`}</div>`;
 }
 
 // Ticking: saved straight away, the box is locked while it saves, and it flips back if saving fails.

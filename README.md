@@ -36,6 +36,7 @@ The database decides status in one place (`requirement_status`), using Philippin
 ## Go-live checklist (things only you can do)
 
 **Blockers (the site can't take real customers without these):**
+0. **Database changes waiting:** in Supabase → SQL Editor, run `supabase/manual/2026-10-17-new-features.sql`, then `supabase/manual/2026-10-19-revenue.sql` (each once, in that order; each is all-or-nothing and refuses to run twice). Until then the site hides every feature they add.
 1. **Domain + email:** buy a `.com` domain (cheapest reliable: Cloudflare Registrar, about US$10.44/year at cost; a `.ph` costs about US$41-45/year). Create a free [Resend](https://resend.com) account and verify the domain. Then:
    - Supabase → Authentication → Emails → SMTP Settings: enter Resend's SMTP details. Until then, new customers can't confirm sign-up.
    - Supabase → Edge Functions → Secrets: add `RESEND_API_KEY` and `EMAIL_FROM` (e.g. `PermitPal <hello@yourdomain.com>`). This turns on reminders, invitations, quote requests, team reminders and Contact form emails.
@@ -49,9 +50,10 @@ The database decides status in one place (`requirement_status`), using Philippin
 5. **Register PermitPal as a business** (DTI, barangay, Mayor's Permit, BIR) before taking the first payment: business customers need an invoice.
 
 **Before charging:**
-6. **Plan payments:** GCash and UnionBank details are set (Admin → Payment details; change the account name there if it differs). When a customer pays, set their plan in Admin → Workspaces & plans.
+6. **Payments:** GCash and UnionBank details are set (Admin → Payment details). Every payment is confirmed by you in the app (Orders, Care, Partner billing, or Workspaces & plans → "Record a payment"), and Admin → Money lists any payment still missing its BIR invoice number.
 7. **Online checkout (optional):** add `PAYMONGO_SECRET_KEY` and `APP_URL` as Edge Function secrets, then tick "Pay online" in Admin → Payment details.
-8. **Professionals:** add real liaison firms and accountants in Admin → Professionals (their email receives quote requests). Tick "Licence checked" only after seeing their business permit and licence. Agree the per-request fee with each firm (they pay you) and bill monthly from Admin → Quote requests. The two sample firms exist only in the demo.
+8. **Professionals:** add real liaison firms and accountants in Admin → Professionals (their email receives quote requests), or approve the ones that apply on the "For service providers" page. Tick "Licence checked" only after seeing their business permit and licence. Choose how each firm pays (per quote request, per sale, flat monthly, or free), add checklist lines if they pay for one, and send monthly statements from Admin → Partner billing. Insurers: per-request or per-sale fees are blocked until your Insurance Commission licence number is saved (Insurance Code, Sec. 307). The sample firms exist only in the demo.
+8b. **Year-round care and the on-time guarantee:** prices are in Admin → Care. Have a lawyer read the "Year-round care" and "On-time guarantee" sections of the terms before the first sale; the guarantee is written as a service guarantee for your own misses, not insurance.
 9. **Prices:** team plan prices are ₱1,490 (Fleet), ₱1,990 (Accounting firm), ₱9,990 (Property). (The Head office plan is switched off and no longer offered.) Validate them on sales calls; ask Claude to change them.
 
 **Legal:**

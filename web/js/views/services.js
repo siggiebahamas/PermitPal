@@ -3,8 +3,8 @@
 // staff save straight to the customer's account. Guard rails, because this is money and the law:
 // an exact quote before anything starts, written authorization, government fees at cost with
 // official receipts, and never paying anyone to speed things up (RA 11032 bans fixers).
-import { html, fmtDate, fmtDateTime, peso, toast, toastError, confirmDialog, when, normalizePhone, timeAgo, openModal, formObject, plural } from '../util.js';
-import { S, on, go, reload, canEdit, has, reqById, service, serviceFor, business, vehicle, person, empty } from '../core.js';
+import { html, fmtDate, fmtDateTime, peso, toast, toastError, confirmDialog, when, normalizePhone, timeAgo, openModal, formObject, plural, todayPH } from '../util.js';
+import { S, on, go, reload, canEdit, has, reqById, service, serviceFor, business, vehicle, person, empty, careOf, coverOf, tierOf, location_ } from '../core.js';
 import { byPriority, subjectLabel, dueShort, ICON } from '../components.js';
 import * as db from 'pp/data';
 
@@ -41,20 +41,47 @@ const PROMISES = [
 const FINE_PRINT = 'PermitPal acts as your authorized representative, only with your written authorization, and follows each office\'s standard process. We never pay anyone to speed things up: that is against the law (RA 11032). Processing times are set by the government office.';
 let settingsCache = null;
 const settings = async () => (settingsCache ||= await db.appSettings().catch(() => ({})));
+export const paySettings = settings;
 const price = (s) => (s.price_from == null ? 'Quoted per job' : `From ${peso(s.price_from)}`);
 const isOpen = (a) => !['completed', 'cancelled'].includes(a.status);
+// What "urgent" costs, said before they ask (rush pays for our priority, never the government's).
+const rushText = (s) => (has('revenue') && s?.rush_fee != null
+  ? (Number(s.rush_fee) > 0 ? `+${peso(s.rush_fee)} rush fee: we file within 1 business day and follow up daily. Government processing times don't change.` : 'No extra charge.')
+  : "may cost more; we'll say so in the quote");
+// Orders the customer sees: done-for-you jobs and renewals started by Year-round care.
+const isOrder = (a) => a.service_code || a.care_plan_id;
+// Permits that can be renewed for them right now (no open request, a service exists for it).
+// Overdue or due within 30 days: what "Renew several" ticks for you.
+const dueNow = (r) => r.status === 'action_required' || (r.days_left != null && r.days_left <= 30);
+export const renewable = () => S.data.reqs.filter((r) => r.subject !== 'person' && !r.open_request_id && r.expires && serviceFor(r)).sort(byPriority);
+// Payment details shown wherever the customer pays us (orders and care bills).
+export function payDetails(st) {
+  const gcash = st.gcash_number ? html`<div class="paywith"><b>GCash</b><span>${st.gcash_number}${st.gcash_name ? ' · ' + st.gcash_name : ''}</span></div>` : '';
+  const bank = st.bank_account_number ? html`<div class="paywith"><b>${st.bank_name || 'Bank transfer'}</b><span>${st.bank_account_number}${st.bank_account_name ? ' · ' + st.bank_account_name : ''}</span></div>` : '';
+  return html`${gcash || bank ? html`<div class="paywiths">${gcash}${bank}</div>` : html`<p class="muted">PermitPal will send you the payment details. Then enter the reference below.</p>`}
+    ${when(st.payment_note, html`<p class="muted small">${st.payment_note}</p>`)}
+    <p class="muted small">Only pay to the accounts shown here. PermitPal staff will never ask you to pay a personal account by text or chat.</p>`;
+}
 
 // ---------------------------------------------------------------- catalog + my requests
 export function services(el, params) {
   if (!has('services')) { el.innerHTML = String(empty('Not available yet', 'Done-for-you services are coming soon.', html`<a class="btn btn-primary" href="#/pros">Find a professional instead</a>`)); return; }
-  const requests = (S.data.requests || []).filter((a) => a.service_code);
+  const requests = (S.data.requests || []).filter(isOrder);
   const open = requests.filter(isOpen);
   const done = requests.filter((a) => !isOpen(a));
-  const svc = S.data.services || [];
+  const rev = has('revenue');
+  const svc = (S.data.services || []).filter((s) => !(rev && s.category === 'plan'));
+  const due = rev ? careOf().invoices.filter((i) => i.status === 'due') : [];
+  const many = rev && canEdit() ? renewable().filter(dueNow) : [];
+  const setup = rev ? service('setup_from_paper') : null;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Done for you</h1>
-      <p class="muted">Skip the queues. We renew permits, apply for new ones and keep your papers current, and you can follow every step here.</p></div></div>
+      <p class="muted">Skip the queues. We renew permits, apply for new ones and keep your papers current, and you can follow every step here.</p></div>
+      ${when(many.length > 1, html`<button class="btn btn-primary" data-act="svc-bulk">Renew ${many.length} for me</button>`)}</div>
+    ${due.map((i) => html`<div class="banner ${i.due_on < todayPH() ? 'warn' : 'info'}"><div><b>Year-round care bill ${i.number}:</b> ${peso(i.amount_php)}${i.first ? ', coverage starts when it\'s paid' : `, due ${fmtDate(i.due_on)}`}.</div>
+      <div class="banner-actions"><a class="btn btn-sm btn-primary" href="#/care?pay=${i.id}">Pay</a></div></div>`)}
     <section class="card promises">${PROMISES.map(([t, d]) => html`<div class="promise">${ICON.check}<div><b>${t}</b><span>${d}</span></div></div>`)}</section>
+    ${when(rev, careTeaser())}
 
     ${when(requests.length, html`<section class="card">
       <div class="card-head"><div><h2>Your requests</h2><p class="card-sub">${plural(open.length, 'open request')}</p></div></div>
@@ -62,6 +89,9 @@ export function services(el, params) {
       ${when(done.length > 5, html`<div class="sheet-foot">${done.length - 5} older requests are not shown.</div>`)}
     </section>`)}
 
+    ${when(setup && !S.data.reqs.some((r) => r.cycle_id), html`<section class="card offer-wide"><div><h2>${setup?.name}</h2><p class="muted">${setup?.summary}</p>
+      <p class="small"><b>${price(setup || {})}</b> ${setup?.price_unit} · usually ${setup?.turnaround}</p></div>
+      ${when(canEdit(), html`<button class="btn btn-primary btn-sm" data-act="svc-request" data-code="setup_from_paper">Get a quote</button>`)}</section>`)}
     ${CATEGORIES.map(([cat, title, sub]) => {
       const list = svc.filter((s) => s.category === cat);
       return list.length ? html`<h3 class="section-label svc-cat">${title}</h3><p class="section-sub svc-cat-sub">${sub}</p>
@@ -76,11 +106,25 @@ export function services(el, params) {
   if (pick && canEdit()) { history.replaceState(null, '', '#/services'); openRequest(pick, {}); }
 }
 
+// Year-round care, at the top of the catalog: what it costs and whether you have it.
+function careTeaser() {
+  const c = careOf();
+  const live = c.plans.filter((p) => p.status !== 'cancelled');
+  const from = (subject) => Math.min(...c.tiers.filter((t) => t.subject === subject).map((t) => Number(t.monthly_php)));
+  if (!c.tiers.length && !live.length) return '';
+  return html`<section class="card care-teaser"><div>
+      <h2>Year-round care</h2>
+      <p class="muted">${live.length ? `We're looking after ${plural(live.filter((p) => p.location_id).length, 'branch', 'branches')} and ${plural(live.filter((p) => p.vehicle_id).length, 'vehicle')} for you.`
+        : `One monthly fee and we start every renewal for you, all year. From ${peso(from('branch'))} per branch or ${peso(from('vehicle'))} per vehicle a month.`}</p></div>
+    <a class="btn ${live.length ? 'btn-soft' : 'btn-primary'} btn-sm" href="#/care">${live.length ? 'Your plan' : 'See how it works'}</a></section>`;
+}
+
 function serviceCard(s) {
   return html`<section class="card svc">
     <div class="svc-top"><h2>${s.name}</h2><div class="svc-price"><b>${price(s)}</b><small>${s.price_unit}</small></div></div>
     <p class="svc-sum">${s.summary}</p>
     <ul class="svc-inc">${(s.includes || []).map((i) => html`<li>${ICON.check}<span>${i}</span></li>`)}</ul>
+    ${when(has('revenue') && Number(s.rush_fee) > 0, html`<p class="muted small">Urgent? +${peso(s.rush_fee)} and we file within 1 business day.</p>`)}
     <div class="svc-foot"><span class="muted small">${s.turnaround ? 'Usually ' + s.turnaround : ''}</span>
       ${canEdit() ? html`<button class="btn btn-primary btn-sm" data-act="svc-request" data-code="${s.code}">Get a quote</button>` : ''}</div>
   </section>`;
@@ -88,15 +132,19 @@ function serviceCard(s) {
 
 function orderLine(a) {
   const [label, cls] = ORDER_STATUS[a.status] || [a.status, 'needinfo'];
+  const care = a.care_plan_id && has('revenue');
   const action = a.status === 'quoted' ? 'Review quote' : a.payment_status === 'awaiting_payment' && isOpen(a) ? 'Pay now' : 'Open';
   return html`<a class="line" href="#/services/orders/${a.id}"><span class="line-main"><b>${a.kind === 'apply' ? 'New: ' : ''}${a.requirement_name}</b>
-    <small>${a.subject_label} · sent ${timeAgo(a.created_at)}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
+    <small>${a.subject_label} · ${care ? (a.created_by ? 'included in Care Plus' : 'started by Year-round care') : 'sent'} ${timeAgo(a.created_at)}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
     <span class="chip ${cls}">${label}</span><span class="btn btn-sm ${['Review quote', 'Pay now'].includes(action) ? 'btn-primary' : 'btn-soft'}">${action}</span></a>`;
 }
 
 // ---------------------------------------------------------------- asking for a quote
 function targets(s) {
-  // What the order is for: a tracked permit (renewals) or a business / vehicle / person.
+  // What the order is for: a tracked permit (renewals, walk-throughs) or a business / vehicle / person.
+  if (s.visit && has('revenue')) {
+    return { kind: 'requirement', visit: true, list: S.data.reqs.filter((r) => !r.open_request_id && s.type_codes.includes(r.type_code)).sort(byPriority) };
+  }
   if (s.category === 'renewal') {
     const reqs = S.data.reqs.filter((r) => !r.open_request_id && (s.type_codes.length ? s.type_codes.includes(r.type_code) : r.subject !== 'person'))
       .sort(byPriority);
@@ -124,7 +172,14 @@ export function openRequest(code, { requirementId } = {}) {
   }
   if (t.kind === 'subject' && !t.list.length && !optional) return toast(`Add a ${s.applies_to} first, then ask for this service.`, 'error');
   const start = t.kind === 'requirement' ? (t.list.find((r) => r.id === requirementId) || t.list[0]) : null;
-  const pick = t.kind === 'requirement'
+  const loc = start?.location_id ? location_(start.location_id) : null;
+  const pick = t.visit
+    ? html`<label class="field"><span>For which permit's inspection?</span><select name="target" required>
+        ${t.list.map((r) => html`<option value="${r.id}" ${r === start ? 'selected' : ''}>${r.name} — ${subjectLabel(r)}</option>`)}</select></label>
+      <div class="grid2"><label class="field"><span>Dates that suit you</span><input name="visit_dates" maxlength="200" required placeholder="e.g. Any weekday morning next week"></label>
+        <label class="field"><span>Site address</span><input name="site_address" maxlength="300" required value="${loc ? [loc.address, loc.city].filter(Boolean).join(', ') : ''}"></label></div>
+      <p class="muted small" data-included hidden>${ICON.check} Included in your Care Plus plan (one walk-through a year per branch): no service fee.</p>`
+    : t.kind === 'requirement'
     ? html`<label class="field"><span>Which permit?</span><select name="target" required>
         ${t.list.map((r) => html`<option value="${r.id}" ${r === start ? 'selected' : ''}>${r.name} — ${subjectLabel(r)} (${dueShort(r)})</option>`)}</select></label>
       <fieldset class="field kind-pick"><legend>What do you need?</legend>
@@ -138,7 +193,8 @@ export function openRequest(code, { requirementId } = {}) {
     ${pick}
     ${when(s.category === 'renewal', html`<label class="field"><span>Do you have the documents?</span><select name="docs_status">
       <option value="have">Yes, they're uploaded in PermitPal</option><option value="need">No, I still need them</option><option value="not_sure" selected>Not sure what's needed</option></select></label>`)}
-    <label class="check"><input type="checkbox" name="rush"><span>It's urgent <small class="muted">(may cost more; we'll say so in the quote)</small></span></label>
+    ${when(s.needs_access && has('revenue'), html`<p class="banner info small"><span>To do this, PermitPal joins your workspace as a team member until the job is done. You'll be asked to OK that with the quote, and you can remove it anytime under Team.</span></p>`)}
+    ${when(!(s.visit && has('revenue')), html`<label class="check"><input type="checkbox" name="rush"><span>It's urgent <small class="muted">(${rushText(s)})</small></span></label>`)}
     <div class="grid2">
       <label class="field"><span>Best way to reach you</span><select name="contact_method">
         <option value="email">Email</option><option value="phone">Phone call / SMS</option><option value="viber">Viber</option><option value="whatsapp">WhatsApp</option></select></label>
@@ -156,10 +212,25 @@ export function openRequest(code, { requirementId } = {}) {
       m.addEventListener('change', () => { v.value = m.value === 'email' ? S.profile.email || '' : S.profile.phone || ''; v.placeholder = m.value === 'email' ? 'you@company.ph' : '0917 123 4567'; });
       // Choosing a different permit updates "renew" vs "first time" to match it.
       const sel = form.querySelector('select[name=target]');
-      if (t.kind === 'requirement' && sel) sel.addEventListener('change', () => {
+      if (t.kind === 'requirement' && sel && !t.visit) sel.addEventListener('change', () => {
         const r = reqById(sel.value);
         form.querySelector(`[name=kind][value=${firstTime(r) ? 'apply' : 'renew'}]`).checked = true;
       });
+      // Walk-throughs: say when Care Plus covers it, and fill the branch address.
+      if (t.visit && sel) {
+        const sync = () => {
+          const r = reqById(sel.value);
+          const p = r ? coverOf(r) : null;
+          const used = p && (S.data.requests || []).some((a) => a.care_plan_id === p.id && service(a.service_code)?.visit && a.status !== 'cancelled'
+            && Date.now() - Date.parse(a.created_at) < 365 * 864e5);
+          form.querySelector('[data-included]').hidden = !(p && p.status === 'active' && tierOf(p.tier)?.walkthroughs > 0 && !used);
+          const l = r?.location_id ? location_(r.location_id) : null;
+          const addr = form.querySelector('[name=site_address]');
+          if (l && !addr.dataset.typed) addr.value = [l.address, l.city].filter(Boolean).join(', ');
+        };
+        form.querySelector('[name=site_address]').addEventListener('input', (e) => { e.target.dataset.typed = '1'; });
+        sel.addEventListener('change', sync); sync();
+      }
     },
     onSubmit: async (fd) => {
       const f = formObject(fd);
@@ -167,8 +238,9 @@ export function openRequest(code, { requirementId } = {}) {
       if (f.contact_method === 'email') { if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) throw new Error('Please enter a valid email address so we can send your quote.'); }
       else { contact = normalizePhone(contact); if (!contact) throw new Error('Please enter a valid mobile number, e.g. 0917 123 4567.'); }
       if (!f.consent) throw new Error('Please tick the box to authorize PermitPal for this request.');
-      const row = { org_id: S.org.id, service_code: s.code, notes: f.notes, rush: !!f.rush, contact_method: f.contact_method, contact_value: contact,
-        docs_status: f.docs_status, consent: true, kind: t.kind === 'requirement' ? (f.kind === 'apply' ? 'apply' : 'renew') : 'other' };
+      const notes = t.visit ? [`Preferred dates: ${f.visit_dates}`, `Site address: ${f.site_address}`, f.notes].filter(Boolean).join('\n') : f.notes;
+      const row = { org_id: S.org.id, service_code: s.code, notes, rush: !!f.rush, contact_method: f.contact_method, contact_value: contact,
+        docs_status: f.docs_status, consent: true, kind: t.visit ? 'other' : t.kind === 'requirement' ? (f.kind === 'apply' ? 'apply' : 'renew') : 'other' };
       if (t.kind === 'requirement') {
         if (!f.target) throw new Error('Choose the permit.');
         row.requirement_id = f.target;
@@ -183,7 +255,7 @@ export function openRequest(code, { requirementId } = {}) {
     },
   });
 }
-on('svc-request', (ds) => openRequest(ds.code));
+on('svc-request', (ds) => openRequest(ds.code, { requirementId: ds.req || null }));
 on('svc-for-req', (ds) => { const r = reqById(ds.id); if (r) openRequest(serviceFor(r)?.code, { requirementId: r.id }); });
 
 // ---------------------------------------------------------------- one order
@@ -209,20 +281,30 @@ export async function order(el, id) {
     : ['paid', 'waived'].includes(a.payment_status) ? 3 : a.accepted_at ? 2 : a.quoted_at ? 1 : 0;
   const steps = ['Request sent', 'Quote', 'Payment', 'In progress', 'Done'];
   const r = a.requirement_id ? reqById(a.requirement_id) : null;
+  const rev = has('revenue');
+  const care = rev && a.care_plan_id;
+  const jobSteps = rev ? s?.steps || [] : [];
+  const access = rev ? careOf().staff.find((x) => x.request_id === a.id) : null;
 
   el.innerHTML = String(html`
     <a class="back" href="#/services">← Done for you</a>
-    <div class="page-head"><div><h1>${a.requirement_name}</h1><p class="muted">${KIND_LABEL[a.kind] || 'Request'} · ${a.subject_label}${a.location_label ? ' · ' + a.location_label : ''}${a.rush ? ' · Urgent' : ''}</p></div>
+    <div class="page-head"><div><h1>${a.requirement_name}</h1><p class="muted">${KIND_LABEL[a.kind] || 'Request'} · ${a.subject_label}${a.location_label ? ' · ' + a.location_label : ''}${a.rush ? ' · Urgent' : ''}${care ? (a.created_by ? ' · Included in Care Plus' : ' · Year-round care') : ''}</p></div>
       <div class="head-side"><span class="chip lg ${cls}">${label}</span></div></div>
     ${when(stage >= 0, html`<ol class="stepper" aria-label="Progress">${steps.map((t, i) => html`<li class="${i < stage ? 'done' : i === stage ? 'now' : ''}" ${i === stage ? 'aria-current="step"' : ''}><span>${i < stage ? '✓' : i + 1}</span>${t}</li>`)}</ol>`)}
 
-    ${when(a.status === 'submitted', html`<div class="banner info"><div><b>We're preparing your exact quote.</b> You'll get it within 1 business day, by ${a.contact_method === 'email' ? 'email' : a.contact_method} and here. Nothing is charged until you accept it.</div></div>`)}
+    ${when(a.status === 'submitted', care && !a.created_by
+      ? html`<div class="banner info"><div><b>Your care plan started this renewal.</b> We're checking the exact government fees and will send them here within 1 business day. Our service fee is covered by your plan.</div></div>`
+      : html`<div class="banner info"><div><b>We're preparing your exact quote.</b> You'll get it within 1 business day, by ${a.contact_method === 'email' ? 'email' : a.contact_method} and here. Nothing is charged until you accept it.</div></div>`)}
+    ${when(access && !closed, html`<div class="banner info"><div><b>PermitPal has access to ${S.org.name}</b> to do this set-up. It ends automatically when this order is done. <a href="#/team">Remove it now</a></div></div>`)}
     ${when(a.status === 'quoted', quoteBox(a))}
     ${when(['awaiting_payment', 'pending_verification'].includes(a.payment_status) && !closed, payBox(a, st))}
     ${when(['paid', 'waived'].includes(a.payment_status) && !closed, html`<div class="banner progress"><div><b>We're working on it.</b> Sign and upload the authorization letter below if you haven't yet. We'll post every update here.</div></div>`)}
     ${when(a.status === 'completed', html`<div class="banner ok-banner"><div><b>Done.</b> ${r ? html`The new record is saved to <a href="#/requirement/${r.id}">${r.name}</a>.` : 'Your documents are attached below.'}</div></div>`)}
     ${when(a.admin_note && !closed && a.status !== 'quoted', html`<div class="banner warn"><div><b>From PermitPal:</b> ${a.admin_note}</div></div>`)}
 
+    ${when(jobSteps.length, html`<section class="card"><div class="card-head"><div><h2>Steps</h2><p class="card-sub">${a.steps_done || 0} of ${jobSteps.length} done</p></div></div>
+      <ol class="job-steps">${jobSteps.map((t, i) => html`<li class="${i < (a.steps_done || 0) ? 'done' : i === (a.steps_done || 0) && !closed && ['paid', 'waived'].includes(a.payment_status) ? 'now' : ''}">
+        <span aria-hidden="true">${i < (a.steps_done || 0) ? '✓' : i + 1}</span>${t}${i < (a.steps_done || 0) ? html`<span class="sr-only"> (done)</span>` : ''}</li>`)}</ol></section>`)}
     <section class="card">
       <div class="card-head"><div><h2>Summary</h2></div>
         ${when(!closed, html`<button class="btn btn-sm btn-soft" data-act="auth-letter" data-id="${a.id}">${ICON.file} Authorization letter</button>`)}</div>
@@ -231,7 +313,7 @@ export async function order(el, id) {
         <dt>Type</dt><dd>${KIND_LABEL[a.kind] || 'Request'}</dd>
         <dt>For</dt><dd>${a.subject_label}</dd>
         ${when(a.due_on, html`<dt>Permit deadline</dt><dd>${fmtDate(a.due_on)}</dd>`)}
-        <dt>Quote</dt><dd>${a.quote_php != null ? html`${peso(a.quote_php)} <span class="muted small">(service ${peso(a.quote_service_fee)} + government fees ${peso(a.quote_gov_fees)})</span>` : 'Being prepared'}</dd>
+        <dt>Quote</dt><dd>${a.quote_php != null ? html`${peso(a.quote_php)} <span class="muted small">(service ${peso(a.quote_service_fee)}${Number(a.quote_rush_fee) > 0 ? ' + rush ' + peso(a.quote_rush_fee) : ''} + government fees ${peso(a.quote_gov_fees)})</span>` : 'Being prepared'}</dd>
         <dt>Payment</dt><dd>${PAYMENT_STATUS[a.payment_status] || a.payment_status}${a.paid_at ? ' · ' + fmtDate(a.paid_at.slice(0, 10)) : ''}</dd>
         ${when(a.gov_fees_actual != null, html`<dt>Government fees paid</dt><dd>${peso(a.gov_fees_actual)}</dd>`)}
         ${refunds.map((x) => html`<dt>Refunded</dt><dd><b>${peso(x.amount_php)}</b> <span class="muted small">${fmtDate(x.created_at.slice(0, 10))} · ${x.reason}${x.reference ? ' · ref ' + x.reference : ''}</span></dd>`)}
@@ -283,12 +365,18 @@ export async function order(el, id) {
 }
 
 function quoteBox(a) {
+  const s = service(a.service_code);
+  const care = has('revenue') && a.care_plan_id;
+  const access = has('revenue') && s?.needs_access;
   return html`<section class="card quote">
     <div class="card-head"><div><h2>Your quote</h2><p class="card-sub">Sent ${a.quoted_at ? timeAgo(a.quoted_at) : ''}</p></div></div>
-    <div class="qline"><span>Service fee</span><b>${peso(a.quote_service_fee)}</b></div>
+    <div class="qline"><span>Service fee${care && !Number(a.quote_service_fee) ? html` <small class="muted">(covered by your care plan)</small>` : ''}</span><b>${peso(a.quote_service_fee)}</b></div>
+    ${when(Number(a.quote_rush_fee) > 0, html`<div class="qline"><span>Rush fee <small class="muted">(we file within 1 business day)</small></span><b>${peso(a.quote_rush_fee)}</b></div>`)}
     <div class="qline"><span>Government fees <small class="muted">(estimate, paid at cost with official receipts)</small></span><b>${peso(a.quote_gov_fees)}</b></div>
     <div class="qline total"><span>Total</span><b>${peso(a.quote_php)}</b></div>
     ${when(a.quote_note, html`<p class="quote-note pre">${a.quote_note}</p>`)}
+    ${when(access && canEdit(), html`<label class="check consent"><input type="checkbox" data-access-ok>
+      <span>PermitPal may join ${S.org.name} as a team member to set it up. Access ends automatically when the job is done, and I can remove it anytime under Team.</span></label>`)}
     ${when(canEdit(), html`<div class="btn-row qbtns"><button class="btn btn-primary" data-act="quote-accept" data-id="${a.id}">Accept quote</button>
       <button class="btn btn-ghost" data-act="order-cancel" data-id="${a.id}">No thanks</button></div>`)}
     <div class="sheet-foot">If the government fees end up lower, we refund the difference. If they are higher, we ask you before paying. If we can't deliver, the service fee is refunded in full.</div>
@@ -299,14 +387,10 @@ function payBox(a, st) {
   if (a.payment_status === 'pending_verification') {
     return html`<div class="banner info"><div><b>We're checking your payment</b> of ${peso(a.quote_php)}${a.payment_ref ? ' (ref ' + a.payment_ref + ')' : ''}. Work starts as soon as it's confirmed, usually within 1 business day.</div></div>`;
   }
-  const gcash = st.gcash_number ? html`<div class="paywith"><b>GCash</b><span>${st.gcash_number}${st.gcash_name ? ' · ' + st.gcash_name : ''}</span></div>` : '';
-  const bank = st.bank_account_number ? html`<div class="paywith"><b>${st.bank_name || 'Bank transfer'}</b><span>${st.bank_account_number}${st.bank_account_name ? ' · ' + st.bank_account_name : ''}</span></div>` : '';
   return html`<section class="card pay">
     <div class="card-head"><div><h2>Pay ${peso(a.quote_php)}</h2><p class="card-sub">Pay exactly this amount. Work starts once the payment is confirmed.</p></div></div>
     ${when(st.online_payments === 'on' && canEdit(), html`<button class="btn btn-primary btn-block" data-act="order-pay-online" data-id="${a.id}">Pay online (GCash, Maya, card)</button><div class="divider">or pay directly</div>`)}
-    ${gcash || bank ? html`<div class="paywiths">${gcash}${bank}</div>` : html`<p class="muted">PermitPal will send you the payment details. Then enter the reference below.</p>`}
-    ${when(st.payment_note, html`<p class="muted small">${st.payment_note}</p>`)}
-    <p class="muted small">Only pay to the accounts shown here. PermitPal staff will never ask you to pay a personal account by text or chat.</p>
+    ${payDetails(st)}
     ${when(canEdit(), html`<form class="pay-form">
       <div class="grid2">
         <label class="field"><span>Paid with</span><select name="method"><option value="gcash">GCash</option><option value="maya">Maya</option><option value="bank_transfer">Bank transfer</option><option value="other">Other</option></select></label>
@@ -320,8 +404,10 @@ function payBox(a, st) {
 on('quote-accept', async (ds) => {
   const a = S.data.requests.find((x) => x.id === ds.id);
   if (!a) return;
+  const box = document.querySelector('[data-access-ok]');
+  if (box && !box.checked) { box.closest('label').classList.add('need'); box.focus(); return toast('Tick the box to let PermitPal join for the set-up first.', 'error'); }
   if (!(await confirmDialog('Accept this quote?', `Total ${peso(a.quote_php)}. Next you'll pay, then we start.`, { confirmLabel: 'Accept quote', danger: false }))) return;
-  try { await db.acceptQuote(ds.id); await reload(); toast('Quote accepted. Pay below to get started.'); } catch (e) { toastError(e); }
+  try { await db.acceptQuote(ds.id, !!box?.checked); await reload(); toast(Number(a.quote_php) ? 'Quote accepted. Pay below to get started.' : 'Accepted. We\'re starting now.'); } catch (e) { toastError(e); }
 });
 on('order-cancel', async (ds) => {
   if (!(await confirmDialog('Cancel this request?', 'We will stop working on it. Nothing has been charged.', { confirmLabel: 'Cancel request', cancelLabel: 'Keep it' }))) return;
@@ -388,3 +474,70 @@ export function serviceOffer(r, { compact = false } = {}) {
     <span class="muted">${price(s)} ${s.price_unit} plus government fees at cost${s.turnaround ? ' · usually ' + s.turnaround : ''}. Exact quote first; nothing is charged until you accept.</span></div></div>
     <button class="btn btn-primary btn-sm" data-act="svc-for-req" data-id="${r.id}">Get a quote</button></div>`;
 }
+
+// ---------------------------------------------------------------- several permits in one request
+// Overdue and due-within-30-days are ticked for them; everything else is one tap away.
+export function openBulk(preselect = null) {
+  if (!has('revenue')) return;
+  if (!canEdit()) return toast('Only people who can edit this workspace can ask for a quote.', 'error');
+  const list = renewable();
+  if (!list.length) return toast('Nothing to renew right now: every permit is either done, being handled, or has no renewal service.', 'info');
+  const pre = (r) => (preselect ? preselect.includes(r.id) : dueNow(r));
+  const groups = [
+    ['Overdue', list.filter((r) => r.status === 'action_required')],
+    ['Due within 60 days', list.filter((r) => r.status !== 'action_required' && r.days_left != null && r.days_left <= 60)],
+    ['Later', list.filter((r) => r.status !== 'action_required' && !(r.days_left != null && r.days_left <= 60))],
+  ].filter(([, l]) => l.length);
+  openModal('Renew several for me', html`
+    <p class="muted small">Tick the permits we should renew. You get an exact quote for each one within 1 business day, and accept or decline each separately. Nothing is charged until you accept.</p>
+    ${groups.map(([title, l]) => html`<fieldset class="bulk-group"><legend>${title} <small class="muted">(${l.length})</small></legend>
+      ${title === 'Later' && !l.some(pre) ? html`<details><summary>Show ${plural(l.length, 'permit')}</summary>${l.map((r) => bulkRow(r, pre(r)))}</details>` : l.map((r) => bulkRow(r, pre(r)))}</fieldset>`)}
+    <div class="bulk-sum" aria-live="polite" data-bulk-sum></div>
+    <label class="check"><input type="checkbox" name="rush"><span>They're urgent <small class="muted">(a rush fee applies to each one; it's shown in each quote)</small></span></label>
+    <div class="grid2">
+      <label class="field"><span>Best way to reach you</span><select name="contact_method">
+        <option value="email">Email</option><option value="phone">Phone call / SMS</option><option value="viber">Viber</option><option value="whatsapp">WhatsApp</option></select></label>
+      <label class="field"><span>Email or mobile</span><input name="contact_value" value="${S.profile.email || ''}" maxlength="120" required></label>
+    </div>
+    <label class="field"><span>Anything we should know? <small>(optional)</small></span><textarea name="notes" rows="2" maxlength="2000"></textarea></label>
+    <label class="check consent"><input type="checkbox" name="consent" required>
+      <span>I authorize PermitPal to process these for ${S.org.name} and will sign an authorization letter. Government fees are paid at cost with official receipts.
+        <a href="terms.html#services" target="_blank" rel="noopener">Done-for-you terms</a></span></label>`, {
+    wide: true, submitLabel: 'Ask for quotes',
+    onOpen: (form) => {
+      const m = form.querySelector('[name=contact_method]');
+      const v = form.querySelector('[name=contact_value]');
+      m.addEventListener('change', () => { v.value = m.value === 'email' ? S.profile.email || '' : S.profile.phone || ''; });
+      const paint = () => {
+        const ids = [...form.querySelectorAll('[name=req]:checked')].map((x) => x.value);
+        const est = ids.map((id) => serviceFor(reqById(id))).reduce((t, x) => t + Number(x?.price_from || 0), 0);
+        const quoted = ids.filter((id) => serviceFor(reqById(id))?.price_from == null).length;
+        form.querySelector('[data-bulk-sum]').innerHTML = String(ids.length
+          ? html`<b>${plural(ids.length, 'permit')}</b> · our fees from about ${peso(est)}${quoted ? ` plus ${quoted} quoted separately` : ''}, plus government fees at cost.${ids.length > 25 ? html` <span class="due overdue">Choose up to 25 at a time.</span>` : ''}`
+          : html`<span class="muted">Tick at least one permit.</span>`);
+        form.querySelector('button[type=submit]').textContent = ids.length ? `Ask for ${plural(ids.length, 'quote')}` : 'Ask for quotes';
+      };
+      form.addEventListener('change', paint); paint();
+    },
+    onSubmit: async (fd) => {
+      const f = formObject(fd);
+      const ids = fd.getAll('req');
+      if (!ids.length) throw new Error('Tick at least one permit.');
+      if (ids.length > 25) throw new Error('Choose up to 25 permits at a time.');
+      let contact = (f.contact_value || '').trim();
+      if (f.contact_method === 'email') { if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) throw new Error('Please enter a valid email address so we can send your quotes.'); }
+      else { contact = normalizePhone(contact); if (!contact) throw new Error('Please enter a valid mobile number, e.g. 0917 123 4567.'); }
+      if (!f.consent) throw new Error('Please tick the box to authorize PermitPal for these permits.');
+      await db.requestServicesBulk({ org_id: S.org.id, requirement_ids: ids, rush: !!f.rush, contact_method: f.contact_method, contact_value: contact, notes: f.notes, consent: true });
+      await reload();
+      go('#/services');
+      toast(`Sent. You'll get ${plural(ids.length, 'quote')} within 1 business day.`);
+    },
+  });
+}
+function bulkRow(r, checked) {
+  const s = serviceFor(r);
+  return html`<label class="check bulk-row"><input type="checkbox" name="req" value="${r.id}" ${checked ? 'checked' : ''}>
+    <span><b>${r.name}</b> <small class="muted">${subjectLabel(r)} · ${dueShort(r)}</small><small class="muted">${s ? `${price(s)} ${s.price_unit}` : ''}</small></span></label>`;
+}
+on('svc-bulk', (ds) => openBulk(ds.ids ? ds.ids.split(',') : null));

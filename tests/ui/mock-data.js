@@ -141,6 +141,7 @@ export async function loadOrgData() {
     vehicles: db.vehicles.filter((v) => !v.deleted_at), people: db.people.filter((x) => !x.deleted_at), services: SERVICES,
     reqs: statusRows(), requests: db.requests.map((a) => ({ ...a })),
     members: db.members.map((m) => ({ ...m, profile: { ...m.profile } })),
+    care: careData(),
   };
 }
 export const setCurrentOrg = async () => {};
@@ -279,7 +280,7 @@ export const payments = async () => [];
 export const updatePrefs = async (userId, patch) => { Object.assign(myPrefs, patch); };
 export const updateProfile = async (userId, patch) => { if ('phone' in patch && patch.phone !== me.phone) me.phone_verified_at = null; Object.assign(me, patch); };
 export const adminOrgs = async () => [{ id: org.id, name: org.name, plan_id: org.plan_id, created_at: new Date().toISOString(), owner_email: user.email, members: 1, businesses: 1, vehicles: 1, open_requests: db.requests.length }];
-export const adminRequests = async () => db.requests.map((a) => ({ ...a, orgs: { name: org.name } }));
+export const adminRequests = async () => db.requests.map((a) => ({ ...a, orgs: { name: org.name, care_gov_preapproval_php: org.care_gov_preapproval_php || 0 } }));
 export const adminOutbox = async () => [];
 export const adminRequestDocs = async () => [];
 
@@ -337,7 +338,12 @@ export async function requestService(f) {
     business_id: f.business_id || r?.business_id || null, vehicle_id: f.vehicle_id || r?.vehicle_id || null, person_id: f.person_id || r?.person_id || null,
     requirement_name: r?.name || s.name, subject_label: subj, notes: f.notes || null, rush: !!f.rush, contact_method: f.contact_method || 'email',
     contact_value: f.contact_value || null, docs_status: f.docs_status || 'not_sure', status: 'submitted', payment_status: 'unpaid',
-    due_on: r?.expires_on || null, created_at: now(), updated_at: now(), kind: f.kind || 'renew', consented_at: now() };
+    due_on: r?.expires_on || null, created_at: now(), updated_at: now(), kind: f.kind || 'renew', consented_at: now(), quote_rush_fee: 0, steps_done: 0 };
+  // A walk-through for a Care Plus branch is included once a year.
+  if (s.visit && r && db.care) {
+    const plan = db.care.plans.find((p) => p.status === 'active' && p.location_id === r.location_id && p.tier === 'branch_plus');
+    if (plan && !db.requests.some((x) => x.care_plan_id === plan.id && SERVICES.find((y) => y.code === x.service_code)?.visit && x.status !== 'cancelled')) a.care_plan_id = plan.id;
+  }
   db.requests.unshift(a);
   event(a, 'created', a.notes || 'Request sent');
   return a.id;
@@ -346,9 +352,11 @@ export const orderRefunds = async (id) => db.refunds.filter((r) => r.request_id 
 export const staffAccessLog = async () => db.access;
 export const getRequest = async (id) => { const a = db.requests.find((x) => x.id === id); return a ? { ...a } : null; };
 export const orderEvents = async (id) => db.events.filter((e) => e.request_id === id);
-export async function acceptQuote(id) {
+export async function acceptQuote(id, access = false) {
   const a = db.requests.find((x) => x.id === id);
   if (a.status !== 'quoted') throw new Error('There is no quote to accept.');
+  if (SERVICES.find((x) => x.code === a.service_code)?.needs_access && !access) throw new Error('Tick the box to give PermitPal temporary access, so we can set things up for you.');
+  if (access) a.staff_access = true;
   Object.assign(a, { accepted_at: now(), payment_status: a.quote_php ? 'awaiting_payment' : 'waived', status: a.quote_php ? 'awaiting_customer' : 'in_progress' });
   event(a, 'accepted', 'Quote accepted');
 }
@@ -366,8 +374,16 @@ export const appSettings = async () => ({ ...settings });
 // ---------------------------------------------------------------- partners, referrals, sharing, workspaces
 export const listPartners = async () => db.partners.filter((p) => p.published);
 export async function requestReferral(f) {
-  const r = { id: uid(), org_id: f.org_id, partner_id: f.partner_id, requirement_id: f.requirement_id || null, note: f.note || null, status: 'new', created_at: now(), commission: null };
+  if (db.referrals.some((x) => x.partner_id === f.partner_id && (x.requirement_id || '') === (f.requirement_id || '') && Date.now() - Date.parse(x.created_at) < 7 * 864e5)) {
+    throw new Error('You already sent this request this week. They will contact you soon.');
+  }
+  const r = { id: uid(), org_id: f.org_id, partner_id: f.partner_id, requirement_id: f.requirement_id || null, note: f.note || null, status: 'requested', created_at: now(), commission: null, placement_id: f.placement_id || null };
   db.referrals.unshift(r);
+  const p = db.partners.find((x) => x.id === f.partner_id);
+  if ((p?.fee_model || 'per_lead') === 'per_lead' && Number(p?.lead_fee_php) > 0) {
+    db.charges.unshift({ id: uid(), partner_id: p.id, kind: 'lead', description: 'Quote request from ' + org.name, amount_php: Number(p.lead_fee_php), occurred_on: today(), referral_id: r.id, status: 'unbilled', statement_id: null });
+  }
+  if (f.placement_id) { const st = placementStat(f.placement_id); st.leads++; }
   return r.id;
 }
 export const myReferrals = async () => db.referrals.map(({ commission, ...r }) => r);
@@ -385,10 +401,16 @@ export async function getSharedCompliance() {
 }
 
 // ---------------------------------------------------------------- admin console
-export async function adminQuote(id, fee, gov, note) {
+export async function adminQuote(id, fee, gov, note, rush = 0) {
   const a = db.requests.find((x) => x.id === id);
-  Object.assign(a, { quote_service_fee: Number(fee), quote_gov_fees: Number(gov), quote_php: Number(fee) + Number(gov), quote_note: note || null, quoted_at: now(), status: 'quoted' });
+  if (Number(rush) > 0 && !a.rush) throw new Error("The customer didn't ask for this to be rushed. Leave the rush fee at 0.");
+  const total = Number(fee) + Number(gov) + Number(rush || 0);
+  const auto = a.care_plan_id && !a.created_by && !Number(fee) && !Number(rush) && Number(gov) <= Number(org.care_gov_preapproval_php || 0);
+  Object.assign(a, { quote_service_fee: Number(fee), quote_rush_fee: Number(rush || 0), quote_gov_fees: Number(gov), quote_php: total, quote_note: note || null, quoted_at: now(),
+    status: auto ? (total ? 'awaiting_customer' : 'in_progress') : 'quoted', accepted_at: auto ? now() : null, payment_status: auto ? (total ? 'awaiting_payment' : 'waived') : 'unpaid',
+    admin_note: auto && total ? `Government fees ₱${Number(gov).toLocaleString()}, within the amount you pre-approved. Pay to start.` : null });
   event(a, 'quote', `Quote sent: ₱${a.quote_php}`, true);
+  if (auto) event(a, 'accepted', 'Accepted for you: within the government fees you pre-approved.', true);
 }
 export async function adminConfirmPayment(id, okPaid, note) {
   const a = db.requests.find((x) => x.id === id);
@@ -398,6 +420,10 @@ export async function adminConfirmPayment(id, okPaid, note) {
 export async function adminUpdateOrder(a0, { status, message, file, govActual, provider }) {
   const a = db.requests.find((x) => x.id === a0.id);
   if (status) a.status = status;
+  if (['completed', 'cancelled'].includes(status)) {
+    // PermitPal's temporary access ends with the job
+    for (const x of (db.staffAccess || []).filter((y) => y.request_id === a.id && !y.ended_at)) { x.ended_at = now(); db.members = db.members.filter((m) => m.user_id !== x.user_id); }
+  }
   if (provider) a.provider_name = provider;
   if (govActual !== '' && govActual != null) a.gov_fees_actual = Number(govActual);
   event(a, file ? 'file' : status ? 'status' : 'message', message || (status ? `Status: ${status}` : ''), true, file?.name || null);
@@ -624,7 +650,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue'];
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries(ALL_FEATURES.map((f) => [f, true])));
 
 db.clientErrors = [];
@@ -880,3 +906,395 @@ export async function setRequireMfa(orgId, on) {
   org.require_mfa = !!on;
 }
 export const adminResetMfa = async () => 1;
+
+// ---------------------------------------------------------------- revenue: one-time jobs, Year-round care, fees from firms, money
+// Same rules as supabase/migrations/20261019002200_revenue.sql, in memory.
+const REV = globalThis.PP_FEATURES !== 'none';
+if (REV) {
+  const S_ = (code) => SERVICES.find((x) => x.code === code);
+  const rush = { renew_mayors_permit: 1000, renew_barangay_clearance: 500, renew_fsic: 800, renew_sanitary_permit: 500, renew_lto_registration: 500, renew_other: 800, pkg_new_business: 5000, pkg_new_branch: 3000, pkg_amendment: 2000, doc_replacement: 500, doc_bir_update: 1000 };
+  for (const x of SERVICES) Object.assign(x, { rush_fee: rush[x.code] ?? null, steps: x.steps || [], visit: false, needs_access: false });
+  Object.assign(S_('pkg_new_business'), { steps: ['Business name or company registered (DTI, SEC or CDA)', 'Barangay clearance', "Mayor's Permit", 'BIR registration (COR)', 'Books and invoices registered with BIR', 'Everything saved to your account'] });
+  Object.assign(S_('pkg_new_branch'), { steps: ['Barangay clearance', "Mayor's Permit", 'Fire safety inspection (FSIC)', 'BIR branch registration', 'Everything saved to your account'] });
+  Object.assign(S_('adv_fire_preinspection'), { name: 'Pre-inspection walk-through (fire or sanitary)', visit: true, price_unit: 'per site visit', type_codes: ['fsic', 'sanitary_permit'],
+    summary: 'We visit before the fire or sanitary inspector does and give you a written list of what to fix first, so you pass the first time.' });
+  SERVICES.push({ code: 'setup_from_paper', name: 'Set up my account for me', category: 'package', active: true, sort: 200,
+    summary: "Send us photos or scans of your permits, registrations and OR/CRs. We enter everything into PermitPal with the right dates, attach each file, switch on your reminders, and list what's missing or about to expire.",
+    includes: ['Every permit entered with its dates and file', "What's missing or expiring, listed for you", 'Reminders checked and switched on', 'Temporary access that ends when we finish'],
+    price_from: 1500, price_unit: 'up to 20 documents, then ₱50 each', turnaround: '2-5 working days', applies_to: 'any', type_codes: [], rush_fee: 1000, visit: false, needs_access: true,
+    steps: ['Photos or scans received', 'Businesses, branches and vehicles added', 'Permits entered with dates and files', "What's missing or expiring, listed for you", 'Reminders checked and on'] });
+  SERVICES.sort((a, b) => a.sort - b.sort);
+  for (const code of ['plan_branch_care', 'plan_vehicle_care']) { const i = SERVICES.findIndex((x) => x.code === code); if (i >= 0) SERVICES.splice(i, 1); }
+  if (!T('fsic').checklist.some((i) => i.k === 'inspect')) T('fsic').checklist.push({ k: 'inspect', t: 'Have someone at the site for the inspection' });
+}
+org.care_gov_preapproval_php = 0;
+db.charges = []; db.statements = []; db.placements = []; db.placementStats = []; db.apps = []; db.planPayments = []; db.staffAccess = [];
+db.care = { plans: [], invoices: [], claims: [] };
+db.history = []; // other customers' money, so the staff Money views have something to show in the demo
+const tiers = [
+  { code: 'branch_care', subject: 'branch', name: 'Care', monthly_php: 1500, yearly_php: 15000, guarantee: false, guarantee_cap_php: 0, walkthroughs: 0, active: true, sort: 10,
+    includes: ["We start every renewal for this branch before it's due", 'Our service fee is included: you only pay government fees, at cost', 'Official receipts and the new permits saved for you', 'One person to message about everything'] },
+  { code: 'branch_plus', subject: 'branch', name: 'Care Plus', monthly_php: 2000, yearly_php: 20000, guarantee: true, guarantee_cap_php: 10000, walkthroughs: 1, active: true, sort: 20,
+    includes: ['Everything in Care', 'On-time guarantee: if we miss a deadline, we pay the late penalty (up to ₱10,000 per permit)', 'One fire or sanitary pre-inspection walk-through a year'] },
+  { code: 'vehicle_care', subject: 'vehicle', name: 'Care', monthly_php: 300, yearly_php: 3000, guarantee: false, guarantee_cap_php: 0, walkthroughs: 0, active: true, sort: 30,
+    includes: ['Registration, CTPL, emission test and inspection handled every year', 'Our service fee is included: you only pay government fees and the premium, at cost', 'The new OR/CR saved for you'] },
+  { code: 'vehicle_plus', subject: 'vehicle', name: 'Care Plus', monthly_php: 400, yearly_php: 4000, guarantee: true, guarantee_cap_php: 3000, walkthroughs: 0, active: true, sort: 40,
+    includes: ['Everything in Care', 'On-time guarantee: if we miss the deadline, we pay the late penalty (up to ₱3,000)'] },
+];
+let billSeq = 0;
+const billNo = (p) => `${p}-${today().slice(0, 4)}-${String(++billSeq).padStart(5, '0')}`;
+const endOf = (start, billing) => { const d = new Date(start + 'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + (billing === 'yearly' ? 12 : 1)); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
+function covered(p) {
+  const l = db.locations.find((x) => x.id === p.location_id);
+  return statusRows().filter((r) => r.subject !== 'person' && (p.vehicle_id ? r.vehicle_id === p.vehicle_id : r.business_id === l?.business_id && (r.location_id === p.location_id || (!r.location_id && l?.is_main))));
+}
+function careData() {
+  if (!REV) return { plans: [], invoices: [], coverage: [], claims: [], tiers: [], staff: [] };
+  const live = db.care.plans.filter((p) => p.status !== 'cancelled');
+  return { plans: db.care.plans.map((p) => ({ ...p })), invoices: db.care.invoices.map((i) => ({ ...i })), claims: db.care.claims.map((c) => ({ ...c })), tiers: tiers.map((t) => ({ ...t })),
+    coverage: live.flatMap((p) => covered(p).map((r) => ({ requirement_id: r.id, plan_id: p.id, tier: p.tier, status: p.status, paid_through: p.paid_through }))),
+    staff: db.staffAccess.filter((x) => !x.ended_at).map((x) => ({ ...x })) };
+}
+export const careTiers = async () => tiers.map((t) => ({ ...t }));
+export const loadCare = async () => careData();
+export const loadMembers = async () => db.members.map((m) => ({ ...m, profile: { ...m.profile } }));
+export async function startCare(orgId, items, billing) {
+  if (org.role !== 'owner') throw new Error('Only the workspace owner can start a paid plan.');
+  if (!items.length) throw new Error('Choose at least one branch or vehicle.');
+  const lines = [];
+  for (const it of items) {
+    const t = tiers.find((x) => x.code === it.tier);
+    if (!t || (it.kind === 'location') !== (t.subject === 'branch')) throw new Error("That plan doesn't match what you chose.");
+    const l = it.kind === 'location' ? db.locations.find((x) => x.id === it.id) : null;
+    const v = it.kind === 'vehicle' ? db.vehicles.find((x) => x.id === it.id) : null;
+    const b = l ? db.businesses.find((x) => x.id === l.business_id) : null;
+    const label = l ? `${b.name} · ${l.name}${l.city ? ' (' + l.city + ')' : ''}` : `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`;
+    if (db.care.plans.some((p) => p.status !== 'cancelled' && (l ? p.location_id === l.id : p.vehicle_id === v.id))) throw new Error(`${label} already has a care plan.`);
+    const price = billing === 'yearly' ? t.yearly_php : t.monthly_php;
+    const p = { id: uid(), org_id: org.id, tier: t.code, location_id: l?.id || null, vehicle_id: v?.id || null, business_id: l?.business_id || v?.business_id || null, label, billing, price_php: price,
+      status: 'pending', started_on: null, paid_through: null, cancel_at: null, ended_reason: null, consented_at: now(), created_at: now() };
+    db.care.plans.push(p);
+    lines.push({ plan_id: p.id, label, tier: t.name, amount: price });
+  }
+  const inv = { id: uid(), org_id: org.id, number: billNo('C'), first: true, period_start: today(), period_end: endOf(today(), billing), lines, amount_php: lines.reduce((t, x) => t + x.amount, 0),
+    status: 'due', due_on: addDays(3), created_at: now() };
+  db.care.invoices.unshift(inv);
+  return inv.id;
+}
+export async function cancelCare(id) {
+  const p = db.care.plans.find((x) => x.id === id);
+  if (p.status === 'pending' || !p.paid_through || p.paid_through < today()) { Object.assign(p, { status: 'cancelled', cancel_at: today() }); dropFromUnpaid(id); return today(); }
+  p.cancel_at = p.paid_through; dropFromUnpaid(id); return p.paid_through;
+}
+function dropFromUnpaid(planId) {
+  for (const i of db.care.invoices.filter((x) => x.status === 'due' && x.lines.some((l) => l.plan_id === planId))) {
+    i.lines = i.lines.filter((l) => l.plan_id !== planId);
+    i.amount_php = i.lines.reduce((t, l) => t + l.amount, 0);
+    if (!i.lines.length) Object.assign(i, { status: 'void', note: 'Cancelled: nothing left on this bill.' });
+  }
+}
+export async function resumeCare(id) { const p = db.care.plans.find((x) => x.id === id); if (!p.cancel_at) throw new Error("This plan isn't set to end."); p.cancel_at = null; }
+export async function setCarePreapproval(orgId, amount) { if (!['owner', 'admin'].includes(org.role)) throw new Error('Only owners and admins can change this.'); org.care_gov_preapproval_php = amount; }
+export async function payCareInvoice(inv, { method, ref, file }) {
+  const i = db.care.invoices.find((x) => x.id === inv.id);
+  if (!['due', 'pending_verification'].includes(i.status)) throw new Error('This bill is already paid or was cancelled.');
+  if (!ref && !(file && file.size)) throw new Error('Add the reference number or a screenshot of the payment.');
+  Object.assign(i, { status: 'pending_verification', pay_method: method, pay_ref: ref || null, proof_path: file?.size ? `${org.id}/care/${i.id}/${file.name}` : null, proof_name: file?.name || null, reported_at: now() });
+}
+export async function fileGuaranteeClaim(orgId, { plan_id, requirement_id, penalty, note, file }) {
+  const p = db.care.plans.find((x) => x.id === plan_id);
+  if (!tiers.find((t) => t.code === p.tier)?.guarantee) throw new Error('The on-time guarantee comes with Care Plus.');
+  if (!(file && file.size)) throw new Error('Attach the official receipt that shows the penalty.');
+  const r = statusRows().find((x) => x.id === requirement_id);
+  if (!r?.expires_on || r.expires_on >= today()) throw new Error("This permit hasn't lapsed: there's no past expiry date on file for it.");
+  const c = { id: uid(), org_id: org.id, plan_id, requirement_id, requirement_name: r.name, lapsed_on: r.expires_on, penalty_php: penalty, note: note || null, receipt_path: `${org.id}/care/claims/${file.name}`, receipt_name: file.name,
+    status: 'submitted', approved_php: null, decision_note: null, created_at: now() };
+  db.care.claims.unshift(c);
+  return c.id;
+}
+export async function requestServicesBulk(f) {
+  if (!f.consent) throw new Error('Please tick the box to confirm PermitPal may act for you on these permits.');
+  if (!f.requirement_ids.length) throw new Error('Choose at least one permit.');
+  if (f.requirement_ids.length > 25) throw new Error('Choose up to 25 permits at a time.');
+  const batch = uid();
+  const rows = statusRows();
+  for (const id of f.requirement_ids) {
+    const r = rows.find((x) => x.id === id);
+    if (!r) throw new Error('One of those permits was not found. Refresh the page and try again.');
+    if (db.requests.some((a) => a.requirement_id === id && !['completed', 'cancelled'].includes(a.status))) throw new Error(`${r.name} (${r.subject_name}) already has an open request.`);
+  }
+  for (const id of f.requirement_ids) {
+    const r = rows.find((x) => x.id === id);
+    const s = SERVICES.find((x) => x.category === 'renewal' && x.type_codes.includes(r.type_code)) || SERVICES.find((x) => x.code === 'renew_other');
+    const aid = await requestService({ org_id: org.id, service_code: s.code, requirement_id: id, notes: f.notes, rush: f.rush, contact_method: f.contact_method, contact_value: f.contact_value, consent: true, kind: r.cycle_id ? 'renew' : 'apply' });
+    db.requests.find((a) => a.id === aid).batch_id = batch;
+  }
+  return batch;
+}
+export async function adminOrderStep(id, done) {
+  const a = db.requests.find((x) => x.id === id);
+  const steps = SERVICES.find((x) => x.code === a.service_code)?.steps || [];
+  if (!steps.length) throw new Error('This service has no steps.');
+  if (done < 0 || done > steps.length) throw new Error(`Choose a step between 0 and ${steps.length}.`);
+  const before = a.steps_done || 0;
+  a.steps_done = done;
+  event(a, 'status', done > before ? `Step ${done} of ${steps.length} done: ${steps[done - 1]}` : `Progress updated: ${done} of ${steps.length} steps done`, true);
+}
+export async function adminJoinWorkspace(id) {
+  const a = db.requests.find((x) => x.id === id);
+  if (!a.staff_access) throw new Error("The customer hasn't given PermitPal access for this order.");
+  if (!['paid', 'waived'].includes(a.payment_status)) throw new Error('Wait until the order is paid, then join.');
+  db.staffAccess.push({ user_id: 'u9', request_id: id, requirement_name: a.requirement_name, joined_at: now(), ended_at: null });
+  if (!db.members.some((m) => m.user_id === 'u9')) db.members.push({ user_id: 'u9', role: 'member', profile: { first_name: 'Fe', last_name: 'Staff', email: 'fe@permitpal.ph' } });
+  event(a, 'status', 'PermitPal joined your workspace to do the set-up.', true);
+  return org.id;
+}
+
+// ---------------------------------------------------------------- firms
+function placementStat(id) {
+  let st = db.placementStats.find((x) => x.placement_id === id);
+  if (!st) db.placementStats.push(st = { placement_id: id, views: 0, clicks: 0, leads: 0, seen: new Set() });
+  return st;
+}
+export const listPlacements = async () => (REV ? db.placements.filter((x) => x.active && x.starts_on <= today() && x.ends_on >= today()).map((x) => {
+  const p = db.partners.find((y) => y.id === x.partner_id);
+  return p?.published ? { id: x.id, partner_id: p.id, partner_name: p.name, category: p.category, verified: !!p.verified, type_code: x.type_code, item_key: x.item_key, cities: x.cities, headline: x.headline } : null;
+}).filter(Boolean) : []);
+export async function logPlacement(ids, kind) {
+  for (const id of new Set(ids)) { const st = placementStat(id); const k = kind + ':' + today(); if (!st.seen.has(k)) { st.seen.add(k); if (kind === 'view') st.views++; else st.clicks++; } }
+}
+export async function applyAsPartner(f) {
+  if (f.trap) return;
+  if (db.apps.some((a) => a.email === f.email.toLowerCase() && Date.now() - Date.parse(a.created_at) < 864e5)) throw new Error("We already have your application. We'll reply within 3 business days.");
+  db.apps.unshift({ id: uid(), ...f, email: f.email.toLowerCase(), status: 'new', created_at: now() });
+}
+export const adminApplications = async () => db.apps.map((a) => ({ ...a }));
+export async function adminApplicationToPartner(id) {
+  const a = db.apps.find((x) => x.id === id);
+  const p = { id: uid(), category: a.category, name: a.name, description: '', licence: a.licence || '', services: a.services || '', website: a.website || '', contact_name: a.contact_name, contact_phone: a.phone || '',
+    contact_email: a.email, cities: String(a.cities || '').split(',').map((x) => x.trim()).filter(Boolean), published: false, verified: false, fee_model: a.category === 'insurance' ? 'none' : 'per_lead', type_codes: [], sort: 100 };
+  db.partners.push(p);
+  Object.assign(a, { status: 'listed', partner_id: p.id });
+  return p.id;
+}
+export async function adminSetApplication(id, patch) { Object.assign(db.apps.find((x) => x.id === id), patch); }
+export const adminPlacements = async () => db.placements.map((x) => ({ ...x }));
+export async function adminSavePlacement(id, row) {
+  if (id) return Object.assign(db.placements.find((x) => x.id === id), row);
+  if (db.placements.some((o) => o.active && o.type_code === row.type_code && (o.item_key || '') === (row.item_key || '') && o.starts_on <= row.ends_on && o.ends_on >= row.starts_on
+    && (!o.cities.length || !row.cities.length || o.cities.some((c) => row.cities.includes(c))))) throw new Error('Another firm already has this step for these dates and cities. One firm per step keeps it from looking like an ad.');
+  db.placements.push({ id: uid(), active: true, created_at: now(), ...row });
+}
+export const adminPlacementStats = async () => db.placementStats.map(({ seen, ...x }) => ({ ...x }));
+export const adminCharges = async () => db.charges.map((c) => ({ ...c }));
+export const adminStatements = async () => db.statements.map((x) => ({ ...x }));
+export async function adminRecordSale(refId, sale) {
+  const r = db.referrals.find((x) => x.id === refId); const p = db.partners.find((x) => x.id === r.partner_id);
+  const fee = p.fee_model === 'per_sale_flat' ? Number(p.sale_fee_php || 0) : p.fee_model === 'per_sale_percent' ? Math.round(sale * Number(p.sale_pct || 0)) / 100 : 0;
+  Object.assign(r, { status: 'converted', sale_php: sale });
+  const old = db.charges.find((c) => c.referral_id === refId && c.kind === 'sale');
+  if (old) old.amount_php = fee; else if (fee > 0) db.charges.unshift({ id: uid(), partner_id: p.id, kind: 'sale', description: `Sale to ${org.name}: ₱${sale.toLocaleString()}`, amount_php: fee, occurred_on: today(), referral_id: refId, status: 'unbilled' });
+  return fee;
+}
+export async function adminAddCharge(partnerId, description, amount, on) { db.charges.unshift({ id: uid(), partner_id: partnerId, kind: 'other', description, amount_php: amount, occurred_on: on || today(), status: 'unbilled' }); }
+export async function adminWaiveCharge(id) { db.charges.find((c) => c.id === id).status = 'waived'; }
+export async function adminCreateStatement(partnerId, through) {
+  const list = db.charges.filter((c) => c.partner_id === partnerId && c.status === 'unbilled' && c.occurred_on <= through);
+  if (!list.length) throw new Error('Nothing to bill for this firm up to that date.');
+  const s = { id: uid(), partner_id: partnerId, number: billNo('P'), period_end: through, total_php: list.reduce((t, c) => t + c.amount_php, 0), status: 'sent', sent_at: now(), due_on: addDays(15), created_at: now() };
+  db.statements.unshift(s);
+  list.forEach((c) => Object.assign(c, { status: 'billed', statement_id: s.id }));
+  return s.id;
+}
+export async function adminStatementPaid(id, method, ref, no) {
+  const s = db.statements.find((x) => x.id === id);
+  Object.assign(s, { status: 'paid', paid_at: now(), paid_method: method, paid_ref: ref, bir_invoice_no: no || s.bir_invoice_no || null });
+  db.charges.filter((c) => c.statement_id === id).forEach((c) => { c.status = 'paid'; });
+}
+export async function adminStatementVoid(id, note) {
+  Object.assign(db.statements.find((x) => x.id === id), { status: 'void', note });
+  db.charges.filter((c) => c.statement_id === id).forEach((c) => Object.assign(c, { status: 'unbilled', statement_id: null }));
+}
+
+// ---------------------------------------------------------------- staff: care
+const withOrg = (x) => ({ ...x, orgs: { name: x.org_name || org.name } });
+export const adminCarePlans = async () => [...db.care.plans, ...db.history.filter((h) => h.type === 'plan')].map(withOrg);
+export const adminCareInvoices = async () => db.care.invoices.map(withOrg);
+export const adminClaims = async () => db.care.claims.map(withOrg);
+export const adminCareGaps = async () => db.care.plans.filter((p) => p.status === 'active').flatMap((p) => covered(p).filter((r) => r.expires && !r.expires_on)
+  .map((r) => ({ plan_id: p.id, org_name: org.name, plan_label: p.label, requirement_id: r.id, requirement_name: r.name })));
+export const adminCareTiers = async () => tiers.map((t) => ({ ...t }));
+export async function adminSaveCareTier(code, patch) { Object.assign(tiers.find((t) => t.code === code), patch); }
+export async function adminConfirmCarePayment(id, okPaid, note, no) {
+  const i = db.care.invoices.find((x) => x.id === id);
+  if (!okPaid) { Object.assign(i, { status: 'due', note: 'We could not find this payment. Please check the reference number and send it again.' }); return; }
+  const billing = db.care.plans.find((p) => p.id === i.lines[0]?.plan_id)?.billing || 'monthly';
+  if (i.first || i.period_start < addDays(-7)) Object.assign(i, { period_start: today(), period_end: endOf(today(), billing) });
+  Object.assign(i, { status: 'paid', paid_at: now(), bir_invoice_no: no || null });
+  for (const l of i.lines) { const p = db.care.plans.find((x) => x.id === l.plan_id); if (p && p.status !== 'cancelled') Object.assign(p, { status: 'active', started_on: p.started_on || i.period_start, paid_through: i.period_end }); }
+}
+export async function adminVoidCareInvoice(id, note) {
+  const i = db.care.invoices.find((x) => x.id === id);
+  Object.assign(i, { status: 'void', note });
+  if (i.first) i.lines.forEach((l) => { const p = db.care.plans.find((x) => x.id === l.plan_id); if (p?.status === 'pending') Object.assign(p, { status: 'cancelled', cancel_at: today(), ended_reason: note }); });
+}
+export async function adminSetCarePlan(id, status, note) {
+  const p = [...db.care.plans, ...db.history].find((x) => x.id === id);
+  if (status === 'active' && (!p.paid_through || p.paid_through < today())) throw new Error("Confirm a payment first: the plan isn't paid up.");
+  Object.assign(p, { status, ...(status === 'cancelled' ? { cancel_at: today(), ended_reason: note } : {}) });
+}
+export async function adminDecideClaim(id, approve, amount, note) {
+  const c = db.care.claims.find((x) => x.id === id);
+  if (!approve && String(note || '').trim().length < 10) throw new Error("Explain why it's declined (the customer sees it).");
+  const cap = tiers.find((t) => t.code === db.care.plans.find((p) => p.id === c.plan_id)?.tier)?.guarantee_cap_php || 0;
+  Object.assign(c, approve ? { status: 'approved', approved_php: Math.min(amount ?? c.penalty_php, c.penalty_php, cap), decision_note: note || null, decided_at: now() } : { status: 'declined', decision_note: note, decided_at: now() });
+}
+export async function adminClaimPaid(id, method, ref) { Object.assign(db.care.claims.find((x) => x.id === id), { status: 'paid', paid_at: now(), paid_method: method, paid_ref: ref }); }
+export async function adminRecordPlanPayment(f) {
+  const pl = plans.find((p) => p.id === f.plan);
+  db.planPayments.unshift({ id: uid(), org_name: org.name, plan_id: f.plan, plan_name: pl?.name, months: f.months, amount_php: f.amount, paid_at: now(), bir_invoice_no: f.invoice_no || null });
+  org.plan_id = f.plan;
+}
+
+// ---------------------------------------------------------------- staff: money (mirrors admin_money)
+const dayOf = (ts) => new Date(ts).toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 10);
+const moneySettings = { goal: null, ic: '' };
+function moneyLines() {
+  const L = [];
+  const orders = [...db.requests.map((a) => ({ ...a, who: org.name })), ...db.history.filter((h) => h.type === 'order')];
+  for (const a of orders) {
+    const fee = Number(a.quote_service_fee || 0) + Number(a.quote_rush_fee || 0);
+    const base = { label: a.requirement_name, who: a.who || a.org_name, ref_kind: 'order', ref_id: a.id, stream: 'jobs' };
+    if (a.paid_at && ['paid', 'refunded'].includes(a.payment_status)) {
+      if (fee > 0) L.push({ ...base, day: dayOf(a.paid_at), kind: 'service_fee', state: 'collected', amount: fee, invoice_no: a.bir_invoice_no || null, rush: Number(a.quote_rush_fee || 0) });
+      if (Number(a.quote_gov_fees) > 0) L.push({ ...base, day: dayOf(a.paid_at), kind: 'gov_fees_in', state: 'held', amount: Number(a.quote_gov_fees), invoice_no: a.bir_invoice_no || null, rush: 0 });
+      if (Number(a.gov_fees_actual) > 0) L.push({ ...base, day: dayOf(a.updated_at || a.paid_at), kind: 'gov_fees_out', state: 'held', amount: -Number(a.gov_fees_actual), invoice_no: null, rush: 0 });
+    } else if (['awaiting_payment', 'pending_verification'].includes(a.payment_status) && a.status !== 'cancelled' && fee > 0) {
+      L.push({ ...base, day: dayOf(a.accepted_at || a.quoted_at || a.created_at), kind: 'service_fee', state: 'to_collect', amount: fee, invoice_no: null, rush: Number(a.quote_rush_fee || 0) });
+    } else if (a.status === 'quoted' && fee > 0) L.push({ ...base, day: dayOf(a.quoted_at), kind: 'service_fee', state: 'pipeline', amount: fee, invoice_no: null, rush: Number(a.quote_rush_fee || 0) });
+  }
+  for (const r of db.refunds) { const a = db.requests.find((x) => x.id === r.request_id); L.push({ day: dayOf(r.created_at), stream: 'jobs', kind: 'refund', state: r.kind === 'fee_difference' ? 'held' : 'collected', amount: -r.amount_php, label: a?.requirement_name, who: org.name, ref_kind: 'order', ref_id: r.request_id, invoice_no: null, rush: 0 }); }
+  const invs = [...db.care.invoices.map((i) => ({ ...i, who: org.name })), ...db.history.filter((h) => h.type === 'care')];
+  for (const i of invs) {
+    if (i.status === 'paid') L.push({ day: dayOf(i.paid_at), stream: 'care', kind: 'care_fee', state: 'collected', amount: i.amount_php, label: 'Year-round care, bill ' + i.number, who: i.who, ref_kind: 'care', ref_id: i.id, invoice_no: i.bir_invoice_no || null, rush: 0 });
+    else if (['due', 'pending_verification'].includes(i.status)) L.push({ day: i.due_on, stream: 'care', kind: 'care_fee', state: 'to_collect', amount: i.amount_php, label: 'Year-round care, bill ' + i.number, who: i.who, ref_kind: 'care', ref_id: i.id, invoice_no: null, rush: 0 });
+  }
+  for (const c of db.care.claims) {
+    if (c.status === 'paid') L.push({ day: dayOf(c.paid_at), stream: 'care', kind: 'guarantee', state: 'cost', amount: -c.approved_php, label: 'On-time guarantee: ' + c.requirement_name, who: org.name, ref_kind: 'claim', ref_id: c.id, invoice_no: null, rush: 0 });
+    if (c.status === 'approved') L.push({ day: dayOf(c.decided_at), stream: 'care', kind: 'guarantee', state: 'to_pay', amount: -c.approved_php, label: 'On-time guarantee: ' + c.requirement_name, who: org.name, ref_kind: 'claim', ref_id: c.id, invoice_no: null, rush: 0 });
+  }
+  for (const c of db.charges.filter((x) => x.status !== 'waived')) {
+    const s = db.statements.find((x) => x.id === c.statement_id);
+    L.push({ day: c.status === 'paid' && s?.paid_at ? dayOf(s.paid_at) : c.occurred_on, stream: 'partners', kind: c.kind, state: { paid: 'collected', billed: 'to_collect' }[c.status] || 'unbilled', amount: c.amount_php,
+      label: c.description, who: db.partners.find((p) => p.id === c.partner_id)?.name || 'Firm', ref_kind: s ? 'statement' : 'partner', ref_id: s?.id || c.partner_id, invoice_no: s?.bir_invoice_no || null, rush: 0 });
+  }
+  for (const pm of db.planPayments) L.push({ day: dayOf(pm.paid_at), stream: 'plans', kind: 'team_plan', state: 'collected', amount: pm.amount_php, label: `${pm.plan_name} plan, ${pm.months} month${pm.months > 1 ? 's' : ''}`, who: pm.org_name, ref_kind: 'plan', ref_id: pm.id, invoice_no: pm.bir_invoice_no || null, rush: 0 });
+  return L.sort((a, b) => String(b.day).localeCompare(String(a.day)));
+}
+export const adminMoney = async (from, to) => moneyLines().filter((l) => (l.day >= from && l.day <= to) || ['to_collect', 'pipeline', 'unbilled', 'to_pay'].includes(l.state));
+export async function adminMoneySummary() {
+  const L = moneyLines();
+  const live = [...db.care.plans, ...db.history.filter((h) => h.type === 'plan')];
+  const active = live.filter((p) => p.status === 'active' && p.paid_through >= today());
+  const miss = new Set(L.filter((l) => !l.invoice_no && ((l.state === 'collected' && l.amount > 0 && l.ref_kind !== 'claim') || l.kind === 'gov_fees_in')).map((l) => l.ref_kind + l.ref_id));
+  return {
+    today: today(), goal: moneySettings.goal, ic_licence_no: moneySettings.ic,
+    mrr_care: active.filter((p) => !p.cancel_at).reduce((t, p) => t + (p.billing === 'yearly' ? p.price_php / 12 : p.price_php), 0),
+    care_active: active.length, care_pending: live.filter((p) => p.status === 'pending').length, care_paused: live.filter((p) => p.status === 'paused').length,
+    care_ending: live.filter((p) => p.cancel_at && p.status !== 'cancelled').length,
+    mrr_plans: globalThis.PP_DEMO ? 6470 : 0, plans_paying: globalThis.PP_DEMO ? 3 : 0,
+    held_gov: L.filter((l) => l.state === 'held').reduce((t, l) => t + l.amount, 0),
+    gov_unrecorded: db.requests.filter((a) => a.status === 'completed' && a.paid_at && Number(a.quote_gov_fees) > 0 && a.gov_fees_actual == null).length,
+    quotes_to_send: db.requests.filter((a) => a.status === 'submitted').length, care_to_quote: db.requests.filter((a) => a.status === 'submitted' && a.care_plan_id).length,
+    order_payments_to_check: db.requests.filter((a) => a.payment_status === 'pending_verification').length,
+    care_payments_to_check: db.care.invoices.filter((i) => i.status === 'pending_verification').length,
+    care_overdue: db.care.invoices.filter((i) => i.status === 'due' && i.due_on < today()).length,
+    claims_to_decide: db.care.claims.filter((c) => c.status === 'submitted').length, claims_to_pay: db.care.claims.filter((c) => c.status === 'approved').length,
+    partners_to_bill: new Set(db.charges.filter((c) => c.status === 'unbilled' && c.occurred_on < today().slice(0, 8) + '01').map((c) => c.partner_id)).size,
+    statements_overdue: db.statements.filter((s) => s.status === 'sent' && s.due_on < today()).length,
+    applications_new: db.apps.filter((a) => a.status === 'new').length, staff_access_open: db.staffAccess.filter((x) => !x.ended_at).length,
+    covered_missing_dates: (await adminCareGaps()).length, missing_invoice: miss.size,
+  };
+}
+export async function adminSetMoneySetting(key, value) {
+  if (key === 'money_goal') { if (value && !/^\d{0,9}(\.\d{1,2})?$/.test(value)) throw new Error('Enter the goal in pesos, e.g. 100000.'); moneySettings.goal = value ? Number(value) : null; }
+  else moneySettings.ic = value;
+}
+export async function adminSetInvoiceNo(kind, id, no) {
+  const target = kind === 'order' ? [...db.requests, ...db.history].find((x) => x.id === id) : kind === 'care' ? [...db.care.invoices, ...db.history].find((x) => x.id === id)
+    : kind === 'statement' ? db.statements.find((x) => x.id === id) : db.planPayments.find((x) => x.id === id);
+  if (!target) throw new Error('Payment not found.');
+  target.bir_invoice_no = no || null;
+}
+
+// ---------------------------------------------------------------- demo: a year of money, a care plan, a checklist line, an application
+if (REV) {
+  db.partners.push({ id: 'p3', category: 'fire_safety', name: 'Metro Fire Safety Supply (sample)', description: 'Extinguisher refills, tagging and fire-safety signs.', services: 'Extinguisher refill and tagging',
+    licence: 'BFP-accredited', cities: [], coverage: 'Metro Manila and Cebu', website: '', type_codes: ['fsic'], published: true, verified: true, sort: 30, fee_model: 'monthly', monthly_fee_php: 2500, contact_email: 'hello@metrofire.ph' });
+  db.placements.push({ id: 'pl1', partner_id: 'p3', type_code: 'fsic', item_key: 'ready', cities: [], headline: 'Extinguishers refilled and tagged within the week', starts_on: addDays(-40), ends_on: addDays(140), monthly_fee_php: 2500, active: true, created_at: now() });
+}
+if (REV && globalThis.PP_DEMO) {
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const daysAgo = (d) => new Date(Date.now() - d * 864e5).toISOString();
+  const custs = ['Lola Nena Bakeshop', 'Bright Smile Dental', 'Kuya Jun Hardware', 'Mabuhay Printing', 'Sunrise Laundry Hub', 'Kape Uno Ortigas', 'Isla Water Station', 'Golden Wok Eatery'];
+  const jobs = [["Mayor's / Business Permit renewal", 2500, 1000], ['Barangay Business Clearance', 1000, 500], ['Fire Safety Inspection Certificate (FSIC)', 1500, 800], ['LTO vehicle registration renewal', 800, 500], ['New business registration', 15000, 5000], ['Set up my account for me', 1500, 0]];
+  for (let d = 360; d > 2; d -= 4 + Math.floor(rnd() * 5)) {
+    const growth = 1 + (360 - d) / 200; // the business grows over the year
+    const n = rnd() < 0.35 * growth ? 2 : 1;
+    for (let k = 0; k < n; k++) {
+      const [name, fee, rushFee] = jobs[Math.floor(rnd() * (d > 200 ? 4 : jobs.length))];
+      const isRush = rnd() < 0.2 && rushFee > 0;
+      db.history.push({ type: 'order', id: uid(), org_name: custs[Math.floor(rnd() * custs.length)], requirement_name: name, quote_service_fee: fee, quote_rush_fee: isRush ? rushFee : 0, quote_gov_fees: Math.round(rnd() * 6000),
+        gov_fees_actual: null, paid_at: daysAgo(d), payment_status: 'paid', status: 'completed', bir_invoice_no: d > 20 ? 'INV-' + (1000 + Math.round(d)) : null });
+      const h = db.history[db.history.length - 1];
+      if (d > 12) h.gov_fees_actual = h.quote_gov_fees; // paid to the agency; the newest ones are still being filed
+    }
+  }
+  // care customers, starting a few months ago and growing
+  [['Bright Smile Dental', 'Main branch (Pasig City)', 'branch_plus', 2000, 150], ['Kape Uno Ortigas', 'Main branch (Pasig City)', 'branch_care', 1500, 120], ['Golden Wok Eatery', 'Main branch (Quezon City)', 'branch_care', 1500, 75],
+   ['Isla Water Station', 'Delivery van · NCF 2201', 'vehicle_care', 300, 60], ['Isla Water Station', 'Delivery van · NCF 2202', 'vehicle_care', 300, 60], ['Lola Nena Bakeshop', 'Main branch (Quezon City)', 'branch_plus', 2000, 40]]
+    .forEach(([who, label, tier, price, since]) => {
+      const id = uid();
+      db.history.push({ type: 'plan', id, org_name: who, label: `${who} · ${label}`, tier, billing: 'monthly', price_php: price, status: 'active', started_on: addDays(-since), paid_through: addDays(30 - (since % 30)), cancel_at: null });
+      for (let d = since; d > 0; d -= 30) db.history.push({ type: 'care', id: uid(), org_name: who, who, number: billNo('C'), amount_php: price, status: 'paid', paid_at: daysAgo(d), due_on: addDays(-d), bir_invoice_no: d > 25 ? 'INV-C' + d : null });
+    });
+  // fees from firms: leads and a listing over the past months, billed and paid monthly
+  const firmFees = [['p1', 'lead', 500, 'Quote request'], ['p2', 'lead', 400, 'Quote request'], ['p3', 'placement', 2500, 'Featured on the "Fire Safety Inspection Certificate (FSIC)" checklist']];
+  for (let m = 5; m >= 1; m--) {
+    for (const [pid, kind, amt, desc] of firmFees) {
+      const count = kind === 'lead' ? 2 + Math.floor(rnd() * 4) : 1;
+      if (pid === 'p3' && m > 2) continue;
+      const day = addDays(-30 * m - 5);
+      const stmt = { id: uid(), partner_id: pid, number: billNo('P'), period_end: addDays(-30 * m), total_php: amt * count, status: 'paid', sent_at: daysAgo(30 * m - 2), due_on: addDays(-30 * m + 13), paid_at: daysAgo(30 * m - 10), paid_method: 'Bank transfer', bir_invoice_no: m > 1 ? 'INV-P' + m + pid : null, created_at: daysAgo(30 * m - 2) };
+      db.statements.push(stmt);
+      for (let i = 0; i < count; i++) db.charges.push({ id: uid(), partner_id: pid, kind, description: `${desc}${kind === 'lead' ? ' from ' + custs[i % custs.length] : ''}`, amount_php: amt, occurred_on: day, status: 'paid', statement_id: stmt.id });
+    }
+  }
+  db.charges.unshift({ id: uid(), partner_id: 'p1', kind: 'lead', description: 'Quote request from Mabuhay Printing', amount_php: 500, occurred_on: addDays(-35), status: 'unbilled' },
+    { id: uid(), partner_id: 'p3', kind: 'placement', description: 'Featured on the "Fire Safety Inspection Certificate (FSIC)" checklist, this month', amount_php: 2500, occurred_on: today().slice(0, 8) + '01', status: 'unbilled' });
+  for (let m = 6; m >= 0; m--) db.planPayments.push({ id: uid(), org_name: ['Pacific Fleet Rentals', 'Reyes & Co. CPAs', 'Kape Uno Head Office'][m % 3], plan_id: ['fleet', 'firm', 'head_office'][m % 3], plan_name: ['Fleet', 'Accounting firm', 'Head office'][m % 3],
+    months: 1, amount_php: [1490, 1990, 4990][m % 3], paid_at: daysAgo(30 * m + 3), bir_invoice_no: m ? 'INV-T' + m : null });
+  // this workspace: Care Plus on the Cebu main branch (paid), a vehicle waiting for its first payment, a renewal the plan started
+  const l2 = db.locations.find((l) => l.id === 'l2');
+  const cp = { id: 'cp1', org_id: org.id, tier: 'branch_plus', location_id: 'l2', vehicle_id: null, business_id: 'b2', label: `Visayas Sari-Sari Distribution Co. · Main branch (${l2.city})`, billing: 'monthly', price_php: 2000,
+    status: 'active', started_on: addDays(-70), paid_through: addDays(20), cancel_at: null, consented_at: daysAgo(70), created_at: daysAgo(70) };
+  const vp = { id: 'cp2', org_id: org.id, tier: 'vehicle_care', location_id: null, vehicle_id: 'v2', business_id: 'b2', label: 'Toyota Hilux · NBC 4417', billing: 'monthly', price_php: 300,
+    status: 'pending', started_on: null, paid_through: null, cancel_at: null, consented_at: daysAgo(1), created_at: daysAgo(1) };
+  db.care.plans.push(cp, vp);
+  db.care.invoices.push({ id: uid(), org_id: org.id, number: billNo('C'), first: false, period_start: addDays(-40), period_end: addDays(-11), lines: [{ plan_id: 'cp1', label: cp.label, tier: 'Care Plus', amount: 2000 }], amount_php: 2000, status: 'paid', due_on: addDays(-41), paid_at: daysAgo(41), bir_invoice_no: 'INV-C77', created_at: daysAgo(47) },
+    { id: uid(), org_id: org.id, number: billNo('C'), first: true, period_start: addDays(-70), period_end: addDays(-41), lines: [{ plan_id: 'cp1', label: cp.label, tier: 'Care Plus', amount: 2000 }], amount_php: 2000, status: 'paid', due_on: addDays(-67), paid_at: daysAgo(70), bir_invoice_no: 'INV-C51', created_at: daysAgo(70) });
+  db.care.invoices.unshift({ id: 'ci-v', org_id: org.id, number: billNo('C'), first: true, period_start: today(), period_end: endOf(today(), 'monthly'), lines: [{ plan_id: 'cp2', label: vp.label, tier: 'Care', amount: 300 }], amount_php: 300, status: 'due', due_on: addDays(2), created_at: daysAgo(1) });
+  // the paid-up period after the two paid bills
+  db.care.invoices.find((i) => i.number && i.amount_php === 2000 && !i.first).period_end = addDays(20);
+  const mp2 = db.requirements.find((r) => r.business_id === 'b2' && r.location_id === 'l2' && r.type_code === 'mayors_permit');
+  const ca = { id: 'ord2', org_id: org.id, created_by: null, service_code: 'renew_mayors_permit', requirement_id: mp2.id, business_id: 'b2', vehicle_id: null, person_id: null, care_plan_id: 'cp1',
+    requirement_name: mp2.name, subject_label: 'Visayas Sari-Sari Distribution Co.', notes: 'Started by your Year-round care plan.', rush: false, contact_method: 'email', contact_value: 'sadie@test.ph', docs_status: 'not_sure',
+    status: 'quoted', payment_status: 'unpaid', quote_service_fee: 0, quote_rush_fee: 0, quote_gov_fees: 8200, quote_php: 8200, quote_note: "Based on last year's assessment of the City Treasurer.", quoted_at: daysAgo(1), due_on: addDays(22), created_at: daysAgo(3), updated_at: now(), kind: 'renew', consented_at: daysAgo(70) };
+  db.requests.unshift(ca);
+  event(ca, 'created', 'Started automatically by your Year-round care plan.', true);
+  event(ca, 'quote', 'Quote: ₱8,200 (service fee ₱0, government fees ₱8,200)', true);
+  db.apps.push({ id: uid(), name: 'Cebu Pest Busters', category: 'pest_control', cities: 'Cebu City, Mandaue City', contact_name: 'Rhea Lim', email: 'rhea@pestbusters.ph', phone: '+639171112222', licence: 'FDA LTO for pest control', services: 'Pest control and certificates', website: '', message: 'We serve restaurants and warehouses.', status: 'new', created_at: daysAgo(1) });
+  const st = placementStat('pl1'); st.views = 41; st.clicks = 6; st.leads = 2;
+  moneySettings.goal = 60000;
+}

@@ -244,3 +244,77 @@ test('photo text: expiry before issue is treated as a misread', () => {
   assert.equal(r.expires.length, 0);
   assert.equal(findReferences('Permit No. 2026').length, 0); // a bare year is not a permit number
 });
+
+// ---------------------------------------------------------------- money (Admin > Money)
+import { months, monthTotals, byMonth, change, pipeline, missingInvoices, filterLedger, ledgerCsv, niceTicks, aging, prevMonth } from '../web/js/money.js';
+
+const L = [
+  { day: '2026-10-03', stream: 'jobs', kind: 'service_fee', state: 'collected', amount: 3500, rush: 1000, label: "Mayor's Permit", who: 'Rosa Foods', ref_kind: 'order', ref_id: 'o1', invoice_no: null },
+  { day: '2026-10-03', stream: 'jobs', kind: 'gov_fees_in', state: 'held', amount: 4200, rush: 0, label: "Mayor's Permit", who: 'Rosa Foods', ref_kind: 'order', ref_id: 'o1', invoice_no: null },
+  { day: '2026-10-08', stream: 'jobs', kind: 'refund', state: 'collected', amount: -500, rush: 0, label: 'FSIC', who: 'Rosa Foods', ref_kind: 'order', ref_id: 'o2', invoice_no: null },
+  { day: '2026-10-09', stream: 'care', kind: 'care_fee', state: 'collected', amount: 2300, rush: 0, label: 'Care bill C-1', who: 'Rosa Foods', ref_kind: 'care', ref_id: 'c1', invoice_no: 'INV-1' },
+  { day: '2026-10-10', stream: 'care', kind: 'guarantee', state: 'cost', amount: -2000, rush: 0, label: 'Guarantee', who: 'Rosa Foods', ref_kind: 'claim', ref_id: 'g1', invoice_no: null },
+  { day: '2026-09-20', stream: 'partners', kind: 'lead', state: 'collected', amount: 500, rush: 0, label: 'Lead', who: 'Runners', ref_kind: 'statement', ref_id: 's1', invoice_no: null },
+  { day: '2026-09-20', stream: 'partners', kind: 'placement', state: 'collected', amount: 1500, rush: 0, label: 'Line', who: 'Runners', ref_kind: 'statement', ref_id: 's1', invoice_no: null },
+  { day: '2026-09-01', stream: 'plans', kind: 'team_plan', state: 'collected', amount: 1490, rush: 0, label: 'Fleet', who: 'Fleet Co', ref_kind: 'plan', ref_id: 'p1', invoice_no: 'INV-2' },
+  { day: '2026-10-15', stream: 'jobs', kind: 'service_fee', state: 'pipeline', amount: 2500, rush: 0, label: 'Quoted', who: 'Bea', ref_kind: 'order', ref_id: 'o3', invoice_no: null },
+  { day: '2026-08-01', stream: 'partners', kind: 'lead', state: 'to_collect', amount: 300, rush: 0, label: 'Billed lead', who: 'Runners', ref_kind: 'statement', ref_id: 's2', invoice_no: null },
+  { day: '2026-10-18', stream: 'partners', kind: 'lead', state: 'unbilled', amount: 300, rush: 0, label: 'New lead', who: 'Runners', ref_kind: 'partner', ref_id: 'x', invoice_no: null },
+];
+
+test('money: months run oldest first and cross the year', () => {
+  assert.deepEqual(months('2026-02-10', 4), ['2025-11', '2025-12', '2026-01', '2026-02']);
+  assert.equal(prevMonth('2026-01'), '2025-12');
+});
+test('money: a month adds collected money by stream, refunds taken off, payouts kept apart', () => {
+  const m = monthTotals(L, '2026-10');
+  assert.equal(m.by.jobs, 3000); // 3,500 fee - 500 refund (government money held is not revenue)
+  assert.equal(m.by.care, 2300);
+  assert.equal(m.total, 5300);
+  assert.equal(m.costs, -2000);
+  assert.equal(m.net, 3300);
+  assert.equal(m.rush, 1000);
+  assert.equal(monthTotals(L, '2026-09').by.partners, 2000);
+  assert.equal(byMonth(L, '2026-10-19', 3).map((r) => r.total).join(','), '0,3490,5300');
+  // A month in progress compares with the same days of the month before.
+  assert.equal(monthTotals(L, '2026-09', 19).total, 1490);
+  assert.equal(monthTotals(L, '2026-09', 20).total, 3490);
+});
+test('money: change is a whole percentage, or null when there is nothing to compare', () => {
+  assert.equal(change(150, 100), 50);
+  assert.equal(change(50, 100), -50);
+  assert.equal(change(100, 0), null);
+  assert.equal(change(0, 0), 0);
+});
+test('money: the pipeline puts each open peso in one lane, aged', () => {
+  const p = pipeline(L, '2026-10-19');
+  assert.equal(p.quoted.total, 2500);
+  assert.equal(p.billed.total, 300);
+  assert.equal(p.billed.ages['31+ days'], 300);
+  assert.equal(p.unbilled.total, 300);
+  assert.equal(p.unbilled.ages['0–15 days'], 300);
+  assert.equal(aging('2026-10-03', '2026-10-19'), '16–30 days');
+});
+test('money: every payment without a BIR invoice number is listed once, with its full amount', () => {
+  const miss = missingInvoices(L);
+  const keys = miss.map((p) => `${p.ref_kind}:${p.ref_id}:${p.amount}`).sort();
+  assert.deepEqual(keys, ['order:o1:7700', 'statement:s1:2000']); // fee + government fees in one payment; a statement's charges together
+});
+test('money: the ledger filters and exports with the invoice number column', () => {
+  assert.equal(filterLedger(L, { stream: 'care' }).length, 2);
+  assert.equal(filterLedger(L, { state: 'collected', month: '2026-09' }).length, 3);
+  assert.equal(filterLedger(L, { q: 'inv-2' }).length, 1);
+  const csv = ledgerCsv(filterLedger(L, { stream: 'plans' }));
+  assert.equal(csv[0][8], 'BIR invoice no.');
+  assert.equal(csv[1][8], 'INV-2');
+  assert.equal(csv[1][6], '1490.00');
+});
+test('money: chart ticks are round numbers that cover the top', () => {
+  assert.deepEqual(niceTicks(9800, 4), [0, 2500, 5000, 7500, 10000]);
+  assert.deepEqual(niceTicks(0), [0]);
+  const t = niceTicks(123456, 4);
+  assert.ok(t[t.length - 1] >= 123456 && t.length <= 6);
+});
+test('csv: a name that looks like a formula stays text in Excel; numbers stay numbers', () => {
+  assert.equal(toCsv([['=HYPERLINK("x")', '+1', '@cmd', '-2000', '-12.5', 'ok']]), `"'=HYPERLINK(""x"")",'+1,'@cmd,-2000,-12.5,ok`);
+});

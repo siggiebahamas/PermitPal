@@ -1,8 +1,9 @@
 // A single requirement: its current record, files, past records and history — plus the
 // flows used everywhere else (add details, upload, renew, started renewing).
 import { html, fmtDate, fmtDateTime, timeAgo, fileSize, todayPH, openModal, confirmDialog, toast, toastError, formObject, when, peso } from '../util.js';
-import { S, on, go, reload, canEdit, has, reqById, typeOf, vehicle, memberName, empty, subjectHref } from '../core.js';
-import { loadPartners, partnerSuggestions, penaltyNote } from './extras.js';
+import { S, on, go, reload, canEdit, has, reqById, typeOf, vehicle, memberName, empty, subjectHref, coverOf } from '../core.js';
+import { loadPartners, loadPlacements, partnerSuggestions, penaltyNote, trackPlacements } from './extras.js';
+import { careNote } from './care.js';
 import { STATUS, statusChip, dueText, subjectLabel, ICON } from '../components.js';
 import { suggestDue } from '../rules.js';
 import { handledByLine } from './assign.js';
@@ -26,13 +27,14 @@ export async function render(el, id) {
     if (loadingId === id) return;
     loadingId = id;
     try {
-      const [d] = await Promise.all([db.requirementDetail(id, { checklist: has('library2') }), loadPartners()]);
+      const [d] = await Promise.all([db.requirementDetail(id, { checklist: has('library2') }), loadPartners(), loadPlacements()]);
       detail = { id, ...d };
     } catch (e) { toastError(e); }
     loadingId = null;
     if (!location.hash.includes(id)) return; // navigated away while loading
   }
   el.innerHTML = String(page(r));
+  trackPlacements(el);
 }
 
 export function forget() { detail = null; }
@@ -106,7 +108,8 @@ function page(r) {
       ${when(edit && r.expires && r.status !== 'in_progress' && r.status !== 'compliant', html`
         <button class="btn btn-ghost" data-act="req-start-renewal" data-id="${r.id}">I've started the renewal</button>`)}
     </div>
-    ${checklistCard(r, detail.ticks || [], { offer: serviceOffer(r, { compact: true }) }) || serviceOffer(r)}
+    ${careNote(r) || ''}
+    ${checklistCard(r, detail.ticks || [], { offer: coverOf(r) ? '' : serviceOffer(r, { compact: true }) }) || (coverOf(r) ? '' : serviceOffer(r))}
     ${partnerSuggestions(r)}
 
     ${when(past.length, html`

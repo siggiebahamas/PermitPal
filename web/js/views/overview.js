@@ -1,6 +1,6 @@
 // Dashboard, Compliance (filterable list) and Documents.
 import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
-import { S, on, hooks, canEdit, empty, has, memberName, serviceFor } from '../core.js';
+import { S, on, hooks, canEdit, empty, has, memberName, serviceFor, careOf, service, coverOf } from '../core.js';
 import { assignable, bulk, bulkBar } from './assign.js';
 import { filingsBrief } from './filings.js';
 import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
@@ -16,6 +16,8 @@ export function dashboard(el) {
       <div class="onboard">
         <a class="onboard-card" href="#/businesses?add=1">${ICON.building}<b>Add a business</b><span>We'll build its permit checklist for you: Mayor's Permit, Barangay Clearance, BIR, FSIC and more, based on what it does.</span></a>
         <a class="onboard-card" href="#/vehicles?add=1">${ICON.car}<b>Add a vehicle</b><span>Track LTO registration, CTPL, emission and inspection. We'll work out the renewal month from the plate.</span></a>
+        ${when_(has('revenue') && canEdit() && service('setup_from_paper'), html`<button class="onboard-card" data-act="svc-request" data-code="setup_from_paper">${ICON.briefcase}<b>Have a box of papers?</b>
+          <span>Send us photos of your permits and we'll set everything up for you, with the right dates and reminders. ${service('setup_from_paper')?.price_from != null ? 'From ₱' + Number(service('setup_from_paper').price_from).toLocaleString() : ''}.</span></button>`)}
       </div>`);
     return;
   }
@@ -26,6 +28,7 @@ export function dashboard(el) {
   el.innerHTML = String(html`
     ${brief(first, c, open)}
     ${statTiles(c)}
+    ${careNudge(open)}
     <section class="card next">
       <div class="card-head"><div><h2>Next actions</h2><p class="card-sub">Most urgent first</p></div><a class="link" href="#/compliance">See all</a></div>
       ${open.length ? open.slice(0, 8).map((r) => reqRow(r)) : html`<div class="all-good">${ICON.check} Everything is compliant. Nice work.</div>`}
@@ -35,6 +38,19 @@ export function dashboard(el) {
   filingsBrief(el.querySelector('[data-filings-brief]'));
 }
 const when_ = (c, v) => (c ? v : '');
+
+// One quiet suggestion when there's a lot to renew and no Year-round care yet. Closing it keeps it closed.
+const nudgeKey = () => `pp-care-nudge-${S.org?.id}`;
+function careNudge(open) {
+  if (!has('revenue') || !canEdit() || careOf().plans.some((p) => p.status !== 'cancelled') || !careOf().tiers.length) return '';
+  const busy = open.filter((r) => ['action_required', 'renew_soon'].includes(r.status)).length;
+  if (busy < 3) return '';
+  try { if (localStorage.getItem(nudgeKey())) return ''; } catch { /* private browsing: show it */ }
+  const from = Math.min(...careOf().tiers.filter((t) => t.subject === 'branch').map((t) => Number(t.monthly_php)));
+  return html`<section class="card nudge"><div>${ICON.briefcase}<p><b>${busy} renewals coming up.</b> Rather hand them over? With Year-round care we start every renewal for you${Number.isFinite(from) ? `, from ₱${from.toLocaleString()} a month per branch` : ''}.</p></div>
+    <div class="btn-row"><a class="btn btn-sm btn-soft" href="#/care">See how it works</a><button class="btn btn-sm btn-ghost" data-act="nudge-close" aria-label="Don't show this again">Not now</button></div></section>`;
+}
+on('nudge-close', (ds, btn) => { try { localStorage.setItem(nudgeKey(), '1'); } catch { /* fine */ } btn.closest('.nudge')?.remove(); });
 
 // ---------------------------------------------------------------- daily brief
 // Greeting and a one-line summary on the left; "Do this first" on the right, with one button to press.
@@ -79,7 +95,8 @@ function brief(first, c, open) {
               : html`<a class="btn btn-primary focus-go" href="#/requirement/${r.id}">Open it</a>`}
             ${when_(open.length > 1, html`<button class="btn btn-ghost" data-act="brief-skip">Skip for now</button>`)}
           </div>
-          ${when_(has('services') && canEdit() && !r.open_request_id && ['action_required', 'renew_soon'].includes(r.status) && serviceFor(r),
+          ${when_(has('revenue') && coverOf(r) && !r.open_request_id, html`<p class="focus-alt">${ICON.check} Covered by Year-round care: we'll start this renewal for you.</p>`)}
+          ${when_(has('services') && canEdit() && !r.open_request_id && !coverOf(r) && ['action_required', 'renew_soon'].includes(r.status) && serviceFor(r),
             html`<p class="focus-alt">No time? <button class="linklike" data-act="svc-for-req" data-id="${r.id}">Have PermitPal ${r.cycle_id ? 'renew' : 'get'} it for you</button></p>`)}` : html`<div class="brief-date">Do this first</div><div class="all-good">${ICON.check} Nothing to do. You're all caught up.</div>`}
       </div>
     </section>`;
@@ -133,7 +150,8 @@ export function compliance(el, params) {
   const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Compliance</h1><p class="muted">Every permit and registration across your businesses and vehicles.</p></div>
-      <div class="btn-row">${when_(canEdit(), html`<button class="btn btn-ghost btn-sm" data-act="imp-open" data-kind="permits">${ICON.upload} Import permit records</button>`)}
+      <div class="btn-row">${when_(has('revenue') && canEdit(), html`<button class="btn btn-soft btn-sm" data-act="svc-bulk">${ICON.briefcase} Have PermitPal renew several</button>`)}
+        ${when_(canEdit(), html`<button class="btn btn-ghost btn-sm" data-act="imp-open" data-kind="permits">${ICON.upload} Import permit records</button>`)}
         <button class="btn btn-ghost btn-sm" data-act="calendar-export">${ICON.calendar} Add to calendar</button>
         <button class="btn btn-ghost btn-sm" data-act="share-open" data-scope="org">${ICON.share} Share proof</button>
         <button class="btn btn-ghost btn-sm" data-act="export-csv">Export CSV</button>

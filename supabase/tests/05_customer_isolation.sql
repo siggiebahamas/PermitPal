@@ -53,6 +53,6 @@ do $$ declare t text; s int; begin
   begin insert into public.services (code, name) values ('x', 'x'); insert into r values ('ANON insert services', 1, null, null, 'ALLOWED'); exception when others then insert into r values ('ANON insert services', 0, null, null, 'blocked'); end;
 end $$;
 reset role;
-select tbl, (coalesce(seen,0) + coalesce(updated,0) + coalesce(deleted,0) = 0 or tbl in ('ANON reads services', 'ANON reads plans')) and note not like '%ALLOWED%' as ok,
+select tbl, (coalesce(seen,0) + coalesce(updated,0) + coalesce(deleted,0) = 0 or tbl in ('ANON reads services', 'ANON reads plans', 'ANON reads care_tiers')) and note not like '%ALLOWED%' as ok,
        seen, updated, deleted, note from r order by ok, tbl;  -- services and plans are the public catalogue and price list
 rollback;

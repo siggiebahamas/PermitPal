@@ -65,24 +65,43 @@ export async function avatarUrl(path) {
 // ---------------------------------------------------------------- workspace data
 let typesCache = null;
 let servicesCache = null;
-export async function loadOrgData(orgId) {
+export async function loadOrgData(orgId, { revenue = false } = {}) {
   if (!typesCache) typesCache = ok(await sb.from('requirement_types').select('*').order('sort'));
   if (!servicesCache) servicesCache = ok(await sb.from('services').select('*').eq('active', true).order('sort'));
-  const [businesses, locations, vehicles, people, reqs, requests, members] = await Promise.all([
+  const [businesses, locations, vehicles, people, reqs, requests, members, care] = await Promise.all([
     sb.from('businesses').select('*').eq('org_id', orgId).is('deleted_at', null).order('name').then(ok),
     sb.from('business_locations').select('*').eq('org_id', orgId).is('deleted_at', null).order('is_main', { ascending: false }).order('name').then(ok),
     sb.from('vehicles').select('*').eq('org_id', orgId).is('deleted_at', null).order('make_model').then(ok),
     sb.from('people').select('*').eq('org_id', orgId).is('deleted_at', null).order('full_name').then(ok),
     sb.from('requirement_status').select('*').eq('org_id', orgId).then(ok),
     sb.from('assistance_requests').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(ok),
-    sb.from('org_members').select('user_id, role, created_at').eq('org_id', orgId).then(ok),
+    loadMembers(orgId),
+    revenue ? loadCare(orgId) : { plans: [], invoices: [], coverage: [], claims: [], tiers: [], staff: [] },
   ]);
-  // org_members points at auth.users, so fetch teammates' profiles separately.
+  return { types: typesCache, services: servicesCache, businesses, locations, vehicles, people, reqs, requests, members, care };
+}
+
+// The team, with each teammate's profile (org_members points at auth.users, so profiles come separately).
+export async function loadMembers(orgId) {
+  const members = ok(await sb.from('org_members').select('user_id, role, created_at').eq('org_id', orgId));
   const profiles = members.length
     ? ok(await sb.from('profiles').select('id, first_name, last_name, email, avatar_path, role_title').in('id', members.map((m) => m.user_id)))
     : [];
   for (const m of members) m.profile = profiles.find((p) => p.id === m.user_id) || {};
-  return { types: typesCache, services: servicesCache, businesses, locations, vehicles, people, reqs, requests, members };
+  return members;
+}
+// Year-round care: the plans, bills, which permit each plan covers, claims, prices, and any temporary
+// PermitPal access (small lists, used on many pages; refreshed when the care or team page opens).
+export async function loadCare(orgId) {
+  const [plans, invoices, coverage, claims, tiers, staff] = await Promise.all([
+    sb.from('care_plans').select('*').eq('org_id', orgId).order('created_at').then(ok),
+    sb.from('care_invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(60).then(ok),
+    sb.rpc('care_coverage', { p_org: orgId }).then(ok),
+    sb.from('guarantee_claims').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(ok),
+    sb.from('care_tiers').select('*').eq('active', true).order('sort').then(ok),
+    sb.rpc('my_staff_access', { p_org: orgId }).then(ok),
+  ]);
+  return { plans, invoices, coverage, claims, tiers, staff };
 }
 
 // ---------------------------------------------------------------- businesses, branches, vehicles
@@ -201,7 +220,7 @@ export const staffAccessLog = async (orgId) =>
 export const getRequest = async (id) => ok(await sb.from('assistance_requests').select('*').eq('id', id).maybeSingle());
 export const orderEvents = async (reqId) =>
   ok(await sb.from('request_events').select('*').eq('request_id', reqId).order('id'));
-export const acceptQuote = async (reqId) => ok(await sb.rpc('accept_quote', { p_req: reqId }));
+export const acceptQuote = async (reqId, access = false) => ok(await sb.rpc('accept_quote', access ? { p_req: reqId, p_access: true } : { p_req: reqId }));
 
 // Files attached to an order (payment proof, messages) live in the workspace folder.
 export async function uploadRequestFile(orgId, reqId, file) {
@@ -239,6 +258,7 @@ export const listPartners = async () => ok(await sb.rpc('list_professionals'));
 export const requestReferral = async (f) => ok(await sb.rpc('request_referral', {
   p_org: f.org_id, p_partner: f.partner_id, p_requirement: f.requirement_id || null, p_note: f.note || null,
   p_contact_method: f.contact_method || 'email', p_contact_value: f.contact_value || null,
+  ...(f.placement_id ? { p_placement: f.placement_id } : {}),
 }));
 export const myReferrals = async (orgId) =>
   ok(await sb.from('referrals').select('id, partner_id, requirement_id, note, status, created_at').eq('org_id', orgId).order('created_at', { ascending: false }));
@@ -324,14 +344,15 @@ export async function startCheckout(orgId, planId, months) {
 export const adminOrgs = async () => ok(await sb.rpc('admin_orgs'));
 export const adminOrgKinds = async () => ok(await sb.from('orgs').select('id, kind, trial_ends_at'));
 export const adminSetPlan = async (orgId, plan, expires) => ok(await sb.rpc('admin_set_plan', { p_org: orgId, p_plan: plan, p_expires: expires }));
-export const adminRequests = async () =>
-  ok(await sb.from('assistance_requests').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
+export const adminRequests = async (care = false) =>
+  ok(await sb.from('assistance_requests').select(care ? '*, orgs(name, care_gov_preapproval_php)' : '*, orgs(name)').order('created_at', { ascending: false }).limit(300));
 export const adminOutbox = async () =>
   ok(await sb.from('message_outbox').select('id, channel, to_address, subject, status, attempts, last_error, created_at, sent_at')
     .order('id', { ascending: false }).limit(100));
 export const adminRequestDocs = async (reqId) =>
   ok(await sb.from('documents').select('id, file_name, storage_path, created_at').eq('requirement_id', reqId).is('deleted_at', null));
-export const adminQuote = async (reqId, fee, gov, note) => ok(await sb.rpc('admin_quote_request', { p_req: reqId, p_service_fee: fee, p_gov_fees: gov, p_note: note || null }));
+export const adminQuote = async (reqId, fee, gov, note, rush = 0) => ok(await sb.rpc('admin_quote_request', {
+  p_req: reqId, p_service_fee: fee, p_gov_fees: gov, p_note: note || null, ...(rush ? { p_rush_fee: rush } : {}) }));
 export const adminConfirmPayment = async (reqId, okPaid, note) => ok(await sb.rpc('admin_confirm_payment', { p_req: reqId, p_ok: okPaid, p_note: note || null }));
 export async function adminUpdateOrder(a, { status, message, file, govActual, provider }) {
   const up = file && file.size ? await uploadRequestFile(a.org_id, a.id, file) : null;
@@ -462,3 +483,80 @@ export const mfa = {
 export const lockedOrgs = async () => ok(await sb.rpc('my_locked_orgs'));
 export const setRequireMfa = async (orgId, on) => ok(await sb.rpc('set_require_mfa', { p_org: orgId, p_on: !!on }));
 export const adminResetMfa = async (email, reason) => ok(await sb.rpc('admin_reset_mfa', { p_email: email, p_reason: reason }));
+
+// ---------------------------------------------------------------- one-time jobs: several at once, set-up, steps
+export const requestServicesBulk = async (f) => ok(await sb.rpc('request_services_bulk', {
+  p_org: f.org_id, p_reqs: f.requirement_ids, p_rush: !!f.rush, p_contact_method: f.contact_method || 'email',
+  p_contact_value: f.contact_value || null, p_notes: f.notes || null, p_consent: !!f.consent,
+}));
+export const adminOrderStep = async (reqId, done) => ok(await sb.rpc('admin_order_step', { p_req: reqId, p_done: done }));
+export const adminJoinWorkspace = async (reqId) => ok(await sb.rpc('admin_join_workspace', { p_req: reqId }));
+
+// ---------------------------------------------------------------- year-round care
+async function uploadCareFile(orgId, folder, file) {
+  const problem = checkFile(file);
+  if (problem) throw new Error(problem);
+  const path = `${orgId}/care/${folder}/${rand()}-${safeName(file.name)}`;
+  const contentType = file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg');
+  ok(await sb.storage.from('documents').upload(path, file, { contentType, upsert: false }));
+  return { path, name: file.name.slice(0, 255) };
+}
+export const careTiers = async () => ok(await sb.from('care_tiers').select('*').eq('active', true).order('sort'));
+export const startCare = async (orgId, items, billing) => ok(await sb.rpc('start_care', { p_org: orgId, p_items: items, p_billing: billing, p_consent: true }));
+export const cancelCare = async (planId, reason) => ok(await sb.rpc('cancel_care', { p_plan: planId, p_reason: reason || null }));
+export const resumeCare = async (planId) => ok(await sb.rpc('resume_care', { p_plan: planId }));
+export const setCarePreapproval = async (orgId, amount) => ok(await sb.rpc('set_care_preapproval', { p_org: orgId, p_amount: amount }));
+export async function payCareInvoice(inv, { method, ref, file }) {
+  const up = file && file.size ? await uploadCareFile(inv.org_id, inv.id, file) : null;
+  return ok(await sb.rpc('pay_care_invoice', { p_invoice: inv.id, p_method: method, p_ref: ref || null, p_proof_path: up?.path || null, p_proof_name: up?.name || null }));
+}
+export async function fileGuaranteeClaim(orgId, { plan_id, requirement_id, penalty, note, file }) {
+  const up = file && file.size ? await uploadCareFile(orgId, 'claims', file) : null;
+  return ok(await sb.rpc('file_guarantee_claim', { p_plan: plan_id, p_requirement: requirement_id, p_penalty: penalty, p_note: note || null,
+    p_receipt_path: up?.path || null, p_receipt_name: up?.name || null }));
+}
+
+// ---------------------------------------------------------------- firms: checklist lines, applications
+export const listPlacements = async () => ok(await sb.rpc('list_placements'));
+export const logPlacement = async (ids, kind) => ok(await sb.rpc('log_placement', { p_ids: ids, p_kind: kind }));
+export const applyAsPartner = async (f) => ok(await sb.rpc('apply_as_partner', {
+  p_name: f.name, p_category: f.category, p_cities: f.cities || '', p_contact_name: f.contact_name, p_email: f.email, p_phone: f.phone || '',
+  p_licence: f.licence || '', p_services: f.services || '', p_website: f.website || '', p_message: f.message || '', p_trap: f.trap || null,
+}));
+
+// ---------------------------------------------------------------- staff: money, care, firms
+export const adminMoney = async (from, to) => ok(await sb.rpc('admin_money', { p_from: from, p_to: to }));
+export const adminMoneySummary = async () => ok(await sb.rpc('admin_money_summary'));
+export const adminSetMoneySetting = async (key, value) => ok(await sb.rpc('admin_set_money_setting', { p_key: key, p_value: value }));
+export const adminSetInvoiceNo = async (kind, id, no) => ok(await sb.rpc('admin_set_invoice_no', { p_kind: kind, p_id: id, p_no: no || null }));
+export const adminRecordPlanPayment = async (f) => ok(await sb.rpc('admin_record_plan_payment', {
+  p_org: f.org_id, p_plan: f.plan, p_months: f.months, p_amount: f.amount, p_method: f.method || null, p_ref: f.ref || null, p_invoice_no: f.invoice_no || null,
+}));
+export const adminCarePlans = async () => ok(await sb.from('care_plans').select('*, orgs(name)').order('created_at', { ascending: false }).limit(500));
+export const adminCareInvoices = async () => ok(await sb.from('care_invoices').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
+export const adminClaims = async () => ok(await sb.from('guarantee_claims').select('*, orgs(name)').order('created_at', { ascending: false }).limit(200));
+export const adminCareGaps = async () => ok(await sb.rpc('admin_care_gaps'));
+export const adminCareTiers = async () => ok(await sb.from('care_tiers').select('*').order('sort'));
+export const adminSaveCareTier = async (code, patch) => ok(await sb.from('care_tiers').update(patch).eq('code', code));
+export const adminConfirmCarePayment = async (id, okPaid, note, invoiceNo) => ok(await sb.rpc('admin_confirm_care_payment', {
+  p_invoice: id, p_ok: !!okPaid, p_note: note || null, p_invoice_no: invoiceNo || null }));
+export const adminVoidCareInvoice = async (id, note) => ok(await sb.rpc('admin_void_care_invoice', { p_invoice: id, p_note: note }));
+export const adminSetCarePlan = async (id, status, note) => ok(await sb.rpc('admin_set_care_plan', { p_plan: id, p_status: status, p_note: note }));
+export const adminDecideClaim = async (id, approve, amount, note) => ok(await sb.rpc('admin_decide_claim', { p_claim: id, p_approve: !!approve, p_amount: amount ?? null, p_note: note || null }));
+export const adminClaimPaid = async (id, method, ref) => ok(await sb.rpc('admin_claim_paid', { p_claim: id, p_method: method || null, p_ref: ref || null }));
+export const adminPlacements = async () => ok(await sb.from('partner_placements').select('*').order('starts_on', { ascending: false }));
+export const adminSavePlacement = async (id, row) => ok(id
+  ? await sb.from('partner_placements').update(row).eq('id', id)
+  : await sb.from('partner_placements').insert(row));
+export const adminPlacementStats = async (from, to) => ok(await sb.rpc('admin_placement_stats', { p_from: from, p_to: to }));
+export const adminCharges = async () => ok(await sb.from('partner_charges').select('*').order('occurred_on', { ascending: false }).limit(1000));
+export const adminStatements = async () => ok(await sb.from('partner_statements').select('*').order('created_at', { ascending: false }).limit(300));
+export const adminRecordSale = async (refId, sale, note) => ok(await sb.rpc('admin_record_sale', { p_referral: refId, p_sale_php: sale, p_note: note || null }));
+export const adminAddCharge = async (partnerId, description, amount, on) => ok(await sb.rpc('admin_add_partner_charge', { p_partner: partnerId, p_description: description, p_amount: amount, p_on: on || null }));
+export const adminWaiveCharge = async (id) => ok(await sb.rpc('admin_waive_charge', { p_charge: id }));
+export const adminCreateStatement = async (partnerId, through, email) => ok(await sb.rpc('admin_create_statement', { p_partner: partnerId, p_through: through, p_email: !!email }));
+export const adminStatementPaid = async (id, method, ref, invoiceNo) => ok(await sb.rpc('admin_statement_paid', { p_statement: id, p_method: method || null, p_ref: ref || null, p_invoice_no: invoiceNo || null }));
+export const adminStatementVoid = async (id, note) => ok(await sb.rpc('admin_statement_void', { p_statement: id, p_note: note }));
+export const adminApplications = async () => ok(await sb.from('partner_applications').select('*').order('created_at', { ascending: false }).limit(200));
+export const adminApplicationToPartner = async (id) => ok(await sb.rpc('admin_application_to_partner', { p_app: id }));
+export const adminSetApplication = async (id, patch) => ok(await sb.from('partner_applications').update(patch).eq('id', id));

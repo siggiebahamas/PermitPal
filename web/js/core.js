@@ -53,6 +53,14 @@ export const service = (code) => S.data?.services?.find((x) => x.code === code);
 // The done-for-you service that handles a given permit type, if we offer one.
 export const serviceFor = (r) => S.data?.services?.find((x) => x.category === 'renewal' && x.type_codes.includes(r.type_code))
   || (r.subject !== 'person' ? S.data?.services?.find((x) => x.code === 'renew_other') : null);
+// Year-round care: the plan (not cancelled) on a branch or vehicle, and the plan covering a permit.
+export const careOf = () => S.data?.care || { plans: [], invoices: [], coverage: [], claims: [], tiers: [], staff: [] };
+export const planFor = (kind, id) => careOf().plans.find((p) => p.status !== 'cancelled' && (kind === 'location' ? p.location_id === id : p.vehicle_id === id));
+export const coverOf = (r) => {
+  const c = careOf().coverage.find((x) => x.requirement_id === r.id && x.status !== 'cancelled');
+  return c ? careOf().plans.find((p) => p.id === c.plan_id) || null : null;
+};
+export const tierOf = (code) => careOf().tiers.find((t) => t.code === code);
 export const subjectHref = (r) => (r.subject === 'business' ? `#/businesses/${r.business_id}` : r.subject === 'person' ? `#/people/${r.person_id}` : `#/vehicles/${r.vehicle_id}`);
 export function memberName(userId) {
   if (!userId) return 'PermitPal';

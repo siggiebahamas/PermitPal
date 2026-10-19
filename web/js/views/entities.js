@@ -8,6 +8,7 @@ import { reqRow, statTiles, counts, byPriority, dueShort, shortName, ICON, STATU
 import { plateSchedule, suggestDue } from '../rules.js';
 import * as db from 'pp/data';
 import { scanBox, wireScan } from './scan.js';
+import { careLine } from './care.js';
 
 const tabs = { business: 'requirements', vehicle: 'requirements', person: 'requirements' };
 const optionList = (items, cur) => items.map(([v, l]) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`);
@@ -225,7 +226,8 @@ export function businessDetail(el, id) {
         return html`<section class="card"><div class="card-head"><h2>${l.name}${l.city ? ' · ' + l.city : ''}</h2><span class="muted small">${plural(list.length, 'item')}</span></div>
           ${list.length ? list.map((r) => reqRow(r, { showSubject: false })) : html`<p class="muted pad">Nothing tracked for this branch yet.</p>`}
           ${when(canEdit(), html`<button class="line add" data-act="req-add" data-subject="business" data-id="${id}" data-loc="${l.id}"><span class="plus">+</span>Add a permit to this branch</button>`)}
-          ${when(list.length, html`<div class="sheet-foot">${c2.compliant} of ${c2.total} compliant</div>`)}</section>`;
+          ${when(list.length, html`<div class="sheet-foot">${c2.compliant} of ${c2.total} compliant</div>`)}
+          ${careLine('location', l.id)}</section>`;
       })}
       ${when(wide.length, html`<section class="card"><div class="card-head"><h2>Whole business</h2><span class="muted small">Registrations that cover every branch</span></div>
         ${wide.map((r) => reqRow(r, { showSubject: false }))}</section>`)}
@@ -455,7 +457,8 @@ export function vehicleDetail(el, id) {
     body.innerHTML = String(html`<section class="card"><div class="card-head"><h2>Permits</h2><span class="muted small">${plural(reqs.length, 'item')}</span></div>
       ${reqs.map((r) => reqRow(r, { showSubject: false }))}
       ${when(canEdit(), html`<button class="line add" data-act="req-add" data-subject="vehicle" data-id="${id}"><span class="plus">+</span>Add a permit to this vehicle</button>`)}
-      <div class="sheet-foot">${c.compliant} of ${c.total} compliant</div></section>
+      <div class="sheet-foot">${c.compliant} of ${c.total} compliant</div>
+      ${careLine('vehicle', id)}</section>
       ${suggestions('vehicle', id)}`);
   }
   else if (tab === 'documents') filesTab(body, reqs, 'vehicle', id);

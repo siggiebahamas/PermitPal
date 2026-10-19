@@ -1,7 +1,7 @@
 // Smaller tools: partners & introductions, costs & yearly budget,
 // shareable proof-of-compliance links, the inspection pack (.zip) and calendar export (.ics).
 import { html, fmtDate, fmtDateTime, peso, toast, toastError, when, plural, timeAgo, openModal, formObject, normalizePhone, todayPH, download, confirmDialog } from '../util.js';
-import { S, on, go, reload, canEdit, business, vehicle, person, reqsOf, empty } from '../core.js';
+import { S, on, go, reload, canEdit, business, vehicle, person, reqsOf, empty, has } from '../core.js';
 import { STATUS, byPriority, subjectLabel, dueShort, ICON, counts } from '../components.js';
 import * as db from 'pp/data';
 
@@ -17,6 +17,45 @@ export const PARTNER_CATEGORIES = {
 };
 let partnersCache = null;
 export const loadPartners = async () => (partnersCache ||= await db.listPartners().catch(() => []));
+// One quiet, labelled line on a matching checklist step (firms pay to be there; people can switch them off).
+let placementsCache = null;
+export const loadPlacements = async () => (has('revenue') ? (placementsCache ||= await db.listPlacements().catch(() => [])) : []);
+export function placementFor(r, itemKey) {
+  if (!has('revenue') || S.profile?.show_partner_offers === false || !placementsCache) return null;
+  const city = r.location_city || '';
+  return placementsCache.find((p) => p.type_code === r.type_code && (p.item_key || null) === (itemKey || null)
+    && (!p.cities?.length || (city && p.cities.includes(city)))) || null;
+}
+export function placementLine(p, r) {
+  return html`<div class="ck-partner" data-placement="${p.id}">
+    <span class="ck-partner-tag">Partner</span>
+    <span class="ck-partner-text"><b>${p.partner_name}</b> · ${p.headline}${p.verified ? html` <small class="muted">· licence checked</small>` : ''}</span>
+    <span class="ck-partner-acts">${canEdit() ? html`<button type="button" class="linklike" data-act="placement-quote" data-id="${p.partner_id}" data-req="${r.id}" data-pl="${p.id}">Request a quote</button> · ` : ''}<button type="button" class="linklike" data-act="placement-why">Why this?</button></span>
+  </div>`;
+}
+// Counted once per person per day (the server enforces it); only lines actually on screen count.
+const seenNow = new Set();
+export function trackPlacements(root) {
+  if (!has('revenue') || !root) return;
+  const log = (scope) => {
+    const ids = [...scope.querySelectorAll('[data-placement]')].filter((x) => x.getClientRects().length).map((x) => x.dataset.placement).filter((id) => !seenNow.has(id));
+    if (!ids.length) return;
+    ids.forEach((id) => seenNow.add(id));
+    db.logPlacement(ids, 'view').catch(() => {});
+  };
+  root.querySelectorAll('details.checklist').forEach((d) => { if (d.open) log(d); d.addEventListener('toggle', () => { if (d.open) log(d); }); });
+}
+on('placement-quote', async (ds) => {
+  await loadPartners();
+  db.logPlacement([ds.pl], 'click').catch(() => {});
+  partnerIntro(ds.id, ds.req || null, ds.pl);
+});
+on('placement-why', () => openModal('Why am I seeing this?', html`
+  <p>PermitPal shows one licensed firm on a checklist step when it matches the step and your city. The firm pays PermitPal to be listed there.</p>
+  <ul class="small"><li>It never changes the firm's price, and you don't have to use them.</li>
+    <li>We check each firm's business permit (and professional licence, where one is needed) before listing it.</li>
+    <li>We only share your details if you press "Request a quote".</li></ul>
+  <p class="muted small">Rather not see these? Turn them off in <a href="#/settings">Settings</a>.</p>`));
 let proCat = 'all';
 let proCity = 'all';
 
@@ -45,7 +84,8 @@ export async function partners(el, params = new URLSearchParams()) {
     ${when(mine.length, html`<section class="card"><div class="card-head"><h2>Your quote requests</h2></div>
       ${mine.map((r) => { const p = list.find((x) => x.id === r.partner_id); return html`<div class="line"><span class="line-main"><b>${p?.name || 'Professional'}</b><small>${r.note || ''} · ${timeAgo(r.created_at)}</small></span>
         <span class="chip ${r.status === 'converted' ? 'ok' : r.status === 'not_converted' ? 'needinfo' : 'progress'}">${{ requested: 'Sent', introduced: 'They replied', converted: 'Hired', not_converted: 'Closed' }[r.status] || 'Sent'}</span></div>`; })}</section>`)}
-    <p class="fineprint">Listed firms pay PermitPal for the quote requests we send them. It never changes their price, and you're free to choose anyone. PermitPal does not file anything with the government itself.</p>`);
+    <p class="fineprint">Listed firms pay PermitPal for the quote requests we send them (or a flat monthly fee). It never changes their price, and you're free to choose anyone.${has('revenue') ? '' : ' PermitPal does not file anything with the government itself.'}</p>
+    ${when(has('revenue'), html`<p class="fineprint">Run a licensed firm? <a href="#/list-your-firm">Apply to be listed</a>.</p>`)}`);
 }
 document.addEventListener('change', (e) => {
   if (e.target.matches('[data-pro-cat]')) { proCat = e.target.value; partners(document.getElementById('main')); }
@@ -64,7 +104,7 @@ function proCard(p) {
   </section>`;
 }
 
-export function partnerIntro(partnerId, requirementId = null) {
+export function partnerIntro(partnerId, requirementId = null, placementId = null) {
   const p = (partnersCache || []).find((x) => x.id === partnerId);
   if (!p) return;
   const r = requirementId ? S.data.reqs.find((x) => x.id === requirementId) : null;
@@ -82,7 +122,7 @@ export function partnerIntro(partnerId, requirementId = null) {
       let v = f.contact_value;
       if (f.contact_method === 'email') { if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) throw new Error('Please enter a valid email address.'); }
       else { v = normalizePhone(v); if (!v) throw new Error('Please enter a valid mobile number.'); }
-      await db.requestReferral({ org_id: S.org.id, partner_id: p.id, requirement_id: requirementId, note: f.note, contact_method: f.contact_method, contact_value: v });
+      await db.requestReferral({ org_id: S.org.id, partner_id: p.id, requirement_id: requirementId, note: f.note, contact_method: f.contact_method, contact_value: v, placement_id: placementId });
       toast(`Sent. ${p.name} will contact you within 1 business day.`);
       if (location.hash.startsWith('#/pros')) partners(document.getElementById('main'));
     },
