@@ -67,7 +67,7 @@ async function ordersTab() {
   const closed = list.filter((a) => ['completed', 'cancelled'].includes(a.status));
   const earned = closed.filter((a) => a.status === 'completed' && ['paid', 'waived'].includes(a.payment_status)).reduce((t, a) => t + Number(a.quote_service_fee || 0), 0);
   const line = (a) => html`<button class="line" data-act="admin-order" data-id="${a.id}"><span class="line-main"><b>${KIND_LABEL[a.kind] || 'Request'}: ${a.requirement_name} — ${a.subject_label}</b>
-    <small>${a.orgs?.name || ''} · ${timeAgo(a.created_at)}${a.rush ? ' · URGENT' : ''}${a.care_plan_id ? (a.created_by ? ' · CARE PLUS (included)' : ' · CARE') : ''}${a.batch_id ? ' · several at once' : ''}${a.due_on ? ' · due ' + fmtDate(a.due_on) : ''}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
+    <small>${a.orgs?.name || ''} · ${timeAgo(a.created_at)}${a.rush ? ' · URGENT' : ''}${a.care_plan_id ? (a.created_by ? ' · CARE (walk-through included)' : a.care_plans?.billing === 'per_renewal' ? ' · CARE (pay per renewal)' : ' · CARE') : ''}${a.batch_id ? ' · several at once' : ''}${a.due_on ? ' · due ' + fmtDate(a.due_on) : ''}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
     <span class="chip ${ORDER_STATUS[a.status]?.[1]}">${ORDER_STATUS[a.status]?.[0]}</span></button>`;
   const used = new Set();
   return html`
@@ -93,6 +93,8 @@ function orderDetail(a, events) {
   const rev = has('revenue');
   const svc = (S.data?.services || []).find((x) => x.code === a.service_code);
   const care = rev && a.care_plan_id;
+  // Pay per renewal: quote our usual price; the All-in plan (or an included walk-through): ₱0.
+  const payPer = care && !a.created_by && a.care_plans?.billing === 'per_renewal';
   const steps = rev ? svc?.steps || [] : [];
   const paid = ['paid', 'waived'].includes(a.payment_status);
   return html`
@@ -110,7 +112,9 @@ function orderDetail(a, events) {
         <dt>Quote</dt><dd>${a.quote_php != null ? html`${peso(a.quote_php)} (fee ${peso(a.quote_service_fee)} + gov ${peso(a.quote_gov_fees)})` : '—'}</dd>
         <dt>Payment</dt><dd>${PAYMENT_STATUS[a.payment_status]}${a.payment_method ? ' · ' + a.payment_method : ''}${a.payment_ref ? ' · ref ' + a.payment_ref : ''}</dd>
         <dt>Received</dt><dd>${fmtDateTime(a.created_at)}</dd>
-        ${when(care, html`<dt>Care</dt><dd>${a.created_by ? 'Walk-through included in Care Plus: quote ₱0 service fee.' : 'Started by Year-round care: our fee is covered. Quote the government fees only (₱0 service fee).'}</dd>`)}
+        ${when(care, html`<dt>Care</dt><dd>${a.created_by ? 'Walk-through included in their care plan: quote ₱0 service fee.'
+          : payPer ? `Started by Year-round care, pay per renewal: quote our usual fee${svc?.price_from != null ? ` (${peso(svc.price_from)})` : ''} plus the government fees. Within their pre-approval and at or below the usual fee, it's accepted for them.${a.requirement_id ? ' If this job also covers another open one for the same vehicle (LTO includes the emission test and inspection), quote that one ₱0.' : ''}`
+          : 'Started by Year-round care: our fee is covered. Quote the government fees only (₱0 service fee).'}</dd>`)}
         ${when(rev && paid, html`<dt>BIR invoice no.</dt><dd><form class="inline-form inv-form" data-kind="order" data-id="${a.id}"><input name="no" maxlength="60" value="${a.bir_invoice_no || ''}" aria-label="BIR invoice number" placeholder="Add after you issue it"><button class="btn btn-sm btn-ghost">Save</button></form></dd>`)}
       </dl>
       ${when(!closed && a.requirement_id, html`<button class="btn btn-sm btn-ghost" data-act="admin-docs" data-id="${a.requirement_id}">Show customer's files</button>
@@ -119,7 +123,7 @@ function orderDetail(a, events) {
 
     ${when(['submitted', 'quoted', 'awaiting_customer'].includes(a.status) && !['paid', 'waived', 'pending_verification'].includes(a.payment_status), html`<section class="card"><h2>${a.quote_php != null ? 'Change the quote' : 'Send the quote'}</h2>
       <form class="admin-quote" data-id="${a.id}"><div class="grid2">
-        <label class="field"><span>Service fee (₱)</span><input name="fee" type="number" min="0" step="0.01" required value="${a.quote_service_fee ?? (care ? 0 : '')}"></label>
+        <label class="field"><span>Service fee (₱)</span><input name="fee" type="number" min="0" step="0.01" required value="${a.quote_service_fee ?? (payPer ? svc?.price_from ?? '' : care ? 0 : '')}"></label>
         ${when(rev && a.rush, html`<label class="field"><span>Rush fee (₱) <small>(they asked for it urgent)</small></span><input name="rush" type="number" min="0" step="0.01" value="${Number(a.quote_rush_fee) || (svc?.rush_fee ?? '')}"></label>`)}
         <label class="field"><span>Government fees, estimate (₱)</span><input name="gov" type="number" min="0" step="0.01" value="${a.quote_gov_fees ?? ''}"></label></div>
         ${when(care && !a.created_by, html`<p class="muted small">If the government fees are within the ${peso(a.orgs?.care_gov_preapproval_php || 0)} they pre-approved, the quote is accepted for them automatically.</p>`)}

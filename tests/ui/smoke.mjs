@@ -747,27 +747,34 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('care: "Year-round care" is in the menu', (await page.locator('.sidebar a[data-nav=care]').count()) === 1);
   await go('#/care');
   check('care: the page explains why in plain words, with the price', /We renew your permits/.test(await page.textContent('main .cx-hero')) && /Reminders tell you\. Year-round care does it\./.test(await page.textContent('main'))
-    && /₱1,200/.test(await page.textContent('main .cx-price')) && /₱250/.test(await page.textContent('main .cx-price')) && /Care Plus/.test(await page.textContent('main .cx-plus')));
+    && /₱0 a month/.test(await page.textContent('main .cx-hero')));
+  const ways = (await page.textContent('main .cx-ways')).replace(/\s+/g, ' ');
+  check('care: two ways to pay, per renewal first (₱0, with its fees) and the All-in plan (₱1,200 / ₱250)', /Pay per renewal/.test(ways) && /₱0 a month/.test(ways) && /Mayor's Permit\s*₱6,000/.test(ways)
+    && /All-in plan/.test(ways) && /₱1,200 a month per branch/.test(ways) && /₱250 a month per vehicle/.test(ways) && ways.indexOf('Pay per renewal') < ways.indexOf('All-in plan'), ways.slice(0, 200));
+  check('care: it gives this business its own yearly cost both ways', /For your 1 branch and 1 vehicle: about ₱\d[\d,]* a year/.test(ways) && /₱14,500 a year, paid yearly/.test(ways), ways);
+  await page.click('main .cx-faq summary:has-text("Why would anyone pay monthly?")');
+  check('care: "Why would anyone pay monthly?" says tracking is free and the monthly price is optional', /isn't a fee for tracking: tracking and reminders are always free/.test(await page.textContent('main .cx-faq')));
   check('care: it shows this business its own year (renewals and hours)', /Your business, every year/.test(await page.textContent('main .cx-year')) && /renewals to do/.test(await page.textContent('main .cx-nums')));
   await page.click('main .cx-covers summary');
   check('care: "Which permits are included?" lists them, and what isn\'t', /Mayor's \/ Business Permit/.test(await page.textContent('main .cx-covers')) && /FDA/.test(await page.textContent('main .cx-covers')));
   await go('#/businesses/b1');
   const offer = page.locator('main .care-line');
-  check('care: each branch card has one quiet line offering it', (await offer.count()) === 1 && /handle this branch all year/.test(await offer.textContent()) && /₱1,200\/month/.test(await offer.textContent()));
+  check('care: each branch card has one quiet line offering it', (await offer.count()) === 1 && /handle this branch all year/.test(await offer.textContent()) && /No monthly fee: pay per renewal/.test(await offer.textContent()));
   await offer.click(); await page.waitForTimeout(350);
   check('care: the line opens the start page with that branch ticked', (await page.evaluate(() => location.hash)).startsWith('#/care/start') && await page.isChecked('[name=pick][value="location:l1"]'));
   const total = async () => (await page.textContent('[data-care-total]')).replace(/\s+/g, ' ');
-  check('care: the total shows straight away (Care, monthly)', /Total per month\s*₱1,200/.test(await total()), await total());
-  await page.check('[name=level][value=plus]'); await page.check('[name=pick][value="vehicle:v1"]'); await page.waitForTimeout(100);
-  check('care: Care Plus for a branch and a vehicle adds up', /₱1,800/.test(await total()) && /₱350/.test(await total()) && /Total per month\s*₱2,150/.test(await total()), await total());
+  check('care: pay per renewal is the default, at ₱0 now and every month', await page.isChecked('[name=billing][value=per_renewal]') && /To pay now, and every month\s*₱0/.test(await total())
+    && /about ₱\d[\d,]* a year, paid one renewal at a time/.test(await total()) && (await page.textContent('.care-total .btn-block')).trim() === 'Start', await total());
+  await page.check('[name=billing][value=monthly]'); await page.check('[name=pick][value="vehicle:v1"]'); await page.waitForTimeout(100);
+  check('care: the All-in plan for a branch and a vehicle adds up', /₱1,200/.test(await total()) && /₱250/.test(await total()) && /Total per month\s*₱1,450/.test(await total()), await total());
   await page.check('[name=billing][value=yearly]'); await page.waitForTimeout(100);
-  check('care: yearly shows the yearly price', /Total per year\s*₱21,500/.test(await total()) && (await page.textContent('.care-total .btn-block')).includes('₱21,500'), await total());
+  check('care: yearly shows the yearly price', /Total per year\s*₱14,500/.test(await total()) && (await page.textContent('.care-total .btn-block')).includes('₱14,500'), await total());
   await page.check('[name=billing][value=monthly]');
   await page.click('.care-total .btn-block'); await page.waitForTimeout(200);
   check('care: nothing starts without the authorization tick', /tick the box/i.test(await page.textContent('.care-form .form-error')));
   await page.check('.care-form [name=consent]');
   await page.click('.care-total .btn-block'); await page.waitForTimeout(700);
-  check('care: starting goes to the plan with the first bill open to pay', (await page.evaluate(() => location.hash)) === '#/care' && /Pay bill C-/.test(await page.textContent('#modal-root')) && /₱2,150/.test(await page.textContent('#modal-root .quote-hint')));
+  check('care: starting goes to the plan with the first bill open to pay', (await page.evaluate(() => location.hash)) === '#/care' && /Pay bill C-/.test(await page.textContent('#modal-root')) && /₱1,450/.test(await page.textContent('#modal-root .quote-hint')));
   check('care: payment details are shown in the bill', /0917 000 0000/.test(await page.textContent('#modal-root .paywiths')));
   await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(200);
   check('care: "I\'ve paid" needs a reference or screenshot', /reference number or a screenshot/.test(await page.textContent('#modal-root .modal-error')));
@@ -1031,6 +1038,17 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     /Not in Care, quoted per job: FDA License to Operate/.test(await page.textContent('main .care-row:has-text("Visayas Sari-Sari Distribution Co. · Main branch")')));
   await page.evaluate(() => { location.hash = '#/care/start'; }); await page.waitForTimeout(450);
   check('care start: a branch with extra licences says how many are quoted separately', /1 quoted separately/.test(await page.textContent('main .care-pick:has-text("Visayas Sari-Sari Distribution Co. · Main branch")')));
+  await page.evaluate(() => { location.hash = '#/care'; }); await page.waitForTimeout(450);
+  const hilux = page.locator('main .care-row', { hasText: 'Toyota Hilux' });
+  check('care: a pay-per-renewal vehicle says "no monthly fee" and can be turned off', /no monthly fee/.test(await hilux.textContent()) && (await hilux.locator('[data-act=care-cancel]').textContent()).trim() === 'Turn off');
+  await hilux.locator('[data-act=care-cancel]').click(); await page.waitForTimeout(250);
+  check('care: turning it off stops today and keeps reminders', /stop starting renewals for it today/.test(await page.textContent('#modal-root')) && /Reminders keep coming, for free/.test(await page.textContent('#modal-root')));
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(450);
+  check('care: turned off, it\'s gone from "What we handle"', (await page.locator('main .care-row:not(details .care-row)', { hasText: 'Toyota Hilux' }).count()) === 0);
+  await page.evaluate(() => { location.hash = '#/care/start?veh=v2'; }); await page.waitForTimeout(450);
+  await page.check('.care-form [name=consent]'); await page.click('.care-total .btn-block'); await page.waitForTimeout(700);
+  check('care: pay per renewal starts at once, with no bill to pay', (await page.evaluate(() => location.hash)) === '#/care' && (await page.locator('#modal-root .quote-hint').count()) === 0
+    && /We'll message you when we start a renewal/.test(await page.textContent('#toast')) && (await page.locator('main .care-row:not(details .care-row)', { hasText: 'Toyota Hilux' }).locator('.chip', { hasText: 'Active' }).count()) === 1);
   await page.evaluate(() => { location.hash = '#/services/orders/ord2'; }); await page.waitForTimeout(450);
   check('care renewal order: says the plan started it and the fee is covered', /covered by your care plan/.test(await page.textContent('main .card.quote')) && /Year-round care/.test(await page.textContent('main .page-head')));
   check('phone: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));

@@ -96,7 +96,7 @@ function homeView() {
         <div class="mh-ico">${REPEAT}</div>
         <h2>Comes in every month</h2>
         <p class="mh-big">${peso(n(s.mrr_care) + n(s.mrr_plans))}</p>
-        <p class="mh-sub">From ${plural(n(s.care_active), 'care plan')} and ${plural(n(s.plans_paying), 'team subscription')}, even if no new job comes in.${n(s.care_pending) ? ` ${n(s.care_pending)} more waiting for a first payment.` : ''}</p>
+        <p class="mh-sub">From ${plural(n(s.care_active), 'monthly care plan')} and ${plural(n(s.plans_paying), 'team subscription')}, even if no new job comes in.${n(s.care_pending) ? ` ${n(s.care_pending)} more waiting for a first payment.` : ''}${n(s.care_autorenew) ? ` ${plural(n(s.care_autorenew), 'branch or vehicle', 'branches and vehicles')} on pay per renewal bring in a fee each time we renew.` : ''}</p>
       </section>
       <section class="mh-card held">
         <div class="mh-ico">${BANK}</div>

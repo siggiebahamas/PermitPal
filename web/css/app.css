@@ -1231,6 +1231,28 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .cx-plus div { display: flex; flex-direction: column; gap: 2px; }
 .cx-plus b { color: var(--heading); }
 
+.cx-ways { margin: 18px 0; }
+.cx-ways h2 { font-size: 22px; margin: 0 0 14px; }
+.cx-ways-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.cx-way { border: 1px solid var(--border); border-radius: 20px; padding: 20px; background: var(--card); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; min-width: 0; }
+.cx-way.on { border: 2px solid var(--brand); box-shadow: 0 20px 40px -28px rgba(27, 77, 181, .55); }
+.cx-way.on .cx-col-tag { color: var(--brand); }
+.cx-way h3 { margin: 0; font-size: 22px; color: var(--heading); }
+.cx-way p { margin: 0; }
+.cx-way-price { color: var(--muted); }
+.cx-way-price b { font-size: 34px; font-weight: 800; color: var(--heading); line-height: 1.1; }
+.cx-fees { list-style: none; margin: 4px 0; padding: 0; width: 100%; display: grid; gap: 2px; }
+.cx-fees li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--rule); }
+.cx-fees li:last-child { border-bottom: 0; }
+.cx-fees b { color: var(--heading); white-space: nowrap; }
+.cx-plusses { list-style: none; margin: 4px 0; padding: 0; display: grid; gap: 9px; }
+.cx-plusses li { display: flex; gap: 10px; align-items: flex-start; }
+.cx-plusses svg { width: 20px; height: 20px; flex: none; margin-top: 2px; fill: none; stroke: var(--s-ok); stroke-width: 2.4; }
+.cx-plusses b { color: var(--heading); }
+.cx-way .cx-yours { margin: 4px 0; }
+.cx-way .btn { margin-top: 6px; }
+@media (max-width: 699px) { .cx-ways-grid { grid-template-columns: minmax(0, 1fr); } }
+
 .cx-faq { margin: 18px 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .cx-faq > details, .cx-faq .cx-sub { min-width: 0; }
 .cx-faq details { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 4px 16px; }

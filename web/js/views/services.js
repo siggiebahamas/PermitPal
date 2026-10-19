@@ -135,7 +135,7 @@ function orderLine(a) {
   const care = a.care_plan_id && has('revenue');
   const action = a.status === 'quoted' ? 'Review quote' : a.payment_status === 'awaiting_payment' && isOpen(a) ? 'Pay now' : 'Open';
   return html`<a class="line" href="#/services/orders/${a.id}"><span class="line-main"><b>${a.kind === 'apply' ? 'New: ' : ''}${a.requirement_name}</b>
-    <small>${a.subject_label} · ${care ? (a.created_by ? 'included in Care Plus' : 'started by Year-round care') : 'sent'} ${timeAgo(a.created_at)}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
+    <small>${a.subject_label} · ${care ? (a.created_by ? 'included in your care plan' : 'started by Year-round care') : 'sent'} ${timeAgo(a.created_at)}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
     <span class="chip ${cls}">${label}</span><span class="btn btn-sm ${['Review quote', 'Pay now'].includes(action) ? 'btn-primary' : 'btn-soft'}">${action}</span></a>`;
 }
 
@@ -178,7 +178,7 @@ export function openRequest(code, { requirementId } = {}) {
         ${t.list.map((r) => html`<option value="${r.id}" ${r === start ? 'selected' : ''}>${r.name} — ${subjectLabel(r)}</option>`)}</select></label>
       <div class="grid2"><label class="field"><span>Dates that suit you</span><input name="visit_dates" maxlength="200" required placeholder="e.g. Any weekday morning next week"></label>
         <label class="field"><span>Site address</span><input name="site_address" maxlength="300" required value="${loc ? [loc.address, loc.city].filter(Boolean).join(', ') : ''}"></label></div>
-      <p class="muted small" data-included hidden>${ICON.check} Included in your Care Plus plan (one walk-through a year per branch): no service fee.</p>`
+      <p class="muted small" data-included hidden>${ICON.check} Included in your care plan (one walk-through a year per branch): no service fee.</p>`
     : t.kind === 'requirement'
     ? html`<label class="field"><span>Which permit?</span><select name="target" required>
         ${t.list.map((r) => html`<option value="${r.id}" ${r === start ? 'selected' : ''}>${r.name} — ${subjectLabel(r)} (${dueShort(r)})</option>`)}</select></label>
@@ -216,7 +216,7 @@ export function openRequest(code, { requirementId } = {}) {
         const r = reqById(sel.value);
         form.querySelector(`[name=kind][value=${firstTime(r) ? 'apply' : 'renew'}]`).checked = true;
       });
-      // Walk-throughs: say when Care Plus covers it, and fill the branch address.
+      // Walk-throughs: say when the care plan covers it, and fill the branch address.
       if (t.visit && sel) {
         const sync = () => {
           const r = reqById(sel.value);
@@ -288,12 +288,14 @@ export async function order(el, id) {
 
   el.innerHTML = String(html`
     <a class="back" href="#/services">← Done for you</a>
-    <div class="page-head"><div><h1>${a.requirement_name}</h1><p class="muted">${KIND_LABEL[a.kind] || 'Request'} · ${a.subject_label}${a.location_label ? ' · ' + a.location_label : ''}${a.rush ? ' · Urgent' : ''}${care ? (a.created_by ? ' · Included in Care Plus' : ' · Year-round care') : ''}</p></div>
+    <div class="page-head"><div><h1>${a.requirement_name}</h1><p class="muted">${KIND_LABEL[a.kind] || 'Request'} · ${a.subject_label}${a.location_label ? ' · ' + a.location_label : ''}${a.rush ? ' · Urgent' : ''}${care ? (a.created_by ? ' · Included in your care plan' : ' · Year-round care') : ''}</p></div>
       <div class="head-side"><span class="chip lg ${cls}">${label}</span></div></div>
     ${when(stage >= 0, html`<ol class="stepper" aria-label="Progress">${steps.map((t, i) => html`<li class="${i < stage ? 'done' : i === stage ? 'now' : ''}" ${i === stage ? 'aria-current="step"' : ''}><span>${i < stage ? '✓' : i + 1}</span>${t}</li>`)}</ol>`)}
 
     ${when(a.status === 'submitted', care && !a.created_by
-      ? html`<div class="banner info"><div><b>Your care plan started this renewal.</b> We're checking the exact government fees and will send them here within 1 business day. Our service fee is covered by your plan.</div></div>`
+      ? html`<div class="banner info"><div><b>Your care plan started this renewal.</b> ${careOf().plans.find((p) => p.id === a.care_plan_id)?.billing === 'per_renewal'
+        ? 'We\'re checking the government fees and will send you the exact price here within 1 business day: our usual fee plus the government fees. Nothing is filed until you approve it.'
+        : 'We\'re checking the exact government fees and will send them here within 1 business day. Our service fee is covered by your plan.'}</div></div>`
       : html`<div class="banner info"><div><b>We're preparing your exact quote.</b> You'll get it within 1 business day, by ${a.contact_method === 'email' ? 'email' : a.contact_method} and here. Nothing is charged until you accept it.</div></div>`)}
     ${when(access && !closed, html`<div class="banner info"><div><b>PermitPal has access to ${S.org.name}</b> to do this set-up. It ends automatically when this order is done. <a href="#/team">Remove it now</a></div></div>`)}
     ${when(a.status === 'quoted', quoteBox(a))}

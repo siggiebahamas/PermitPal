@@ -79,14 +79,14 @@ export function checklistCard(r, ticks = [], { offer = '' } = {}) {
   </details>`;
 }
 
-// Our own walk-through, on the "inspection" step: one line, and free when Care Plus includes it.
+// Our own walk-through, on the "inspection" step: one line, and free when the care plan includes it.
 function walkthroughLine(r) {
   if (!has('revenue') || !canEdit() || r.open_request_id) return '';
   const s = (S.data?.services || []).find((x) => x.visit && x.type_codes.includes(r.type_code));
   if (!s) return '';
   const p = coverOf(r);
   const incl = p && p.status === 'active' && tierOf(p.tier)?.walkthroughs > 0;
-  return html`<div class="ck-offer">${incl ? 'Included in your Care Plus plan:' : 'Want to pass the first time?'}
+  return html`<div class="ck-offer">${incl ? 'Included in your care plan:' : 'Want to pass the first time?'}
     <button type="button" class="linklike" data-act="svc-request" data-code="${s.code}" data-req="${r.id}">Book a pre-inspection walk-through</button>
     ${incl ? '' : html`<small class="muted">${s.price_from != null ? 'from ' + peso(s.price_from) : ''}</small>`}</div>`;
 }

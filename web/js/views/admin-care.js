@@ -20,6 +20,7 @@ export async function careTab() {
   cache = { plans, invoices, claims, tiers };
   const live = plans.filter((p) => p.status !== 'cancelled');
   const active = live.filter((p) => p.status === 'active' && p.paid_through >= todayPH());
+  const perRenewal = live.filter((p) => p.status === 'active' && p.billing === 'per_renewal');
   const mrr = active.filter((p) => !p.cancel_at).reduce((t, p) => t + monthlyOf(p), 0);
   const check = invoices.filter((i) => i.status === 'pending_verification');
   const open = invoices.filter((i) => i.status === 'due');
@@ -30,7 +31,7 @@ export async function careTab() {
   return html`
     <div class="stats four">
       <div class="stat ok"><div class="stat-n">${peso(Math.round(mrr))}</div><div class="stat-l">Care each month</div></div>
-      <div class="stat progress"><div class="stat-n">${active.length}</div><div class="stat-l">Active plans</div></div>
+      <div class="stat progress"><div class="stat-n">${active.length}</div><div class="stat-l">Paid plans${perRenewal.length ? html` <small>+ ${perRenewal.length} per renewal</small>` : ''}</div></div>
       <div class="stat"><div class="stat-n">${live.filter((p) => p.status === 'pending').length}</div><div class="stat-l">Waiting for first payment</div></div>
       <div class="stat overdue"><div class="stat-n">${live.filter((p) => p.status === 'paused').length}</div><div class="stat-l">Paused (unpaid)</div></div>
     </div>
@@ -59,7 +60,7 @@ export async function careTab() {
     <section class="card"><div class="card-head"><h2>All plans</h2><span class="muted small">${plural(live.length, 'live plan')}</span></div>
       ${plans.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Workspace</th><th>Branch or vehicle</th><th>Plan</th><th>Price</th><th>Status</th><th>Paid until</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>
         ${plans.map((p) => { const [l, cls] = PLAN_STATUS[p.status] || [p.status, '']; return html`<tr class="${p.status === 'cancelled' ? 'muted' : ''}"><td>${org(p)}</td><td>${p.label}</td><td>${tierName(p.tier)}</td>
-          <td>${peso(p.price_php)}/${p.billing === 'yearly' ? 'yr' : 'mo'}</td><td><span class="chip ${cls}">${l}</span>${p.cancel_at && p.status !== 'cancelled' ? html`<div class="muted small">ends ${fmtDate(p.cancel_at)}</div>` : ''}</td>
+          <td>${p.billing === 'per_renewal' ? 'Per renewal' : html`${peso(p.price_php)}/${p.billing === 'yearly' ? 'yr' : 'mo'}`}</td><td><span class="chip ${cls}">${l}</span>${p.cancel_at && p.status !== 'cancelled' ? html`<div class="muted small">ends ${fmtDate(p.cancel_at)}</div>` : ''}</td>
           <td>${p.paid_through ? fmtDate(p.paid_through) : '—'}</td>
           <td>${p.status !== 'cancelled' ? html`<button class="btn btn-sm btn-ghost" data-act="care-set" data-id="${p.id}">Change</button>` : ''}</td></tr>`; })}
       </tbody></table></div>` : empty('No care plans yet', 'Customers start them from Year-round care. New sign-ups also arrive by email.')}
@@ -68,6 +69,7 @@ export async function careTab() {
       ${tiers.map((t) => html`<form class="admin-tier grid2" data-code="${t.code}">
         <label class="field"><span>${t.subject === 'branch' ? 'Branch' : 'Vehicle'}: ${t.name}, per month (₱)</span><input name="monthly" type="number" min="0" step="1" value="${t.monthly_php}" required></label>
         <label class="field"><span>Per year (₱)</span><input name="yearly" type="number" min="0" step="1" value="${t.yearly_php}" required></label>
+        ${S.features?.autorenew && !Number(t.monthly_php) ? html`<p class="muted small" style="grid-column:1/-1">Pay per renewal: keep this at ₱0. Customers pay each renewal's usual price from Services.</p>` : ''}
         ${t.guarantee ? html`<label class="field"><span>Guarantee limit per permit (₱)</span><input name="cap" type="number" min="0" step="100" value="${t.guarantee_cap_php}"></label>` : ''}
         <label class="check"><input type="checkbox" name="active" ${t.active ? 'checked' : ''}> <span>Offered</span></label>
         <details class="tier-scope"><summary>Permits it renews (${(t.covers || []).length})</summary>

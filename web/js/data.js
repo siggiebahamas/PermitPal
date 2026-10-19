@@ -345,7 +345,7 @@ export const adminOrgs = async () => ok(await sb.rpc('admin_orgs'));
 export const adminOrgKinds = async () => ok(await sb.from('orgs').select('id, kind, trial_ends_at'));
 export const adminSetPlan = async (orgId, plan, expires) => ok(await sb.rpc('admin_set_plan', { p_org: orgId, p_plan: plan, p_expires: expires }));
 export const adminRequests = async (care = false) =>
-  ok(await sb.from('assistance_requests').select(care ? '*, orgs(name, care_gov_preapproval_php)' : '*, orgs(name)').order('created_at', { ascending: false }).limit(300));
+  ok(await sb.from('assistance_requests').select(care ? '*, orgs(name, care_gov_preapproval_php), care_plans(billing)' : '*, orgs(name)').order('created_at', { ascending: false }).limit(300));
 export const adminOutbox = async () =>
   ok(await sb.from('message_outbox').select('id, channel, to_address, subject, status, attempts, last_error, created_at, sent_at')
     .order('id', { ascending: false }).limit(100));

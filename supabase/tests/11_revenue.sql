@@ -172,13 +172,13 @@ select pg_temp.res('access ends by itself when the job is done', not exists (sel
 -- ================================================================ 2) year-round care
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000b2","role":"authenticated"}', true);
 set local role authenticated;
-do $$ begin perform public.start_care((select org from t_ids), jsonb_build_array(jsonb_build_object('kind','location','id',(select loc from t_ids),'tier','branch_care')), 'monthly', true);
+do $$ begin perform public.start_care((select org from t_ids), jsonb_build_array(jsonb_build_object('kind','location','id',(select loc from t_ids),'tier','branch_plus')), 'monthly', true);
   perform pg_temp.res('only the owner can start a paid plan', false, 'was allowed');
 exception when others then perform pg_temp.res('only the owner can start a paid plan', sqlerrm like 'Only the workspace owner%', sqlerrm); end $$;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
-do $$ begin perform public.start_care((select org from t_ids), jsonb_build_array(jsonb_build_object('kind','vehicle','id',(select veh from t_ids),'tier','branch_care')), 'monthly', true);
+do $$ begin perform public.start_care((select org from t_ids), jsonb_build_array(jsonb_build_object('kind','vehicle','id',(select veh from t_ids),'tier','branch_plus')), 'monthly', true);
   perform pg_temp.res('a branch plan can''t be put on a vehicle', false, 'was allowed');
 exception when others then perform pg_temp.res('a branch plan can''t be put on a vehicle', sqlerrm like '%doesn''t match%', sqlerrm); end $$;
 do $$ begin perform public.start_care((select org from t_ids), jsonb_build_array(jsonb_build_object('kind','location','id',(select loc from t_ids),'tier','branch_plus')), 'monthly', false);
@@ -186,12 +186,12 @@ do $$ begin perform public.start_care((select org from t_ids), jsonb_build_array
 exception when others then perform pg_temp.res('starting care needs the consent tick', true, sqlerrm); end $$;
 update t_ids set inv = public.start_care(org, jsonb_build_array(
   jsonb_build_object('kind','location','id',loc,'tier','branch_plus'),
-  jsonb_build_object('kind','vehicle','id',veh,'tier','vehicle_care')), 'monthly', true);
-select pg_temp.res('one sign-up bill for everything chosen', amount_php = 2050 and status = 'due' and first and jsonb_array_length(lines) = 2, amount_php::text)
+  jsonb_build_object('kind','vehicle','id',veh,'tier','vehicle_plus')), 'monthly', true);
+select pg_temp.res('one sign-up bill for everything chosen', amount_php = 1450 and status = 'due' and first and jsonb_array_length(lines) = 2, amount_php::text)
   from public.care_invoices where id = (select inv from t_ids);
 select pg_temp.res('plans wait for the first payment', count(*) = 2 and bool_and(status = 'pending'), string_agg(status, ','))
   from public.care_plans where org_id = (select org from t_ids);
-do $$ begin perform public.start_care((select org from t_ids), jsonb_build_array(jsonb_build_object('kind','location','id',(select loc from t_ids),'tier','branch_care')), 'monthly', true);
+do $$ begin perform public.start_care((select org from t_ids), jsonb_build_array(jsonb_build_object('kind','location','id',(select loc from t_ids),'tier','branch_care')), 'per_renewal', true);
   perform pg_temp.res('one plan per branch', false, 'was allowed');
 exception when others then perform pg_temp.res('one plan per branch', sqlerrm like '%already has a care plan%', sqlerrm); end $$;
 do $$ begin perform public.pay_care_invoice((select inv from t_ids), 'gcash', '', null);
@@ -277,12 +277,12 @@ select pg_temp.res('within the pre-approved amount: accepted for them, waiting f
 select pg_temp.res('above it: they approve it themselves', status = 'quoted', status)
   from public.assistance_requests where care_plan_id is not null and requirement_id = (select lto from t_ids);
 
--- walk-through included once a year with Care Plus
+-- walk-through included once a year with the All-in plan
 update public.assistance_requests set status = 'completed' where id = (select ord from t_ids);
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
 update t_ids set walk = public.request_service(org, 'adv_fire_preinspection', fsic, p_kind => 'other', p_consent => true);
-select pg_temp.res('a walk-through for a Care Plus branch is marked as included', care_plan_id = (select plan from t_ids), coalesce(care_plan_id::text, 'none'))
+select pg_temp.res('a walk-through for an All-in branch is marked as included', care_plan_id = (select plan from t_ids), coalesce(care_plan_id::text, 'none'))
   from public.assistance_requests where id = (select walk from t_ids);
 update public.assistance_requests set status = 'cancelled' where id = (select walk from t_ids);
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
@@ -291,7 +291,7 @@ reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); en
 update public.care_plans set paid_through = private.today_ph() + 5 where org_id = (select org from t_ids);
 select private.care_daily();
 select pg_temp.res('the next bill is made 7 days before the paid period ends, one per workspace',
-  count(*) = 1 and min(amount_php) = 2050 and min(period_start) = private.today_ph() + 6, count(*)::text)
+  count(*) = 1 and min(amount_php) = 1450 and min(period_start) = private.today_ph() + 6, count(*)::text)
   from public.care_invoices where org_id = (select org from t_ids) and not first;
 select private.care_daily();
 select pg_temp.res('...and only once', count(*) = 1, count(*)::text) from public.care_invoices where org_id = (select org from t_ids) and not first;
@@ -315,9 +315,11 @@ update public.care_plans set started_on = private.today_ph() - 120 where org_id 
 update public.requirement_cycles set expires_on = private.today_ph() - 10 where requirement_id = (select brgy from t_ids);
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
-do $$ begin perform public.file_guarantee_claim((select vplan from t_ids), (select lto from t_ids), 500, null, (select org from t_ids) || '/care/claims/r.pdf');
-  perform pg_temp.res('the guarantee is only on Care Plus', false, 'was allowed');
-exception when others then perform pg_temp.res('the guarantee is only on Care Plus', sqlerrm like '%comes with Care Plus%', sqlerrm); end $$;
+select public.start_care(org, jsonb_build_array(jsonb_build_object('kind','location','id',loc2,'tier','branch_care')), 'per_renewal', true) from t_ids;
+do $$ begin perform public.file_guarantee_claim((select id from public.care_plans where location_id = (select loc2 from t_ids)),
+    (select id from public.requirements where location_id = (select loc2 from t_ids) and type_code = 'mayors_permit'), 500, null, (select org from t_ids) || '/care/claims/r.pdf');
+  perform pg_temp.res('the guarantee is only on the All-in plan', false, 'was allowed');
+exception when others then perform pg_temp.res('the guarantee is only on the All-in plan', sqlerrm like '%comes with the All-in plan%', sqlerrm); end $$;
 do $$ begin perform public.file_guarantee_claim((select plan from t_ids), (select lto from t_ids), 500, null, (select org from t_ids) || '/care/claims/r.pdf');
   perform pg_temp.res('only permits the plan covers', false, 'was allowed');
 exception when others then perform pg_temp.res('only permits the plan covers', sqlerrm like '%isn''t covered%', sqlerrm); end $$;
@@ -505,7 +507,7 @@ select pg_temp.res('one-time jobs: our fee (with rush) is collected, government 
   (select sum(amount) from t_money where stream = 'jobs' and state = 'collected' and kind = 'service_fee' and ref_id = (select ord from t_ids)) = 2300
   and (select sum(amount) from t_money where state = 'held' and ref_id = (select ord from t_ids)) = 2000, '');
 select pg_temp.res('care bills paid are collected; the guarantee payout is a cost',
-  (select sum(amount) from t_money where stream = 'care' and state = 'collected') = 4100 and (select sum(amount) from t_money where state = 'cost') = -10000, '');
+  (select sum(amount) from t_money where stream = 'care' and state = 'collected') = 2900 and (select sum(amount) from t_money where state = 'cost') = -10000, '');
 select pg_temp.res('firms: the paid statement is collected', (select sum(amount) from t_money where stream = 'partners' and state = 'collected') = 2500, '');
 select pg_temp.res('team plans are collected', (select sum(amount) from t_money where stream = 'plans') = 4470, '');
 select pg_temp.res('accepted, not paid: the care renewal''s fees are not counted as ours', not exists (select 1 from t_money where state = 'to_collect' and stream = 'jobs' and amount = 0), '');
