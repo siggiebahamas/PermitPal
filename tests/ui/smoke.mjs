@@ -31,6 +31,16 @@ const server = http.createServer((req, res) => {
 await new Promise((r) => server.listen(4173, r));
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
+// The live site only sells online work for now (no city hall or LTO runs). Most blocks below still turn
+// the in-person services on, so they keep working for when they come back; one block checks the
+// online-only site the way customers see it.
+let inPerson = true;
+const openPage = browser.newPage.bind(browser);
+browser.newPage = async (opts) => {
+  const p = await openPage(opts);
+  if (inPerson) await p.addInitScript(() => { globalThis.PP_IN_PERSON = true; });
+  return p;
+};
 const results = [];
 const check = (name, cond, extra = '') => { results.push([cond ? 'PASS' : 'FAIL', name, extra]); };
 
@@ -1072,6 +1082,52 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('features off: nothing new shows before the database is updated', seen.length === 0, seen.join(','));
   check('features off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
+}
+
+// Online only, as on the live site: nothing that needs someone at city hall, the LTO or an inspection.
+{
+  inPerson = false;
+  const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await page.addInitScript(() => { globalThis.PP_DEMO = true; });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(400); };
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  check('online only: no Year-round care in the menu', (await page.locator('.sidebar a[data-nav=care]').count()) === 0 && (await page.locator('.sidebar a[data-nav=services]').count()) === 1);
+  check('online only: the dashboard offers no in-person renewals or care', (await page.locator('main [data-act=svc-for-req], main .nudge').count()) === 0);
+  await go('#/care');
+  check('online only: old Year-round care links go to Done for you', (await page.evaluate(() => location.hash)) === '#/services');
+  const names = await page.locator('main .svc-grid .svc h2').allTextContents();
+  check('online only: Done for you lists only online services', names.length >= 4 && names.some((x) => /Set up my account/.test(x)) && names.some((x) => /DTI business name/.test(x))
+    && !names.some((x) => /Mayor|Barangay|Fire Safety|Sanitary|LTO|walk-through|New business|branch opening|closure|replacement/i.test(x)), names.join(' | '));
+  check('online only: no care teaser and no "Renew several"', (await page.locator('main .care-teaser, main [data-act=svc-bulk]').count()) === 0
+    && /Online paperwork, done for you/.test(await page.textContent('main .page-head')));
+  check('online only: the demo\'s sample order is the online set-up job', (await page.locator('main .line', { hasText: 'Set up my account for me' }).count()) >= 1);
+  await go('#/services?service=renew_mayors_permit');
+  check('online only: an in-person service can\'t be ordered by link', /not available/.test(await page.textContent('#toast')) && (await page.locator('#modal-root .modal').count()) === 0);
+  await go('#/compliance');
+  check('online only: no "Have PermitPal renew several" on Compliance', (await page.locator('main [data-act=svc-bulk]').count()) === 0);
+  await go('#/businesses/b2');
+  check('online only: branch cards don\'t offer Year-round care', (await page.locator('main .care-line').count()) === 0);
+  const mp = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b2').id));
+  await go('#/requirement/' + mp);
+  check('online only: a Mayor\'s Permit page offers no renewal by PermitPal', (await page.locator('main [data-act=svc-for-req], main .care-note, main .ck-offer').count()) === 0);
+  await go('#/admin');
+  check('online only: staff have no Care tab', (await page.locator('[data-act=admin-tab][data-tab=care]').count()) === 0);
+  await page.click('[data-act=money-view][data-v=earnings]'); await page.waitForTimeout(350);
+  check('online only: Money doesn\'t show a care stream', !/Monthly care plans/.test(await page.textContent('main')) && /Team subscriptions/.test(await page.textContent('main')));
+  await page.click('[data-act=admin-tab][data-tab=services]'); await page.waitForTimeout(400);
+  check('online only: staff see which services are hidden', (await page.locator('main .chip', { hasText: 'In person: hidden' }).count()) >= 10);
+  check('online only: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+  const out = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await out.addInitScript(() => { globalThis.PP_LOGGED_OUT = true; });
+  await out.goto('http://localhost:4173/'); await out.waitForSelector('.landing h1');
+  check('online only: the sign-in page doesn\'t sell Year-round care', !/Or let us do it all|Year-round care/.test(await out.textContent('.landing')));
+  await out.close();
+  inPerson = true;
 }
 
 await browser.close();

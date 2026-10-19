@@ -2,7 +2,7 @@
 // (head office, accounting firm, property, fleet) with their prices read live from the plans table.
 import { html } from '../util.js';
 import { ICON } from '../components.js';
-import { has } from '../core.js';
+import { has, IN_PERSON } from '../core.js';
 import * as db from 'pp/data';
 
 const FEATURES = [
@@ -23,8 +23,8 @@ const TEAMS = [
 export async function landing(app) {
   // Show the page at once; team prices fill in when they arrive (a slow or unreachable server never blocks the page).
   const plansP = db.listPlans().catch(() => []);
-  const tiersP = has('revenue') ? db.careTiers().catch(() => []) : Promise.resolve([]);
-  const features = has('revenue') ? [...FEATURES, [ICON.check, 'Or let us do it all', 'Year-round care: one monthly fee per branch or vehicle and we start every renewal for you. You approve the government fees; we do the rest.']] : FEATURES;
+  const tiersP = has('revenue') && IN_PERSON ? db.careTiers().catch(() => []) : Promise.resolve([]);
+  const features = has('revenue') && IN_PERSON ? [...FEATURES, [ICON.check, 'Or let us do it all', 'Year-round care: one monthly fee per branch or vehicle and we start every renewal for you. You approve the government fees; we do the rest.']] : FEATURES;
   app.innerHTML = String(html`
     <main class="landing">
       <header class="lp-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>

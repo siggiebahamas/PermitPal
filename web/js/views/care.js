@@ -6,7 +6,7 @@
 // Once they have a plan, it shows what we're handling, anything that needs them, and the details
 // folded away. Kept honest: prices up front, what's not included, cancelling is one tap.
 import { html, raw, fmtDate, peso, toast, toastError, confirmDialog, openModal, formObject, plural, when, todayPH } from '../util.js';
-import { S, on, go, reload, canEdit, isOrgAdmin, isOwner, has, careOf, planFor, coverOf, tierOf, typeOf, reqById, locationsOf, reqsOf, service, serviceFor, empty } from '../core.js';
+import { S, on, go, reload, canEdit, isOrgAdmin, isOwner, has, careOf, planFor, coverOf, tierOf, typeOf, reqById, locationsOf, reqsOf, service, serviceFor, empty, IN_PERSON } from '../core.js';
 import { ICON, byPriority, subjectLabel, dueShort } from '../components.js';
 import { ORDER_STATUS, payDetails, paySettings } from './services.js';
 import * as db from 'pp/data';
@@ -673,7 +673,7 @@ on('care-claim', () => {
 // ---------------------------------------------------------------- small offers elsewhere in the app
 // A branch card or vehicle page: "covered" when it is, otherwise one quiet line.
 export function careLine(kind, id) {
-  if (!has('revenue')) return '';
+  if (!has('revenue') || !IN_PERSON) return '';
   const p = planFor(kind, id);
   if (p) {
     const [label, cls] = PLAN_STATUS[p.status] || [p.status, ''];
@@ -686,7 +686,7 @@ export function careLine(kind, id) {
 
 // A permit page: what care is doing for this permit.
 export function careNote(r) {
-  if (!has('revenue')) return '';
+  if (!has('revenue') || !IN_PERSON) return '';
   const p = coverOf(r);
   if (!p) return '';
   const lead = r.subject === 'vehicle' ? LEAD_DAYS.vehicle : LEAD_DAYS.business;

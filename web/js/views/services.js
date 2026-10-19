@@ -4,7 +4,7 @@
 // an exact quote before anything starts, written authorization, government fees at cost with
 // official receipts, and never paying anyone to speed things up (RA 11032 bans fixers).
 import { html, fmtDate, fmtDateTime, peso, toast, toastError, confirmDialog, when, normalizePhone, timeAgo, openModal, formObject, plural, todayPH } from '../util.js';
-import { S, on, go, reload, canEdit, has, reqById, service, serviceFor, business, vehicle, person, empty, careOf, coverOf, tierOf, location_ } from '../core.js';
+import { S, on, go, reload, canEdit, has, reqById, service, serviceFor, offered, IN_PERSON, business, vehicle, person, empty, careOf, coverOf, tierOf, location_ } from '../core.js';
 import { byPriority, subjectLabel, dueShort, ICON } from '../components.js';
 import * as db from 'pp/data';
 
@@ -24,12 +24,17 @@ export const PAYMENT_STATUS = {
   paid: 'Paid', waived: 'Nothing to pay', refunded: 'Refunded',
 };
 export const KIND_LABEL = { renew: 'Renewal', apply: 'New application', other: 'Request' };
-const CATEGORIES = [
+const CATEGORIES = IN_PERSON ? [
   ['renewal', 'Renewals and first-time applications', 'We renew it (or get it for the first time) and save the permit to your account.'],
   ['plan', 'Year-round care', 'One monthly fee. We watch and renew everything for you, so you never have to think about it.'],
   ['package', 'Packages', 'Bigger jobs, done in the right order.'],
   ['document', 'Registrations and documents', 'One-time registrations, replacements, copies and updates.'],
   ['advisory', 'Advisory', 'Get ready before an inspection or a bid.'],
+] : [
+  ['package', 'Set up', 'We type in your permits for you, from photos or a spreadsheet.'],
+  ['renewal', 'Online renewals', 'Renewals done fully online, at a fixed fee. The new certificate is saved to your account.'],
+  ['document', 'Online registrations', 'Registrations filed online for you.'],
+  ['advisory', 'Online upkeep', 'Keeping your online government accounts current.'],
 ];
 const PROMISES = [
   ['Exact quote first', 'Nothing starts and nothing is charged until you accept a written quote.'],
@@ -70,18 +75,19 @@ export function services(el, params) {
   const open = requests.filter(isOpen);
   const done = requests.filter((a) => !isOpen(a));
   const rev = has('revenue');
-  const svc = (S.data.services || []).filter((s) => !(rev && s.category === 'plan'));
+  const svc = (S.data.services || []).filter((s) => !(rev && s.category === 'plan') && offered(s));
   const due = rev ? careOf().invoices.filter((i) => i.status === 'due') : [];
-  const many = rev && canEdit() ? renewable().filter(dueNow) : [];
+  const many = rev && IN_PERSON && canEdit() ? renewable().filter(dueNow) : [];
   const setup = rev ? service('setup_from_paper') : null;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Done for you</h1>
-      <p class="muted">Skip the queues. We renew permits, apply for new ones and keep your papers current, and you can follow every step here.</p></div>
+      <p class="muted">${IN_PERSON ? 'Skip the queues. We renew permits, apply for new ones and keep your papers current, and you can follow every step here.'
+        : 'Online paperwork, done for you: we set up your account from your papers, and handle filings that are 100% online. Follow every step here.'}</p></div>
       ${when(many.length > 1, html`<button class="btn btn-primary" data-act="svc-bulk">Renew ${many.length} for me</button>`)}</div>
     ${due.map((i) => html`<div class="banner ${i.due_on < todayPH() ? 'warn' : 'info'}"><div><b>Year-round care bill ${i.number}:</b> ${peso(i.amount_php)}${i.first ? ', coverage starts when it\'s paid' : `, due ${fmtDate(i.due_on)}`}.</div>
       <div class="banner-actions"><a class="btn btn-sm btn-primary" href="#/care?pay=${i.id}">Pay</a></div></div>`)}
     <section class="card promises">${PROMISES.map(([t, d]) => html`<div class="promise">${ICON.check}<div><b>${t}</b><span>${d}</span></div></div>`)}</section>
-    ${when(rev, careTeaser())}
+    ${when(rev && IN_PERSON, careTeaser())}
 
     ${when(requests.length, html`<section class="card">
       <div class="card-head"><div><h2>Your requests</h2><p class="card-sub">${plural(open.length, 'open request')}</p></div></div>
@@ -97,7 +103,7 @@ export function services(el, params) {
       return list.length ? html`<h3 class="section-label svc-cat">${title}</h3><p class="section-sub svc-cat-sub">${sub}</p>
         <div class="svc-grid">${list.map(serviceCard)}</div>` : '';
     })}
-    <p class="muted small fineprint">Prices are starting points: your quote depends on your city, the permit and how urgent it is. ${FINE_PRINT}
+    <p class="muted small fineprint">${IN_PERSON ? 'Prices are starting points: your quote depends on your city, the permit and how urgent it is.' : 'Our fees are fixed. Government fees are paid at cost.'} ${FINE_PRINT}
       <a href="terms.html#services" target="_blank" rel="noopener">Done-for-you terms</a></p>`);
   // Links from a permit page or a notification open the request form straight away.
   const pre = params?.get('req');
@@ -161,7 +167,7 @@ const firstTime = (r) => !r?.cycle_id;
 
 export function openRequest(code, { requirementId } = {}) {
   const s = service(code);
-  if (!s) return toast('That service is not available right now.', 'error');
+  if (!offered(s)) return toast('That service is not available right now.', 'error');
   if (!canEdit()) return toast('Only people who can edit this workspace can ask for a quote.', 'error');
   const t = targets(s);
   const optional = s.applies_to === 'any' && s.category !== 'renewal';
@@ -464,12 +470,12 @@ on('auth-letter', (ds) => {
 // ---------------------------------------------------------------- the offer on a permit page
 export function serviceOffer(r, { compact = false } = {}) {
   if (!has('services')) return '';
-  const s = serviceFor(r);
-  if (!s || !canEdit() || (r.status === 'compliant' && !r.expires)) return '';
-  if (r.open_request_id) {
+  if (r.open_request_id && canEdit()) {
     return html`<div class="offer-inline"><div class="offer-body">${ICON.briefcase}<div><b>PermitPal is handling this</b>
       <span class="muted">Follow the progress in your request.</span></div></div><a class="btn btn-soft btn-sm" href="#/services/orders/${r.open_request_id}">Open request</a></div>`;
   }
+  const s = serviceFor(r);
+  if (!s || !canEdit() || (r.status === 'compliant' && !r.expires)) return '';
   const apply = !r.cycle_id;
   return html`<div class="offer-inline ${compact ? 'compact' : ''}"><div class="offer-body">${ICON.briefcase}<div>
     <b>${compact ? 'No time for all this?' : ''} Have PermitPal ${apply ? 'get it for you' : 'renew it for you'}</b>

@@ -3,7 +3,7 @@
 // (leads) sent to them, payment details, the email log and browser errors.
 // Only accounts with profiles.is_platform_admin can load any of this (enforced in the database).
 import { html, fmtDate, fmtDateTime, timeAgo, toast, toastError, when, peso, todayPH, openModal, plural, confirmDialog } from '../util.js';
-import { S, on, rerender, empty, has } from '../core.js';
+import { S, on, rerender, empty, has, IN_PERSON, offered } from '../core.js';
 import { PARTNER_CATEGORIES } from './extras.js';
 import { ORDER_STATUS, PAYMENT_STATUS, KIND_LABEL } from './services.js';
 import { ICON } from '../components.js';
@@ -20,11 +20,12 @@ export async function admin(el) {
   el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   const rev = has('revenue');
   tab ||= rev ? 'money' : 'inbox';
+  if (tab === 'care' && !IN_PERSON) tab = 'money';
   const tabBtn = (k, l) => html`<button class="tab ${tab === k ? 'active' : ''}" data-act="admin-tab" data-tab="${k}">${l}</button>`;
   let body = '';
   try {
     if (tab === 'money' && rev) body = await moneyTab((t) => { tab = t; openOrder = null; rerender(); });
-    else if (tab === 'care' && rev) body = await careTab();
+    else if (tab === 'care' && rev && IN_PERSON) body = await careTab();
     else if (tab === 'billing' && rev) body = await billingTab();
     else if (tab === 'partners' && rev) body = await partnersTab2();
     else if (tab === 'orders' && has('services')) body = await ordersTab();
@@ -39,7 +40,7 @@ export async function admin(el) {
   } catch (e) { toastError(e); }
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>PermitPal admin</h1><p class="muted">Staff tools. Customers never see this page.</p></div></div>
-    <div class="tabs">${rev ? tabBtn('money', 'Money') : ''}${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${rev ? tabBtn('care', 'Care') : ''}${tabBtn('services', 'Services & prices')}` : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${rev ? tabBtn('billing', 'Partner billing') : tabBtn('referrals', 'Quote requests')}
+    <div class="tabs">${rev ? tabBtn('money', 'Money') : ''}${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${rev && IN_PERSON ? tabBtn('care', 'Care') : ''}${tabBtn('services', 'Services & prices')}` : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${rev ? tabBtn('billing', 'Partner billing') : tabBtn('referrals', 'Quote requests')}
       ${tabBtn('payments', 'Payment details')}${tabBtn('outbox', 'Messages')}${has('errors') ? tabBtn('errors', 'Errors') : ''}</div>
     ${body}`);
   wire(el);
@@ -203,9 +204,9 @@ on('staff-file', async (ds) => {
 
 // ---------------------------------------------------------------- services & prices
 function servicesTab(list) {
-  return html`<p class="muted small">These are the starting prices customers see. Every order still gets an exact quote from you.</p>
+  return html`<p class="muted small">These are the starting prices customers see. Every order still gets an exact quote from you.${IN_PERSON ? '' : ' Services that need someone at city hall, the LTO or an inspection are switched off for now: customers don\'t see them, whatever "Offered" says.'}</p>
     ${list.map((s) => html`<section class="card"><form class="admin-svc" data-code="${s.code}">
-      <div class="card-head"><h2>${s.name}</h2><label class="check"><input type="checkbox" name="active" ${s.active ? 'checked' : ''}> Offered</label></div>
+      <div class="card-head"><h2>${s.name}${offered(s) ? '' : html` <span class="chip needinfo">In person: hidden</span>`}</h2><label class="check"><input type="checkbox" name="active" ${s.active ? 'checked' : ''}> Offered</label></div>
       <div class="grid2">
         <label class="field"><span>Name</span><input name="name" maxlength="120" value="${s.name}" required></label>
         <label class="field"><span>Starting price (₱) <small>blank = quoted</small></span><input name="price_from" type="number" min="0" step="1" value="${s.price_from ?? ''}"></label>

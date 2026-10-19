@@ -472,10 +472,15 @@ if (globalThis.PP_DEMO) {
   addReq('person', 'pp1', null, types.find((t) => t.code === 'drivers_license'), { reference_no: 'N01-23-456789', expires_on: addDays(48) });
   addReq('person', 'pp1', null, types.find((t) => t.code === 'health_certificate'), { reference_no: 'HC-2291', expires_on: addDays(-3) });
   const fsic = db.requirements.find((r) => r.business_id === 'b2' && r.type_code === 'fsic' && r.location_id === 'l3');
-  const a = { id: 'ord1', org_id: org.id, created_by: user.id, service_code: 'renew_fsic', requirement_id: fsic.id, business_id: 'b2', vehicle_id: null, person_id: null,
+  // The demo's sample order: an FSIC renewal when in-person work is on, otherwise the online set-up job.
+  const a = globalThis.PP_IN_PERSON ? { id: 'ord1', org_id: org.id, created_by: user.id, service_code: 'renew_fsic', requirement_id: fsic.id, business_id: 'b2', vehicle_id: null, person_id: null,
     requirement_name: fsic.name, subject_label: 'Visayas Sari-Sari Distribution Co. · Mandaue warehouse', notes: 'Inspection usually takes a week here.', rush: false,
     contact_method: 'email', contact_value: null, docs_status: 'have', status: 'quoted', payment_status: 'unpaid', quote_service_fee: 1500, quote_gov_fees: 1800,
-    quote_php: 3300, quote_note: 'Government fee is based on last year\'s assessment. If it ends up lower, we refund the difference.', quoted_at: now(), due_on: null, created_at: now(), updated_at: now() };
+    quote_php: 3300, quote_note: 'Government fee is based on last year\'s assessment. If it ends up lower, we refund the difference.', quoted_at: now(), due_on: null, created_at: now(), updated_at: now() }
+    : { id: 'ord1', org_id: org.id, created_by: user.id, service_code: 'setup_from_paper', requirement_id: null, business_id: 'b2', vehicle_id: null, person_id: null,
+      requirement_name: 'Set up my account for me', subject_label: 'Visayas Sari-Sari Distribution Co.', notes: 'About 40 permits, photos in a shared folder.', rush: false, kind: 'other',
+      contact_method: 'email', contact_value: null, docs_status: 'have', status: 'quoted', payment_status: 'unpaid', quote_service_fee: 3000, quote_gov_fees: 0,
+      quote_php: 3000, quote_note: 'Up to 60 permits typed in from your photos, with expiry dates and files.', quoted_at: now(), due_on: null, created_at: now(), updated_at: now() };
   db.requests.unshift(a);
   event(a, 'created', a.notes);
   event(a, 'quote', 'Quote sent: ₱3,300', true);
@@ -1256,7 +1261,9 @@ if (REV && globalThis.PP_DEMO) {
   const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   const daysAgo = (d) => new Date(Date.now() - d * 864e5).toISOString();
   const custs = ['Lola Nena Bakeshop', 'Bright Smile Dental', 'Kuya Jun Hardware', 'Mabuhay Printing', 'Sunrise Laundry Hub', 'Kape Uno Ortigas', 'Isla Water Station', 'Golden Wok Eatery'];
-  const jobs = [["Mayor's / Business Permit renewal", 6000, 2000], ['Barangay Business Clearance', 1500, 500], ['Fire Safety Inspection Certificate (FSIC)', 3000, 1000], ['LTO vehicle registration renewal', 2000, 800], ['New business registration', 25000, 5000], ['Set up my account for me', 1500, 0]];
+  const jobs = globalThis.PP_IN_PERSON
+    ? [["Mayor's / Business Permit renewal", 6000, 2000], ['Barangay Business Clearance', 1500, 500], ['Fire Safety Inspection Certificate (FSIC)', 3000, 1000], ['LTO vehicle registration renewal', 2000, 800], ['New business registration', 25000, 5000], ['Set up my account for me', 1500, 0]]
+    : [['Set up my account for me', 1500, 0], ['Set up my account for me', 3000, 0], ['DTI business name renewal', 1500, 500], ['PhilGEPS Platinum renewal', 2500, 800], ['DOLE establishment registration', 2000, 0]];
   for (let d = 360; d > 2; d -= 4 + Math.floor(rnd() * 5)) {
     const growth = 1 + (360 - d) / 200; // the business grows over the year
     const n = rnd() < 0.35 * growth ? 2 : 1;
@@ -1269,8 +1276,8 @@ if (REV && globalThis.PP_DEMO) {
       if (d > 12) h.gov_fees_actual = h.quote_gov_fees; // paid to the agency; the newest ones are still being filed
     }
   }
-  // care customers, starting a few months ago and growing
-  [['Bright Smile Dental', 'Main branch (Pasig City)', 'branch_plus', 1200, 150], ['Kape Uno Ortigas', 'Main branch (Pasig City)', 'branch_plus', 1200, 120], ['Golden Wok Eatery', 'Main branch (Quezon City)', 'branch_plus', 1200, 75],
+  // care customers (only when in-person work is on), starting a few months ago and growing
+  if (globalThis.PP_IN_PERSON) [['Bright Smile Dental', 'Main branch (Pasig City)', 'branch_plus', 1200, 150], ['Kape Uno Ortigas', 'Main branch (Pasig City)', 'branch_plus', 1200, 120], ['Golden Wok Eatery', 'Main branch (Quezon City)', 'branch_plus', 1200, 75],
    ['Isla Water Station', 'Delivery van · NCF 2201', 'vehicle_plus', 250, 60], ['Isla Water Station', 'Delivery van · NCF 2202', 'vehicle_plus', 250, 60], ['Lola Nena Bakeshop', 'Main branch (Quezon City)', 'branch_plus', 1200, 40]]
     .forEach(([who, label, tier, price, since]) => {
       const id = uid();
@@ -1296,6 +1303,7 @@ if (REV && globalThis.PP_DEMO) {
   // a licence Care doesn't renew (quoted per job), on the branch with the All-in plan
   addReq('business', 'b2', 'l2', { code: null, name: 'FDA License to Operate', expires: true }, { reference_no: 'FDA-LTO-3301', expires_on: addDays(140) });
   // this workspace: the All-in plan on the Cebu main branch (paid), a pickup on pay per renewal, a renewal the plan started
+  if (globalThis.PP_IN_PERSON) {
   const l2 = db.locations.find((l) => l.id === 'l2');
   const cp = { id: 'cp1', org_id: org.id, tier: 'branch_plus', location_id: 'l2', vehicle_id: null, business_id: 'b2', label: `Visayas Sari-Sari Distribution Co. · Main branch (${l2.city})`, billing: 'monthly', price_php: 1200,
     status: 'active', started_on: addDays(-70), paid_through: addDays(20), cancel_at: null, consented_at: daysAgo(70), created_at: daysAgo(70) };
@@ -1313,6 +1321,7 @@ if (REV && globalThis.PP_DEMO) {
   db.requests.unshift(ca);
   event(ca, 'created', 'Started automatically by your Year-round care plan.', true);
   event(ca, 'quote', 'Quote: ₱8,200 (service fee ₱0, government fees ₱8,200)', true);
+  }
   db.apps.push({ id: uid(), name: 'Cebu Pest Busters', category: 'pest_control', cities: 'Cebu City, Mandaue City', contact_name: 'Rhea Lim', email: 'rhea@pestbusters.ph', phone: '+639171112222', licence: 'FDA LTO for pest control', services: 'Pest control and certificates', website: '', message: 'We serve restaurants and warehouses.', status: 'new', created_at: daysAgo(1) });
   const st = placementStat('pl1'); st.views = 41; st.clicks = 6; st.leads = 2;
   moneySettings.goal = 60000;

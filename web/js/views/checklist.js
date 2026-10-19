@@ -3,7 +3,7 @@
 // the current permit period, so recording the renewal starts a clean checklist for next time.
 // Everything is written as general guidance: the city or agency has the final say.
 import { html, fmtDate, toast, toastError, when, plural, peso } from '../util.js';
-import { S, canEdit, has, typeOf, memberName, reqById, coverOf, tierOf } from '../core.js';
+import { S, canEdit, has, typeOf, memberName, reqById, coverOf, tierOf, offered } from '../core.js';
 import { STATUS, statusChip } from '../components.js';
 import { placementFor, placementLine } from './extras.js';
 import * as db from 'pp/data';
@@ -83,7 +83,7 @@ export function checklistCard(r, ticks = [], { offer = '' } = {}) {
 function walkthroughLine(r) {
   if (!has('revenue') || !canEdit() || r.open_request_id) return '';
   const s = (S.data?.services || []).find((x) => x.visit && x.type_codes.includes(r.type_code));
-  if (!s) return '';
+  if (!offered(s)) return '';
   const p = coverOf(r);
   const incl = p && p.status === 'active' && tierOf(p.tier)?.walkthroughs > 0;
   return html`<div class="ck-offer">${incl ? 'Included in your care plan:' : 'Want to pass the first time?'}

@@ -1,6 +1,6 @@
 // Boot, sign-in state, the page shell (sidebar, which is a slide-in menu on phones) and the router.
 import { html, toast, toastError, fmtDate, closeModal, friendlyError } from './util.js';
-import { S, actions, hooks, on, isStaff, has } from './core.js';
+import { S, actions, hooks, on, isStaff, has, IN_PERSON } from './core.js';
 import { ICON } from './components.js';
 import { initErrorReporting, reportError } from './errors.js';
 import * as db from 'pp/data';
@@ -152,7 +152,7 @@ function buildNav() {
   const base = has('filings') ? [...BASE_NAV.slice(0, 4), ['filings', 'filings', ICON.calendar], ...BASE_NAV.slice(4)] : BASE_NAV;
   NAV = k?.nav ? [base[0], ['network', k.nav, k.icon], ...base.slice(1)] : base;
   // Below Notifications the menu has two color-coded groups: Tools (pine) and Account (navy).
-  TOOLS = [...(has('services') ? [['services', 'services']] : []), ...(has('revenue') ? [['care', 'care']] : []), ['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'], ...(k?.nav ? [] : [['network', 'team_tools']])];
+  TOOLS = [...(has('services') ? [['services', 'services']] : []), ...(has('revenue') && IN_PERSON ? [['care', 'care']] : []), ['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'], ...(k?.nav ? [] : [['network', 'team_tools']])];
   ACCOUNT = [['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings'], ['contact', 'contact']];
   MORE = [['notifications', 'notifications'], ...TOOLS, ...ACCOUNT];
 }
@@ -234,7 +234,8 @@ async function renderPage() {
     else if (a === 'network') await network(main);
     else if (a === 'connect') await connectPage(main, b);
     else if (a === 'services' && has('services')) b === 'orders' && parts[2] ? await order(main, parts[2]) : services(main, params);
-    else if (a === 'care' && has('revenue')) b === 'start' ? careStart(main, params) : await care(main, params);
+    else if (a === 'care' && has('revenue') && IN_PERSON) b === 'start' ? careStart(main, params) : await care(main, params);
+    else if (a === 'care') { location.hash = '#/services'; return; }
     else if (a === 'list-your-firm' && has('revenue')) partnerApplyPage(main, { signedIn: true });
     else if (['pros', 'partners', 'services', 'help'].includes(a)) await partners(main, params);
     else if (a === 'contact') contactPage(main, { signedIn: true });

@@ -1,6 +1,6 @@
 // Dashboard, Compliance (filterable list) and Documents.
 import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
-import { S, on, hooks, canEdit, empty, has, memberName, serviceFor, careOf, service, coverOf } from '../core.js';
+import { S, on, hooks, canEdit, empty, has, memberName, serviceFor, careOf, service, coverOf, IN_PERSON } from '../core.js';
 import { assignable, bulk, bulkBar } from './assign.js';
 import { filingsBrief } from './filings.js';
 import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
@@ -42,7 +42,7 @@ const when_ = (c, v) => (c ? v : '');
 // One quiet suggestion when there's a lot to renew and no Year-round care yet. Closing it keeps it closed.
 const nudgeKey = () => `pp-care-nudge-${S.org?.id}`;
 function careNudge(open) {
-  if (!has('revenue') || !canEdit() || careOf().plans.some((p) => p.status !== 'cancelled') || !careOf().tiers.length) return '';
+  if (!has('revenue') || !IN_PERSON || !canEdit() || careOf().plans.some((p) => p.status !== 'cancelled') || !careOf().tiers.length) return '';
   const busy = open.filter((r) => ['action_required', 'renew_soon'].includes(r.status)).length;
   if (busy < 3) return '';
   try { if (localStorage.getItem(nudgeKey())) return ''; } catch { /* private browsing: show it */ }
@@ -150,7 +150,7 @@ export function compliance(el, params) {
   const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Compliance</h1><p class="muted">Every permit and registration across your businesses and vehicles.</p></div>
-      <div class="btn-row">${when_(has('revenue') && canEdit(), html`<button class="btn btn-soft btn-sm" data-act="svc-bulk">${ICON.briefcase} Have PermitPal renew several</button>`)}
+      <div class="btn-row">${when_(has('revenue') && IN_PERSON && canEdit(), html`<button class="btn btn-soft btn-sm" data-act="svc-bulk">${ICON.briefcase} Have PermitPal renew several</button>`)}
         ${when_(canEdit(), html`<button class="btn btn-ghost btn-sm" data-act="imp-open" data-kind="permits">${ICON.upload} Import permit records</button>`)}
         <button class="btn btn-ghost btn-sm" data-act="calendar-export">${ICON.calendar} Add to calendar</button>
         <button class="btn btn-ghost btn-sm" data-act="share-open" data-scope="org">${ICON.share} Share proof</button>

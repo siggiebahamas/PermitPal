@@ -50,9 +50,19 @@ export const locationsOf = (bizId) => S.data.locations.filter((l) => l.business_
 export const reqsOf = (subject, id) =>
   S.data.reqs.filter((r) => (subject === 'business' ? r.business_id === id : subject === 'person' ? r.person_id === id : r.vehicle_id === id));
 export const service = (code) => S.data?.services?.find((x) => x.code === code);
+// PermitPal only sells work it can do online for now: no lining up at city hall or the LTO, no
+// inspections or visits (local rules and fees vary too much to quote them well). Those services,
+// Year-round care, rush fees on them and "renew several" stay in the code: set IN_PERSON to bring
+// them back. The tests switch it on to keep checking them.
+export const IN_PERSON = !!globalThis.PP_IN_PERSON;
+const ONLINE_SERVICES = new Set(['setup_from_paper', 'renew_dti_business_name', 'renew_philgeps', 'adv_philgeps', 'apply_dole_registration']);
+export const offered = (s) => !!s && (IN_PERSON || ONLINE_SERVICES.has(s.code));
 // The done-for-you service that handles a given permit type, if we offer one.
-export const serviceFor = (r) => S.data?.services?.find((x) => x.category === 'renewal' && x.type_codes.includes(r.type_code))
-  || (r.subject !== 'person' ? S.data?.services?.find((x) => x.code === 'renew_other') : null);
+export const serviceFor = (r) => {
+  const s = S.data?.services?.find((x) => x.category === 'renewal' && x.type_codes.includes(r.type_code))
+    || (r.subject !== 'person' ? S.data?.services?.find((x) => x.code === 'renew_other') : null);
+  return offered(s) ? s : null;
+};
 // Year-round care: the plan (not cancelled) on a branch or vehicle, and the plan covering a permit.
 export const careOf = () => S.data?.care || { plans: [], invoices: [], coverage: [], claims: [], tiers: [], staff: [] };
 export const planFor = (kind, id) => careOf().plans.find((p) => p.status !== 'cancelled' && (kind === 'location' ? p.location_id === id : p.vehicle_id === id));

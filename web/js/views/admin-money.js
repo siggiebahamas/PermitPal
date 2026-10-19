@@ -5,7 +5,7 @@
 //   Owed to you   who owes what, and how long they've been waiting
 //   All payments  every line like a bank statement, with search and a download for the accountant
 import { html, raw, fmtDate, peso, toast, toastError, when, plural, todayPH, download, toCsv } from '../util.js';
-import { on, rerender } from '../core.js';
+import { on, rerender, IN_PERSON } from '../core.js';
 import { ICON } from '../components.js';
 import { STREAMS, STREAM_KEYS, KIND_NAMES, STATE_NAMES, SHOW_GROUPS, byMonth, monthTotals, months, monthLabel, prevMonth, pipeline, missingInvoices,
   filterLedger, ledgerCsv, niceTicks, compact, firstOfRange, monthOf, daysSince } from '../money.js';
@@ -36,6 +36,9 @@ on('money-go', (ds) => (ds.view ? (st.view = ds.view, rerender()) : gotoTab?.(ds
 on('money-receipts', () => document.getElementById('money-invoices')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 on('money-all-receipts', () => { st.allReceipts = true; rerender(); });
 
+// Year-round care is switched off with the rest of the in-person work, so its stream isn't shown.
+const SHOWN_KEYS = STREAM_KEYS.filter((k) => IN_PERSON || k !== 'care');
+const noteOf = (k) => (k === 'jobs' && !IN_PERSON ? 'Account set-ups and online filings customers asked for' : STREAMS[k].note);
 const streamDot = (k) => html`<span class="dot" style="background:${STREAMS[k].color}" aria-hidden="true"></span>`;
 const monthName = (m) => monthLabel(m, true).replace(/^(\w+)/, (x) => ({ Jan: 'January', Feb: 'February', Mar: 'March', Apr: 'April', May: 'May', Jun: 'June', Jul: 'July', Aug: 'August', Sep: 'September', Oct: 'October', Nov: 'November', Dec: 'December' })[x]);
 // "₱1,800 more than the same days last month", in words rather than a percentage.
@@ -96,7 +99,7 @@ function homeView() {
         <div class="mh-ico">${REPEAT}</div>
         <h2>Comes in every month</h2>
         <p class="mh-big">${peso(n(s.mrr_care) + n(s.mrr_plans))}</p>
-        <p class="mh-sub">From ${plural(n(s.care_active), 'monthly care plan')} and ${plural(n(s.plans_paying), 'team subscription')}, even if no new job comes in.${n(s.care_pending) ? ` ${n(s.care_pending)} more waiting for a first payment.` : ''}${n(s.care_autorenew) ? ` ${plural(n(s.care_autorenew), 'branch or vehicle', 'branches and vehicles')} on pay per renewal bring in a fee each time we renew.` : ''}</p>
+        <p class="mh-sub">From ${IN_PERSON ? `${plural(n(s.care_active), 'monthly care plan')} and ` : ''}${plural(n(s.plans_paying), 'team subscription')}, even if no new job comes in.${n(s.care_pending) ? ` ${n(s.care_pending)} more waiting for a first payment.` : ''}${n(s.care_autorenew) ? ` ${plural(n(s.care_autorenew), 'branch or vehicle', 'branches and vehicles')} on pay per renewal bring in a fee each time we renew.` : ''}</p>
       </section>
       <section class="mh-card held">
         <div class="mh-ico">${BANK}</div>
@@ -145,7 +148,7 @@ function earningsView() {
   const who = new Map();
   for (const l of data.lines) if (l.state === 'collected' && monthOf(l.day) === m) who.set(l.who, (who.get(l.who) || 0) + Number(l.amount));
   const top = [...who.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const most = Math.max(1, ...STREAM_KEYS.map((k) => cur.by[k]));
+  const most = Math.max(1, ...SHOWN_KEYS.map((k) => cur.by[k]));
   return html`
     <div class="filters"><label class="field inline"><span>Show</span><select data-money-month>${ms.slice().reverse().map((x) => html`<option value="${x}" ${x === m ? 'selected' : ''}>${monthName(x)}</option>`)}</select></label></div>
     <section class="card money-hero">
@@ -154,10 +157,10 @@ function earningsView() {
       ${goal ? goalBar(cur.total, goal) : ''}
     </section>
     <section class="card"><div class="card-head"><div><h2>Where it came from</h2><p class="card-sub">Your money, by the kind of work.</p></div></div>
-      <div class="src-list">${STREAM_KEYS.map((k) => html`<div class="src money-stat">
+      <div class="src-list">${SHOWN_KEYS.map((k) => html`<div class="src money-stat">
         <div class="src-top"><span class="src-name">${streamDot(k)} ${STREAMS[k].name}</span><b>${peso(cur.by[k])}</b></div>
         <div class="src-bar" aria-hidden="true"><span style="width:${Math.round((Math.max(0, cur.by[k]) / most) * 100)}%;background:${STREAMS[k].color}"></span></div>
-        <div class="muted small">${STREAMS[k].note}${k === 'jobs' && cur.rush ? ` · ${peso(cur.rush)} of it from rush fees` : ''}</div></div>`)}</div>
+        <div class="muted small">${noteOf(k)}${k === 'jobs' && cur.rush ? ` · ${peso(cur.rush)} of it from rush fees` : ''}</div></div>`)}</div>
       ${cur.costs ? html`<p class="muted small">You paid out ${peso(-cur.costs)} in late-fee guarantees this month, so you kept ${peso(cur.net)}.</p>` : ''}
     </section>
     ${trendCard()}
@@ -168,7 +171,7 @@ function trendCard() {
   const rows = byMonth(data.lines, data.today, 12);
   const H = 220, W = 640, L = 46, B = 26, T = 12;
   const plotW = W - L - 8, band = plotW / rows.length, bar = Math.min(24, band * 0.55);
-  const max = Math.max(...rows.map((r) => STREAM_KEYS.reduce((t, k) => t + Math.max(0, r.by[k]), 0)), 0);
+  const max = Math.max(...rows.map((r) => SHOWN_KEYS.reduce((t, k) => t + Math.max(0, r.by[k]), 0)), 0);
   const ticks = niceTicks(max || 1000, 4);
   const top = ticks[ticks.length - 1];
   const y = (v) => T + (H - T - B) * (1 - v / top);
@@ -176,7 +179,7 @@ function trendCard() {
   const cols = rows.map((r, i) => {
     const x = L + band * i + (band - bar) / 2;
     let base = 0;
-    const segs = STREAM_KEYS.filter((k) => r.by[k] > 0);
+    const segs = SHOWN_KEYS.filter((k) => r.by[k] > 0);
     const rects = segs.map((k, j) => {
       const y0 = y(base);
       base += r.by[k];
@@ -187,7 +190,7 @@ function trendCard() {
       const rr = Math.min(4, h, bar / 2); // rounded data end, square at the baseline
       return html`<path d="M${x},${y0} V${t + rr} Q${x},${t} ${x + rr},${t} H${x + bar - rr} Q${x + bar},${t} ${x + bar},${t + rr} V${y0} Z" fill="${STREAMS[k].color}"></path>`;
     });
-    const label = `${monthName(r.month)}: ${peso(r.total)}. ${STREAM_KEYS.map((k) => `${STREAMS[k].name} ${peso(r.by[k])}`).join(', ')}.`;
+    const label = `${monthName(r.month)}: ${peso(r.total)}. ${SHOWN_KEYS.map((k) => `${STREAMS[k].name} ${peso(r.by[k])}`).join(', ')}.`;
     const show = r === best && r.total > 0 || i === rows.length - 1;
     return html`<g class="col" tabindex="0" role="img" aria-label="${label}" data-tip="${i}">
       <rect class="hit" x="${L + band * i}" y="${T}" width="${band}" height="${H - T - B}" fill="transparent"></rect>${rects}
@@ -195,12 +198,12 @@ function trendCard() {
       <text x="${x + bar / 2}" y="${H - 8}" text-anchor="middle" class="tick">${monthLabel(r.month)}</text></g>`;
   });
   return html`<section class="card"><div class="card-head"><div><h2>Money earned each month</h2><p class="card-sub">The last 12 months. Tap a month to see the breakdown.</p></div></div>
-      <div class="legend">${STREAM_KEYS.map((k) => html`<span>${streamDot(k)} ${STREAMS[k].name}</span>`)}</div>
+      <div class="legend">${SHOWN_KEYS.map((k) => html`<span>${streamDot(k)} ${STREAMS[k].name}</span>`)}</div>
       <div class="chart-wrap"><svg class="trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-label="Money earned each month, last 12 months">
         ${ticks.map((t) => html`<line x1="${L}" x2="${W - 8}" y1="${y(t)}" y2="${y(t)}" class="grid"></line><text x="${L - 6}" y="${y(t) + 4}" text-anchor="end" class="tick">${compact(t)}</text>`)}
         ${cols}</svg><div class="chart-tip" hidden></div></div>
-      <details class="mh-numbers"><summary>See the numbers</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Money earned each month, as a table"><table class="table num-table"><thead><tr><th>Month</th>${STREAM_KEYS.map((k) => html`<th>${STREAMS[k].name}</th>`)}<th>Total</th><th>Paid out</th></tr></thead><tbody>
-        ${rows.slice().reverse().map((r) => html`<tr><td>${monthName(r.month)}</td>${STREAM_KEYS.map((k) => html`<td>${peso(r.by[k])}</td>`)}<td><b>${peso(r.total)}</b></td><td>${r.costs ? peso(-r.costs) : '—'}</td></tr>`)}
+      <details class="mh-numbers"><summary>See the numbers</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Money earned each month, as a table"><table class="table num-table"><thead><tr><th>Month</th>${SHOWN_KEYS.map((k) => html`<th>${STREAMS[k].name}</th>`)}<th>Total</th><th>Paid out</th></tr></thead><tbody>
+        ${rows.slice().reverse().map((r) => html`<tr><td>${monthName(r.month)}</td>${SHOWN_KEYS.map((k) => html`<td>${peso(r.by[k])}</td>`)}<td><b>${peso(r.total)}</b></td><td>${r.costs ? peso(-r.costs) : '—'}</td></tr>`)}
       </tbody></table></div></details>
     </section>`;
 }
@@ -208,7 +211,7 @@ function trendCard() {
 function showTip(g) {
   const wrap = g.closest('.chart-wrap'), tip = wrap.querySelector('.chart-tip');
   const r = byMonth(data.lines, data.today, 12)[Number(g.dataset.tip)];
-  tip.innerHTML = String(html`<b>${monthName(r.month)}: ${peso(r.total)}</b>${STREAM_KEYS.map((k) => html`<div>${streamDot(k)} ${STREAMS[k].name} <span>${peso(r.by[k])}</span></div>`)}`);
+  tip.innerHTML = String(html`<b>${monthName(r.month)}: ${peso(r.total)}</b>${SHOWN_KEYS.map((k) => html`<div>${streamDot(k)} ${STREAMS[k].name} <span>${peso(r.by[k])}</span></div>`)}`);
   tip.hidden = false;
   const box = g.getBoundingClientRect(), w = wrap.getBoundingClientRect();
   tip.style.left = `${Math.max(0, Math.min(w.width - 230, box.left - w.left + box.width / 2 - 115))}px`;
@@ -255,7 +258,7 @@ function paymentsView() {
       <input type="search" data-ledger="q" placeholder="Search a name or receipt number" value="${f.q}" aria-label="Search payments">
       <select data-ledger="month" aria-label="Month">${opt('all', 'All months', f.month)}${ms.map((x) => opt(x, monthName(x), f.month))}</select>
       <select data-ledger="state" aria-label="Show">${SHOW_GROUPS.map(([v, l]) => opt(v, l, f.state))}</select>
-      <select data-ledger="stream" aria-label="Kind of work">${opt('all', 'All kinds of work', f.stream)}${STREAM_KEYS.map((k) => opt(k, STREAMS[k].name, f.stream))}</select>
+      <select data-ledger="stream" aria-label="Kind of work">${opt('all', 'All kinds of work', f.stream)}${SHOWN_KEYS.map((k) => opt(k, STREAMS[k].name, f.stream))}</select>
       <button class="btn btn-sm btn-soft" data-act="ledger-csv">${ICON.download} Download for my accountant</button>
     </div>
     <div class="pay-sums">
