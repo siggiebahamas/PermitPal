@@ -1,24 +1,30 @@
-// Money: turns the staff ledger (one row per peso line, from admin_money) into the five views in
-// Admin > Money. Kept free of the page so the sums can be tested on their own.
+// Money: turns the staff ledger (one row per peso line, from admin_money) into the views in
+// Admin > Money. Kept free of the page so the sums can be tested on their own. Every name shown to
+// people is plain: "received", "owed to you", "not your money", never accounting words.
 // States: collected (ours, in the bank), to_collect (billed or accepted, not paid), pipeline (quoted,
 // not accepted), unbilled (firms owe it, no statement yet), held (government money we hold for
 // customers: never revenue), cost (guarantee payouts), to_pay (approved payouts not sent yet).
 export const STREAMS = {
-  jobs: { name: 'One-time jobs', color: '#2a78d6', note: 'Renewals, packages, set-ups and walk-throughs: our fee and rush fees' },
-  care: { name: 'Year-round care', color: '#eb6834', note: 'Monthly and yearly care bills' },
-  partners: { name: 'Fees from firms', color: '#1baf7a', note: 'Quote requests, sales, listings and checklist lines' },
-  plans: { name: 'Team plans', color: '#eda100', note: 'Fleet, accounting firm, head office and property plans' },
+  jobs: { name: 'One-time jobs', color: '#2a78d6', note: 'Renewals and packages customers asked for, including rush fees' },
+  care: { name: 'Monthly care plans', color: '#eb6834', note: 'Year-round care bills, paid monthly or yearly' },
+  partners: { name: 'Fees from partner firms', color: '#1baf7a', note: 'What firms pay you for quote requests, sales and listings' },
+  plans: { name: 'Team subscriptions', color: '#eda100', note: 'Fleet, accounting firm and property plans' },
 };
 export const STREAM_KEYS = Object.keys(STREAMS);
 export const KIND_NAMES = {
-  service_fee: 'Service fee', gov_fees_in: 'Government fees received', gov_fees_out: 'Government fees paid', refund: 'Refund',
-  care_fee: 'Care bill', guarantee: 'Guarantee payout', lead: 'Quote request fee', sale: 'Sale fee', placement: 'Checklist line',
-  listing: 'Monthly listing', other: 'Other charge', team_plan: 'Team plan',
+  service_fee: 'Our fee', gov_fees_in: 'Government fee from customer', gov_fees_out: 'Government fee paid to the office', refund: 'Refund',
+  care_fee: 'Monthly care bill', guarantee: 'Late-fee payout (guarantee)', lead: 'Quote request fee', sale: 'Sale fee', placement: 'Checklist ad',
+  listing: 'Monthly listing', other: 'Other charge', team_plan: 'Team subscription',
 };
 export const STATE_NAMES = {
-  collected: 'Collected', to_collect: 'To collect', pipeline: 'Quoted', unbilled: 'Not billed yet', held: 'Held for government fees',
-  cost: 'Paid out', to_pay: 'To pay out',
+  collected: 'Received', to_collect: 'Owed to you', pipeline: 'Waiting for a yes', unbilled: 'Not billed yet',
+  held: 'Not your money', cost: 'Paid out', to_pay: 'You need to pay',
 };
+// The "Show" choices on All payments: a few plain groups instead of every state.
+export const SHOW_GROUPS = [
+  ['all', 'Everything'], ['collected', 'Money you received'], ['to_collect,unbilled', 'Owed to you'], ['pipeline', 'Prices waiting for a yes'],
+  ['held', 'Government money (not yours)'], ['cost,to_pay', 'Money you paid out'],
+];
 
 const num = (v) => Number(v) || 0;
 export const monthOf = (day) => String(day || '').slice(0, 7);
@@ -108,13 +114,14 @@ export function missingInvoices(lines) {
 // The ledger, filtered the way the page asks.
 export function filterLedger(lines, { stream = 'all', state = 'all', month = 'all', q = '' } = {}) {
   const needle = q.trim().toLowerCase();
-  return lines.filter((l) => (stream === 'all' || l.stream === stream) && (state === 'all' || l.state === state)
+  const states = state === 'all' ? null : String(state).split(',');
+  return lines.filter((l) => (stream === 'all' || l.stream === stream) && (!states || states.includes(l.state))
     && (month === 'all' || monthOf(l.day) === month)
     && (!needle || `${l.label} ${l.who} ${l.invoice_no || ''} ${KIND_NAMES[l.kind] || l.kind}`.toLowerCase().includes(needle)));
 }
 
 export function ledgerCsv(lines) {
-  return [['Date', 'Stream', 'What', 'Status', 'Customer or firm', 'Description', 'Amount (PHP)', 'Rush fee part (PHP)', 'BIR invoice no.'],
+  return [['Date', 'Income type', 'What', 'Status', 'Customer or firm', 'Details', 'Amount (PHP)', 'Rush fee part (PHP)', 'BIR invoice no.'],
     ...lines.map((l) => [l.day, STREAMS[l.stream]?.name || l.stream, KIND_NAMES[l.kind] || l.kind, STATE_NAMES[l.state] || l.state, l.who || '',
       l.label || '', num(l.amount).toFixed(2), num(l.rush) ? num(l.rush).toFixed(2) : '', l.invoice_no || ''])];
 }
@@ -131,3 +138,6 @@ export function niceTicks(max, count = 4) {
   return out;
 }
 export const compact = (n) => (Math.abs(n) >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : Math.abs(n) >= 1e3 ? `${+(n / 1e3).toFixed(1)}K` : String(Math.round(n)));
+
+// Days between a date and today (for "waiting 12 days").
+export const daysSince = (day, today) => Math.max(0, Math.round((Date.parse(today + 'T00:00:00Z') - Date.parse(String(day).slice(0, 10) + 'T00:00:00Z')) / 864e5));

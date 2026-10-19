@@ -1,8 +1,9 @@
-// Year-round care: a monthly (or yearly) fee per branch or vehicle, and PermitPal starts every covered
-// renewal itself. The page shows what's covered, the bills, the renewals the plan started, and the
-// on-time guarantee (Care Plus). Kept honest on purpose: prices up front, what's not included, when
-// coverage starts and ends, and cancelling is one tap (it runs to the end of what's paid).
-import { html, fmtDate, peso, toast, toastError, confirmDialog, openModal, formObject, plural, when, todayPH } from '../util.js';
+// Year-round care: a monthly (or yearly) fee per branch or vehicle, and PermitPal does every covered
+// renewal itself. The page has one job for someone who hasn't started: show in their own numbers what
+// renewing permits costs them in time, and that reminders only tell you while care does it for you.
+// Once they have a plan, it shows what we're handling, anything that needs them, and the details
+// folded away. Kept honest: prices up front, what's not included, cancelling is one tap.
+import { html, raw, fmtDate, peso, toast, toastError, confirmDialog, openModal, formObject, plural, when, todayPH } from '../util.js';
 import { S, on, go, reload, canEdit, isOrgAdmin, isOwner, has, careOf, planFor, coverOf, tierOf, typeOf, reqById, locationsOf, reqsOf, empty } from '../core.js';
 import { ICON, byPriority, subjectLabel, dueShort } from '../components.js';
 import { ORDER_STATUS, payDetails, paySettings } from './services.js';
@@ -16,6 +17,13 @@ export const PLAN_STATUS = {
 };
 const BILL_STATUS = { due: ['To pay', 'soon'], pending_verification: ['Payment being checked', 'progress'], paid: ['Paid', 'ok'], void: ['Cancelled', 'needinfo'] };
 const LEAD_DAYS = { business: 60, vehicle: 45 };
+// Hours an owner spends doing a renewal themselves: gathering papers, lining up, paying, coming back
+// to claim it. Rough, on purpose, and shown as "about". Emission test, inspection and CTPL are done on
+// the same LTO trip, so they count as part of the registration.
+const DIY_HOURS = { mayors_permit: 6, barangay_clearance: 2, fsic: 3, sanitary_permit: 3, annual_building_inspection: 2, signage_permit: 2, liquor_license: 2, lto_registration: 4 };
+const X_ICON = raw('<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg>');
+const CLOCK = raw('<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>');
+const SHIELD = raw('<svg viewBox="0 0 24 24"><path d="M12 3.5 5 6v5.5c0 4.2 3 7.6 7 9 4-1.4 7-4.8 7-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></svg>');
 const ownerName = () => {
   const m = (S.data?.members || []).find((x) => x.role === 'owner');
   return [m?.profile?.first_name, m?.profile?.last_name].filter(Boolean).join(' ') || m?.profile?.email || 'the owner';
@@ -42,74 +50,196 @@ const outOfScope = (p) => {
 export async function care(el, params) {
   if (!has('revenue')) { el.innerHTML = String(empty('Not available yet', 'Year-round care is coming soon.', html`<a class="btn btn-primary" href="#/services">See Done for you</a>`)); return; }
   // Bills and plans change on PermitPal's side (a payment confirmed, a renewal started): show them as they are now.
-  if (!el.querySelector('.care-row, .care-hero')) el.innerHTML = String(html`<div class="loading">Loading…</div>`);
+  if (!el.querySelector('.care-row, .cx-hero')) el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   try { S.data.care = await db.loadCare(S.org.id); } catch { /* show what we have */ }
   if (!location.hash.startsWith('#/care')) return;
   const c = careOf();
   const plans = c.plans.filter((p) => p.status !== 'cancelled');
-  const ended = c.plans.filter((p) => p.status === 'cancelled');
-  const dueBills = c.invoices.filter((i) => ['due', 'pending_verification'].includes(i.status));
-  const careOrders = (S.data.requests || []).filter((a) => a.care_plan_id);
-  const monthly = plans.filter((p) => p.status !== 'pending').reduce((t, p) => t + (p.billing === 'yearly' ? Number(p.price_php) / 12 : Number(p.price_php)), 0);
-  const plus = plans.filter((p) => tierOf(p.tier)?.guarantee);
-
-  el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Year-round care</h1>
-      <p class="muted">We start every renewal for you, all year. You pay one ${plans.length ? 'bill' : 'monthly fee'} for our work, and government fees at cost.</p></div>
-      ${when(plans.length && canEdit(), html`<a class="btn btn-primary" href="#/care/start">+ Add branches or vehicles</a>`)}</div>
-
-    ${dueBills.map((i) => billBanner(i))}
-
-    ${plans.length ? html`
-      <div class="stats four">
-        <div class="stat ok"><div class="stat-n">${plans.filter((p) => p.location_id).length}</div><div class="stat-l">Branches covered</div></div>
-        <div class="stat ok"><div class="stat-n">${plans.filter((p) => p.vehicle_id).length}</div><div class="stat-l">Vehicles covered</div></div>
-        <div class="stat progress"><div class="stat-n">${careOrders.filter((a) => !['completed', 'cancelled'].includes(a.status)).length}</div><div class="stat-l">Renewals we're handling</div></div>
-        <div class="stat"><div class="stat-n">${peso(Math.round(monthly))}</div><div class="stat-l">A month, for our work</div></div>
-      </div>
-      <section class="card">
-        <div class="card-head"><div><h2>What we handle</h2><p class="card-sub">Each renewal starts about ${LEAD_DAYS.business} days before it's due (${LEAD_DAYS.vehicle} for vehicles). We send you the government fees to approve, then do the rest.</p></div></div>
-        ${plans.map(planRow)}
-      </section>
-      ${careOrders.length ? html`<section class="card"><div class="card-head"><div><h2>Renewals the plan started</h2><p class="card-sub">Open one to approve fees, pay, or message us</p></div></div>
-        ${careOrders.slice(0, 20).map(orderLine)}</section>` : ''}
-      ${preapprovalCard()}
-      ${when(plus.length, guaranteeCard(plus))}
-      ${billsCard(c.invoices)}
-      ${when(ended.length, html`<details class="folder card"><summary>${plural(ended.length, 'ended plan')}</summary>${ended.map(planRow)}</details>`)}`
-    : intro()}
-    <p class="muted small fineprint">Care covers our service fee for the yearly permits listed on each plan, for the branches and vehicles you choose. Special licences (FDA, DOH, franchises, contractor licences), staff licences and new permits you don't have yet are one-time jobs with their own quote.
-      Government fees, premiums and penalties are paid at cost with official receipts. Cancel anytime: the plan runs to the end of what you've paid, with no refund for the rest of that period.
-      <a href="terms.html#care" target="_blank" rel="noopener">Year-round care terms</a></p>`);
-
+  el.innerHTML = String(plans.length ? planPage(c, plans) : introPage());
   const pay = params?.get('pay');
   if (pay) { history.replaceState(null, '', '#/care'); const inv = c.invoices.find((i) => i.id === pay); if (inv) openPay(inv); }
 }
 
-function intro() {
-  const branch = tiersFor('branch'), vehicle = tiersFor('vehicle');
-  const can = isOwner();
-  return html`
-    <section class="card care-hero">
-      <ol class="care-how">
-        <li><b>Choose branches and vehicles</b><span>The yearly permits are covered: Mayor's Permit, barangay clearance, FSIC, sanitary permit, LTO registration, CTPL and more. Special licences (FDA, DOH, franchises) are quoted separately.</span></li>
-        <li><b>Pay one bill a month</b><span>Or yearly and get 2 months free. Our service fee for every renewal is included.</span></li>
-        <li><b>We start each renewal for you</b><span>About ${LEAD_DAYS.business} days before it's due. You approve the government fees, we file, and the new permit is saved here.</span></li>
-      </ol>
-      <div class="btn-row">${can ? html`<a class="btn btn-primary" href="#/care/start">Choose what we handle</a>`
-        : html`<span class="muted small">Only ${ownerName()} (the owner) can start a paid plan. Share this page with them.</span>`}</div>
-    </section>
-    ${branch.length ? html`<h3 class="section-label">For a business branch</h3><div class="svc-grid care-tiers">${branch.map((t) => tierCard(t, 'branch'))}</div>` : ''}
-    ${vehicle.length ? html`<h3 class="section-label">For a vehicle</h3><div class="svc-grid care-tiers">${vehicle.map((t) => tierCard(t, 'vehicle'))}</div>` : ''}`;
+// What renewing costs this business in time, from its own permits (or a typical branch if none yet).
+function yourYear() {
+  const scope = { business: scopeOf('branch'), vehicle: scopeOf('vehicle') };
+  const reqs = (S.data.reqs || []).filter((r) => r.expires && DIY_HOURS[r.type_code] && scope[r.subject]?.has(r.type_code));
+  const branches = (S.data.businesses || []).reduce((t, b) => t + locationsOf(b.id).length, 0);
+  const vehicles = (S.data.vehicles || []).length;
+  const hours = reqs.reduce((t, r) => t + DIY_HOURS[r.type_code], 0);
+  const b = minPrice('branch'), v = minPrice('vehicle');
+  const monthly = (Number.isFinite(b) ? branches * b : 0) + (Number.isFinite(v) ? vehicles * v : 0);
+  return { renewals: reqs.length, hours, days: Math.max(1, Math.round(hours / 8)), branches, vehicles, monthly, b, v };
 }
 
-function tierCard(t, subject) {
-  return html`<section class="card svc care-tier ${t.guarantee ? 'plus' : ''}">
-    <div class="svc-top"><h2>${t.name}</h2><div class="svc-price"><b>${peso(t.monthly_php)}</b><small>per ${subject} / month</small></div></div>
-    <p class="muted small">or ${peso(t.yearly_php)} a year</p>
-    <ul class="svc-inc">${(t.includes || []).map((i) => html`<li>${ICON.check}<span>${i}</span></li>`)}</ul>
-    ${(t.covers || []).length ? html`<p class="small care-covers"><b>Renews:</b> ${typeNames(t.covers).join(', ')}.</p>` : ''}
-  </section>`;
+const startBtn = (label = 'Let PermitPal handle it') => isOwner()
+  ? html`<a class="btn btn-primary btn-lg" href="#/care/start">${label}</a>`
+  : html`<p class="muted small">Only ${ownerName()} (the owner) can start this. Share this page with them.</p>`;
+
+function introPage() {
+  const y = yourYear();
+  const plus = tiersFor('branch').find((t) => t.guarantee) || tiersFor('vehicle').find((t) => t.guarantee);
+  const own = y.renewals > 0;
+  return html`
+    <section class="cx-hero">
+      <div class="cx-hero-text">
+        <p class="cx-eyebrow">Year-round care</p>
+        <h1>We renew your permits.<br><span>You run your business.</span></h1>
+        <p class="cx-lede">No more lining up at city hall or the LTO. We start every renewal two months early, do the legwork, and put the new permit in your account. You just say yes to the government fee.</p>
+        <div class="cx-cta">${startBtn()}
+          ${Number.isFinite(y.b) ? html`<span class="cx-price-hint">From <b>${peso(y.b)}</b> a month per branch${Number.isFinite(y.v) ? html` · <b>${peso(y.v)}</b> per vehicle` : ''}</span>` : ''}</div>
+      </div>
+      <div class="cx-hero-art" aria-hidden="true">
+        <div class="cx-pop cx-pop-1"><span class="cx-pop-ico ok">${ICON.check}</span><span><b>Mayor's Permit renewed</b><small>New permit saved to your account</small></span></div>
+        <div class="cx-pop cx-pop-2"><span class="cx-pop-ico">${ICON.peso}</span><span><b>FSIC renewal</b><small>Government fee ₱2,450</small></span><span class="cx-pop-btn">Approve</span></div>
+        <div class="cx-pop cx-pop-3"><span class="cx-pop-ico">${CLOCK}</span><span><b>LTO registration started</b><small>45 days before it's due</small></span></div>
+      </div>
+    </section>
+
+    <section class="cx-year card">
+      <h2>${own ? 'Your business, every year' : 'A typical branch, every year'}</h2>
+      <div class="cx-nums">
+        <div><b>${own ? y.renewals : 4}</b><span>renewals to do</span></div>
+        <div><b>${own ? `~${y.hours}` : '~14'}</b><span>hours of lining up, paying and coming back to claim</span></div>
+        <div><b>${own ? y.days : 2}</b><span>working ${(own ? y.days : 2) === 1 ? 'day' : 'days'} away from your business</span></div>
+      </div>
+      <p class="cx-risk">Miss one and it costs more: a late business permit is <b>25% extra plus 2% a month</b>. A late car registration is <b>₱200 a week</b>.</p>
+    </section>
+
+    <section class="cx-vs" aria-labelledby="cx-vs-h">
+      <h2 id="cx-vs-h">Reminders tell you. Year-round care does it.</h2>
+      <div class="cx-vs-grid">
+        <div class="cx-col">
+          <p class="cx-col-tag">What you have now · free</p>
+          <h3>A reminder</h3>
+          <ul>
+            <li class="yes">${ICON.check}<span>We tell you a permit is due</span></li>
+            <li class="no">${X_ICON}<span>You gather the papers</span></li>
+            <li class="no">${X_ICON}<span>You line up at city hall or the LTO</span></li>
+            <li class="no">${X_ICON}<span>You pay, wait, and go back to claim it</span></li>
+            <li class="no">${X_ICON}<span>You upload the new permit</span></li>
+          </ul>
+          <p class="cx-cost">Your time: <b>about a day per permit</b></p>
+        </div>
+        <div class="cx-col on">
+          <p class="cx-col-tag">Year-round care</p>
+          <h3>We do it for you</h3>
+          <ul>
+            <li class="yes">${ICON.check}<span>We start two months before it's due</span></li>
+            <li class="yes">${ICON.check}<span>We prepare the papers and line up</span></li>
+            <li class="yes">${ICON.check}<span>You approve the government fee on your phone</span></li>
+            <li class="yes">${ICON.check}<span>The new permit appears in your account</span></li>
+            <li class="yes">${ICON.check}<span>Nothing expires. No penalties.</span></li>
+          </ul>
+          <p class="cx-cost">Your time: <b>about 5 minutes per permit</b></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="cx-steps card" aria-labelledby="cx-steps-h">
+      <h2 id="cx-steps-h">How it works</h2>
+      <ol>
+        <li><b>Pick your branches and vehicles</b><span>Two minutes. We already know which permits each one needs.</span></li>
+        <li><b>We start each renewal early</b><span>About 2 months before it's due, so there's no rush and no line on deadline day.</span></li>
+        <li><b>You say yes to the fee</b><span>We send the exact government fee first. You pay it at cost, with official receipts. We do everything else.</span></li>
+      </ol>
+    </section>
+
+    <section class="cx-price card">
+      <div class="cx-price-main">
+        <h2>One simple price</h2>
+        <div class="cx-price-row">
+          ${Number.isFinite(y.b) ? html`<div><b>${peso(y.b)}</b><span>a month per branch</span></div>` : ''}
+          ${Number.isFinite(y.v) ? html`<div><b>${peso(y.v)}</b><span>a month per vehicle</span></div>` : ''}
+        </div>
+        <p class="muted">Our work is included. Government fees are paid at cost. Pay yearly and get 2 months free. Stop anytime.</p>
+        ${own && y.monthly ? html`<p class="cx-yours">For your ${[y.branches ? plural(y.branches, 'branch', 'branches') : '', y.vehicles ? plural(y.vehicles, 'vehicle') : ''].filter(Boolean).join(' and ')}: <b>${peso(y.monthly)} a month</b></p>` : ''}
+        ${startBtn('Choose what we handle')}
+      </div>
+      ${plus ? html`<div class="cx-plus">${SHIELD}<div><b>Want zero risk? Care Plus.</b>
+        <span>If we're ever late, we pay the penalty (up to ${peso(plus.guarantee_cap_php)} per permit), plus a yearly pre-inspection visit. ${tiersFor('branch').find((t) => t.guarantee) ? peso(tiersFor('branch').find((t) => t.guarantee).monthly_php) + ' a month per branch' : ''}${tiersFor('vehicle').find((t) => t.guarantee) ? ', ' + peso(tiersFor('vehicle').find((t) => t.guarantee).monthly_php) + ' per vehicle' : ''}.</span></div></div>` : ''}
+    </section>
+
+    <section class="cx-faq">
+      <h2>Questions</h2>
+      ${coveredDetails()}
+      <details><summary>Do I still pay the government fees?</summary><p>Yes, at cost, with official receipts. We always show you the exact amount before we pay it, and nothing is filed until you say yes.</p></details>
+      <details><summary>Can I stop anytime?</summary><p>Yes, with one tap. The plan runs to the end of the month you've paid, then stops. Nothing more is billed.</p></details>
+      <details><summary>Why not just pay per renewal?</summary><p>You can. Then you have to remember each one, ask us, and approve a new price every time. With Year-round care we start on our own, two months early, so nothing slips. If you only have one or two permits, paying per renewal may suit you better.</p></details>
+      <details><summary>What if you're late?</summary><p>That's what Care Plus is for: if a permit lapses because we missed its deadline, we pay the late penalty, up to ${plus ? peso(plus.guarantee_cap_php) : 'the plan\'s limit'} per permit. <a href="terms.html#guarantee" target="_blank" rel="noopener">How the guarantee works</a></p></details>
+    </section>
+    ${fineprint()}`;
+}
+
+function coveredDetails() {
+  const b = tiersFor('branch')[0], v = tiersFor('vehicle')[0];
+  return html`<details class="cx-covers"><summary>Which permits are included?</summary>
+    ${b ? html`<p><b>For a branch:</b> ${typeNames(b.covers).join(', ')}.</p>` : ''}
+    ${v ? html`<p><b>For a vehicle:</b> ${typeNames(v.covers).join(', ')}.</p>` : ''}
+    <p class="muted">Not included (we quote these separately): FDA or DOH licences, franchises, contractor licences, staff licences and health certificates, and new permits you don't have yet.</p></details>`;
+}
+
+const fineprint = () => html`<p class="muted small fineprint">Care covers our service fee for the yearly permits listed on each plan. Government fees, premiums and penalties are paid at cost with official receipts. Cancel anytime: the plan runs to the end of what you've paid, with no refund for the rest of that period.
+  <a href="terms.html#care" target="_blank" rel="noopener">Year-round care terms</a></p>`;
+
+// The next renewal care will start on its own, across all plans.
+function nextStart(plans) {
+  const live = new Set(plans.filter((p) => p.status === 'active').map((p) => p.id));
+  let best = null;
+  for (const cv of careOf().coverage) {
+    if (!live.has(cv.plan_id)) continue;
+    const r = reqById(cv.requirement_id);
+    if (!r || !r.expires || !r.expires_on || r.open_request_id) continue;
+    const lead = r.subject === 'vehicle' ? LEAD_DAYS.vehicle : LEAD_DAYS.business;
+    const on_ = new Date(Date.parse(r.expires_on) - lead * 864e5).toISOString().slice(0, 10);
+    if (!best || on_ < best.on) best = { r, on: on_ };
+  }
+  return best;
+}
+
+function planPage(c, plans) {
+  const ended = c.plans.filter((p) => p.status === 'cancelled');
+  const dueBills = c.invoices.filter((i) => ['due', 'pending_verification'].includes(i.status));
+  const careOrders = (S.data.requests || []).filter((a) => a.care_plan_id);
+  const open = careOrders.filter((a) => !['completed', 'cancelled'].includes(a.status));
+  const asks = open.filter((a) => a.status === 'quoted' || a.payment_status === 'awaiting_payment');
+  const done = careOrders.filter((a) => a.status === 'completed').length;
+  const handled = new Set(c.coverage.filter((x) => plans.some((p) => p.id === x.plan_id)).map((x) => x.requirement_id)).size;
+  const plus = plans.filter((p) => tierOf(p.tier)?.guarantee);
+  const next = nextStart(plans);
+  const needs = dueBills.length + asks.length;
+  return html`
+    <section class="cx-status card">
+      <div class="cx-status-ico">${ICON.check}</div>
+      <div class="cx-status-text">
+        <p class="cx-eyebrow">Year-round care</p>
+        <h1>We're handling ${plural(handled, 'permit')} for you.</h1>
+        <p class="muted">${open.length ? `${plural(open.length, 'renewal')} in progress right now. ` : ''}${next ? `Next up: ${next.r.name} (${subjectLabel(next.r)}). We start ${next.on <= todayPH() ? 'this week' : 'on ' + fmtDate(next.on)}.` : open.length ? '' : 'Nothing is due soon.'}${done ? ` ${plural(done, 'renewal')} done so far.` : ''}</p>
+      </div>
+      ${when(canEdit(), html`<a class="btn btn-soft" href="#/care/start">+ Add more</a>`)}
+    </section>
+
+    ${needs ? html`<section class="card cx-needs"><div class="card-head"><div><h2>Needs you</h2><p class="card-sub">${needs === 1 ? 'One thing' : `${needs} things`} only you can do. Everything else is on us.</p></div></div>
+      ${dueBills.map((i) => billBanner(i))}
+      ${asks.map(orderLine)}</section>` : ''}
+
+    <section class="card">
+      <div class="card-head"><div><h2>What we handle</h2><p class="card-sub">We start each renewal about 2 months before it's due (45 days for vehicles).</p></div></div>
+      ${plans.map(planRow)}
+    </section>
+
+    ${open.filter((a) => !asks.includes(a)).length ? html`<section class="card"><div class="card-head"><div><h2>In progress</h2><p class="card-sub">Open one to see where it is or message us.</p></div></div>
+      ${open.filter((a) => !asks.includes(a)).map(orderLine)}</section>` : ''}
+
+    <section class="cx-faq cx-details">
+      <h2>Plan details</h2>
+      <details ${Number(S.org.care_gov_preapproval_php || 0) ? '' : 'open'}><summary>Approving government fees</summary>${preapprovalCard()}</details>
+      ${when(plus.length, html`<details><summary>On-time guarantee (Care Plus)</summary>${guaranteeCard(plus)}</details>`)}
+      ${when(c.invoices.length, html`<details><summary>Bills and receipts</summary>${billsCard(c.invoices)}</details>`)}
+      ${coveredDetails()}
+      ${when(ended.length, html`<details><summary>${plural(ended.length, 'ended plan')}</summary>${ended.map(planRow)}</details>`)}
+    </section>
+    ${fineprint()}`;
 }
 
 function planRow(p) {
@@ -123,7 +253,7 @@ function planRow(p) {
   const href = p.location_id ? `#/businesses/${p.business_id}` : `#/vehicles/${p.vehicle_id}`;
   return html`<div class="row care-row">
     <div class="row-main"><div class="row-title"><a href="${href}">${p.label}</a> <span class="tag">${t?.name || p.tier}</span></div>
-      <div class="row-sub">${peso(p.price_php)} a ${per(p.billing)} · ${plural(reqs.length, 'permit')} covered${soon ? ` · ${soon} due soon` : ''}${missing ? html` · <span class="due needinfo">${missing} missing an expiry date</span>` : ''}</div>
+      <div class="row-sub">${plural(reqs.length, 'permit')} handled${soon ? ` · ${soon} coming up` : ''} · ${peso(p.price_php)} a ${per(p.billing)}${missing ? html` · <span class="due needinfo">${missing} missing an expiry date</span>` : ''}</div>
       ${extra.length ? html`<div class="row-sub">Not in Care, quoted per job: ${extra.map((r) => r.name).join(', ')}</div>` : ''}
       <div class="row-sub">${p.status === 'pending' ? 'Starts the day your first bill is paid.'
         : p.status === 'cancelled' ? `Ended ${p.cancel_at ? fmtDate(p.cancel_at) : ''}${p.ended_reason ? ' · ' + p.ended_reason : ''}`
@@ -155,39 +285,39 @@ function billBanner(i) {
 
 function billsCard(list) {
   if (!list.length) return '';
-  return html`<section class="card"><div class="card-head"><div><h2>Bills</h2><p class="card-sub">Our fee for care. Government fees are paid on each renewal.</p></div></div>
+  return html`<div class="cx-sub"><p class="muted small">Our fee for care. Government fees are paid on each renewal.</p>
     <div class="table-wrap"><table class="table"><thead><tr><th>Bill</th><th>Covers</th><th>Amount</th><th>Status</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>
     ${list.map((i) => { const [l, cls] = BILL_STATUS[i.status] || [i.status, '']; return html`<tr>
       <td>${i.number}</td><td>${i.status === 'paid' || !i.first ? `${fmtDate(i.period_start)} – ${fmtDate(i.period_end)}` : 'Starts when paid'}</td>
       <td>${peso(i.amount_php)}<div class="muted small">${(i.lines || []).map((x) => x.label).join(', ')}</div></td>
       <td><span class="chip ${billOverdue(i) ? 'overdue' : cls}">${billOverdue(i) ? 'Overdue' : l}</span>${i.paid_at ? html`<div class="muted small">${fmtDate(i.paid_at.slice(0, 10))}</div>` : ''}</td>
       <td>${i.status === 'due' && canEdit() ? html`<button class="btn btn-sm btn-primary" data-act="care-pay" data-id="${i.id}">Pay</button>` : ''}</td></tr>`; })}
-    </tbody></table></div></section>`;
+    </tbody></table></div></div>`;
 }
 
 function preapprovalCard() {
   const v = Number(S.org.care_gov_preapproval_php || 0);
-  return html`<section class="card"><h2>Government fees</h2>
-    <p class="muted small">For each renewal we send you the exact government fees first. To save you a step, we can go ahead when they are within an amount you choose (you still pay before we file).</p>
+  return html`<div class="cx-sub">
+    <p class="muted small">For each renewal we send you the exact government fee first. To save you a step, we can go ahead when it's within an amount you choose (you still pay before we file).</p>
     ${isOrgAdmin() ? html`<form class="inline-form care-pre"><label class="field"><span>Go ahead without asking me when fees are up to (₱)</span>
         <input name="amount" type="number" min="0" max="200000" step="100" value="${v}" required></label>
         <button class="btn btn-sm btn-soft">Save</button></form>
       <p class="muted small">${v ? `Now: up to ${peso(v)} per renewal. Higher amounts still need your OK.` : 'Now: we always ask you first.'}</p>`
       : html`<p>${v ? `Up to ${peso(v)} per renewal is approved for you.` : 'You approve every renewal\'s fees yourself.'}</p>`}
-  </section>`;
+  </div>`;
 }
 
 function guaranteeCard(plus) {
   const claims = careOf().claims;
   const st = { submitted: ['Being reviewed', 'progress'], approved: ['Approved', 'ok'], declined: ['Declined', 'needinfo'], paid: ['Paid to you', 'ok'] };
-  return html`<section class="card"><div class="card-head"><div><h2>On-time guarantee</h2>
-      <p class="card-sub">Care Plus: if a covered permit lapses because we missed its deadline, we pay the late penalty${plus[0] ? ` (up to ${peso(tierOf(plus[0].tier)?.guarantee_cap_php)} per permit)` : ''}.</p></div>
+  return html`<div class="cx-sub"><div class="card-head"><div>
+      <p class="card-sub">If a covered permit lapses because we missed its deadline, we pay the late penalty${plus[0] ? ` (up to ${peso(tierOf(plus[0].tier)?.guarantee_cap_php)} per permit)` : ''}.</p></div>
       ${when(canEdit(), html`<button class="btn btn-sm btn-soft" data-act="care-claim">Claim it</button>`)}</div>
     <p class="muted small">It applies when the plan was paid up on the expiry date, the permit was in your plan at least 30 days before it expired, and you sent what we asked for within 7 days. Send the official receipt that shows the penalty within 90 days.</p>
     ${claims.map((g) => { const [l, cls] = st[g.status]; return html`<div class="line"><span class="line-main"><b>${g.requirement_name}</b>
       <small>Expired ${fmtDate(g.lapsed_on)} · penalty ${peso(g.penalty_php)}${g.approved_php != null ? ' · approved ' + peso(g.approved_php) : ''}${g.decision_note ? ' · ' + g.decision_note : ''}</small></span>
       <span class="chip ${cls}">${l}</span></div>`; })}
-  </section>`;
+  </div>`;
 }
 
 // ---------------------------------------------------------------- choosing what we handle
@@ -215,23 +345,23 @@ export function careStart(el, params) {
   const levels = [...new Set([...tiers.branch, ...tiers.vehicle].map((t) => (t.guarantee ? 'plus' : 'care')))];
   el.innerHTML = String(html`
     <a class="back" href="#/care">← Year-round care</a>
-    <div class="page-head"><div><h1>Choose what we handle</h1><p class="muted">Pick the branches and vehicles, the level, and how often you'd like to pay. You'll see the total before anything is charged.</p></div></div>
+    <div class="page-head"><div><h1>Let PermitPal handle your renewals</h1><p class="muted">Pick what we should look after. You'll see the total before you pay anything, and you can stop anytime.</p></div></div>
     ${when(!can, html`<div class="banner warn"><div>Only ${ownerName()} (the owner) can start a paid plan. You can look, and share this page with them.</div></div>`)}
     <form class="care-form" novalidate>
-      <section class="card"><h2>1. Branches and vehicles</h2>
+      <section class="card"><h2>1. What should we handle?</h2>
         ${when(subjects.some((s) => s.kind === 'location'), html`<h3 class="section-label">Branches</h3>${subjects.filter((s) => s.kind === 'location').map(row)}`)}
         ${when(subjects.some((s) => s.kind === 'vehicle'), html`<h3 class="section-label">Vehicles</h3>${subjects.filter((s) => s.kind === 'vehicle').map(row)}`)}
         ${when(can, html`<div class="btn-row"><button type="button" class="btn btn-sm btn-ghost" data-pick-all>Choose all</button><button type="button" class="btn btn-sm btn-ghost" data-pick-none>Clear</button></div>`)}
       </section>
-      <section class="card"><h2>2. Level</h2>
+      <section class="card"><h2>2. Choose your plan</h2>
         ${levels.map((lv) => { const b = tiers.branch.find((t) => !!t.guarantee === (lv === 'plus')); const v = tiers.vehicle.find((t) => !!t.guarantee === (lv === 'plus'));
           return html`<label class="check care-level"><input type="radio" name="level" value="${lv}" ${lv === 'care' ? 'checked' : ''} ${can ? '' : 'disabled'}>
             <span><b>${(b || v)?.name}</b> <small class="muted">${b ? `${peso(b.monthly_php)} per branch` : ''}${b && v ? ' · ' : ''}${v ? `${peso(v.monthly_php)} per vehicle` : ''} a month</small>
-            <small>${lv === 'plus' ? 'Everything in Care, plus our on-time guarantee (we pay the late penalty if we miss a deadline) and a yearly pre-inspection walk-through per branch.' : 'We start and handle every renewal. Our service fee is included.'}</small></span></label>`; })}
+            <small>${lv === 'plus' ? 'Same as Care, and if we\'re ever late, we pay the penalty. Includes a yearly pre-inspection visit per branch.' : 'We renew everything on time. Our work is included.'}</small></span></label>`; })}
       </section>
-      <section class="card"><h2>3. How often you pay</h2>
-        <label class="check"><input type="radio" name="billing" value="monthly" checked ${can ? '' : 'disabled'}><span><b>Monthly</b> <small class="muted">Cancel anytime; it runs to the end of the month you've paid.</small></span></label>
-        <label class="check"><input type="radio" name="billing" value="yearly" ${can ? '' : 'disabled'}><span><b>Yearly</b> <small class="muted">2 months free. No refund if you cancel part-way.</small></span></label>
+      <section class="card"><h2>3. Pay monthly or yearly</h2>
+        <label class="check"><input type="radio" name="billing" value="monthly" checked ${can ? '' : 'disabled'}><span><b>Monthly</b> <small class="muted">Stop anytime. It runs to the end of the month you've paid.</small></span></label>
+        <label class="check"><input type="radio" name="billing" value="yearly" ${can ? '' : 'disabled'}><span><b>Yearly</b> <small class="muted">2 months free. No refund if you stop part-way.</small></span></label>
       </section>
       <section class="card care-total" aria-live="polite"><div data-care-total></div>
         <label class="check consent"><input type="checkbox" name="consent" ${can ? '' : 'disabled'}>

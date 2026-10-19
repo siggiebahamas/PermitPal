@@ -746,10 +746,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.waitForSelector('main h1');
   check('care: "Year-round care" is in the menu', (await page.locator('.sidebar a[data-nav=care]').count()) === 1);
   await go('#/care');
-  check('care: the page explains it and shows both levels with prices', /We start each renewal for you/.test(await page.textContent('main')) && (await page.locator('.care-tier').count()) === 4
-    && /₱1,200/.test(await page.textContent('.care-tiers')) && /₱1,800/.test(await page.textContent('.care-tiers')));
-  check('care: each level lists exactly which permits it renews', (await page.locator('.care-tier .care-covers').count()) === 4
-    && /Mayor's \/ Business Permit/.test(await page.textContent('.care-tier .care-covers')) && !/FDA/.test(await page.textContent('.care-tiers')));
+  check('care: the page explains why in plain words, with the price', /We renew your permits/.test(await page.textContent('main .cx-hero')) && /Reminders tell you\. Year-round care does it\./.test(await page.textContent('main'))
+    && /₱1,200/.test(await page.textContent('main .cx-price')) && /₱250/.test(await page.textContent('main .cx-price')) && /Care Plus/.test(await page.textContent('main .cx-plus')));
+  check('care: it shows this business its own year (renewals and hours)', /Your business, every year/.test(await page.textContent('main .cx-year')) && /renewals to do/.test(await page.textContent('main .cx-nums')));
+  await page.click('main .cx-covers summary');
+  check('care: "Which permits are included?" lists them, and what isn\'t', /Mayor's \/ Business Permit/.test(await page.textContent('main .cx-covers')) && /FDA/.test(await page.textContent('main .cx-covers')));
   await go('#/businesses/b1');
   const offer = page.locator('main .care-line');
   check('care: each branch card has one quiet line offering it', (await offer.count()) === 1 && /handle this branch all year/.test(await offer.textContent()) && /₱1,200\/month/.test(await offer.textContent()));
@@ -775,8 +776,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   // staff confirm
   await go('#/admin');
   check('admin: Money is the first tab', (await page.locator('.tabs .tab').first().textContent()).trim() === 'Money' && (await page.locator('.tabs .tab.active').textContent()).trim() === 'Money');
-  check('admin: Money says what needs you (a payment to confirm)', (await page.locator('main .todo', { hasText: 'Payments to confirm' }).count()) === 1);
-  await page.locator('main .todo', { hasText: 'Payments to confirm' }).locator('button').click(); await page.waitForTimeout(400);
+  check('admin: Money says what needs you (a payment to confirm)', (await page.locator('main .todo', { hasText: 'then confirm' }).count()) === 1);
+  await page.locator('main .todo', { hasText: 'then confirm' }).locator('button').click(); await page.waitForTimeout(400);
   check('admin: "Open" goes to the Care tab', (await page.locator('.tabs .tab.active').textContent()).trim() === 'Care' && (await page.locator('main .card', { hasText: 'Payments to confirm' }).count()) === 1);
   await page.click('main [data-act=care-confirm]'); await page.waitForTimeout(200);
   await page.fill('#modal-root [name=no]', 'INV-0042'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
@@ -800,6 +801,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('care: "Keep it" undoes the cancellation', (await page.locator('main .care-row', { hasText: 'Isuzu Elf' }).locator('[data-act=care-cancel]').count()) === 1);
   await page.fill('main .care-pre [name=amount]', '5000'); await page.click('main .care-pre button'); await page.waitForTimeout(400);
   check('care: government-fee pre-approval saves', /up to ₱5,000/.test(await page.textContent('#toast')));
+  await page.click('main .cx-details summary:has-text("On-time guarantee")'); await page.waitForTimeout(150);
   await page.click('main [data-act=care-claim]'); await page.waitForTimeout(250);
   await page.fill('#modal-root [name=penalty]', '2500'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(250);
   check('care: a guarantee claim needs the official receipt', /Please fill in|official receipt/.test(await page.textContent('#modal-root .modal-error')));
@@ -944,30 +946,34 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.goto('http://localhost:4173/');
   await page.waitForSelector('main h1');
   await go('#/admin');
-  check('money: Today lists what needs doing, with counts', (await page.locator('main .todo').count()) >= 3 && /Firms asking to be listed/.test(await page.textContent('main')));
+  check('money: Home shows the four big numbers in plain words', (await page.locator('main .mh-card').count()) === 4 && /You earned this month/.test(await page.textContent('main'))
+    && /Owed to you/.test(await page.textContent('main .mh-cards')) && /Comes in every month/.test(await page.textContent('main')) && /Not your money/.test(await page.textContent('main')));
+  check('money: Home lists what needs doing as sentences, with counts', (await page.locator('main .todo').count()) >= 3 && /want(s)? to be listed on PermitPal/.test(await page.textContent('main')));
+  check('money: Home shows only the first 5 receipt numbers to add, with "Show all"', (await page.locator('#money-invoices tbody tr').count()) <= 5);
+  if (await page.locator('[data-act=money-all-receipts]').count()) { await page.click('[data-act=money-all-receipts]'); await page.waitForTimeout(400); }
   const missBefore = await page.locator('#money-invoices tbody tr').count();
-  check('money: payments without a BIR invoice number are listed', missBefore >= 1, String(missBefore));
+  check('money: payments without a BIR receipt number are listed', missBefore >= 1, String(missBefore));
   await page.fill('#money-invoices tbody tr:first-child [name=no]', 'INV-9001'); await page.click('#money-invoices tbody tr:first-child button'); await page.waitForTimeout(500);
-  check('money: typing the invoice number takes it off the list', (await page.locator('#money-invoices tbody tr').count()) === missBefore - 1);
-  await view('month');
-  check('money: This month shows the total, the goal and each stream', /Collected in/.test(await page.textContent('main .money-hero')) && (await page.locator('main .goal-bar').count()) === 1 && (await page.locator('main .money-stat').count()) === 4);
-  check('money: government money held is shown apart, as not yours', /Not yours to spend/.test(await page.textContent('main')));
-  await view('trend');
-  check('money: Trend draws 12 months, stacked by stream, with a legend and the numbers', (await page.locator('svg.trend .col').count()) === 12 && (await page.locator('main .legend > span').count()) === 4 && (await page.locator('main .num-table tbody tr').count()) === 12);
+  check('money: typing the receipt number takes it off the list', (await page.locator('#money-invoices tbody tr').count()) === missBefore - 1);
+  await view('earnings');
+  check('money: Earnings shows the month, the goal and where it came from', /You earned in/.test(await page.textContent('main .money-hero')) && (await page.locator('main .goal-bar').count()) === 1 && (await page.locator('main .money-stat').count()) === 4);
+  check('money: Earnings draws 12 months, stacked, with a legend and the numbers', (await page.locator('svg.trend .col').count()) === 12 && (await page.locator('main .legend > span').count()) === 4 && (await page.locator('main .num-table tbody tr').count()) === 12);
   const tall = await page.evaluate(() => Math.max(...[...document.querySelectorAll('svg.trend .col')].map((g) => g.getBBox().height)));
   check('money: the year has real columns (not empty)', tall > 40, String(tall));
   await page.focus('svg.trend .col:last-of-type'); await page.waitForTimeout(150);
-  check('money: a column explains itself on focus (keyboard) or hover', !(await page.locator('.chart-tip').isHidden()) && /One-time jobs/.test(await page.textContent('.chart-tip')));
-  await view('pipeline');
-  check('money: Pipeline shows money on its way, by lane and age', (await page.locator('main .lane').count()) === 5 && /Money on its way/.test(await page.textContent('main')));
-  await view('ledger');
+  check('money: a month explains itself on focus (keyboard) or hover', !(await page.locator('.chart-tip').isHidden()) && /One-time jobs/.test(await page.textContent('.chart-tip')));
+  await view('owed');
+  check('money: Owed to you lists who owes what, and for how long', (await page.locator('main .lane').count()) === 5 && /People owe you/.test(await page.textContent('main')) && (await page.locator('main .wait').count()) >= 1);
+  await view('payments');
   const rows = await page.locator('main table.ledger tbody tr').count();
-  check('money: Ledger lists every line', rows > 50, String(rows));
+  check('money: All payments lists every line', rows > 50, String(rows));
   await page.selectOption('main [data-ledger=stream]', 'care'); await page.waitForTimeout(400);
-  check('money: the ledger filters by stream', (await page.locator('main table.ledger tbody tr').count()) < rows && !(await page.textContent('main table.ledger tbody')).includes('One-time jobs'));
+  check('money: All payments filters by kind of work', (await page.locator('main table.ledger tbody tr').count()) < rows && !(await page.textContent('main table.ledger tbody')).includes('One-time jobs'));
+  await page.selectOption('main [data-ledger=state]', 'collected'); await page.waitForTimeout(400);
+  check('money: "Show: Money you received" shows only received payments', (await page.locator('main table.ledger tbody tr').count()) >= 1 && (await page.locator('main table.ledger tbody tr:not(.collected)').count()) === 0);
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=ledger-csv]')]);
   const csv = fs.readFileSync(await dl.path(), 'utf8');
-  check('money: the CSV has the invoice number column for the bookkeeper', /BIR invoice no\./.test(csv.split('\n')[0]) && csv.split('\n').length > 5);
+  check('money: the download has the receipt number column for the accountant', /BIR invoice no\./.test(csv.split('\n')[0]) && csv.split('\n').length > 2);
   // Partner billing: make and settle a statement
   await page.click('[data-act=admin-tab][data-tab=billing]'); await page.waitForTimeout(400);
   check('billing: each firm\'s unbilled total is shown', /Not billed yet/.test(await page.textContent('main')) && (await page.locator('main [data-act=stmt-new]').count()) >= 1);
@@ -1014,7 +1020,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const o = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     if (o > 1) bad.push(`${h} ${o}px`);
   }
-  for (const v of ['month', 'trend', 'pipeline', 'ledger']) {
+  for (const v of ['earnings', 'owed', 'payments']) {
     await page.click(`[data-act=money-view][data-v=${v}]`); await page.waitForTimeout(350);
     const o = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     if (o > 1) bad.push(`money ${v} ${o}px`);
