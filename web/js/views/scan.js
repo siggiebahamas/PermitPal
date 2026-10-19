@@ -9,7 +9,7 @@ import { readDocument } from '../ocrparse.js';
 
 export const scanBox = () => html`<div class="scan-box">
   <button type="button" class="btn btn-soft btn-sm" data-scan-start>${ICON.camera} Fill from a photo</button>
-  <input type="file" accept="image/*" capture="environment" data-scan-file hidden>
+  <input type="file" accept="image/*" capture="environment" data-scan-file hidden aria-label="Photo of the document">
   <small class="muted">Optional. We read the dates and numbers on the photo, on this phone, and you check them before saving.</small>
   <div class="scan-status" aria-live="polite"></div></div>`;
 

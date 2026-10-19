@@ -48,7 +48,7 @@ export function openImport(kind = 'vehicles') {
     <ol class="import-steps">
       <li><b>Get the template</b> <button type="button" class="btn btn-sm btn-soft" id="imp-template">Download template</button>
         <span class="muted small">Open it in Excel or Google Sheets and fill in one row each. Your own sheet works too if its headings are similar.</span></li>
-      <li><b>Choose the file</b> <input type="file" id="imp-file" accept=".xlsx,.csv,.txt,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+      <li><b>Choose the file</b> <input type="file" id="imp-file" aria-label="Spreadsheet file (Excel or CSV)" accept=".xlsx,.csv,.txt,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
         <span class="muted small">Excel (.xlsx) or CSV.${canReadExcel() ? '' : ' This browser can only read CSV: in Excel use File → Save As → CSV.'}</span></li>
     </ol>
     <div id="imp-sheet"></div>

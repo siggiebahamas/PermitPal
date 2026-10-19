@@ -85,7 +85,7 @@ export async function startSetup({ onDone, second = false } = {}) {
         <small class="muted">Can't scan it? Choose "enter a setup key" in the app and type: <code class="secret">${grouped(enrolled.totp.secret)}</code>
           <button type="button" class="linklike" data-copy="${enrolled.totp.secret}">Copy</button></small></li>
       <li><b>Type the 6-digit code</b> the app now shows for PermitPal:
-        <input name="code" class="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required placeholder="123456"></li>
+        <input name="code" class="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required placeholder="123456" aria-label="6-digit code from the app"></li>
     </ol>
     <p class="muted small">Keep the key private: anyone with it can make your codes.</p>`, {
     submitLabel: 'Turn on',

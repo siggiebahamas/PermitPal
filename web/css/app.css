@@ -1021,3 +1021,10 @@ code.secret { font-size: 15px; font-weight: 700; color: var(--heading); word-bre
 .auth-card details.lost summary { cursor: pointer; font-weight: 700; color: var(--brand); }
 .mfa-on { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .mfa-on svg { width: 18px; height: 18px; stroke: var(--s-ok); fill: none; stroke-width: 2.6; }
+
+/* ---------- very long names never push the page sideways ---------- */
+fieldset { min-width: 0; }
+fieldset legend { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.check > span, .ck-dep > span, .ck-text, .scan-list li, .pick-main b { min-width: 0; overflow-wrap: anywhere; }
+a.back { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+.modal .linklike, .modal-body .btn { overflow-wrap: anywhere; white-space: normal; text-align: left; max-width: 100%; }
