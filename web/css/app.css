@@ -1001,3 +1001,9 @@ fieldset.q > small { display: block; margin-top: 2px; }
 .chip-btn.small { min-height: 30px; padding: 3px 10px; font-size: 13.5px; }
 .scan-ok { margin: 8px 0 0; font-weight: 700; }
 input.from-scan { background: #FFF6CC !important; border-color: #D8B000 !important; }
+
+/* ---------- text messages ---------- */
+.sms-form { max-width: 460px; }
+.sms-form input[name=code] { font-size: 24px; letter-spacing: .3em; max-width: 220px; font-variant-numeric: tabular-nums; }
+.sms-verified { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sms-verified svg { width: 18px; height: 18px; stroke: var(--s-ok); fill: none; stroke-width: 2.6; }

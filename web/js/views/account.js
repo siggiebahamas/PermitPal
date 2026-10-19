@@ -7,7 +7,7 @@ import {
   S, on, reload, rerender, canEdit, isOrgAdmin, isOwner, memberName, empty, effectivePlan, ROLES, business, vehicle, person, has,
 } from '../core.js';
 import { handledCount } from './assign.js';
-import { avatar } from '../components.js';
+import { avatar, ICON } from '../components.js';
 import { KINDS, teamAccess, connectionsCard } from './network.js';
 import * as db from 'pp/data';
 
@@ -214,7 +214,7 @@ export async function settings(el, section) {
           <label class="field"><span>First name</span><input name="first_name" maxlength="80" value="${p.first_name}"></label>
           <label class="field"><span>Last name</span><input name="last_name" maxlength="80" value="${p.last_name}"></label>
           <label class="field"><span>Role / title <small>(optional)</small></span><input name="role_title" maxlength="80" value="${p.role_title}" placeholder="e.g. Fleet head"></label>
-          <label class="field"><span>Mobile number <small>(for SMS / WhatsApp)</small></span><input name="phone" value="${p.phone || ''}" placeholder="0917 123 4567"></label>
+          ${when(!has('sms'), html`<label class="field"><span>Mobile number <small>(for SMS / WhatsApp)</small></span><input name="phone" value="${p.phone || ''}" placeholder="0917 123 4567"></label>`)}
         </div>
         <label class="field"><span>Photo <small>(optional)</small></span><input type="file" name="avatar" accept="image/jpeg,image/png,image/webp"></label>
         <p class="muted small">Email: ${p.email}</p>
@@ -231,6 +231,7 @@ export async function settings(el, section) {
       ${toggle('remind_30', '30 days before')}${toggle('remind_7', '7 days before')}${toggle('remind_1', '1 day before')}
       ${toggle('weekly_digest', 'Monday summary email')}
     </section>
+    ${when(has('sms'), smsSection(channels))}
 
     <section class="card"><h2>Delivery log</h2>
       <p class="muted small">Proof of every reminder we sent you (or tried to).</p>
@@ -313,13 +314,15 @@ export async function settings(el, section) {
     e.preventDefault();
     const fd = new FormData(pf);
     const f = formObject(fd);
+    const hasPhone = fd.has('phone'); // with text messages on, the number is managed (and verified) in its own section
     const phone = f.phone ? normalizePhone(f.phone) : null;
     if (f.phone && !phone) return toast('Please enter a valid mobile number, e.g. 0917 123 4567.', 'error');
     try {
       const file = fd.get('avatar');
       if (file && file.size) await db.uploadAvatar(S.user.id, file);
-      await db.updateProfile(S.user.id, { first_name: f.first_name, last_name: f.last_name, role_title: f.role_title, phone: phone || null });
-      Object.assign(S.profile, { first_name: f.first_name, last_name: f.last_name, role_title: f.role_title, phone: phone || null });
+      const patch = { first_name: f.first_name, last_name: f.last_name, role_title: f.role_title, ...(hasPhone ? { phone: phone || null } : {}) };
+      await db.updateProfile(S.user.id, patch);
+      Object.assign(S.profile, patch);
       await reload();
       toast('Profile saved.');
     } catch (err) { toastError(err); }
@@ -414,4 +417,94 @@ on('plan-request', async (ds) => {
 on('plan-checkout', async (ds) => {
   const months = Number(document.querySelector(`[data-months="${ds.plan}"]`)?.value || 1);
   try { location.href = await db.startCheckout(S.org.id, ds.plan, months); } catch (e) { toastError(e); }
+});
+
+// ---------------------------------------------------------------- text messages
+// A number gets texts only after the person types back the code we text to it, so reminders never go to
+// a mistyped or someone else's number. Texts cost money, so they come with team plans and are capped.
+const fmtPhone = (p) => (p ? String(p).replace(/^\+63(\d{3})(\d{3})(\d{4})$/, '0$1 $2 $3') : '');
+let smsStep = null; // { phone } while waiting for the code
+let smsChanging = false; // "Change number" pressed: the old number keeps working until the new one is verified
+window.addEventListener('hashchange', () => { smsChanging = false; });
+function smsSection(channels) {
+  const p = S.profile;
+  const plan = effectivePlan();
+  const verified = p.phone && p.phone_verified_at;
+  const on = !!S.prefs?.sms_enabled;
+  let body;
+  if (channels.sms === false) body = html`<p class="muted">Text reminders are being set up. Email and in-app reminders work meanwhile.</p>`;
+  else if (!plan?.paid_channels) {
+    body = html`<p class="muted">Text reminders come with team plans (Fleet, Accounting firm, Head office, Property). On ${plan?.name || 'your'} plan you get email and in-app reminders.</p>
+      ${when(isOwner(), html`<a class="btn btn-sm btn-soft" href="#/settings/billing">See plans</a>`)}`;
+  } else if (smsStep) {
+    body = html`<form id="sms-code" class="sms-form">
+      <p>We texted a 6-digit code to <b>${fmtPhone(smsStep.phone)}</b>. It works for 10 minutes.</p>
+      <label class="field"><span>Code</span><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" pattern="[0-9 ]*" required placeholder="123456"></label>
+      <div class="btn-row"><button class="btn btn-primary">Verify</button>
+        <button type="button" class="btn btn-ghost" data-act="sms-resend" ${smsStep.wait ? 'disabled' : ''}>${smsStep.wait ? `Send again in ${smsStep.wait}s` : 'Send the code again'}</button>
+        <button type="button" class="linklike" data-act="sms-change">Wrong number?</button></div>
+      <p class="muted small">No text after a few minutes? Check the number, and that the phone has signal.</p></form>`;
+  } else if (verified && !smsChanging) {
+    body = html`<p class="sms-verified">${ICON.check} Texts go to <b>${fmtPhone(p.phone)}</b> <span class="chip ok">Verified</span></p>
+      <label class="toggle"><div><div>Send me reminders by text</div><div class="muted small">At most one text a day per workspace (about 7am), listing what's due. Never more than 3 a day.</div></div>
+        <input type="checkbox" data-pref="sms_enabled" ${on ? 'checked' : ''}></label>
+      <div class="btn-row"><button type="button" class="btn btn-sm btn-ghost" data-act="sms-change">Change number</button>
+        <button type="button" class="btn btn-sm btn-ghost danger" data-act="sms-remove">Remove number</button></div>`;
+  } else {
+    body = html`<form id="sms-start" class="sms-form">
+      <p class="muted small">We'll text you a code to make sure the number is yours. Reminders only go to a number that's been checked this way.</p>
+      <label class="field"><span>Your mobile number</span><input name="phone" inputmode="tel" autocomplete="tel" required value="${smsChanging ? '' : fmtPhone(p.phone)}" placeholder="0917 123 4567"></label>
+      <div class="btn-row"><button class="btn btn-primary">Text me a code</button>
+        ${when(verified, html`<button type="button" class="btn btn-ghost" data-act="sms-cancel">Cancel: keep ${fmtPhone(p.phone)}</button>`)}</div></form>`;
+  }
+  return html`<section class="card" id="sms"><h2>Text messages (SMS)</h2>${body}</section>`;
+}
+let smsTimer = null;
+function countdown() {
+  clearInterval(smsTimer);
+  smsStep.wait = 60;
+  smsTimer = setInterval(() => {
+    if (!smsStep) return clearInterval(smsTimer);
+    smsStep.wait = Math.max(0, smsStep.wait - 1);
+    const b = document.querySelector('[data-act=sms-resend]');
+    if (b) { b.disabled = smsStep.wait > 0; b.textContent = smsStep.wait ? `Send again in ${smsStep.wait}s` : 'Send the code again'; }
+    if (!smsStep.wait) clearInterval(smsTimer);
+  }, 1000);
+}
+async function sendCode(phone) {
+  const res = await db.startPhoneVerification(phone);
+  smsStep = { phone: res.phone };
+  countdown();
+  rerender();
+  toast('Code sent. Check your text messages.');
+}
+document.addEventListener('submit', async (e) => {
+  const f = e.target;
+  if (f.id !== 'sms-start' && f.id !== 'sms-code') return;
+  e.preventDefault();
+  const btn = f.querySelector('button:not([type=button])');
+  btn.disabled = true;
+  try {
+    if (f.id === 'sms-start') {
+      const phone = normalizePhone(new FormData(f).get('phone'));
+      if (!phone || !/^\+639\d{9}$/.test(phone)) throw new Error('Enter a Philippine mobile number, like 0917 123 4567.');
+      await sendCode(phone);
+    } else {
+      const code = String(new FormData(f).get('code') || '').replace(/\D/g, '');
+      if (code.length !== 6) throw new Error('The code has 6 digits.');
+      const phone = await db.confirmPhoneCode(code);
+      smsStep = null; smsChanging = false; clearInterval(smsTimer);
+      Object.assign(S.profile, { phone, phone_verified_at: new Date().toISOString() });
+      S.prefs.sms_enabled = true;
+      await reload();
+      toast('Number verified. Reminders will also come by text.');
+    }
+  } catch (err) { toastError(err); btn.disabled = false; }
+});
+on('sms-resend', async () => { try { await sendCode(smsStep.phone); } catch (e) { toastError(e); } });
+on('sms-change', () => { smsStep = null; clearInterval(smsTimer); smsChanging = true; rerender(); });
+on('sms-cancel', () => { smsChanging = false; rerender(); });
+on('sms-remove', async () => {
+  if (!(await confirmDialog('Remove your mobile number?', 'Text reminders stop. Email and in-app reminders carry on.', { confirmLabel: 'Remove number' }))) return;
+  try { await db.removePhone(); Object.assign(S.profile, { phone: null, phone_verified_at: null }); S.prefs.sms_enabled = false; rerender(); toast('Number removed. No more texts.'); } catch (e) { toastError(e); }
 });

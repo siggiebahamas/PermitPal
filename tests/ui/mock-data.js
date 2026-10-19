@@ -15,7 +15,7 @@ const plans = [
   { id: 'free', name: 'Free', available: true, price_php_monthly: 0, max_members: null, max_locations_per_business: null, paid_channels: false, features: ['Unlimited businesses'] },
   { id: 'business', name: 'Business', price_php_monthly: null, max_members: 5, max_locations_per_business: 1, paid_channels: true, features: ['More'] },
   { id: 'business_plus', name: 'Business Plus', price_php_monthly: null, max_members: 20, max_locations_per_business: null, paid_channels: true, features: ['Branches'], available: false },
-  { id: 'fleet', name: 'Fleet', available: true, price_php_monthly: 1490, features: ['Fleet board: every vehicle\'s registration, CTPL, emission and inspection', 'Import vehicles from a spreadsheet', 'Export for your records', 'Everything in Free'] },
+  { id: 'fleet', name: 'Fleet', available: true, paid_channels: true, price_php_monthly: 1490, features: ['Fleet board: every vehicle\'s registration, CTPL, emission and inspection', 'Import vehicles from a spreadsheet', 'Export for your records', 'Everything in Free'] },
   { id: 'firm', name: 'Accounting firm', available: true, price_php_monthly: 1990, features: ['Client board: every client\'s permits on one screen', 'One-click reminders to clients', 'Everything in Free'] },
   { id: 'head_office', name: 'Head office', available: true, price_php_monthly: 4990, features: ['Branch board: every branch and franchisee on one screen', 'One-click reminders to branches', 'Everything in Free'] },
   { id: 'property', name: 'Property', available: true, price_php_monthly: 9990, features: ['Tenant board: every tenant\'s permits on one screen', 'Download tenants\' shared copies', 'Everything in Free'] },
@@ -130,9 +130,10 @@ export const auth = {
   onChange: (cb) => { authCb = cb; },
   signIn: async () => ({}), signUp: async () => ({}), signOut: async () => {}, sendReset: async () => ({}), setPassword: async () => ({}), google: async () => ({}),
 };
+const me = { id: user.id, email: user.email, first_name: 'Sadie', last_name: 'Luna', role_title: '', phone: null, phone_verified_at: null, lang: 'en', current_org_id: org.id, is_platform_admin: true };
+const myPrefs = { email_enabled: true, sms_enabled: false, whatsapp_enabled: false, business_alerts: true, vehicle_alerts: true, remind_30: true, remind_7: true, remind_1: true, weekly_digest: true };
 export async function loadMe() {
-  return { profile: { id: user.id, email: user.email, first_name: 'Sadie', last_name: 'Luna', role_title: '', phone: null, lang: 'en', current_org_id: org.id, is_platform_admin: true },
-    orgs: [org], plans, prefs: { email_enabled: true, sms_enabled: false, whatsapp_enabled: false, business_alerts: true, vehicle_alerts: true, remind_30: true, remind_7: true, remind_1: true, weekly_digest: true } };
+  return { profile: { ...me }, orgs: [org], plans, prefs: { ...myPrefs } };
 }
 export async function loadOrgData() {
   return {
@@ -273,10 +274,10 @@ export async function trash() {
 }
 export const invites = async () => [];
 export const invite = async () => ({});
-export const channelStatus = async () => ({ email: false, sms: false, whatsapp: false });
+export const channelStatus = async () => ({ email: false, sms: !!globalThis.PP_SMS, whatsapp: false });
 export const payments = async () => [];
-export const updatePrefs = async () => {};
-export const updateProfile = async () => {};
+export const updatePrefs = async (userId, patch) => { Object.assign(myPrefs, patch); };
+export const updateProfile = async (userId, patch) => { if ('phone' in patch && patch.phone !== me.phone) me.phone_verified_at = null; Object.assign(me, patch); };
 export const adminOrgs = async () => [{ id: org.id, name: org.name, plan_id: org.plan_id, created_at: new Date().toISOString(), owner_email: user.email, members: 1, businesses: 1, vehicles: 1, open_requests: db.requests.length }];
 export const adminRequests = async () => db.requests.map((a) => ({ ...a, orgs: { name: org.name } }));
 export const adminOutbox = async () => [];
@@ -822,3 +823,27 @@ export async function markFiling(f) {
 }
 export async function unmarkFiling(id) { db.filingRecords = db.filingRecords.filter((r) => r.id !== id); }
 globalThis.__ppFilingDue = filingDue; // lets the browser tests compare dates
+
+
+// ---------------------------------------------------------------- text messages (the test's code is always 123456)
+let smsPending = null;
+export async function startPhoneVerification(raw) {
+  const d = String(raw || '').replace(/\D/g, '');
+  const phone = /^09\d{9}$/.test(d) ? '+63' + d.slice(1) : /^639\d{9}$/.test(d) ? '+' + d : null;
+  if (!phone) throw new Error('Enter a Philippine mobile number, like 0917 123 4567.');
+  if (smsPending && Date.now() - smsPending.at < 60000 && smsPending.phone === phone && smsPending.sent > 1) throw new Error('Please wait a minute before asking for another code.');
+  smsPending = { phone, at: Date.now(), tries: 0, sent: (smsPending?.sent || 0) + 1 };
+  return { phone };
+}
+export async function confirmPhoneCode(code) {
+  if (!smsPending) throw new Error('That code has expired. Ask for a new one.');
+  if (smsPending.tries >= 5) throw new Error('Too many wrong tries. Ask for a new code.');
+  if (String(code).replace(/\D/g, '') !== '123456') { smsPending.tries++; throw new Error(`That code is not right. Check the text message and try again (${5 - smsPending.tries} tries left).`); }
+  Object.assign(me, { phone: smsPending.phone, phone_verified_at: new Date().toISOString() });
+  myPrefs.sms_enabled = true;
+  const p = smsPending.phone; smsPending = null;
+  return p;
+}
+export async function removePhone() { Object.assign(me, { phone: null, phone_verified_at: null }); myPrefs.sms_enabled = false; }
+
+if (globalThis.PP_PLAN) org.plan_id = globalThis.PP_PLAN; // test hook: a workspace on a paid plan

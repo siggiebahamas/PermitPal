@@ -619,6 +619,40 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.close();
 }
 
+// Text messages: who can get them, verifying a number with a code, changing and removing it.
+{
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto('http://localhost:4173/#/settings');
+  await page.waitForSelector('main h1');
+  check('texts: while texting is being set up, says so', /being set up/.test(await page.textContent('#sms')));
+  check('texts: the number lives in its own section, not the profile form', (await page.locator('#profile-form [name=phone]').count()) === 0);
+  await page.addInitScript(() => { globalThis.PP_SMS = true; });
+  await page.reload(); await page.waitForSelector('#sms');
+  check('texts: on the Free plan, explains they come with team plans', /come with team plans/.test(await page.textContent('#sms')));
+  await page.addInitScript(() => { globalThis.PP_SMS = true; globalThis.PP_PLAN = 'fleet'; });
+  await page.reload(); await page.waitForSelector('#sms');
+  await page.fill('#sms-start [name=phone]', '12345'); await page.click('#sms-start button'); await page.waitForTimeout(200);
+  check('texts: a number that is not a PH mobile is refused', /Philippine mobile/.test(await page.textContent('#toast')));
+  await page.fill('#sms-start [name=phone]', '0917-123-4567'); await page.click('#sms-start button'); await page.waitForTimeout(300);
+  check('texts: says where the code went', /0917 123 4567/.test(await page.textContent('#sms')) && (await page.locator('#sms-code [name=code]').count()) === 1);
+  check('texts: "send again" waits a minute', await page.locator('[data-act=sms-resend]').isDisabled() && /Send again in \d+s/.test(await page.textContent('[data-act=sms-resend]')));
+  await page.fill('#sms-code [name=code]', '000000'); await page.click('#sms-code button:not([type=button])'); await page.waitForTimeout(200);
+  check('texts: a wrong code says how many tries are left', /4 tries left/.test(await page.textContent('#toast')));
+  await page.fill('#sms-code [name=code]', '123 456'); await page.click('#sms-code button:not([type=button])'); await page.waitForTimeout(400);
+  check('texts: the right code verifies the number and turns texts on', /Verified/.test(await page.textContent('#sms')) && await page.isChecked('#sms [data-pref=sms_enabled]'));
+  await page.click('#sms [data-act=sms-change]'); await page.waitForTimeout(200);
+  check('texts: changing the number asks for a new one, and can be cancelled', (await page.locator('#sms-start').count()) === 1 && /Cancel: keep 0917 123 4567/.test(await page.textContent('#sms')));
+  await page.evaluate(() => { location.hash = '#/'; }); await page.waitForTimeout(250);
+  await page.evaluate(() => { location.hash = '#/settings'; }); await page.waitForTimeout(350);
+  check('texts: until a new number is verified, texts keep going to the old one', /Verified/.test(await page.textContent('#sms')));
+  await page.click('#sms [data-act=sms-remove]'); await page.click('.modal button[type=submit]'); await page.waitForTimeout(300);
+  check('texts: removing the number stops texts', (await page.locator('#sms-start').count()) === 1 && /No more texts/.test(await page.textContent('#toast')));
+  check('texts: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+
 // Error reporting: a crash in the browser is sent (scrubbed of personal details) and staff see it in Admin.
 {
   const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
@@ -655,9 +689,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.waitForSelector('main h1');
   const seen = [];
   const mp = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit').id));
-  for (const h of ['#/compliance', '#/businesses/b1', '#/team', '#/settings/workspace', '#/admin', '#/requirement/' + mp, '#/']) {
+  for (const h of ['#/compliance', '#/businesses/b1', '#/team', '#/settings', '#/settings/workspace', '#/admin', '#/requirement/' + mp, '#/']) {
     await page.evaluate((x) => { location.hash = x; }, h); await page.waitForTimeout(250);
-    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors], [data-tab=orders], .checklist, .offer-inline, .lib-more, .focus-alt, .sidebar [data-nav=services], .sidebar [data-nav=filings], [data-filings-brief]:not([hidden]), #staff-access').count()) seen.push(h);
+    if (await page.locator('main .who, main .handled, [data-act=bulk-toggle], #esc-form, [data-tab=errors], [data-tab=orders], .checklist, .offer-inline, .lib-more, .focus-alt, .sidebar [data-nav=services], .sidebar [data-nav=filings], [data-filings-brief]:not([hidden]), #staff-access, #sms').count()) seen.push(h);
   }
   check('features off: nothing new shows before the database is updated', seen.length === 0, seen.join(','));
   check('features off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));

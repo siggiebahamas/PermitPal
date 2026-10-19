@@ -292,6 +292,8 @@ function settingsTab(st) {
       ${f('support_phone', 'Support phone')}${f('support_email', 'Support email')}</div>
     ${f('payment_note', 'Note shown under the payment details')}
     <label class="check"><input type="checkbox" name="online_payments" ${st.online_payments === 'on' ? 'checked' : ''}> Show "Pay online" (only after PayMongo keys are added to Supabase)</label>
+    ${when(has('sms'), html`<label class="field"><span>Most text messages per month, all customers together <small>(each costs about ₱0.50–1)</small></span>
+      <input name="sms_monthly_cap" type="number" min="0" max="100000" step="1" value="${st.sms_monthly_cap || '1000'}"></label>`)}
     <button class="btn btn-primary">Save</button></form></section>`;
 }
 
@@ -399,6 +401,11 @@ function wire(el) {
   submit('.admin-settings', async (f, fd) => {
     for (const k of ['gcash_name', 'gcash_number', 'bank_name', 'bank_account_name', 'bank_account_number', 'support_phone', 'support_email', 'payment_note']) await db.adminSaveSetting(k, String(fd.get(k) || '').trim());
     await db.adminSaveSetting('online_payments', fd.get('online_payments') === 'on' ? 'on' : 'off');
+    if (fd.has('sms_monthly_cap')) {
+      const cap = Number(fd.get('sms_monthly_cap'));
+      if (!Number.isInteger(cap) || cap < 0) throw new Error('The text limit must be a whole number, 0 or more.');
+      await db.adminSaveSetting('sms_monthly_cap', String(cap));
+    }
     toast('Saved. Customers see these on their next visit.');
   });
   el.querySelectorAll('.plan-form').forEach((f) => f.addEventListener('submit', async (e) => {

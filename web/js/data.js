@@ -445,3 +445,8 @@ export const markFiling = async (f) => ok(await sb.rpc('mark_filing', {
   p_reference: f.reference || null, p_amount: f.amount ?? null, p_note: f.note || null,
 }));
 export const unmarkFiling = async (id) => ok(await sb.rpc('unmark_filing', { p_id: id }));
+
+// ---------------------------------------------------------------- text messages (verified numbers only)
+export const startPhoneVerification = async (phone) => ok(await sb.rpc('start_phone_verification', { p_phone: phone }));
+export const confirmPhoneCode = async (code) => ok(await sb.rpc('confirm_phone_code', { p_code: code }));
+export const removePhone = async () => ok(await sb.rpc('remove_phone'));
