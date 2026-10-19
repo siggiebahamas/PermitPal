@@ -46,6 +46,9 @@ create table if not exists public.care_tiers (
   guarantee_cap_php numeric(12,2) not null default 0 check (guarantee_cap_php >= 0),
   walkthroughs  int not null default 0 check (walkthroughs between 0 and 12),
   includes      text[] not null default '{}',
+  -- The permit types this plan renews. Anything else (FDA or DOH licences, franchises, contractor
+  -- licences, custom permits) is a one-time job with its own quote.
+  covers        text[] not null default '{}',
   active        boolean not null default true,
   sort          int not null default 100,
   updated_at    timestamptz not null default now()
@@ -61,15 +64,19 @@ create policy care_tiers_admin_update on public.care_tiers for update to authent
 revoke insert, delete on public.care_tiers from anon, authenticated;
 grant select on public.care_tiers to anon;
 
-insert into public.care_tiers (code, subject, name, monthly_php, yearly_php, guarantee, guarantee_cap_php, walkthroughs, includes, sort) values
-  ('branch_care', 'branch', 'Care', 1500, 15000, false, 0, 0,
-   array['We start every renewal for this branch before it''s due','Our service fee is included: you only pay government fees, at cost','Official receipts and the new permits saved for you','One person to message about everything'], 10),
-  ('branch_plus', 'branch', 'Care Plus', 2000, 20000, true, 10000, 1,
-   array['Everything in Care','On-time guarantee: if we miss a deadline, we pay the late penalty (up to ₱10,000 per permit)','One fire or sanitary pre-inspection walk-through a year'], 20),
-  ('vehicle_care', 'vehicle', 'Care', 300, 3000, false, 0, 0,
-   array['Registration, CTPL, emission test and inspection handled every year','Our service fee is included: you only pay government fees and the premium, at cost','The new OR/CR saved for you'], 30),
-  ('vehicle_plus', 'vehicle', 'Care Plus', 400, 4000, true, 3000, 0,
-   array['Everything in Care','On-time guarantee: if we miss the deadline, we pay the late penalty (up to ₱3,000)'], 40)
+insert into public.care_tiers (code, subject, name, monthly_php, yearly_php, guarantee, guarantee_cap_php, walkthroughs, includes, covers, sort) values
+  ('branch_care', 'branch', 'Care', 1200, 12000, false, 0, 0,
+   array['We start every covered renewal for this branch about 60 days before it''s due','Our service fee is included: you only pay government fees, at cost','Official receipts and the new permits saved for you','One person to message about everything'],
+   array['mayors_permit','barangay_clearance','fsic','sanitary_permit','annual_building_inspection','signage_permit','liquor_license','dti_business_name','bmbe_certificate'], 10),
+  ('branch_plus', 'branch', 'Care Plus', 1800, 18000, true, 10000, 1,
+   array['Everything in Care','On-time guarantee: if we miss a deadline, we pay the late penalty (up to ₱10,000 per permit)','One fire or sanitary pre-inspection walk-through a year'],
+   array['mayors_permit','barangay_clearance','fsic','sanitary_permit','annual_building_inspection','signage_permit','liquor_license','dti_business_name','bmbe_certificate'], 20),
+  ('vehicle_care', 'vehicle', 'Care', 250, 2500, false, 0, 0,
+   array['Registration, CTPL, emission test and inspection handled every year','Our service fee is included: you only pay government fees and the premium, at cost','The new OR/CR saved for you'],
+   array['lto_registration','ctpl','emission_test','mvir'], 30),
+  ('vehicle_plus', 'vehicle', 'Care Plus', 350, 3500, true, 3000, 0,
+   array['Everything in Care','On-time guarantee: if we miss the deadline, we pay the late penalty (up to ₱3,000)'],
+   array['lto_registration','ctpl','emission_test','mvir'], 40)
 on conflict (code) do nothing;
 
 -- Government fees the customer lets us accept for them on a care renewal, per renewal.
@@ -174,7 +181,8 @@ revoke all on public.guarantee_claims from anon;
 create or replace function private.care_covered(p_plan uuid) returns table (requirement_id uuid)
 language sql stable security definer set search_path = '' as $$
   select r.id from public.care_plans p
-  join public.requirements r on r.org_id = p.org_id and r.deleted_at is null and r.subject <> 'person'
+  join public.care_tiers t on t.code = p.tier
+  join public.requirements r on r.org_id = p.org_id and r.deleted_at is null and r.subject <> 'person' and r.type_code = any(t.covers)
   left join public.business_locations l on l.id = p.location_id
   where p.id = p_plan and (
     (p.vehicle_id is not null and r.vehicle_id = p.vehicle_id)
@@ -207,9 +215,21 @@ insert into public.services (code, name, category, summary, includes, price_from
    array['Photos or scans received','Businesses, branches and vehicles added','Permits entered with dates and files','What''s missing or expiring, listed for you','Reminders checked and on'], true)
 on conflict (code) do nothing;
 
+-- Prices that pay for the time a job really takes (queues, inspections, follow-ups), fixed and
+-- quoted up front. Only prices still at their first default change, so edits made in Admin are kept.
+update public.services s set price_from = v.new_price, price_unit = coalesce(v.unit, s.price_unit) from (values
+  ('renew_mayors_permit', 2500, 6000, null), ('renew_barangay_clearance', 1000, 1500, null), ('renew_fsic', 1500, 3000, null),
+  ('renew_sanitary_permit', 1200, 2500, null), ('renew_lto_registration', 800, 2000, 'per vehicle (emission test and inspection included)'),
+  ('renew_ctpl', 300, 500, null), ('renew_dti_business_name', 500, 1500, null), ('renew_philgeps', 2000, 2500, null),
+  ('pkg_new_business', 15000, 25000, null), ('pkg_new_branch', 8000, 12000, null), ('pkg_amendment', 5000, 8000, null), ('pkg_closure', 8000, 15000, null),
+  ('apply_dole_registration', 1500, 2000, null), ('apply_bmbe', 1500, 2000, null))
+  v(code, old_price, new_price, unit)
+where s.code = v.code and s.price_from = v.old_price;
+update public.services set price_unit = 'quoted per permit, from ₱1,500' where code = 'renew_other' and price_from is null and price_unit = 'quoted per permit';
+
 update public.services s set rush_fee = v.fee from (values
-  ('renew_mayors_permit', 1000), ('renew_barangay_clearance', 500), ('renew_fsic', 800), ('renew_sanitary_permit', 500),
-  ('renew_lto_registration', 500), ('renew_dti_business_name', 300), ('renew_philgeps', 800), ('renew_other', 800),
+  ('renew_mayors_permit', 2000), ('renew_barangay_clearance', 500), ('renew_fsic', 1000), ('renew_sanitary_permit', 800),
+  ('renew_lto_registration', 800), ('renew_dti_business_name', 500), ('renew_philgeps', 800), ('renew_other', 1000),
   ('pkg_new_business', 5000), ('pkg_new_branch', 3000), ('pkg_amendment', 2000), ('doc_replacement', 500), ('doc_bir_update', 1000),
   ('apply_dole_registration', 500), ('setup_from_paper', 1000)) v(code, fee)
 where s.code = v.code and s.rush_fee is null;

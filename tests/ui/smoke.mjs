@@ -398,7 +398,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   // Done for you: menu, catalog, asking for a quote.
   check('done for you: in the menu', (await page.locator('.sidebar a[data-nav=services]').count()) === 1);
   await go('#/requirement/' + mpId);
-  check('done for you: offered on the permit page with the starting price', /Have PermitPal renew it for you/.test(await page.textContent('.checklist .offer-inline')) && /₱2,500/.test(await page.textContent('.checklist .offer-inline')));
+  check('done for you: offered on the permit page with the starting price', /Have PermitPal renew it for you/.test(await page.textContent('.checklist .offer-inline')) && /₱6,000/.test(await page.textContent('.checklist .offer-inline')));
   await page.click('.checklist .offer-inline [data-act=svc-for-req]');
   check('done for you: the quote form picks this permit and "renew"', (await page.inputValue('.modal select[name=target]')) === mpId && await page.isChecked('.modal input[name=kind][value=renew]'));
   await page.click('.modal button[type=submit]'); await page.waitForTimeout(200);
@@ -747,24 +747,26 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('care: "Year-round care" is in the menu', (await page.locator('.sidebar a[data-nav=care]').count()) === 1);
   await go('#/care');
   check('care: the page explains it and shows both levels with prices', /We start each renewal for you/.test(await page.textContent('main')) && (await page.locator('.care-tier').count()) === 4
-    && /₱1,500/.test(await page.textContent('.care-tiers')) && /₱2,000/.test(await page.textContent('.care-tiers')));
+    && /₱1,200/.test(await page.textContent('.care-tiers')) && /₱1,800/.test(await page.textContent('.care-tiers')));
+  check('care: each level lists exactly which permits it renews', (await page.locator('.care-tier .care-covers').count()) === 4
+    && /Mayor's \/ Business Permit/.test(await page.textContent('.care-tier .care-covers')) && !/FDA/.test(await page.textContent('.care-tiers')));
   await go('#/businesses/b1');
   const offer = page.locator('main .care-line');
-  check('care: each branch card has one quiet line offering it', (await offer.count()) === 1 && /handle this branch all year/.test(await offer.textContent()) && /₱1,500\/month/.test(await offer.textContent()));
+  check('care: each branch card has one quiet line offering it', (await offer.count()) === 1 && /handle this branch all year/.test(await offer.textContent()) && /₱1,200\/month/.test(await offer.textContent()));
   await offer.click(); await page.waitForTimeout(350);
   check('care: the line opens the start page with that branch ticked', (await page.evaluate(() => location.hash)).startsWith('#/care/start') && await page.isChecked('[name=pick][value="location:l1"]'));
   const total = async () => (await page.textContent('[data-care-total]')).replace(/\s+/g, ' ');
-  check('care: the total shows straight away (Care, monthly)', /Total per month\s*₱1,500/.test(await total()), await total());
+  check('care: the total shows straight away (Care, monthly)', /Total per month\s*₱1,200/.test(await total()), await total());
   await page.check('[name=level][value=plus]'); await page.check('[name=pick][value="vehicle:v1"]'); await page.waitForTimeout(100);
-  check('care: Care Plus for a branch and a vehicle adds up', /₱2,000/.test(await total()) && /₱400/.test(await total()) && /Total per month\s*₱2,400/.test(await total()), await total());
+  check('care: Care Plus for a branch and a vehicle adds up', /₱1,800/.test(await total()) && /₱350/.test(await total()) && /Total per month\s*₱2,150/.test(await total()), await total());
   await page.check('[name=billing][value=yearly]'); await page.waitForTimeout(100);
-  check('care: yearly shows the yearly price', /Total per year\s*₱24,000/.test(await total()) && (await page.textContent('.care-total .btn-block')).includes('₱24,000'), await total());
+  check('care: yearly shows the yearly price', /Total per year\s*₱21,500/.test(await total()) && (await page.textContent('.care-total .btn-block')).includes('₱21,500'), await total());
   await page.check('[name=billing][value=monthly]');
   await page.click('.care-total .btn-block'); await page.waitForTimeout(200);
   check('care: nothing starts without the authorization tick', /tick the box/i.test(await page.textContent('.care-form .form-error')));
   await page.check('.care-form [name=consent]');
   await page.click('.care-total .btn-block'); await page.waitForTimeout(700);
-  check('care: starting goes to the plan with the first bill open to pay', (await page.evaluate(() => location.hash)) === '#/care' && /Pay bill C-/.test(await page.textContent('#modal-root')) && /₱2,400/.test(await page.textContent('#modal-root .quote-hint')));
+  check('care: starting goes to the plan with the first bill open to pay', (await page.evaluate(() => location.hash)) === '#/care' && /Pay bill C-/.test(await page.textContent('#modal-root')) && /₱2,150/.test(await page.textContent('#modal-root .quote-hint')));
   check('care: payment details are shown in the bill', /0917 000 0000/.test(await page.textContent('#modal-root .paywiths')));
   await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(200);
   check('care: "I\'ve paid" needs a reference or screenshot', /reference number or a screenshot/.test(await page.textContent('#modal-root .modal-error')));
@@ -818,7 +820,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await go('#/services');
   check('jobs: the catalog shows Year-round care first and no old "plan" cards', (await page.locator('main .care-teaser').count()) === 1 && (await page.locator('main .svc h2', { hasText: 'Year-round care:' }).count()) === 0);
   check('jobs: "Set up my account for me" is in the catalog', (await page.locator('main .svc', { hasText: 'Set up my account for me' }).count()) === 1);
-  check('jobs: rush prices are shown on the cards', /Urgent\? \+₱1,000/.test(await page.textContent('main .svc:has-text("Mayor\'s / Business Permit renewal")')));
+  check('jobs: rush prices are shown on the cards', /Urgent\? \+₱2,000/.test(await page.textContent('main .svc:has-text("Mayor\'s / Business Permit renewal")')));
   const many = page.locator('main [data-act=svc-bulk]');
   check('jobs: "Renew N for me" appears when several permits are due', (await many.count()) === 1 && /Renew \d+ for me/.test(await many.textContent()));
   await many.click(); await page.waitForTimeout(300);
@@ -835,11 +837,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
   check('admin: several-at-once requests are labelled', (await page.locator('main .line', { hasText: 'several at once' }).count()) >= 2);
   await page.locator('main .line', { hasText: "Renewal: Mayor's" }).first().click(); await page.waitForTimeout(300);
-  check('admin: urgent requests get a rush fee field, filled with the catalog rush fee', (await page.inputValue('.admin-quote [name=rush]')) === '1000');
+  check('admin: urgent requests get a rush fee field, filled with the catalog rush fee', (await page.inputValue('.admin-quote [name=rush]')) === '2000');
   await page.fill('.admin-quote [name=fee]', '2500'); await page.fill('.admin-quote [name=gov]', '4200'); await page.click('.admin-quote button'); await page.waitForTimeout(400);
   await go('#/services');
   await page.locator('main .line', { hasText: "Mayor's" }).first().click(); await page.waitForTimeout(700); // the order page loads it fresh
-  check('jobs: the quote shows the rush fee as its own line, and the total adds up', /Rush fee/.test(await page.textContent('.card.quote')) && (await page.textContent('.qline.total')).includes('7,700'));
+  check('jobs: the quote shows the rush fee as its own line, and the total adds up', /Rush fee/.test(await page.textContent('.card.quote')) && (await page.textContent('.qline.total')).includes('8,700'));
   // set up my account for me
   await go('#/services');
   await page.locator('main .svc', { hasText: 'Set up my account for me' }).locator('[data-act=svc-request]').click(); await page.waitForTimeout(250);
@@ -1018,6 +1020,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     if (o > 1) bad.push(`money ${v} ${o}px`);
   }
   check('phone: the new pages have no sideways scroll at 360px', bad.length === 0, bad.join(', '));
+  await page.evaluate(() => { location.hash = '#/care'; }); await page.waitForTimeout(450);
+  check('care: a licence outside the plan is listed as "Not in Care, quoted per job"',
+    /Not in Care, quoted per job: FDA License to Operate/.test(await page.textContent('main .care-row:has-text("Visayas Sari-Sari Distribution Co. · Main branch")')));
+  await page.evaluate(() => { location.hash = '#/care/start'; }); await page.waitForTimeout(450);
+  check('care start: a branch with extra licences says how many are quoted separately', /1 quoted separately/.test(await page.textContent('main .care-pick:has-text("Visayas Sari-Sari Distribution Co. · Main branch")')));
   await page.evaluate(() => { location.hash = '#/services/orders/ord2'; }); await page.waitForTimeout(450);
   check('care renewal order: says the plan started it and the fee is covered', /covered by your care plan/.test(await page.textContent('main .card.quote')) && /Year-round care/.test(await page.textContent('main .page-head')));
   check('phone: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));

@@ -187,7 +187,7 @@ exception when others then perform pg_temp.res('starting care needs the consent 
 update t_ids set inv = public.start_care(org, jsonb_build_array(
   jsonb_build_object('kind','location','id',loc,'tier','branch_plus'),
   jsonb_build_object('kind','vehicle','id',veh,'tier','vehicle_care')), 'monthly', true);
-select pg_temp.res('one sign-up bill for everything chosen', amount_php = 2300 and status = 'due' and first and jsonb_array_length(lines) = 2, amount_php::text)
+select pg_temp.res('one sign-up bill for everything chosen', amount_php = 2050 and status = 'due' and first and jsonb_array_length(lines) = 2, amount_php::text)
   from public.care_invoices where id = (select inv from t_ids);
 select pg_temp.res('plans wait for the first payment', count(*) = 2 and bool_and(status = 'pending'), string_agg(status, ','))
   from public.care_plans where org_id = (select org from t_ids);
@@ -204,6 +204,19 @@ select public.pay_care_invoice(inv, 'gcash', 'GC-123', org || '/care/' || inv ||
 update t_ids set plan = (select id from public.care_plans where location_id = (select loc from t_ids)),
                  vplan = (select id from public.care_plans where vehicle_id = (select veh from t_ids));
 select pg_temp.res('the team sees its plans, bills and what each covers', (select count(*) from public.care_coverage((select org from t_ids))) >= 5, '');
+reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
+-- Care renews a fixed list of permit types: an FDA licence or a permit the customer typed in is a one-time job.
+insert into public.requirements (org_id, subject, business_id, location_id, type_code, name, notes)
+  select org, 'business', biz, loc, 'fda_lto', 'FDA License to Operate', 'scope-test' from t_ids;
+insert into public.requirements (org_id, subject, business_id, location_id, name, notes)
+  select org, 'business', biz, loc, 'Elevator permit', 'scope-test' from t_ids;
+insert into public.requirement_cycles (org_id, requirement_id, reference_no, expires_on)
+  select r.org_id, r.id, 'X-1', private.today_ph() + 20 from public.requirements r where r.notes = 'scope-test';
+select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
+set local role authenticated;
+select pg_temp.res('Care doesn''t cover licences outside its list, or custom permits',
+  not exists (select 1 from public.care_coverage((select org from t_ids)) c join public.requirements r on r.id = c.requirement_id where r.notes = 'scope-test')
+  and exists (select 1 from public.care_coverage((select org from t_ids)) c where c.requirement_id = (select mp from t_ids)), '');
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000c3","role":"authenticated"}', true);
 set local role authenticated;
@@ -226,6 +239,8 @@ select pg_temp.res('the customer sees the file open in their access log', count(
 
 -- renewals the plan starts by itself
 select pg_temp.res('the daily job starts covered renewals that are due soon', private.care_daily() >= 2, '');
+select pg_temp.res('...and doesn''t start them, even when due soon',
+  not exists (select 1 from public.assistance_requests a join public.requirements r on r.id = a.requirement_id where r.notes = 'scope-test'), '');
 select pg_temp.res('the Mayor''s Permit (40 days away) and the van''s registration (30 days) are started',
   (select count(*) from public.assistance_requests where care_plan_id is not null and created_by is null and requirement_id in ((select mp from t_ids), (select lto from t_ids))) = 2, '');
 select pg_temp.res('the barangay clearance (200 days away) and the other branch are left alone',
@@ -276,7 +291,7 @@ reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); en
 update public.care_plans set paid_through = private.today_ph() + 5 where org_id = (select org from t_ids);
 select private.care_daily();
 select pg_temp.res('the next bill is made 7 days before the paid period ends, one per workspace',
-  count(*) = 1 and min(amount_php) = 2300 and min(period_start) = private.today_ph() + 6, count(*)::text)
+  count(*) = 1 and min(amount_php) = 2050 and min(period_start) = private.today_ph() + 6, count(*)::text)
   from public.care_invoices where org_id = (select org from t_ids) and not first;
 select private.care_daily();
 select pg_temp.res('...and only once', count(*) = 1, count(*)::text) from public.care_invoices where org_id = (select org from t_ids) and not first;
@@ -490,7 +505,7 @@ select pg_temp.res('one-time jobs: our fee (with rush) is collected, government 
   (select sum(amount) from t_money where stream = 'jobs' and state = 'collected' and kind = 'service_fee' and ref_id = (select ord from t_ids)) = 2300
   and (select sum(amount) from t_money where state = 'held' and ref_id = (select ord from t_ids)) = 2000, '');
 select pg_temp.res('care bills paid are collected; the guarantee payout is a cost',
-  (select sum(amount) from t_money where stream = 'care' and state = 'collected') = 4600 and (select sum(amount) from t_money where state = 'cost') = -10000, '');
+  (select sum(amount) from t_money where stream = 'care' and state = 'collected') = 4100 and (select sum(amount) from t_money where state = 'cost') = -10000, '');
 select pg_temp.res('firms: the paid statement is collected', (select sum(amount) from t_money where stream = 'partners' and state = 'collected') = 2500, '');
 select pg_temp.res('team plans are collected', (select sum(amount) from t_money where stream = 'plans') = 4470, '');
 select pg_temp.res('accepted, not paid: the care renewal''s fees are not counted as ours', not exists (select 1 from t_money where state = 'to_collect' and stream = 'jobs' and amount = 0), '');

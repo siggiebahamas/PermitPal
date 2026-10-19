@@ -1046,6 +1046,11 @@ a.back { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
 .care-how span { color: var(--muted); font-size: 14.5px; }
 @media (min-width: 800px) { .care-how { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .care-tier.plus .svc-top { border-bottom-color: var(--s-ok); }
+.care-covers { color: var(--muted); margin: 0; border-top: 1px solid var(--rule); padding-top: 10px; }
+.care-covers b { color: var(--heading); }
+.tier-scope { grid-column: 1 / -1; margin: 4px 0 8px; }
+.tier-scope summary { cursor: pointer; font-weight: 700; color: var(--link); padding: 4px 0; }
+.tier-scope .check { margin: 4px 0; }
 .care-pick, .care-level, .bulk-row { padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; margin: 0 0 8px; background: var(--card); }
 .care-pick > span, .care-level > span, .bulk-row > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .care-pick:has(input:checked), .care-level:has(input:checked), .bulk-row:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }

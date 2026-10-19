@@ -1,13 +1,19 @@
 // Admin > Care: Year-round care plans, their bills, guarantee claims, and covered permits that still
 // need an expiry date. Every action here tells the customer (the database sends the notice).
 import { html, fmtDate, peso, toast, toastError, openModal, confirmDialog, plural, when, todayPH, formObject } from '../util.js';
-import { on, rerender, empty } from '../core.js';
+import { S, on, rerender, empty } from '../core.js';
 import { PLAN_STATUS } from './care.js';
 import * as db from 'pp/data';
 
 let cache = { plans: [], invoices: [], claims: [], tiers: [] };
 const due = (i) => i.status === 'due' && i.due_on < todayPH();
 const monthlyOf = (p) => (p.billing === 'yearly' ? Number(p.price_php) / 12 : Number(p.price_php));
+// Permit types a plan can renew: the library's expiring ones for that subject, plus any already chosen.
+const scopeChoices = (t) => {
+  const lib = (S.data?.types || []).filter((x) => x.expires && x.subject === (t.subject === 'branch' ? 'business' : 'vehicle'));
+  const extra = (t.covers || []).filter((c) => !lib.some((x) => x.code === c)).map((c) => ({ code: c, name: c }));
+  return [...lib, ...extra];
+};
 
 export async function careTab() {
   const [plans, invoices, claims, gaps, tiers] = await Promise.all([db.adminCarePlans(), db.adminCareInvoices(), db.adminClaims(), db.adminCareGaps(), db.adminCareTiers()]);
@@ -64,6 +70,10 @@ export async function careTab() {
         <label class="field"><span>Per year (₱)</span><input name="yearly" type="number" min="0" step="1" value="${t.yearly_php}" required></label>
         ${t.guarantee ? html`<label class="field"><span>Guarantee limit per permit (₱)</span><input name="cap" type="number" min="0" step="100" value="${t.guarantee_cap_php}"></label>` : ''}
         <label class="check"><input type="checkbox" name="active" ${t.active ? 'checked' : ''}> <span>Offered</span></label>
+        <details class="tier-scope"><summary>Permits it renews (${(t.covers || []).length})</summary>
+          <p class="muted small">Anything not ticked is a one-time job with its own quote, even on a covered branch or vehicle.</p>
+          ${scopeChoices(t).map((x) => html`<label class="check"><input type="checkbox" name="covers" value="${x.code}" ${(t.covers || []).includes(x.code) ? 'checked' : ''}> <span>${x.name}</span></label>`)}
+        </details>
         <div><button class="btn btn-sm btn-soft">Save</button></div></form>`)}
     </section>`;
 }
@@ -129,7 +139,7 @@ document.addEventListener('submit', async (e) => {
   const monthly = Number(fd.get('monthly')), yearly = Number(fd.get('yearly'));
   if (!(monthly >= 0) || !(yearly >= 0)) return toast('Enter prices of ₱0 or more.', 'error');
   try {
-    await db.adminSaveCareTier(f.dataset.code, { monthly_php: monthly, yearly_php: yearly, active: fd.get('active') === 'on',
+    await db.adminSaveCareTier(f.dataset.code, { monthly_php: monthly, yearly_php: yearly, active: fd.get('active') === 'on', covers: fd.getAll('covers'),
       ...(fd.has('cap') ? { guarantee_cap_php: Number(fd.get('cap')) || 0 } : {}) });
     toast('Saved. New sign-ups see the new price.');
   } catch (err) { toastError(err); }

@@ -912,8 +912,17 @@ export const adminResetMfa = async () => 1;
 const REV = globalThis.PP_FEATURES !== 'none';
 if (REV) {
   const S_ = (code) => SERVICES.find((x) => x.code === code);
-  const rush = { renew_mayors_permit: 1000, renew_barangay_clearance: 500, renew_fsic: 800, renew_sanitary_permit: 500, renew_lto_registration: 500, renew_other: 800, pkg_new_business: 5000, pkg_new_branch: 3000, pkg_amendment: 2000, doc_replacement: 500, doc_bir_update: 1000 };
-  for (const x of SERVICES) Object.assign(x, { rush_fee: rush[x.code] ?? null, steps: x.steps || [], visit: false, needs_access: false });
+  const rush = { renew_mayors_permit: 2000, renew_barangay_clearance: 500, renew_fsic: 1000, renew_sanitary_permit: 800, renew_lto_registration: 800, renew_dti_business_name: 500, renew_philgeps: 800, renew_other: 1000, pkg_new_business: 5000, pkg_new_branch: 3000, pkg_amendment: 2000, doc_replacement: 500, doc_bir_update: 1000, apply_dole_registration: 500 };
+  // the same price changes as the migration: [old default, new price]
+  const price = { renew_mayors_permit: [2500, 6000], renew_barangay_clearance: [1000, 1500], renew_fsic: [1500, 3000], renew_sanitary_permit: [1200, 2500], renew_lto_registration: [800, 2000],
+    renew_ctpl: [300, 500], renew_dti_business_name: [500, 1500], renew_philgeps: [2000, 2500], pkg_new_business: [15000, 25000], pkg_new_branch: [8000, 12000], pkg_amendment: [5000, 8000],
+    pkg_closure: [8000, 15000], apply_dole_registration: [1500, 2000], apply_bmbe: [1500, 2000] };
+  for (const x of SERVICES) {
+    Object.assign(x, { rush_fee: rush[x.code] ?? null, steps: x.steps || [], visit: false, needs_access: false });
+    if (price[x.code] && Number(x.price_from) === price[x.code][0]) x.price_from = price[x.code][1];
+  }
+  if (S_('renew_lto_registration')) S_('renew_lto_registration').price_unit = 'per vehicle (emission test and inspection included)';
+  if (S_('renew_other') && S_('renew_other').price_from == null) S_('renew_other').price_unit = 'quoted per permit, from ₱1,500';
   Object.assign(S_('pkg_new_business'), { steps: ['Business name or company registered (DTI, SEC or CDA)', 'Barangay clearance', "Mayor's Permit", 'BIR registration (COR)', 'Books and invoices registered with BIR', 'Everything saved to your account'] });
   Object.assign(S_('pkg_new_branch'), { steps: ['Barangay clearance', "Mayor's Permit", 'Fire safety inspection (FSIC)', 'BIR branch registration', 'Everything saved to your account'] });
   Object.assign(S_('adv_fire_preinspection'), { name: 'Pre-inspection walk-through (fire or sanitary)', visit: true, price_unit: 'per site visit', type_codes: ['fsic', 'sanitary_permit'],
@@ -931,14 +940,16 @@ org.care_gov_preapproval_php = 0;
 db.charges = []; db.statements = []; db.placements = []; db.placementStats = []; db.apps = []; db.planPayments = []; db.staffAccess = [];
 db.care = { plans: [], invoices: [], claims: [] };
 db.history = []; // other customers' money, so the staff Money views have something to show in the demo
+const BRANCH_SCOPE = ['mayors_permit', 'barangay_clearance', 'fsic', 'sanitary_permit', 'annual_building_inspection', 'signage_permit', 'liquor_license', 'dti_business_name', 'bmbe_certificate'];
+const VEHICLE_SCOPE = ['lto_registration', 'ctpl', 'emission_test', 'mvir'];
 const tiers = [
-  { code: 'branch_care', subject: 'branch', name: 'Care', monthly_php: 1500, yearly_php: 15000, guarantee: false, guarantee_cap_php: 0, walkthroughs: 0, active: true, sort: 10,
-    includes: ["We start every renewal for this branch before it's due", 'Our service fee is included: you only pay government fees, at cost', 'Official receipts and the new permits saved for you', 'One person to message about everything'] },
-  { code: 'branch_plus', subject: 'branch', name: 'Care Plus', monthly_php: 2000, yearly_php: 20000, guarantee: true, guarantee_cap_php: 10000, walkthroughs: 1, active: true, sort: 20,
+  { code: 'branch_care', subject: 'branch', name: 'Care', monthly_php: 1200, yearly_php: 12000, guarantee: false, guarantee_cap_php: 0, walkthroughs: 0, active: true, sort: 10, covers: BRANCH_SCOPE,
+    includes: ["We start every covered renewal for this branch about 60 days before it's due", 'Our service fee is included: you only pay government fees, at cost', 'Official receipts and the new permits saved for you', 'One person to message about everything'] },
+  { code: 'branch_plus', subject: 'branch', name: 'Care Plus', monthly_php: 1800, yearly_php: 18000, guarantee: true, guarantee_cap_php: 10000, walkthroughs: 1, active: true, sort: 20, covers: BRANCH_SCOPE,
     includes: ['Everything in Care', 'On-time guarantee: if we miss a deadline, we pay the late penalty (up to ₱10,000 per permit)', 'One fire or sanitary pre-inspection walk-through a year'] },
-  { code: 'vehicle_care', subject: 'vehicle', name: 'Care', monthly_php: 300, yearly_php: 3000, guarantee: false, guarantee_cap_php: 0, walkthroughs: 0, active: true, sort: 30,
+  { code: 'vehicle_care', subject: 'vehicle', name: 'Care', monthly_php: 250, yearly_php: 2500, guarantee: false, guarantee_cap_php: 0, walkthroughs: 0, active: true, sort: 30, covers: VEHICLE_SCOPE,
     includes: ['Registration, CTPL, emission test and inspection handled every year', 'Our service fee is included: you only pay government fees and the premium, at cost', 'The new OR/CR saved for you'] },
-  { code: 'vehicle_plus', subject: 'vehicle', name: 'Care Plus', monthly_php: 400, yearly_php: 4000, guarantee: true, guarantee_cap_php: 3000, walkthroughs: 0, active: true, sort: 40,
+  { code: 'vehicle_plus', subject: 'vehicle', name: 'Care Plus', monthly_php: 350, yearly_php: 3500, guarantee: true, guarantee_cap_php: 3000, walkthroughs: 0, active: true, sort: 40, covers: VEHICLE_SCOPE,
     includes: ['Everything in Care', 'On-time guarantee: if we miss the deadline, we pay the late penalty (up to ₱3,000)'] },
 ];
 let billSeq = 0;
@@ -946,7 +957,8 @@ const billNo = (p) => `${p}-${today().slice(0, 4)}-${String(++billSeq).padStart(
 const endOf = (start, billing) => { const d = new Date(start + 'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + (billing === 'yearly' ? 12 : 1)); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
 function covered(p) {
   const l = db.locations.find((x) => x.id === p.location_id);
-  return statusRows().filter((r) => r.subject !== 'person' && (p.vehicle_id ? r.vehicle_id === p.vehicle_id : r.business_id === l?.business_id && (r.location_id === p.location_id || (!r.location_id && l?.is_main))));
+  const scope = tiers.find((t) => t.code === p.tier)?.covers || [];
+  return statusRows().filter((r) => r.subject !== 'person' && scope.includes(r.type_code) && (p.vehicle_id ? r.vehicle_id === p.vehicle_id : r.business_id === l?.business_id && (r.location_id === p.location_id || (!r.location_id && l?.is_main))));
 }
 function careData() {
   if (!REV) return { plans: [], invoices: [], coverage: [], claims: [], tiers: [], staff: [] };
@@ -1238,7 +1250,7 @@ if (REV && globalThis.PP_DEMO) {
   const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   const daysAgo = (d) => new Date(Date.now() - d * 864e5).toISOString();
   const custs = ['Lola Nena Bakeshop', 'Bright Smile Dental', 'Kuya Jun Hardware', 'Mabuhay Printing', 'Sunrise Laundry Hub', 'Kape Uno Ortigas', 'Isla Water Station', 'Golden Wok Eatery'];
-  const jobs = [["Mayor's / Business Permit renewal", 2500, 1000], ['Barangay Business Clearance', 1000, 500], ['Fire Safety Inspection Certificate (FSIC)', 1500, 800], ['LTO vehicle registration renewal', 800, 500], ['New business registration', 15000, 5000], ['Set up my account for me', 1500, 0]];
+  const jobs = [["Mayor's / Business Permit renewal", 6000, 2000], ['Barangay Business Clearance', 1500, 500], ['Fire Safety Inspection Certificate (FSIC)', 3000, 1000], ['LTO vehicle registration renewal', 2000, 800], ['New business registration', 25000, 5000], ['Set up my account for me', 1500, 0]];
   for (let d = 360; d > 2; d -= 4 + Math.floor(rnd() * 5)) {
     const growth = 1 + (360 - d) / 200; // the business grows over the year
     const n = rnd() < 0.35 * growth ? 2 : 1;
@@ -1252,8 +1264,8 @@ if (REV && globalThis.PP_DEMO) {
     }
   }
   // care customers, starting a few months ago and growing
-  [['Bright Smile Dental', 'Main branch (Pasig City)', 'branch_plus', 2000, 150], ['Kape Uno Ortigas', 'Main branch (Pasig City)', 'branch_care', 1500, 120], ['Golden Wok Eatery', 'Main branch (Quezon City)', 'branch_care', 1500, 75],
-   ['Isla Water Station', 'Delivery van · NCF 2201', 'vehicle_care', 300, 60], ['Isla Water Station', 'Delivery van · NCF 2202', 'vehicle_care', 300, 60], ['Lola Nena Bakeshop', 'Main branch (Quezon City)', 'branch_plus', 2000, 40]]
+  [['Bright Smile Dental', 'Main branch (Pasig City)', 'branch_plus', 1800, 150], ['Kape Uno Ortigas', 'Main branch (Pasig City)', 'branch_care', 1200, 120], ['Golden Wok Eatery', 'Main branch (Quezon City)', 'branch_care', 1200, 75],
+   ['Isla Water Station', 'Delivery van · NCF 2201', 'vehicle_care', 250, 60], ['Isla Water Station', 'Delivery van · NCF 2202', 'vehicle_care', 250, 60], ['Lola Nena Bakeshop', 'Main branch (Quezon City)', 'branch_plus', 1800, 40]]
     .forEach(([who, label, tier, price, since]) => {
       const id = uid();
       db.history.push({ type: 'plan', id, org_name: who, label: `${who} · ${label}`, tier, billing: 'monthly', price_php: price, status: 'active', started_on: addDays(-since), paid_through: addDays(30 - (since % 30)), cancel_at: null });
@@ -1275,18 +1287,20 @@ if (REV && globalThis.PP_DEMO) {
     { id: uid(), partner_id: 'p3', kind: 'placement', description: 'Featured on the "Fire Safety Inspection Certificate (FSIC)" checklist, this month', amount_php: 2500, occurred_on: today().slice(0, 8) + '01', status: 'unbilled' });
   for (let m = 6; m >= 0; m--) db.planPayments.push({ id: uid(), org_name: ['Pacific Fleet Rentals', 'Reyes & Co. CPAs', 'Kape Uno Head Office'][m % 3], plan_id: ['fleet', 'firm', 'head_office'][m % 3], plan_name: ['Fleet', 'Accounting firm', 'Head office'][m % 3],
     months: 1, amount_php: [1490, 1990, 4990][m % 3], paid_at: daysAgo(30 * m + 3), bir_invoice_no: m ? 'INV-T' + m : null });
+  // a licence Care doesn't renew (quoted per job), on the branch that has Care Plus
+  addReq('business', 'b2', 'l2', { code: null, name: 'FDA License to Operate', expires: true }, { reference_no: 'FDA-LTO-3301', expires_on: addDays(140) });
   // this workspace: Care Plus on the Cebu main branch (paid), a vehicle waiting for its first payment, a renewal the plan started
   const l2 = db.locations.find((l) => l.id === 'l2');
-  const cp = { id: 'cp1', org_id: org.id, tier: 'branch_plus', location_id: 'l2', vehicle_id: null, business_id: 'b2', label: `Visayas Sari-Sari Distribution Co. · Main branch (${l2.city})`, billing: 'monthly', price_php: 2000,
+  const cp = { id: 'cp1', org_id: org.id, tier: 'branch_plus', location_id: 'l2', vehicle_id: null, business_id: 'b2', label: `Visayas Sari-Sari Distribution Co. · Main branch (${l2.city})`, billing: 'monthly', price_php: 1800,
     status: 'active', started_on: addDays(-70), paid_through: addDays(20), cancel_at: null, consented_at: daysAgo(70), created_at: daysAgo(70) };
-  const vp = { id: 'cp2', org_id: org.id, tier: 'vehicle_care', location_id: null, vehicle_id: 'v2', business_id: 'b2', label: 'Toyota Hilux · NBC 4417', billing: 'monthly', price_php: 300,
+  const vp = { id: 'cp2', org_id: org.id, tier: 'vehicle_care', location_id: null, vehicle_id: 'v2', business_id: 'b2', label: 'Toyota Hilux · NBC 4417', billing: 'monthly', price_php: 250,
     status: 'pending', started_on: null, paid_through: null, cancel_at: null, consented_at: daysAgo(1), created_at: daysAgo(1) };
   db.care.plans.push(cp, vp);
-  db.care.invoices.push({ id: uid(), org_id: org.id, number: billNo('C'), first: false, period_start: addDays(-40), period_end: addDays(-11), lines: [{ plan_id: 'cp1', label: cp.label, tier: 'Care Plus', amount: 2000 }], amount_php: 2000, status: 'paid', due_on: addDays(-41), paid_at: daysAgo(41), bir_invoice_no: 'INV-C77', created_at: daysAgo(47) },
-    { id: uid(), org_id: org.id, number: billNo('C'), first: true, period_start: addDays(-70), period_end: addDays(-41), lines: [{ plan_id: 'cp1', label: cp.label, tier: 'Care Plus', amount: 2000 }], amount_php: 2000, status: 'paid', due_on: addDays(-67), paid_at: daysAgo(70), bir_invoice_no: 'INV-C51', created_at: daysAgo(70) });
-  db.care.invoices.unshift({ id: 'ci-v', org_id: org.id, number: billNo('C'), first: true, period_start: today(), period_end: endOf(today(), 'monthly'), lines: [{ plan_id: 'cp2', label: vp.label, tier: 'Care', amount: 300 }], amount_php: 300, status: 'due', due_on: addDays(2), created_at: daysAgo(1) });
+  db.care.invoices.push({ id: uid(), org_id: org.id, number: billNo('C'), first: false, period_start: addDays(-40), period_end: addDays(-11), lines: [{ plan_id: 'cp1', label: cp.label, tier: 'Care Plus', amount: 1800 }], amount_php: 1800, status: 'paid', due_on: addDays(-41), paid_at: daysAgo(41), bir_invoice_no: 'INV-C77', created_at: daysAgo(47) },
+    { id: uid(), org_id: org.id, number: billNo('C'), first: true, period_start: addDays(-70), period_end: addDays(-41), lines: [{ plan_id: 'cp1', label: cp.label, tier: 'Care Plus', amount: 1800 }], amount_php: 1800, status: 'paid', due_on: addDays(-67), paid_at: daysAgo(70), bir_invoice_no: 'INV-C51', created_at: daysAgo(70) });
+  db.care.invoices.unshift({ id: 'ci-v', org_id: org.id, number: billNo('C'), first: true, period_start: today(), period_end: endOf(today(), 'monthly'), lines: [{ plan_id: 'cp2', label: vp.label, tier: 'Care', amount: 250 }], amount_php: 250, status: 'due', due_on: addDays(2), created_at: daysAgo(1) });
   // the paid-up period after the two paid bills
-  db.care.invoices.find((i) => i.number && i.amount_php === 2000 && !i.first).period_end = addDays(20);
+  db.care.invoices.find((i) => i.number && i.amount_php === 1800 && !i.first).period_end = addDays(20);
   const mp2 = db.requirements.find((r) => r.business_id === 'b2' && r.location_id === 'l2' && r.type_code === 'mayors_permit');
   const ca = { id: 'ord2', org_id: org.id, created_by: null, service_code: 'renew_mayors_permit', requirement_id: mp2.id, business_id: 'b2', vehicle_id: null, person_id: null, care_plan_id: 'cp1',
     requirement_name: mp2.name, subject_label: 'Visayas Sari-Sari Distribution Co.', notes: 'Started by your Year-round care plan.', rush: false, contact_method: 'email', contact_value: 'sadie@test.ph', docs_status: 'not_sure',

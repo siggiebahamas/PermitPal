@@ -3,7 +3,7 @@
 // on-time guarantee (Care Plus). Kept honest on purpose: prices up front, what's not included, when
 // coverage starts and ends, and cancelling is one tap (it runs to the end of what's paid).
 import { html, fmtDate, peso, toast, toastError, confirmDialog, openModal, formObject, plural, when, todayPH } from '../util.js';
-import { S, on, go, reload, canEdit, isOrgAdmin, isOwner, has, careOf, planFor, coverOf, tierOf, reqById, locationsOf, reqsOf, empty } from '../core.js';
+import { S, on, go, reload, canEdit, isOrgAdmin, isOwner, has, careOf, planFor, coverOf, tierOf, typeOf, reqById, locationsOf, reqsOf, empty } from '../core.js';
 import { ICON, byPriority, subjectLabel, dueShort } from '../components.js';
 import { ORDER_STATUS, payDetails, paySettings } from './services.js';
 import * as db from 'pp/data';
@@ -26,6 +26,17 @@ const per = (billing) => (billing === 'yearly' ? 'year' : 'month');
 const tiersFor = (subject) => careOf().tiers.filter((t) => t.subject === subject);
 const minPrice = (subject) => Math.min(...tiersFor(subject).map((t) => Number(t.monthly_php)).filter((n) => n > 0));
 const coveredReqs = (p) => careOf().coverage.filter((c) => c.plan_id === p.id).map((c) => reqById(c.requirement_id)).filter(Boolean);
+// What a plan renews is a fixed list of permit types; anything else is a one-time job with its own quote.
+const scopeOf = (subject) => new Set(tiersFor(subject).flatMap((t) => t.covers || []));
+const inScope = (subject, r) => !!r.type_code && scopeOf(subject).has(r.type_code);
+const typeNames = (codes) => (codes || []).map((c) => typeOf(c)?.name || c);
+// A plan's permits that Care doesn't renew (shown so nobody assumes they're handled).
+const outOfScope = (p) => {
+  const tier = tierOf(p.tier);
+  const reqs = p.vehicle_id ? reqsOf('vehicle', p.vehicle_id)
+    : (S.data.reqs || []).filter((r) => r.business_id === p.business_id && r.subject === 'business' && (r.location_id === p.location_id || (!r.location_id && locationsOf(p.business_id).find((l) => l.id === p.location_id)?.is_main)));
+  return reqs.filter((r) => r.expires && !(r.type_code && (tier?.covers || []).includes(r.type_code)));
+};
 
 // ---------------------------------------------------------------- the page
 export async function care(el, params) {
@@ -67,7 +78,7 @@ export async function care(el, params) {
       ${billsCard(c.invoices)}
       ${when(ended.length, html`<details class="folder card"><summary>${plural(ended.length, 'ended plan')}</summary>${ended.map(planRow)}</details>`)}`
     : intro()}
-    <p class="muted small fineprint">Care covers our service fee for every renewal of the chosen branches and vehicles (not staff licences, and not new permits you don't have yet: those are a one-time job).
+    <p class="muted small fineprint">Care covers our service fee for the yearly permits listed on each plan, for the branches and vehicles you choose. Special licences (FDA, DOH, franchises, contractor licences), staff licences and new permits you don't have yet are one-time jobs with their own quote.
       Government fees, premiums and penalties are paid at cost with official receipts. Cancel anytime: the plan runs to the end of what you've paid, with no refund for the rest of that period.
       <a href="terms.html#care" target="_blank" rel="noopener">Year-round care terms</a></p>`);
 
@@ -81,7 +92,7 @@ function intro() {
   return html`
     <section class="card care-hero">
       <ol class="care-how">
-        <li><b>Choose branches and vehicles</b><span>Everything each one needs is covered: Mayor's Permit, barangay clearance, FSIC, sanitary permit, LTO registration, CTPL and more.</span></li>
+        <li><b>Choose branches and vehicles</b><span>The yearly permits are covered: Mayor's Permit, barangay clearance, FSIC, sanitary permit, LTO registration, CTPL and more. Special licences (FDA, DOH, franchises) are quoted separately.</span></li>
         <li><b>Pay one bill a month</b><span>Or yearly and get 2 months free. Our service fee for every renewal is included.</span></li>
         <li><b>We start each renewal for you</b><span>About ${LEAD_DAYS.business} days before it's due. You approve the government fees, we file, and the new permit is saved here.</span></li>
       </ol>
@@ -97,6 +108,7 @@ function tierCard(t, subject) {
     <div class="svc-top"><h2>${t.name}</h2><div class="svc-price"><b>${peso(t.monthly_php)}</b><small>per ${subject} / month</small></div></div>
     <p class="muted small">or ${peso(t.yearly_php)} a year</p>
     <ul class="svc-inc">${(t.includes || []).map((i) => html`<li>${ICON.check}<span>${i}</span></li>`)}</ul>
+    ${(t.covers || []).length ? html`<p class="small care-covers"><b>Renews:</b> ${typeNames(t.covers).join(', ')}.</p>` : ''}
   </section>`;
 }
 
@@ -107,10 +119,12 @@ function planRow(p) {
   const soon = reqs.filter((r) => r.expires && r.expires_on && r.days_left != null && r.days_left <= (p.vehicle_id ? LEAD_DAYS.vehicle : LEAD_DAYS.business)).length;
   const missing = reqs.filter((r) => r.expires && !r.expires_on).length;
   const ends = planEnds(p);
+  const extra = p.status === 'cancelled' ? [] : outOfScope(p);
   const href = p.location_id ? `#/businesses/${p.business_id}` : `#/vehicles/${p.vehicle_id}`;
   return html`<div class="row care-row">
     <div class="row-main"><div class="row-title"><a href="${href}">${p.label}</a> <span class="tag">${t?.name || p.tier}</span></div>
       <div class="row-sub">${peso(p.price_php)} a ${per(p.billing)} · ${plural(reqs.length, 'permit')} covered${soon ? ` · ${soon} due soon` : ''}${missing ? html` · <span class="due needinfo">${missing} missing an expiry date</span>` : ''}</div>
+      ${extra.length ? html`<div class="row-sub">Not in Care, quoted per job: ${extra.map((r) => r.name).join(', ')}</div>` : ''}
       <div class="row-sub">${p.status === 'pending' ? 'Starts the day your first bill is paid.'
         : p.status === 'cancelled' ? `Ended ${p.cancel_at ? fmtDate(p.cancel_at) : ''}${p.ended_reason ? ' · ' + p.ended_reason : ''}`
         : ends ? html`<b>Ends ${fmtDate(ends)}</b> (paid until then)` : p.paid_through ? `Paid until ${fmtDate(p.paid_through)}` : ''}</div></div>
@@ -189,10 +203,13 @@ export function careStart(el, params) {
   const can = isOwner();
   const row = (s) => {
     const p = taken(s);
-    const soon = s.reqs.filter((r) => r.expires && r.days_left != null && r.days_left <= 60).length;
+    const subject = s.kind === 'location' ? 'branch' : 'vehicle';
+    const inPlan = s.reqs.filter((r) => r.subject !== 'person' && inScope(subject, r));
+    const extra = s.reqs.filter((r) => r.subject !== 'person' && r.expires && !inScope(subject, r)).length;
+    const soon = inPlan.filter((r) => r.expires && r.days_left != null && r.days_left <= 60).length;
     const checked = !p && (s.id === pre.loc || s.id === pre.veh);
     return html`<label class="check care-pick ${p ? 'taken' : ''}"><input type="checkbox" name="pick" value="${s.kind}:${s.id}" ${checked ? 'checked' : ''} ${p || !can ? 'disabled' : ''}>
-      <span><b>${s.name}</b>${s.sub ? html` <small class="muted">${s.sub}</small>` : ''}<small class="muted">${plural(s.reqs.filter((r) => r.subject !== 'person').length, 'permit')}${soon ? ` · ${soon} due within 60 days` : ''}${p ? ' · already covered' : ''}</small></span></label>`;
+      <span><b>${s.name}</b>${s.sub ? html` <small class="muted">${s.sub}</small>` : ''}<small class="muted">${plural(inPlan.length, 'permit')} covered${soon ? ` · ${soon} due within 60 days` : ''}${extra ? ` · ${extra} quoted separately` : ''}${p ? ' · already covered' : ''}</small></span></label>`;
   };
   const tiers = { branch: tiersFor('branch'), vehicle: tiersFor('vehicle') };
   const levels = [...new Set([...tiers.branch, ...tiers.vehicle].map((t) => (t.guarantee ? 'plus' : 'care')))];
