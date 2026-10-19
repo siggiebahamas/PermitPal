@@ -83,7 +83,9 @@ export async function partners(el, params = new URLSearchParams()) {
       : empty("We're onboarding licensed firms", 'Liaison firms, accountants and fire-safety providers in your area will appear here once their licences are checked.')}
     ${when(mine.length, html`<section class="card"><div class="card-head"><h2>Your quote requests</h2></div>
       ${mine.map((r) => { const p = list.find((x) => x.id === r.partner_id); return html`<div class="line"><span class="line-main"><b>${p?.name || 'Professional'}</b><small>${r.note || ''} · ${timeAgo(r.created_at)}</small></span>
-        <span class="chip ${r.status === 'converted' ? 'ok' : r.status === 'not_converted' ? 'needinfo' : 'progress'}">${{ requested: 'Sent', introduced: 'They replied', converted: 'Hired', not_converted: 'Closed' }[r.status] || 'Sent'}</span></div>`; })}</section>`)}
+        ${has('leads') && canEdit() && ['requested', 'introduced'].includes(r.status)
+          ? html`<span class="hired-ask"><span class="muted small">Did you hire them?</span><button class="btn btn-sm btn-soft" data-act="ref-hired" data-id="${r.id}" data-hired="1">Yes</button><button class="btn btn-sm btn-ghost" data-act="ref-hired" data-id="${r.id}" data-hired="">No</button></span>`
+          : html`<span class="chip ${r.status === 'converted' ? 'ok' : r.status === 'not_converted' ? 'needinfo' : 'progress'}">${{ requested: 'Sent', introduced: 'They replied', converted: 'Hired', not_converted: has('leads') ? "Didn't hire" : 'Closed' }[r.status] || 'Sent'}</span>`}</div>`; })}</section>`)}
     <p class="fineprint">Listed firms pay PermitPal for the quote requests we send them (or a flat monthly fee). It never changes their price, and you're free to choose anyone.${has('revenue') ? '' : ' PermitPal does not file anything with the government itself.'}</p>
     ${when(has('revenue'), html`<p class="fineprint">Run a licensed firm? <a href="#/list-your-firm">Apply to be listed</a>.</p>`)}`);
 }
@@ -99,7 +101,7 @@ function proCard(p) {
     <p class="svc-sum">${p.description}</p>
     ${when(p.services, html`<p class="small"><b>Handles:</b> ${p.services}</p>`)}
     ${when((p.cities || []).length || p.coverage, html`<p class="muted small">Serves: ${(p.cities || []).join(', ') || p.coverage}</p>`)}
-    <div class="svc-foot">${/^https:\/\//i.test(p.website || '') ? html`<a class="small" href="${p.website}" target="_blank" rel="noopener">Website</a>` : html`<span></span>`}
+    <div class="svc-foot"><span></span>
       ${when(canEdit(), html`<button class="btn btn-primary btn-sm" data-act="partner-intro" data-id="${p.id}">Request a quote</button>`)}</div>
   </section>`;
 }
@@ -129,6 +131,10 @@ export function partnerIntro(partnerId, requirementId = null, placementId = null
   });
 }
 on('partner-intro', async (ds) => { await loadPartners(); partnerIntro(ds.id, ds.req || null); });
+// "Did you hire them?" One tap. It tells PermitPal which firms do good work.
+on('ref-hired', async (ds) => {
+  try { await db.answerReferral(ds.id, !!ds.hired); toast(ds.hired ? 'Thanks. Glad it worked out.' : 'Thanks for telling us.'); partners(document.getElementById('main')); } catch (e) { toastError(e); }
+});
 
 // Requirement page: firms who can file this permit for you.
 export function partnerSuggestions(r) {

@@ -21,6 +21,7 @@ that is expected to fail). A run is good when every line in the message says PAS
 | `10_two_step_login.sql` | workspaces that require two-step login, lost-phone resets |
 | `11_revenue.sql` | rush fees, several permits at once, set-up access, package steps, Year-round care (bills, pauses, renewals it starts, the guarantee), fees from firms (leads, sales, listings, checklist lines, statements, applications), the staff ledger |
 | `12_autorenew.sql` | Year-round care with no monthly fee (pay per renewal): no bill, renewals still start early, priced at the usual fee, never paused, no guarantee |
+| `13_leads.sql` | Firms paid per quote request from prepaid credit (paused at zero), no per-sale fees, no website for customers, the firm's 7-day report link and staff decisions, "Did you hire them?" |
 
 Files 06 and later end with `rollback` and print a table instead: every row should say `ok = t`.
 

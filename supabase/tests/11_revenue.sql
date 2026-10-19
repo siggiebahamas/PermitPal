@@ -392,8 +392,8 @@ insert into public.partners (category, name, published) values ('insurance', 'Fr
 select pg_temp.res('an insurer listed for free (no fee) is fine', count(*) = 1, '') from public.partners where name = 'Free Insurer';
 update t_ids set insurer = (select id from public.partners where name = 'Some Insurer');
 select public.admin_set_money_setting('ic_licence_no', 'IC-AG-12345');
-update public.partners set fee_model = 'per_sale_percent', sale_pct = 10 where id = (select insurer from t_ids);
-select pg_temp.res('with the licence on file, per-sale fees for insurers are allowed', fee_model = 'per_sale_percent', fee_model) from public.partners where id = (select insurer from t_ids);
+update public.partners set fee_model = 'per_lead', lead_fee_php = 200 where id = (select insurer from t_ids);
+select pg_temp.res('with the licence on file, insurers can pay per quote request', fee_model = 'per_lead', fee_model) from public.partners where id = (select insurer from t_ids);
 select public.admin_set_money_setting('ic_licence_no', '');
 -- a checklist line
 insert into public.partner_placements (partner_id, type_code, item_key, cities, headline, starts_on, ends_on, monthly_fee_php)
@@ -407,6 +407,8 @@ do $$ begin insert into public.partner_placements (partner_id, type_code, item_k
     select insurer, 'fsic', 'nope', 'A step that does not exist', private.today_ph(), private.today_ph() + 30 from t_ids;
   perform pg_temp.res('only real checklist steps', false, 'was allowed');
 exception when others then perform pg_temp.res('only real checklist steps', sqlerrm like '%doesn''t exist%', sqlerrm); end $$;
+-- quote requests are paid from prepaid credit
+select public.admin_add_credit(partner, 3000, 'GCash', 'GC-CR-1') from t_ids;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
@@ -430,27 +432,26 @@ select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000
 set local role authenticated;
 select pg_temp.res('honest counts: a view counts once per person per day', views = 2 and clicks = 1 and leads = 1, views || '/' || clicks || '/' || leads)
   from public.admin_placement_stats(private.today_ph() - 1, private.today_ph()) where placement_id = (select place from t_ids);
-select pg_temp.res('the quote request records the lead fee and where it came from',
-  (select count(*) from public.partner_charges where referral_id = (select ref from t_ids) and kind = 'lead' and amount_php = 300) = 1
+select pg_temp.res('the quote request takes the fee from the firm''s credit and records where it came from',
+  (select count(*) from public.partner_credits where referral_id = (select ref from t_ids) and kind = 'lead' and amount_php = -300) = 1
   and (select placement_id from public.referrals where id = (select ref from t_ids)) = (select place from t_ids), '');
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select pg_temp.res('the firm gets the lead by email', count(*) = 1, count(*)::text) from public.message_outbox where to_address = 'hello@runners.ph' and dedupe_key like 'lead:%';
 select pg_temp.res('the monthly fee for the checklist line is charged', private.partner_monthly_charges() >= 1, '');
 select pg_temp.res('...once', private.partner_monthly_charges() = 0
   and (select count(*) from public.partner_charges where placement_id = (select place from t_ids) and kind = 'placement') = 1, '');
--- a sale on a per-sale firm
+-- a reported sale is noted, never billed (per-sale fees are gone)
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000f4","role":"authenticated"}', true);
 set local role authenticated;
-update public.partners set fee_model = 'per_sale_flat', sale_fee_php = 700 where id = (select partner from t_ids);
-select pg_temp.res('a reported sale works out the fee', public.admin_record_sale(ref, 6000, 'Extinguisher service') = 700, '') from t_ids;
-select pg_temp.res('recording it again updates, not doubles', public.admin_record_sale(ref, 6000) = 700
-  and (select count(*) from public.partner_charges where referral_id = (select ref from t_ids) and kind = 'sale') = 1, '') from t_ids;
+select pg_temp.res('a reported sale costs the firm nothing extra', public.admin_record_sale(ref, 6000, 'Extinguisher service') = 0, '') from t_ids;
+select pg_temp.res('...and is recorded as hired', status = 'converted' and sale_php = 6000
+  and not exists (select 1 from public.partner_charges where referral_id = (select ref from t_ids) and kind = 'sale'), status) from public.referrals where id = (select ref from t_ids);
 -- statements
 do $$ begin perform public.admin_create_statement((select org2 from t_ids), private.today_ph());
   perform pg_temp.res('a statement needs a real firm', false, 'was allowed');
 exception when others then perform pg_temp.res('a statement needs a real firm', true, sqlerrm); end $$;
 update t_ids set stmt = public.admin_create_statement(partner, private.today_ph(), true);
-select pg_temp.res('the statement adds up every charge not billed yet', total_php = 300 + 1500 + 700 and status = 'sent', total_php::text)
+select pg_temp.res('the statement adds up every charge not billed yet (quote requests are prepaid, so not on it)', total_php = 1500 and status = 'sent', total_php::text)
   from public.partner_statements where id = (select stmt from t_ids);
 do $$ begin perform public.admin_create_statement((select partner from t_ids), private.today_ph());
   perform pg_temp.res('nothing is billed twice', false, 'was allowed');
@@ -460,7 +461,7 @@ select pg_temp.res('the firm is emailed the statement', count(*) = 1, count(*)::
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000f4","role":"authenticated"}', true);
 set local role authenticated;
 select public.admin_statement_void(stmt, 'Wrong month') from t_ids;
-select pg_temp.res('voiding puts the charges back to be billed', (select count(*) from public.partner_charges where partner_id = (select partner from t_ids) and status = 'unbilled') = 3, '');
+select pg_temp.res('voiding puts the charges back to be billed', (select count(*) from public.partner_charges where partner_id = (select partner from t_ids) and status = 'unbilled') = 1, '');
 update t_ids set stmt = public.admin_create_statement(partner, private.today_ph(), false);
 select public.admin_statement_paid(stmt, 'Bank transfer', 'BPI-9', 'INV-0002') from t_ids;
 select pg_temp.res('paid: every charge on it is paid', not exists (select 1 from public.partner_charges where statement_id = (select stmt from t_ids) and status <> 'paid'), '');
@@ -508,7 +509,7 @@ select pg_temp.res('one-time jobs: our fee (with rush) is collected, government 
   and (select sum(amount) from t_money where state = 'held' and ref_id = (select ord from t_ids)) = 2000, '');
 select pg_temp.res('care bills paid are collected; the guarantee payout is a cost',
   (select sum(amount) from t_money where stream = 'care' and state = 'collected') = 2900 and (select sum(amount) from t_money where state = 'cost') = -10000, '');
-select pg_temp.res('firms: the paid statement is collected', (select sum(amount) from t_money where stream = 'partners' and state = 'collected') = 2500, '');
+select pg_temp.res('firms: the paid statement and the prepaid credit are collected', (select sum(amount) from t_money where stream = 'partners' and state = 'collected') = 1500 + 3000, '');
 select pg_temp.res('team plans are collected', (select sum(amount) from t_money where stream = 'plans') = 4470, '');
 select pg_temp.res('accepted, not paid: the care renewal''s fees are not counted as ours', not exists (select 1 from t_money where state = 'to_collect' and stream = 'jobs' and amount = 0), '');
 do $$ declare s jsonb := public.admin_money_summary(); begin

@@ -2,12 +2,18 @@
 // Plain about how it works and what it costs them, before they apply. No account needed.
 import { html, toast, normalizePhone } from '../util.js';
 import { PARTNER_CATEGORIES } from './extras.js';
+import { has } from '../core.js';
 import * as db from 'pp/data';
 
 const HOW = [
   ['Businesses see you where they need you', 'On the permits and checklist steps that match what you do, in the cities you serve.'],
   ['They ask you for a quote', 'We email you their name, business, contact details and what they need, within minutes. You deal with them directly.'],
   ['You pay for what you get', 'A fee per quote request, or a flat monthly listing, agreed before you go live. No setup fee, and you can stop anytime.'],
+];
+const HOW_CREDIT = [
+  HOW[0], HOW[1],
+  ['Prepaid, so no bills', 'Buy credit upfront (for example ₱5,000). Each quote request uses its agreed fee, whether or not you get the job. When it runs low we tell you; at zero you pause until you top up.'],
+  ['Bad lead? Report it', 'Spam, a duplicate, someone you couldn\'t reach, or not your service: report it within 7 days from the link in the email and, if we agree, the fee goes back on your credit. Or choose a flat monthly listing instead.'],
 ];
 
 export function partnerApplyPage(el, { signedIn = false } = {}) {
@@ -16,7 +22,7 @@ export function partnerApplyPage(el, { signedIn = false } = {}) {
   el.innerHTML = String(wrap(html`
     <div class="page-head"><div><h1>List your firm on PermitPal</h1>
       <p class="muted">For licensed liaison firms, accountants, fire-safety, pest-control and water-testing providers, clinics and notaries. Get quote requests from businesses whose permits are due.</p></div></div>
-    <section class="card promises">${HOW.map(([t, d]) => html`<div class="promise"><div><b>${t}</b><span>${d}</span></div></div>`)}</section>
+    <section class="card promises">${(has('leads') ? HOW_CREDIT : HOW).map(([t, d]) => html`<div class="promise"><div><b>${t}</b><span>${d}</span></div></div>`)}</section>
     <section class="card"><h2>Apply</h2>
       <p class="muted small">We check your business permit (and PRC or BFP accreditation, where one applies) before listing you. We reply within 3 business days.</p>
       <form id="apply-form" novalidate>

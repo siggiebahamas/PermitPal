@@ -373,21 +373,94 @@ export const startOrderCheckout = async () => { throw new Error('Online card/GCa
 export const appSettings = async () => ({ ...settings });
 
 // ---------------------------------------------------------------- partners, referrals, sharing, workspaces
-export const listPartners = async () => db.partners.filter((p) => p.published);
+// Like the database: a firm paid per quote request shows only while its credit covers one more.
+const LEADS = !!(globalThis.PP_FEATURES !== 'none');
+const perLead = (p) => (p.fee_model || 'per_lead') === 'per_lead' && Number(p.lead_fee_php) > 0;
+const partnerLive = (p) => !!p.published && (!LEADS || !perLead(p) || Number(p.credit_php || 0) >= Number(p.lead_fee_php));
+db.credits = []; db.disputes = [];
+export const listPartners = async () => db.partners.filter(partnerLive).map(({ website, contact_email, contact_phone, billing_email, credit_php, lead_fee_php, ...p }) => (LEADS ? p : { ...p, website }));
 export async function requestReferral(f) {
-  if (db.referrals.some((x) => x.partner_id === f.partner_id && (x.requirement_id || '') === (f.requirement_id || '') && Date.now() - Date.parse(x.created_at) < 7 * 864e5)) {
+  const p = db.partners.find((x) => x.id === f.partner_id);
+  if (!p || !partnerLive(p)) throw new Error("That professional isn't taking new requests right now. Please choose another.");
+  if (db.referrals.some((x) => x.org_id === f.org_id && x.partner_id === f.partner_id && (x.requirement_id || '') === (f.requirement_id || '') && Date.now() - Date.parse(x.created_at) < 7 * 864e5)) {
     throw new Error('You already sent this request this week. They will contact you soon.');
   }
-  const r = { id: uid(), org_id: f.org_id, partner_id: f.partner_id, requirement_id: f.requirement_id || null, note: f.note || null, status: 'requested', created_at: now(), commission: null, placement_id: f.placement_id || null };
+  const r = { id: uid(), org_id: f.org_id, partner_id: f.partner_id, requirement_id: f.requirement_id || null, note: f.note || null, status: 'requested', created_at: now(), commission: null, placement_id: f.placement_id || null, token: uid() };
   db.referrals.unshift(r);
-  const p = db.partners.find((x) => x.id === f.partner_id);
-  if ((p?.fee_model || 'per_lead') === 'per_lead' && Number(p?.lead_fee_php) > 0) {
+  if (perLead(p) && LEADS) {
+    p.credit_php = Number(p.credit_php) - Number(p.lead_fee_php);
+    db.credits.unshift({ id: uid(), partner_id: p.id, kind: 'lead', amount_php: -Number(p.lead_fee_php), balance_php: p.credit_php, referral_id: r.id, note: 'Quote request from ' + org.name, created_at: now() });
+    r.commission = { amount_php: Number(p.lead_fee_php), status: 'paid' };
+  } else if (perLead(p)) {
     db.charges.unshift({ id: uid(), partner_id: p.id, kind: 'lead', description: 'Quote request from ' + org.name, amount_php: Number(p.lead_fee_php), occurred_on: today(), referral_id: r.id, status: 'unbilled', statement_id: null });
   }
   if (f.placement_id) { const st = placementStat(f.placement_id); st.leads++; }
   return r.id;
 }
-export const myReferrals = async () => db.referrals.map(({ commission, ...r }) => r);
+export async function answerReferral(id, hired) {
+  const r = db.referrals.find((x) => x.id === id);
+  if (!r) throw new Error('Quote request not found.');
+  Object.assign(r, { status: hired ? 'converted' : 'not_converted', outcome_at: now() });
+}
+// The firm's page from the link in the lead email.
+export const demoLeadToken = () => [...db.referrals].sort((a, b) => b.created_at.localeCompare(a.created_at)).find((r) => r.token && !db.disputes.some((d) => d.referral_id === r.id))?.token;
+export async function leadForFirm(token) {
+  const r = db.referrals.find((x) => x.token === token);
+  if (!r) return null;
+  const d = db.disputes.find((x) => x.referral_id === r.id);
+  const req = db.requirements.find((x) => x.id === r.requirement_id);
+  const fee = -db.credits.filter((c) => c.referral_id === r.id && c.kind === 'lead').reduce((t, c) => t + c.amount_php, 0);
+  const until = new Date(Date.parse(r.created_at) + 7 * 864e5).toISOString();
+  return { firm: db.partners.find((p) => p.id === r.partner_id)?.name, business: r.org_name || org.name, permit: req?.name || null, sent_at: r.created_at, fee, report_until: until,
+    can_report: !d && Date.now() < Date.parse(until), dispute: d ? { reason: d.reason, status: d.status, note: d.decision_note, credited: d.credited_php } : null };
+}
+export async function reportLead(token, reason, note) {
+  const r = db.referrals.find((x) => x.token === token);
+  if (!r) throw new Error("This link isn't valid.");
+  if (!['spam', 'duplicate', 'unreachable', 'not_our_service'].includes(reason)) throw new Error('Choose a reason.');
+  if (Date.now() - Date.parse(r.created_at) > 7 * 864e5) throw new Error('Reports are taken within 7 days of the request.');
+  if (db.disputes.some((d) => d.referral_id === r.id)) throw new Error("You already reported this request. We'll email you our decision.");
+  db.disputes.unshift({ id: uid(), referral_id: r.id, partner_id: r.partner_id, reason, note: note || null, status: 'open', credited_php: 0, decision_note: null, created_at: now() });
+}
+export const adminCredits = async () => db.credits.map((c) => ({ ...c }));
+export const adminDisputes = async () => db.disputes.map((d) => {
+  const r = db.referrals.find((x) => x.id === d.referral_id);
+  return { ...d, partners: { name: db.partners.find((p) => p.id === d.partner_id)?.name }, referrals: r ? { created_at: r.created_at, note: r.note, orgs: { name: r.org_name || org.name } } : null };
+});
+export async function adminAddCredit(id, amount, method, ref, no) {
+  const p = db.partners.find((x) => x.id === id);
+  if (!perLead(p)) throw new Error('Credit is for firms that pay per quote request. Set their fee first.');
+  if (!(amount > 0)) throw new Error('Enter the amount they paid, from ₱1 to ₱1,000,000.');
+  if (!String(method || '').trim()) throw new Error('Say how they paid (GCash, bank transfer).');
+  p.credit_php = Number(p.credit_php || 0) + amount;
+  db.credits.unshift({ id: uid(), partner_id: id, kind: 'topup', amount_php: amount, balance_php: p.credit_php, note: 'Prepaid credit', paid_method: method, paid_ref: ref || null, bir_invoice_no: no || null, created_at: now() });
+  return p.credit_php;
+}
+export async function adminAdjustCredit(id, amount, note) {
+  const p = db.partners.find((x) => x.id === id);
+  if (!amount) throw new Error('Enter the change in pesos (minus to take off).');
+  if (String(note || '').trim().length < 5) throw new Error("Say why (kept with the firm's credit history).");
+  if (Number(p.credit_php || 0) + amount < 0) throw new Error(`They only have ₱${Number(p.credit_php || 0).toLocaleString()} in credit.`);
+  p.credit_php = Number(p.credit_php || 0) + amount;
+  db.credits.unshift({ id: uid(), partner_id: id, kind: 'adjust', amount_php: amount, balance_php: p.credit_php, note, created_at: now() });
+  return p.credit_php;
+}
+export async function adminDecideDispute(id, accept, note) {
+  const d = db.disputes.find((x) => x.id === id);
+  if (d.status !== 'open') throw new Error('This report was already decided.');
+  if (!accept && String(note || '').trim().length < 5) throw new Error('Say why, in a sentence the firm will read.');
+  let fee = 0;
+  if (accept) {
+    fee = -db.credits.filter((c) => c.referral_id === d.referral_id && c.kind === 'lead').reduce((t, c) => t + c.amount_php, 0);
+    if (fee > 0) {
+      const p = db.partners.find((x) => x.id === d.partner_id);
+      p.credit_php = Number(p.credit_php || 0) + fee;
+      db.credits.unshift({ id: uid(), partner_id: p.id, kind: 'refund', amount_php: fee, balance_php: p.credit_php, referral_id: d.referral_id, note: 'Credit back: reported lead accepted', created_at: now() });
+    }
+  }
+  Object.assign(d, { status: accept ? 'accepted' : 'declined', credited_php: fee, decision_note: note || null, decided_at: now() });
+}
+export const myReferrals = async () => db.referrals.filter((r) => r.org_id === org.id).map(({ commission, token, ...r }) => r);
 export async function createShare(f) {
   const x = { id: uid(), org_id: f.org_id, scope: f.scope, subject_id: f.subject_id || null, label: f.label || '', show_refs: f.show_refs !== false,
     token: 'demo' + uid().replace(/-/g, '').slice(0, 20), view_count: 0, last_viewed_at: null, revoked_at: null,
@@ -440,7 +513,7 @@ export const adminServices = async () => SERVICES;
 export const adminSaveService = async (code, patch) => Object.assign(SERVICES.find((x) => x.code === code), patch);
 export const adminPartners = async () => db.partners;
 export async function adminSavePartner(id, row) { if (id) Object.assign(db.partners.find((p) => p.id === id), row); else db.partners.push({ id: uid(), published: true, sort: 100, ...row }); }
-export const adminReferrals = async () => db.referrals.map((r) => ({ ...r, orgs: { name: org.name }, partners: db.partners.find((p) => p.id === r.partner_id), referral_commissions: r.commission || { amount_php: null, status: 'pending' } }));
+export const adminReferrals = async () => db.referrals.map(({ token, ...r }) => ({ ...r, orgs: { name: r.org_name || org.name }, partners: db.partners.find((p) => p.id === r.partner_id), referral_commissions: r.commission || { amount_php: null, status: 'pending' } }));
 export const adminSaveReferral = async (id, status) => { db.referrals.find((r) => r.id === id).status = status; };
 export const adminSaveCommission = async (id, patch) => { const r = db.referrals.find((x) => x.id === id); r.commission = { ...(r.commission || {}), ...patch }; };
 export const adminSettings = appSettings;
@@ -463,9 +536,11 @@ export const adminSaveSetting = async (key, value) => { settings[key] = value; }
 // ---------------------------------------------------------------- sample partners and orders
 db.partners.push(
   { id: 'p1', category: 'liaison', name: 'Sample Liaison Services', description: 'Business permit renewals and new registrations for Metro Manila LGUs.', services: "Mayor's Permit renewal, barangay clearance, FSIC filing",
-    licence: 'DTI-registered liaison firm', cities: ['Makati City', 'Taguig City', 'Pasig City'], coverage: 'Metro Manila', website: '', type_codes: ['mayors_permit', 'barangay_clearance', 'fsic'], published: true, verified: true, sort: 10, lead_fee_php: 500, contact_email: 'leads@sample-liaison.ph' },
+    licence: 'DTI-registered liaison firm', cities: ['Makati City', 'Taguig City', 'Pasig City'], coverage: 'Metro Manila', website: '', type_codes: ['mayors_permit', 'barangay_clearance', 'fsic'], published: true, verified: true, sort: 10, lead_fee_php: 500, credit_php: 5000, contact_email: 'leads@sample-liaison.ph' },
   { id: 'p2', category: 'bookkeeping', name: 'Sample Bookkeeping Co.', description: 'Monthly bookkeeping, BIR filings and registration updates.', services: 'BIR registration updates, books of accounts',
-    licence: 'CPA, PRC-licensed', cities: ['Cebu City', 'Mandaue City'], coverage: 'Cebu', website: '', type_codes: ['bir_cor'], published: true, verified: false, sort: 20, lead_fee_php: 400 },
+    licence: 'CPA, PRC-licensed', cities: ['Cebu City', 'Mandaue City'], coverage: 'Cebu', website: '', type_codes: ['bir_cor'], published: true, verified: false, sort: 20, lead_fee_php: 400, credit_php: 1200 },
+  // out of credit: paused, so customers don't see it (staff do)
+  { id: 'p4', category: 'liaison', name: 'Sample Permit Desk', description: 'Permit filing for Quezon City.', services: "Mayor's Permit renewal", licence: 'DTI-registered', cities: ['Quezon City'], coverage: 'Quezon City', website: 'https://example.ph', type_codes: ['mayors_permit'], published: true, verified: true, sort: 30, lead_fee_php: 500, credit_php: 200, contact_email: 'desk@example.ph' },
 );
 if (globalThis.PP_DEMO) {
   db.people.push({ id: 'pp1', org_id: org.id, full_name: 'Jun Reyes', role_title: 'Delivery driver', business_id: 'b2', deleted_at: null });
@@ -656,7 +731,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads'];
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries(ALL_FEATURES.map((f) => [f, true])));
 
 db.clientErrors = [];
@@ -1211,6 +1286,8 @@ function moneyLines() {
     L.push({ day: c.status === 'paid' && s?.paid_at ? dayOf(s.paid_at) : c.occurred_on, stream: 'partners', kind: c.kind, state: { paid: 'collected', billed: 'to_collect' }[c.status] || 'unbilled', amount: c.amount_php,
       label: c.description, who: db.partners.find((p) => p.id === c.partner_id)?.name || 'Firm', ref_kind: s ? 'statement' : 'partner', ref_id: s?.id || c.partner_id, invoice_no: s?.bir_invoice_no || null, rush: 0 });
   }
+  for (const c of db.credits.filter((x) => x.kind === 'topup')) L.push({ day: dayOf(c.created_at), stream: 'partners', kind: 'credit_topup', state: 'collected', amount: c.amount_php, label: 'Prepaid credit for quote requests',
+    who: db.partners.find((p) => p.id === c.partner_id)?.name || 'Firm', ref_kind: 'credit', ref_id: c.id, invoice_no: c.bir_invoice_no || null, rush: 0 });
   for (const pm of db.planPayments) L.push({ day: dayOf(pm.paid_at), stream: 'plans', kind: 'team_plan', state: 'collected', amount: pm.amount_php, label: `${pm.plan_name} plan, ${pm.months} month${pm.months > 1 ? 's' : ''}`, who: pm.org_name, ref_kind: 'plan', ref_id: pm.id, invoice_no: pm.bir_invoice_no || null, rush: 0 });
   return L.sort((a, b) => String(b.day).localeCompare(String(a.day)));
 }
@@ -1235,7 +1312,9 @@ export async function adminMoneySummary() {
     claims_to_decide: db.care.claims.filter((c) => c.status === 'submitted').length, claims_to_pay: db.care.claims.filter((c) => c.status === 'approved').length,
     partners_to_bill: new Set(db.charges.filter((c) => c.status === 'unbilled' && c.occurred_on < today().slice(0, 8) + '01').map((c) => c.partner_id)).size,
     statements_overdue: db.statements.filter((s) => s.status === 'sent' && s.due_on < today()).length,
-    applications_new: db.apps.filter((a) => a.status === 'new').length, staff_access_open: db.staffAccess.filter((x) => !x.ended_at).length,
+    applications_new: db.apps.filter((a) => a.status === 'new').length,
+    disputes_open: db.disputes.filter((d) => d.status === 'open').length, firms_paused: db.partners.filter((p) => p.published && !partnerLive(p)).length,
+    credit_held: db.partners.reduce((t, p) => t + Number(p.credit_php || 0), 0), staff_access_open: db.staffAccess.filter((x) => !x.ended_at).length,
     covered_missing_dates: (await adminCareGaps()).length, missing_invoice: miss.size,
   };
 }
@@ -1245,7 +1324,7 @@ export async function adminSetMoneySetting(key, value) {
 }
 export async function adminSetInvoiceNo(kind, id, no) {
   const target = kind === 'order' ? [...db.requests, ...db.history].find((x) => x.id === id) : kind === 'care' ? [...db.care.invoices, ...db.history].find((x) => x.id === id)
-    : kind === 'statement' ? db.statements.find((x) => x.id === id) : db.planPayments.find((x) => x.id === id);
+    : kind === 'statement' ? db.statements.find((x) => x.id === id) : kind === 'credit' ? db.credits.find((x) => x.id === id) : db.planPayments.find((x) => x.id === id);
   if (!target) throw new Error('Payment not found.');
   target.bir_invoice_no = no || null;
 }
@@ -1324,5 +1403,20 @@ if (REV && globalThis.PP_DEMO) {
   }
   db.apps.push({ id: uid(), name: 'Cebu Pest Busters', category: 'pest_control', cities: 'Cebu City, Mandaue City', contact_name: 'Rhea Lim', email: 'rhea@pestbusters.ph', phone: '+639171112222', licence: 'FDA LTO for pest control', services: 'Pest control and certificates', website: '', message: 'We serve restaurants and warehouses.', status: 'new', created_at: daysAgo(1) });
   const st = placementStat('pl1'); st.views = 41; st.clicks = 6; st.leads = 2;
+  // prepaid credit: two top-ups, quote requests from other customers, one the firm reported
+  const p1 = db.partners.find((p) => p.id === 'p1');
+  let bal = 0;
+  for (const [d, amt, ref] of [[60, 5000, 'GC-55120'], [20, 5000, 'BPI-88201']]) {
+    bal += amt; db.credits.push({ id: uid(), partner_id: 'p1', kind: 'topup', amount_php: amt, balance_php: bal, note: 'Prepaid credit', paid_method: d > 30 ? 'GCash' : 'Bank transfer', paid_ref: ref, bir_invoice_no: d > 30 ? 'INV-CR1' : null, created_at: daysAgo(d) });
+  }
+  const leadsFrom = [['Kuya Jun Hardware', 50, 'converted'], ['Mabuhay Printing', 41, 'converted'], ['Sunrise Laundry Hub', 33, 'not_converted'], ['Golden Wok Eatery', 18, 'converted'], ['Lola Nena Bakeshop', 9, 'requested'], ['Bright Smile Dental', 3, 'requested'], ['Isla Water Station', 1, 'requested']];
+  for (const [who, d, status] of leadsFrom) {
+    const r = { id: uid(), org_id: 'other', org_name: who, partner_id: 'p1', requirement_id: null, note: "Mayor's Permit renewal", status, created_at: daysAgo(d), commission: { amount_php: 500, status: 'paid' }, placement_id: null, token: uid() };
+    db.referrals.push(r);
+    bal -= 500; db.credits.push({ id: uid(), partner_id: 'p1', kind: 'lead', amount_php: -500, balance_php: bal, referral_id: r.id, note: 'Quote request from ' + who, created_at: daysAgo(d) });
+    if (d === 3) db.disputes.push({ id: uid(), referral_id: r.id, partner_id: 'p1', reason: 'duplicate', note: 'They called us directly the day before.', status: 'open', credited_php: 0, decision_note: null, created_at: daysAgo(1) });
+  }
+  db.credits.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  p1.credit_php = bal;
   moneySettings.goal = 60000;
 }

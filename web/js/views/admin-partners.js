@@ -1,26 +1,35 @@
 // Admin > Professionals and Admin > Partner billing: firms that pay PermitPal. Who applied, how each firm
-// pays (per quote request, per sale, flat monthly, or free), their checklist lines with honest counts,
-// what each firm owes, the statements sent, and the quote requests behind them.
-import { html, fmtDate, timeAgo, peso, toast, toastError, openModal, plural, when, todayPH, formObject } from '../util.js';
-import { S, on, rerender, empty } from '../core.js';
+// pays (per quote request from prepaid credit, or a flat monthly listing), their checklist lines with
+// honest counts, their credit, how often customers hire them, the leads they reported, what each firm
+// owes, the statements sent, and the quote requests behind them.
+import { html, fmtDate, timeAgo, peso, toast, toastError, openModal, plural, when, todayPH, formObject, confirmDialog } from '../util.js';
+import { S, on, rerender, empty, has } from '../core.js';
 import { PARTNER_CATEGORIES } from './extras.js';
 import * as db from 'pp/data';
 
-export const FEE_MODELS = {
-  per_lead: 'Per quote request', per_sale_flat: 'Per sale (flat ₱)', per_sale_percent: 'Per sale (% of the sale)', monthly: 'Flat monthly listing', none: 'No fee',
-};
+// Per-sale fees went with prepaid credit: a sale happens outside PermitPal and can't be proven.
+const feeModels = () => (has('leads')
+  ? { per_lead: 'Per quote request (prepaid credit)', monthly: 'Flat monthly listing', none: 'No fee' }
+  : { per_lead: 'Per quote request', per_sale_flat: 'Per sale (flat ₱)', per_sale_percent: 'Per sale (% of the sale)', monthly: 'Flat monthly listing', none: 'No fee' });
+const prepaid = (p) => has('leads') && (p.fee_model || 'per_lead') === 'per_lead' && Number(p.lead_fee_php) > 0;
+const leadsLeft = (p) => Math.floor(Number(p.credit_php || 0) / Number(p.lead_fee_php));
+const paused = (p) => p.published && prepaid(p) && leadsLeft(p) < 1;
+const CREDIT_KIND = { topup: 'Paid in', lead: 'Quote request', refund: 'Credit back', adjust: 'Adjustment' };
+const REASON = { spam: 'Spam or a fake business', duplicate: 'A duplicate', unreachable: "Couldn't reach them", not_our_service: 'Not their service or area' };
 const feeText = (p) => ({
   per_lead: `${peso(p.lead_fee_php)} per quote request`, per_sale_flat: `${peso(p.sale_fee_php)} per sale`, per_sale_percent: `${Number(p.sale_pct || 0)}% of each sale`,
   monthly: `${peso(p.monthly_fee_php)} a month`, none: 'Listed for free',
 }[p.fee_model || 'per_lead']);
-let cache = { partners: [], placements: [], stats: [], charges: [], statements: [], referrals: [], apps: [] };
+let cache = { partners: [], placements: [], stats: [], charges: [], statements: [], referrals: [], apps: [], credits: [], disputes: [] };
 const types = () => S.data?.types || [];
 
 // ---------------------------------------------------------------- professionals (listings)
 export async function partnersTab() {
   const from = new Date(Date.parse(todayPH()) - 29 * 864e5).toISOString().slice(0, 10);
-  const [partners, placements, stats, apps] = await Promise.all([db.adminPartners(), db.adminPlacements(), db.adminPlacementStats(from, todayPH()), db.adminApplications()]);
-  Object.assign(cache, { partners, placements, stats, apps });
+  const leads = has('leads');
+  const [partners, placements, stats, apps, credits, referrals] = await Promise.all([db.adminPartners(), db.adminPlacements(), db.adminPlacementStats(from, todayPH()), db.adminApplications(),
+    leads ? db.adminCredits() : [], leads ? db.adminReferrals() : []]);
+  Object.assign(cache, { partners, placements, stats, apps, credits, referrals });
   const fresh = apps.filter((a) => a.status === 'new');
   return html`<div data-partners-tab>
     ${when(fresh.length, html`<section class="card"><div class="card-head"><div><h2>Firms asking to be listed</h2><p class="card-sub">From the "For service providers" page. Check their business permit (and licence) first.</p></div>
@@ -33,7 +42,10 @@ export async function partnersTab() {
     <section class="card"><h2>Add a professional</h2><p class="muted small">List only registered firms. Tick "Licence checked" after you've seen their business permit and, for accountants, their PRC licence. Quote requests are emailed to their email below.</p>${partnerForm()}</section>
     ${partners.map((p) => {
       const mine = placements.filter((x) => x.partner_id === p.id);
-      return html`<section class="card"><div class="card-head"><div><h2>${p.name}</h2><p class="card-sub">${feeText(p)}</p></div><span class="chip ${p.published ? 'ok' : 'needinfo'}">${p.published ? 'Live' : 'Hidden'}</span></div>
+      return html`<section class="card"><div class="card-head"><div><h2>${p.name}</h2><p class="card-sub">${feeText(p)}</p></div>
+          <span class="chip ${paused(p) ? 'soon' : p.published ? 'ok' : 'needinfo'}">${paused(p) ? 'Paused: no credit' : p.published ? 'Live' : 'Hidden'}</span></div>
+        ${when(leads, outcomes(p))}
+        ${when(prepaid(p), creditBox(p))}
         ${partnerForm(p)}
         <h3 class="h4">Checklist lines</h3>
         <p class="muted small">One quiet line, labelled "Partner", on a matching checklist step. One firm per step per city. People can switch these off.</p>
@@ -43,6 +55,29 @@ export async function partnersTab() {
     })}</div>`;
 }
 
+// How customers did with this firm in the last 90 days: the honest number to show them at renewal time.
+function outcomes(p) {
+  const since = new Date(Date.now() - 90 * 864e5).toISOString();
+  const mine = cache.referrals.filter((r) => r.partner_id === p.id && r.created_at >= since);
+  if (!mine.length) return '';
+  const n = (st) => mine.filter((r) => r.status === st).length;
+  return html`<p class="muted small firm-outcomes">Last 90 days: <b>${plural(mine.length, 'quote request')}</b> · <b>${n('converted')}</b> hired · ${n('not_converted')} didn't hire · ${mine.length - n('converted') - n('not_converted')} no answer yet</p>`;
+}
+
+function creditBox(p) {
+  const hist = cache.credits.filter((c) => c.partner_id === p.id);
+  return html`<div class="credit-box">
+    <div class="credit-top"><div><b class="credit-amt">${peso(p.credit_php || 0)}</b> <span class="muted">credit · ${plural(leadsLeft(p), 'quote request')} left at ${peso(p.lead_fee_php)} each</span></div>
+      <div class="btn-row"><button type="button" class="btn btn-sm btn-primary" data-act="credit-add" data-id="${p.id}">Add credit</button>
+        <button type="button" class="btn btn-sm btn-ghost" data-act="credit-adjust" data-id="${p.id}">Adjust</button></div></div>
+    ${leadsLeft(p) < 1 ? html`<p class="small credit-warn">Customers can't see or contact them until they top up. They were emailed when it ran out.</p>` : leadsLeft(p) < 2 ? html`<p class="small credit-warn">One request left. They were emailed to top up.</p>` : ''}
+    ${hist.length ? html`<details class="credit-hist"><summary>Credit history (${hist.length})</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Credit history for ${p.name}"><table class="table">
+      <thead><tr><th>Date</th><th>What</th><th>Amount</th><th>Balance</th></tr></thead><tbody>
+      ${hist.slice(0, 30).map((c) => html`<tr><td>${fmtDate(c.created_at.slice(0, 10))}</td><td>${c.kind === 'lead' ? c.note || CREDIT_KIND.lead : CREDIT_KIND[c.kind] || c.kind}${c.note && ['refund', 'adjust'].includes(c.kind) ? html`<div class="muted small">${c.note}</div>` : ''}${c.paid_method ? html`<div class="muted small">${c.paid_method}${c.paid_ref ? ', ref ' + c.paid_ref : ''}</div>` : ''}</td>
+        <td>${Number(c.amount_php) > 0 ? '+' + peso(c.amount_php) : '−' + peso(-c.amount_php)}</td><td>${peso(c.balance_php)}</td></tr>`)}</tbody></table></div></details>` : ''}
+  </div>`;
+}
+
 function partnerForm(p = {}) {
   const fm = p.fee_model || 'per_lead';
   return html`<form class="admin-partner" data-id="${p.id || ''}"><div class="grid2">
@@ -50,12 +85,12 @@ function partnerForm(p = {}) {
     <label class="field"><span>Category</span><select name="category">${Object.entries(PARTNER_CATEGORIES).map(([k, v]) => html`<option value="${k}" ${k === p.category ? 'selected' : ''}>${v}</option>`)}</select></label>
     <label class="field"><span>Licence / accreditation <small>(shown)</small></span><input name="licence" maxlength="200" value="${p.licence || ''}" placeholder="e.g. CPA, PRC no. 0123456"></label>
     <label class="field"><span>Cities served <small>(comma separated, shown)</small></span><input name="cities" value="${(p.cities || []).join(', ')}" placeholder="Makati City, Taguig City"></label>
-    <label class="field"><span>How they pay you <small>(internal)</small></span><select name="fee_model" data-fee-model>${Object.entries(FEE_MODELS).map(([k, v]) => html`<option value="${k}" ${k === fm ? 'selected' : ''}>${v}</option>`)}</select></label>
-    <label class="field" data-fee="per_lead" ${fm === 'per_lead' ? '' : 'hidden'}><span>Fee per quote request (₱)</span><input name="lead_fee_php" type="number" min="0" step="1" value="${p.lead_fee_php ?? ''}"></label>
+    <label class="field"><span>How they pay you <small>(internal)</small></span><select name="fee_model" data-fee-model>${Object.entries(feeModels()).map(([k, v]) => html`<option value="${k}" ${k === fm ? 'selected' : ''}>${v}</option>`)}</select></label>
+    <label class="field" data-fee="per_lead" ${fm === 'per_lead' ? '' : 'hidden'}><span>Fee per quote request (₱)${has('leads') ? html` <small>(taken from their credit)</small>` : ''}</span><input name="lead_fee_php" type="number" min="0" step="1" value="${p.lead_fee_php ?? ''}"></label>
     <label class="field" data-fee="per_sale_flat" ${fm === 'per_sale_flat' ? '' : 'hidden'}><span>Fee per sale (₱)</span><input name="sale_fee_php" type="number" min="0" step="1" value="${p.sale_fee_php ?? ''}"></label>
     <label class="field" data-fee="per_sale_percent" ${fm === 'per_sale_percent' ? '' : 'hidden'}><span>Share of each sale (%)</span><input name="sale_pct" type="number" min="0" max="50" step="0.5" value="${p.sale_pct ?? ''}"></label>
     <label class="field" data-fee="monthly" ${fm === 'monthly' ? '' : 'hidden'}><span>Monthly listing fee (₱)</span><input name="monthly_fee_php" type="number" min="0" step="1" value="${p.monthly_fee_php ?? ''}"></label>
-    <label class="field"><span>Website</span><input name="website" maxlength="300" value="${p.website || ''}" placeholder="https://"></label>
+    <label class="field"><span>Website <small>(internal, never shown to customers)</small></span><input name="website" maxlength="300" value="${p.website || ''}" placeholder="https://"></label>
     <label class="field"><span>Shown on permits <small>(type codes, comma separated)</small></span><input name="type_codes" value="${(p.type_codes || []).join(', ')}" placeholder="ctpl, emission_test"></label>
     <label class="field"><span>Contact person <small>(internal)</small></span><input name="contact_name" maxlength="120" value="${p.contact_name || ''}"></label>
     <label class="field"><span>Phone <small>(internal)</small></span><input name="contact_phone" maxlength="60" value="${p.contact_phone || ''}"></label>
@@ -98,6 +133,30 @@ document.addEventListener('change', (e) => {
   if (e.target.matches?.('[data-pl-type]')) e.target.form.querySelector('[data-pl-step]').innerHTML = String(stepOptions(types().find((t) => t.code === e.target.value)));
   if (e.target.matches?.('[data-fee-model]')) e.target.form.querySelectorAll('[data-fee]').forEach((x) => { x.hidden = x.dataset.fee !== e.target.value; });
   if (e.target.matches?.('.admin-partner [name=category]')) e.target.form.querySelector('[data-ins-note]').hidden = e.target.value !== 'insurance';
+});
+on('credit-add', (ds) => {
+  const p = cache.partners.find((x) => x.id === ds.id);
+  openModal(`Add credit for ${p?.name}`, html`<p class="muted small">Record what they paid you. They get an email receipt with their new balance, and they show again straight away if they were paused.</p>
+    <div class="grid2"><label class="field"><span>Amount paid (₱)</span><input name="amount" type="number" min="1" step="1" required value="${Number(p?.lead_fee_php || 0) * 10 || ''}"></label>
+    <label class="field"><span>Paid by</span><input name="method" maxlength="60" placeholder="GCash / bank transfer" required></label>
+    <label class="field"><span>Reference no.</span><input name="ref" maxlength="120"></label>
+    <label class="field"><span>BIR invoice number <small>(or add it later in Money)</small></span><input name="no" maxlength="60"></label></div>`, {
+    submitLabel: 'Add credit',
+    onSubmit: async (fd) => {
+      const f = formObject(fd);
+      const bal = await db.adminAddCredit(ds.id, Number(f.amount), f.method, f.ref, f.no);
+      toast(`Added. ${p?.name} has ${peso(bal)} (${plural(Math.floor(bal / Number(p.lead_fee_php)), 'quote request')}).`); rerender();
+    },
+  });
+});
+on('credit-adjust', (ds) => {
+  const p = cache.partners.find((x) => x.id === ds.id);
+  openModal(`Adjust ${p?.name}'s credit`, html`<p class="muted small">For a correction, a goodwill credit, or money you refunded to a firm that left. Use a minus sign to take credit off.</p>
+    <div class="grid2"><label class="field"><span>Change (₱)</span><input name="amount" type="number" step="1" required placeholder="e.g. 500 or -500"></label>
+    <label class="field"><span>Why <small>(kept in their history)</small></span><input name="note" required minlength="5" maxlength="300"></label></div>`, {
+    submitLabel: 'Save',
+    onSubmit: async (fd) => { const f = formObject(fd); const bal = await db.adminAdjustCredit(ds.id, Number(f.amount), f.note); toast(`Saved. Balance: ${peso(bal)}.`); rerender(); },
+  });
 });
 on('pl-toggle', async (ds) => { try { await db.adminSavePlacement(ds.id, { active: !!ds.on }); toast(ds.on ? 'Turned on.' : 'Turned off.'); rerender(); } catch (e) { toastError(e); } });
 on('app-list', async (ds) => {
@@ -151,8 +210,11 @@ document.addEventListener('submit', async (e) => {
 
 // ---------------------------------------------------------------- partner billing
 export async function billingTab() {
-  const [partners, charges, statements, referrals] = await Promise.all([db.adminPartners(), db.adminCharges(), db.adminStatements(), db.adminReferrals()]);
-  Object.assign(cache, { partners, charges, statements, referrals });
+  const leads = has('leads');
+  const [partners, charges, statements, referrals, disputes] = await Promise.all([db.adminPartners(), db.adminCharges(), db.adminStatements(), db.adminReferrals(), leads ? db.adminDisputes() : []]);
+  Object.assign(cache, { partners, charges, statements, referrals, disputes });
+  const openDisputes = disputes.filter((d) => d.status === 'open');
+  const disputeOf = (refId) => disputes.find((d) => d.referral_id === refId);
   const today = todayPH();
   const lastMonthEnd = new Date(Date.parse(today.slice(0, 8) + '01') - 864e5).toISOString().slice(0, 10);
   const name = (id) => partners.find((p) => p.id === id)?.name || 'Firm';
@@ -172,6 +234,10 @@ export async function billingTab() {
       <div class="stat progress"><div class="stat-n">${peso(sum('open'))}</div><div class="stat-l">Billed, not paid</div></div>
       <div class="stat ok"><div class="stat-n">${peso(sum('paid'))}</div><div class="stat-l">Paid this year</div></div>
       <div class="stat"><div class="stat-n">${referrals.filter((r) => r.created_at.slice(0, 7) === today.slice(0, 7)).length}</div><div class="stat-l">Quote requests this month</div></div></div>
+    ${when(leads && disputes.length, html`<section class="card ${openDisputes.length ? 'cx-needs' : ''}"><div class="card-head"><div><h2>Reported leads</h2>
+        <p class="card-sub">Firms can report a request within 7 days from the link in the lead email. Accept and the fee goes back on their credit; decline with a reason they'll read.</p></div>
+        ${openDisputes.length ? html`<span class="chip soon">${openDisputes.length} to decide</span>` : ''}</div>
+      ${disputes.slice(0, 30).map(disputeRow)}</section>`)}
     <section class="card"><div class="card-head"><div><h2>What each firm owes</h2><p class="card-sub">Make a statement at the start of each month: it adds up everything not billed yet, emails the firm, and is due in 15 days.</p></div></div>
       ${rows.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Firm</th><th>How they pay</th><th>Not billed</th><th>Billed, unpaid</th><th>Paid this year</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>
         ${rows.map((r) => html`<tr><td>${r.p.name}</td><td class="small">${feeText(r.p)}</td><td>${peso(r.unbilled)}${r.n ? html`<div class="muted small">${plural(r.n, 'charge')}</div>` : ''}</td>
@@ -189,11 +255,30 @@ export async function billingTab() {
     <section class="card"><div class="card-head"><div><h2>Quote requests</h2><p class="card-sub">Each one is emailed straight to the firm. Update the status when they tell you; record a sale for firms paid per sale.</p></div></div>
       ${referrals.length ? referrals.map((r) => { const p = partners.find((x) => x.id === r.partner_id) || {}; const perSale = ['per_sale_flat', 'per_sale_percent'].includes(p.fee_model);
         return html`<form class="admin-ref2 line-form" data-id="${r.id}">
-          <div class="line-main"><b>${r.partners?.name} ← ${r.orgs?.name}</b><small>${r.contact_method}${r.contact_value ? ': ' + r.contact_value : ''} · ${timeAgo(r.created_at)}${r.placement_id ? ' · from a checklist line' : ''}${r.note ? ' · ' + r.note : ''}${r.sale_php != null ? ' · sale ' + peso(r.sale_php) : ''}</small></div>
+          <div class="line-main"><b>${r.partners?.name} ← ${r.orgs?.name}${disputeOf(r.id) ? html` <span class="chip ${disputeOf(r.id).status === 'accepted' ? 'ok' : disputeOf(r.id).status === 'open' ? 'soon' : 'needinfo'}">Reported: ${{ open: 'to decide', accepted: 'credited back', declined: 'declined' }[disputeOf(r.id).status]}</span>` : ''}</b><small>${r.contact_method}${r.contact_value ? ': ' + r.contact_value : ''} · ${timeAgo(r.created_at)}${r.placement_id ? ' · from a checklist line' : ''}${r.note ? ' · ' + r.note : ''}${r.sale_php != null ? ' · sale ' + peso(r.sale_php) : ''}</small></div>
           <select name="status" aria-label="Status">${['requested', 'introduced', 'converted', 'not_converted'].map((k) => html`<option value="${k}" ${k === r.status ? 'selected' : ''}>${{ requested: 'Sent', introduced: 'Firm replied', converted: 'Hired', not_converted: 'Closed' }[k]}</option>`)}</select>
           ${perSale ? html`<button type="button" class="btn btn-sm btn-soft" data-act="sale-record" data-id="${r.id}">${r.sale_php != null ? 'Change sale' : 'Record sale'}</button>` : html`<span class="muted small">${Number(sold(r).amount_php) ? peso(sold(r).amount_php) + ' fee' : ''}</span>`}
           <button class="btn btn-sm btn-ghost">Save</button></form>`; }) : empty('No quote requests yet', 'Requests customers send to listed professionals appear here.')}</section></div>`;
 }
+function disputeRow(d) {
+  const st = { open: ['To decide', 'soon'], accepted: ['Accepted', 'ok'], declined: ['Declined', 'needinfo'] }[d.status];
+  return html`<div class="row"><div class="row-main"><div class="row-title">${d.partners?.name || 'Firm'} ← ${d.referrals?.orgs?.name || 'customer'}</div>
+      <div class="row-sub">Request sent ${d.referrals?.created_at ? fmtDate(d.referrals.created_at.slice(0, 10)) : ''} · reported ${timeAgo(d.created_at)} as <b>${REASON[d.reason] || d.reason}</b>${d.note ? html` · "${d.note}"` : ''}</div>
+      ${d.referrals?.note ? html`<div class="row-sub">Customer wrote: "${d.referrals.note}"</div>` : ''}
+      ${d.status !== 'open' ? html`<div class="row-sub">${d.status === 'accepted' && Number(d.credited_php) > 0 ? `${peso(d.credited_php)} credited back` : ''}${d.decision_note ? ' · ' + d.decision_note : ''}</div>` : ''}</div>
+    <div class="row-side"><span class="chip ${st[1]}">${st[0]}</span>
+      ${d.status === 'open' ? html`<button class="btn btn-sm btn-primary" data-act="dispute-accept" data-id="${d.id}">Accept</button><button class="btn btn-sm btn-ghost" data-act="dispute-decline" data-id="${d.id}">Decline</button>` : ''}</div></div>`;
+}
+on('dispute-accept', async (ds) => {
+  const d = cache.disputes.find((x) => x.id === ds.id);
+  if (!(await confirmDialog('Accept this report?', `${d?.partners?.name || 'The firm'} gets the request's fee back on their credit and an email saying so.`, { confirmLabel: 'Accept', danger: false }))) return;
+  try { await db.adminDecideDispute(ds.id, true, null); toast('Accepted. The fee is back on their credit.'); rerender(); } catch (e) { toastError(e); }
+});
+on('dispute-decline', (ds) => openModal('Decline this report?', html`<label class="field"><span>Why <small>(the firm reads this)</small></span>
+    <textarea name="note" rows="3" required minlength="5" maxlength="500" placeholder="e.g. The customer confirmed you called them and sent a quote."></textarea></label>`, {
+  submitLabel: 'Decline',
+  onSubmit: async (fd) => { await db.adminDecideDispute(ds.id, false, String(fd.get('note') || '').trim()); toast('Declined. The firm was emailed your reason.'); rerender(); },
+}));
 on('stmt-new', (ds) => {
   const p = cache.partners.find((x) => x.id === ds.id);
   const to = p?.billing_email || p?.contact_email;

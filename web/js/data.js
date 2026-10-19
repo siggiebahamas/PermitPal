@@ -552,6 +552,15 @@ export const adminPlacementStats = async (from, to) => ok(await sb.rpc('admin_pl
 export const adminCharges = async () => ok(await sb.from('partner_charges').select('*').order('occurred_on', { ascending: false }).limit(1000));
 export const adminStatements = async () => ok(await sb.from('partner_statements').select('*').order('created_at', { ascending: false }).limit(300));
 export const adminRecordSale = async (refId, sale, note) => ok(await sb.rpc('admin_record_sale', { p_referral: refId, p_sale_php: sale, p_note: note || null }));
+// Prepaid credit for firms paid per quote request, their reports on bad leads, and the customer's answer.
+export const adminCredits = async () => ok(await sb.from('partner_credits').select('*').order('created_at', { ascending: false }).limit(1000));
+export const adminAddCredit = async (id, amount, method, ref, no) => ok(await sb.rpc('admin_add_credit', { p_partner: id, p_amount: amount, p_method: method, p_ref: ref || null, p_invoice_no: no || null }));
+export const adminAdjustCredit = async (id, amount, note) => ok(await sb.rpc('admin_adjust_credit', { p_partner: id, p_amount: amount, p_note: note }));
+export const adminDisputes = async () => ok(await sb.from('lead_disputes').select('*, partners(name), referrals(created_at, note, orgs(name))').order('created_at', { ascending: false }).limit(300));
+export const adminDecideDispute = async (id, accept, note) => ok(await sb.rpc('admin_decide_dispute', { p_dispute: id, p_accept: accept, p_note: note || null }));
+export const leadForFirm = async (token) => ok(await sb.rpc('lead_for_firm', { p_token: token }));
+export const reportLead = async (token, reason, note) => ok(await sb.rpc('report_lead', { p_token: token, p_reason: reason, p_note: note || null }));
+export const answerReferral = async (id, hired) => ok(await sb.rpc('answer_referral', { p_referral: id, p_hired: hired }));
 export const adminAddCharge = async (partnerId, description, amount, on) => ok(await sb.rpc('admin_add_partner_charge', { p_partner: partnerId, p_description: description, p_amount: amount, p_on: on || null }));
 export const adminWaiveCharge = async (id) => ok(await sb.rpc('admin_waive_charge', { p_charge: id }));
 export const adminCreateStatement = async (partnerId, through, email) => ok(await sb.rpc('admin_create_statement', { p_partner: partnerId, p_through: through, p_email: !!email }));

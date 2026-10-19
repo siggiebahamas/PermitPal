@@ -19,6 +19,7 @@ import { admin } from './views/admin.js';
 import { services, order } from './views/services.js';
 import { care, careStart } from './views/care.js';
 import { partnerApplyPage } from './views/partner-apply.js';
+import { leadPage } from './views/lead.js';
 import { filings, forgetFilings } from './views/filings.js';
 import { mfaChallenge, mfaRequired } from './views/mfa.js';
 
@@ -71,6 +72,7 @@ async function start() {
     if (!parts[0] || parts[0] === 'welcome') return landing(app);
     if (parts[0] === 'contact') return contactPage(app, { signedIn: false });
     if (parts[0] === 'list-your-firm' && has('revenue')) return partnerApplyPage(app, { signedIn: false });
+    if (parts[0] === 'lead' && has('leads')) return leadPage(app, parts[1], { signedIn: false });
     const mode = ['signup', 'forgot'].includes(parts[0]) ? parts[0] : 'login';
     return authPage(app, mode);
   }
@@ -237,6 +239,7 @@ async function renderPage() {
     else if (a === 'care' && has('revenue') && IN_PERSON) b === 'start' ? careStart(main, params) : await care(main, params);
     else if (a === 'care') { location.hash = '#/services'; return; }
     else if (a === 'list-your-firm' && has('revenue')) partnerApplyPage(main, { signedIn: true });
+    else if (a === 'lead' && has('leads')) await leadPage(main, b, { signedIn: true });
     else if (['pros', 'partners', 'services', 'help'].includes(a)) await partners(main, params);
     else if (a === 'contact') contactPage(main, { signedIn: true });
     else if (a === 'costs') await costs(main);

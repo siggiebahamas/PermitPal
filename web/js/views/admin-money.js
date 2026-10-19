@@ -71,6 +71,8 @@ function homeView() {
     [n(s.care_overdue), `${plural(n(s.care_overdue), 'customer')} haven't paid their monthly care bill`, 'Follow up', { tab: 'care' }],
     [n(s.partners_to_bill), `Bill ${plural(n(s.partners_to_bill), 'partner firm')} for last month`, 'Make bills', { tab: 'billing' }],
     [n(s.statements_overdue), `${plural(n(s.statements_overdue), 'partner firm')} ${n(s.statements_overdue) === 1 ? 'is' : 'are'} late paying their bill`, 'Follow up', { tab: 'billing' }],
+    [n(s.disputes_open), `Decide on ${plural(n(s.disputes_open), 'lead')} a firm reported (they wait for your answer)`, 'Decide', { tab: 'billing' }],
+    [n(s.firms_paused), `${plural(n(s.firms_paused), 'firm')} ${n(s.firms_paused) === 1 ? 'is' : 'are'} paused for no credit: add credit when they pay`, 'Open', { tab: 'partners' }],
     [n(s.applications_new), `${plural(n(s.applications_new), 'firm')} ${n(s.applications_new) === 1 ? 'wants' : 'want'} to be listed on PermitPal`, 'Review', { tab: 'partners' }],
     [n(s.covered_missing_dates), `${plural(n(s.covered_missing_dates), 'permit')} on a care plan ${n(s.covered_missing_dates) === 1 ? 'has' : 'have'} no expiry date yet`, 'Fix', { tab: 'care' }],
     [n(s.gov_unrecorded), `Write down the government fee you paid for ${plural(n(s.gov_unrecorded), 'finished job')}`, 'Record', { tab: 'orders' }],
@@ -271,7 +273,7 @@ function paymentsView() {
       ${list.slice(0, 400).map((l) => html`<tr class="${l.state}"><td>${fmtDate(l.day)}</td>
         <td><b class="pay-what">${KIND_NAMES[l.kind] || l.kind}</b><div class="muted small">${streamDot(l.stream)} ${STREAMS[l.stream]?.name || l.stream} · ${l.label}</div></td><td>${l.who}</td>
         <td><span class="tag st-${l.state}">${STATE_NAMES[l.state] || l.state}</span></td><td class="r ${Number(l.amount) < 0 ? 'neg' : ''}">${peso(l.amount)}</td>
-        <td>${l.state === 'collected' && ['order', 'care', 'statement', 'plan'].includes(l.ref_kind) && Number(l.amount) > 0
+        <td>${l.state === 'collected' && ['order', 'care', 'statement', 'plan', 'credit'].includes(l.ref_kind) && Number(l.amount) > 0
           ? html`<form class="inline-form inv-form" data-kind="${l.ref_kind}" data-id="${l.ref_id}"><input name="no" maxlength="60" value="${l.invoice_no || ''}" aria-label="BIR receipt number" placeholder="Add"><button class="btn btn-sm btn-ghost">Save</button></form>`
           : l.invoice_no || ''}</td></tr>`)}
     </tbody></table></div>${when(list.length > 400, html`<div class="sheet-foot">Showing 400 of ${list.length}. Search or pick a month, or download everything.</div>`)}

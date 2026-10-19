@@ -937,7 +937,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.waitForSelector('.landing');
   check('apply: the public page has a quiet "For service providers" link', (await page.locator('.lp-foot a[href="#/list-your-firm"]').count()) === 1);
   await page.click('.lp-foot a[href="#/list-your-firm"]'); await page.waitForTimeout(400);
-  check('apply: the page says how it works and what it costs them', /You pay for what you get/.test(await page.textContent('main')) && /No setup fee/.test(await page.textContent('main')));
+  check('apply: the page says how it works and what it costs them (prepaid, bad leads credited back)', /Prepaid, so no bills/.test(await page.textContent('main')) && /Bad lead\? Report it/.test(await page.textContent('main')) && /flat monthly listing/.test(await page.textContent('main')));
   await page.click('#apply-form button'); await page.waitForTimeout(200);
   check('apply: empty form says what is missing', /firm's name/.test(await page.textContent('#apply-form .form-error')));
   await page.fill('#apply-form [name=name]', 'Makati Fire Safety'); await page.selectOption('#apply-form [name=category]', 'fire_safety');
@@ -996,7 +996,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('billing: each firm\'s unbilled total is shown', /Not billed yet/.test(await page.textContent('main')) && (await page.locator('main [data-act=stmt-new]').count()) >= 1);
   await page.locator('main [data-act=stmt-new]').first().click(); await page.waitForTimeout(250);
   await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
-  const sent = page.locator('main .row', { hasText: 'Sent' }).first();
+  const sent = page.locator('main .row', { has: page.locator('[data-act=stmt-paid]') }).first();
   check('billing: the statement is made and listed as sent', (await sent.count()) === 1);
   await sent.locator('[data-act=stmt-paid]').click(); await page.waitForTimeout(250);
   await page.fill('#modal-root [name=method]', 'BPI'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
@@ -1082,6 +1082,73 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('features off: nothing new shows before the database is updated', seen.length === 0, seen.join(','));
   check('features off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
+}
+
+// Getting paid for quote requests: prepaid credit, reports from firms, "Did you hire them?".
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await page.addInitScript(() => { globalThis.PP_DEMO = true; });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(450); };
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('main h1');
+  await go('#/pros');
+  check('leads: no firm website in the directory (requests go through PermitPal)', (await page.locator('main .partner a[href^="http"]').count()) === 0);
+  check('leads: a firm out of credit isn\'t listed', !(await page.textContent('main')).includes('Sample Permit Desk') && (await page.textContent('main')).includes('Sample Liaison Services'));
+  await page.click('[data-act=partner-intro][data-id=p1]');
+  await page.selectOption('.modal [name=contact_method]', 'email');
+  await page.fill('.modal [name=contact_value]', 'sadie@test.ph');
+  await page.click('.modal button[type=submit]'); await page.waitForTimeout(500);
+  const ask = page.locator('main .hired-ask').first();
+  check('leads: each request asks "Did you hire them?"', (await ask.count()) === 1 && /Did you hire them\?/.test(await ask.textContent()));
+  await ask.locator('[data-hired="1"]').click(); await page.waitForTimeout(500);
+  check('leads: answering yes marks it Hired', (await page.locator('main .chip', { hasText: 'Hired' }).count()) >= 1 && /Thanks/.test(await page.textContent('#toast')));
+  await go('#/admin');
+  await page.click('[data-act=admin-tab][data-tab=partners]'); await page.waitForTimeout(500);
+  const p1 = page.locator('main section.card', { hasText: 'Sample Liaison Services' }).first();
+  check('leads admin: credit and requests left are shown', /credit · \d+ quote requests? left at ₱500/.test(await p1.textContent()), (await p1.textContent()).slice(0, 200));
+  check('leads admin: how often customers hired the firm', /Last 90 days: \d+ quote requests · \d+ hired/.test(await p1.textContent()));
+  await p1.locator('.credit-hist summary').click(); await page.waitForTimeout(150);
+  check('leads admin: the credit history lists top-ups and requests with the balance', (await p1.locator('.credit-hist tbody tr').count()) >= 8 && /Paid in/.test(await p1.locator('.credit-hist').textContent()));
+  const desk = page.locator('main section.card', { hasText: 'Sample Permit Desk' }).first();
+  check('leads admin: a firm out of credit shows "Paused: no credit"', (await desk.locator('.chip', { hasText: 'Paused: no credit' }).count()) === 1);
+  check('leads admin: per-sale fees are gone', (await page.locator('main [name=fee_model] option[value=per_sale_flat]').count()) === 0
+    && (await page.locator('main [name=fee_model] option[value=per_lead]').first().textContent()).includes('prepaid credit'));
+  await desk.locator('[data-act=credit-add]').click(); await page.waitForTimeout(250);
+  await page.fill('#modal-root [name=amount]', '2500'); await page.fill('#modal-root [name=method]', 'GCash'); await page.fill('#modal-root [name=ref]', '1009 22');
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+  check('leads admin: adding credit puts the firm back live', /Added/.test(await page.textContent('#toast'))
+    && (await page.locator('main section.card', { hasText: 'Sample Permit Desk' }).first().locator('.chip', { hasText: 'Live' }).count()) === 1);
+  await page.click('[data-act=admin-tab][data-tab=billing]'); await page.waitForTimeout(500);
+  check('leads admin: the reported lead waits with its reason', /Reported leads/.test(await page.textContent('main')) && /A duplicate/.test(await page.textContent('main')) && (await page.locator('main [data-act=dispute-accept]').count()) === 1);
+  await page.click('main [data-act=dispute-accept]'); await page.waitForTimeout(250);
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+  check('leads admin: accepting puts the fee back on the firm\'s credit', /back on their credit/.test(await page.textContent('#toast')) && (await page.locator('main .chip', { hasText: 'Accepted' }).count()) === 1);
+  check('leads: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+  // The firm's page, from the link in the lead email: no account needed.
+  const out = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await out.addInitScript(() => { globalThis.PP_DEMO = true; globalThis.PP_LOGGED_OUT = true; });
+  const oerrs = [];
+  out.on('pageerror', (e) => oerrs.push(e.message));
+  await out.goto('http://localhost:4173/'); await out.waitForSelector('.landing h1');
+  const token = await out.evaluate(async () => (await import('/__mock/mock-data.js')).demoLeadToken());
+  await out.evaluate((t) => { location.hash = '#/lead/' + t; }, token); await out.waitForTimeout(600);
+  check('firm page: opens from the email link without an account', /Quote request from Isla Water Station/.test(await out.textContent('h1')) && /₱500 from your PermitPal credit/.test(await out.textContent('.lead-page')));
+  await out.click('#lead-report button'); await out.waitForTimeout(200);
+  check('firm page: a report needs a reason', /Choose a reason/.test(await out.textContent('#lead-report .form-error')));
+  await out.check('#lead-report [name=reason][value=unreachable]');
+  await out.fill('#lead-report [name=note]', 'Called 3 times, no answer');
+  await out.click('#lead-report button'); await out.waitForTimeout(600);
+  check('firm page: the report is sent, and the page says what happens next', /You reported this request/.test(await out.textContent('.lead-page')) && /couldn't reach them/i.test(await out.textContent('.lead-page')));
+  const o = await out.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  check('firm page: fits a phone', o <= 1, `${o}px`);
+  await out.evaluate(() => { location.hash = '#/lead/not-a-real-link'; }); await out.waitForTimeout(500);
+  check('firm page: a broken link says so', /isn't valid/.test(await out.textContent('.lead-page')));
+  check('firm page: no JavaScript errors', oerrs.length === 0, oerrs.slice(0, 3).join(' | '));
+  await out.close();
 }
 
 // Online only, as on the live site: nothing that needs someone at city hall, the LTO or an inspection.
