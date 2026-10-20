@@ -10,6 +10,7 @@ import { handledCount } from './assign.js';
 import { avatar, ICON } from '../components.js';
 import { KINDS, teamAccess, connectionsCard } from './network.js';
 import { mfaSection, requireCard } from './mfa.js';
+import { addonSection, wireAddons } from './plus.js';
 import * as db from 'pp/data';
 
 // ================================================================ history
@@ -328,6 +329,7 @@ export async function settings(el, section) {
   el.querySelectorAll('[data-pref]').forEach((i) => i.addEventListener('change', async () => {
     try { await db.updatePrefs(S.user.id, { [i.dataset.pref]: i.checked }); S.prefs[i.dataset.pref] = i.checked; toast('Saved.'); } catch (e) { i.checked = !i.checked; toastError(e); }
   }));
+  if (section === 'billing') wireAddons(el);
   const pf = el.querySelector('#profile-form');
   if (pf) pf.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -426,7 +428,8 @@ function billingSection(pay) {
       <div class="svc-foot"><span class="muted small">30-day free trial</span>
         ${p.id === k?.plan ? html`<span class="chip ok">Your plan</span>` : when(isOrgAdmin(), html`<button class="btn btn-sm btn-soft" data-act="nb-set-kind" data-kind="${p.id}">Start free trial</button>`)}</div>
     </section>`)}</div>
-    <p class="fineprint">Single businesses stay free. Cancel anytime: your data is never locked or deleted, and you can always export it.</p>`;
+    <p class="fineprint">Single businesses stay free. Cancel anytime: your data is never locked or deleted, and you can always export it.</p>
+    ${addonSection(pay)}`;
 }
 on('plan-request', async (ds) => {
   const p = S.plans.find((x) => x.id === ds.plan);

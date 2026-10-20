@@ -1,6 +1,7 @@
 // In-memory stand-in for web/js/data.js, used only by the browser smoke test.
 // It mimics the database's status rules closely enough to drive every screen.
 import { SERVICES } from './mock-services.js';
+import { addonPrice, addonLabel, FREE_PEOPLE } from '../js/prices.js';
 
 const today = () => new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 10);
 const addDays = (n) => { const d = new Date(today() + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -142,6 +143,7 @@ export async function loadOrgData() {
     reqs: statusRows(), requests: db.requests.map((a) => ({ ...a })),
     members: db.members.map((m) => ({ ...m, profile: { ...m.profile } })),
     care: careData(),
+    plus: plusData(),
   };
 }
 export const setCurrentOrg = async () => {};
@@ -250,6 +252,10 @@ async function sampleImage(title) {
   g.font = '24px sans-serif'; g.fillStyle = '#4B5568'; g.fillText('PermitPal demo - sample document', 60, 200);
   return new Promise((res) => c.toBlob(res, 'image/png'));
 }
+export async function fileBlob(path) {
+  const name = String(path || 'document.pdf').split('/').pop();
+  return /\.(jpe?g|png|webp)$/i.test(name) ? sampleImage(name) : samplePdf(name);
+}
 export async function fileUrl(path) {
   const name = String(path || 'document.pdf').split('/').pop();
   const blob = /\.(jpe?g|png|webp)$/i.test(name) ? await sampleImage(name) : samplePdf(name);
@@ -309,7 +315,13 @@ export const startCheckout = async () => { throw new Error('Payments are off in 
 
 // ---------------------------------------------------------------- people
 export async function createPerson(orgId, f) {
-  const x = { id: uid(), org_id: orgId, full_name: f.full_name, role_title: f.role_title || '', business_id: f.business_id || null, deleted_at: null };
+  // Same rule as the database: 3 people free, more need staff licences.
+  if (PLUS_ON && db.people.filter((p) => !p.deleted_at).length >= peopleCapMock()) {
+    const n = db.people.filter((p) => !p.deleted_at).length;
+    throw Object.assign(new Error(peopleCapMock() <= FREE_PEOPLE ? `You're tracking ${n} people: the free limit is ${FREE_PEOPLE}. Add staff licences (from ₱100 a month per person) under Settings > Plan to track more.`
+      : `You're tracking ${n} people, the most your staff licences cover. Add more under Settings > Plan.`), { hint: 'seat_limit', code: 'P0001' });
+  }
+  const x = { id: uid(), org_id: orgId, full_name: f.full_name, role_title: f.role_title || '', business_id: f.business_id || null, deleted_at: null, paused_at: null, email: null, mobile: null, remind_worker: true, created_at: new Date().toISOString() };
   db.people.push(x);
   for (const code of f.types || []) addReq('person', x.id, null, types.find((t) => t.code === code));
   log(`Added ${x.full_name}`, { entity: 'people' });
@@ -731,7 +743,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus'];
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries(ALL_FEATURES.map((f) => [f, true])));
 
 db.clientErrors = [];
@@ -1420,3 +1432,265 @@ if (REV && globalThis.PP_DEMO) {
   p1.credit_php = bal;
   moneySettings.goal = 60000;
 }
+
+
+// ---------------------------------------------------------------- PermitPal Plus and staff licences
+// The same rules as the database, in memory: prices, the free 3 people, bills, the public page, the check.
+const PLUS_ON = globalThis.PP_FEATURES !== 'none';
+const plusDb = { addons: [], invoices: [], roles: [], submissions: [], stopping: {}, pages: [], recipients: [], views: [], findings: [], runs: [], links: [] };
+const active = (a) => !!a && a.paid_through >= today();
+const addonMock = (kind) => plusDb.addons.find((a) => a.kind === kind) || null;
+const plusIncludedMock = () => org.kind !== 'business' && ((org.trial_ends_at && new Date(org.trial_ends_at) > new Date()) || ['fleet', 'firm', 'head_office', 'property'].includes(org.plan_id));
+const hasPlusMock = () => active(addonMock('plus')) || plusIncludedMock();
+const peopleAllowedMock = () => Math.max(FREE_PEOPLE, active(addonMock('staff')) ? addonMock('staff').people_max : 0);
+function peopleCapMock() { const a = addonMock('staff'); return active(a) && a.next_people_max ? Math.min(peopleAllowedMock(), a.next_people_max) : peopleAllowedMock(); }
+const notPlus = (what) => Object.assign(new Error(`${what} comes with PermitPal Plus.`), { hint: 'plus', code: 'P0001' });
+let ppa = 100;
+function plusData() {
+  if (!PLUS_ON) return { addons: [], invoices: [], roles: [], submissions: [], stopping: {} };
+  return { addons: plusDb.addons.map((a) => ({ ...a })), invoices: plusDb.invoices.map((i) => ({ ...i })), roles: plusDb.roles.map((r) => ({ ...r, type_codes: [...r.type_codes] })),
+    submissions: plusDb.submissions.filter((x) => x.status === 'pending').map((x) => ({ ...x })), stopping: { ...plusDb.stopping } };
+}
+export const loadPlus = async () => plusData();
+const monthEnd = (start, months) => { const d = new Date(start + 'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + months); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
+function quote(kind, people, billing) {
+  const a = addonMock(kind);
+  const months = billing === 'yearly' ? 12 : 1;
+  const price = addonPrice(kind, people, billing);
+  let mode; let start; let credit = 0;
+  if (!a || !a.paid_through || a.paid_through < today()) { mode = 'new'; start = today(); }
+  else if (a.trial || a.comped) { mode = 'after_trial'; start = addDaysTo(a.paid_through, 1); }
+  else if ((a.people_max || null) === (people || null) && a.billing === billing) { mode = 'renewal'; start = addDaysTo(a.paid_through, 1); }
+  else {
+    const last = plusDb.invoices.filter((i) => i.kind === kind && i.status === 'paid').sort((x, y) => y.period_end.localeCompare(x.period_end))[0];
+    if (last && last.period_end >= today()) credit = Math.round(last.price_php * (days(last.period_end) + 1) / (days(last.period_end) - days(last.period_start) + 1) * 100) / 100;
+    if (credit > price) { mode = 'next_period'; start = addDaysTo(a.paid_through, 1); credit = 0; } else { mode = 'change'; start = today(); }
+  }
+  return { mode, kind, people_max: people, billing, months, label: addonLabel(kind, people, billing), price, credit, amount: price - credit, monthly: addonPrice(kind, people, 'monthly'),
+    period_start: start, period_end: monthEnd(start, months), paid_through: a?.paid_through || null, people_now: db.people.filter((p) => !p.deleted_at).length, free_people: FREE_PEOPLE };
+}
+const addDaysTo = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+function checkArgs(kind, people, billing) {
+  if (org.role !== 'owner' && org.role !== 'admin') throw new Error('Only the workspace owner or an admin can change the plan.');
+  if (!['monthly', 'yearly'].includes(billing)) throw new Error('Choose monthly or yearly.');
+  if (kind === 'plus' && plusIncludedMock()) throw new Error('Plus is already included in your team plan.');
+  if (kind === 'staff') {
+    if (!(people >= FREE_PEOPLE + 1 && people <= 5000)) throw new Error(`Choose from ${FREE_PEOPLE + 1} to 5,000 people. The first ${FREE_PEOPLE} are free.`);
+    const n = db.people.filter((p) => !p.deleted_at).length;
+    if (people < n) throw new Error(`You're tracking ${n} people. Remove people first, or choose at least ${n}.`);
+  }
+}
+export async function addonPreview(orgId, kind, people, billing) { checkArgs(kind, people, billing); return quote(kind, people, billing); }
+function paidMock(inv) {
+  inv.status = 'paid'; inv.paid_at = new Date().toISOString();
+  let a = addonMock(inv.kind);
+  if (!a) { a = { org_id: org.id, kind: inv.kind, started_on: inv.period_start }; plusDb.addons.push(a); }
+  Object.assign(a, { people_max: inv.people_max, billing: inv.billing, paid_through: inv.period_end, trial: false, comped: false, next_people_max: null, next_billing: null });
+  delete plusDb.stopping[inv.kind];
+  plusDb.invoices.filter((i) => i.kind === inv.kind && i.status === 'due' && i.id !== inv.id).forEach((i) => { i.status = 'cancelled'; });
+  syncPeople();
+}
+function syncPeople() {
+  const live = db.people.filter((p) => !p.deleted_at);
+  live.forEach((p, i) => { p.paused_at = i >= peopleAllowedMock() ? (p.paused_at || new Date().toISOString()) : null; });
+}
+export async function addonCheckout(orgId, kind, people, billing) {
+  checkArgs(kind, people, billing);
+  const q = quote(kind, people, billing);
+  if (q.mode === 'next_period') { Object.assign(addonMock(kind), { next_people_max: people, next_billing: billing }); return { ...q, scheduled: true }; }
+  const same = plusDb.invoices.find((i) => i.kind === kind && ['due', 'pending_verification'].includes(i.status) && i.people_max === (people || null) && i.billing === billing && i.amount_php === q.amount);
+  if (same) return { ...same };
+  plusDb.invoices.filter((i) => i.kind === kind && i.status === 'due').forEach((i) => { i.status = 'cancelled'; i.note = 'Replaced by your new choice.'; });
+  const inv = { id: uid(), number: `PPA-2026-${String(++ppa).padStart(5, '0')}`, org_id: org.id, kind, people_max: people || null, billing, months: q.months, price_php: q.price, credit_php: q.credit,
+    amount_php: q.amount, period_start: q.period_start, period_end: q.period_end, renewal: ['renewal', 'after_trial'].includes(q.mode), status: 'due', valid_until: addDays(7), note: null, created_at: new Date().toISOString() };
+  plusDb.invoices.unshift(inv);
+  if (inv.amount_php === 0) paidMock(inv);
+  return { ...inv };
+}
+export async function addonReportPayment(inv, { method, ref, file }) {
+  const i = plusDb.invoices.find((x) => x.id === inv.id);
+  if (!ref && !(file && file.size)) throw new Error('Add the reference number or a screenshot of the payment.');
+  Object.assign(i, { status: 'pending_verification', pay_method: method, pay_ref: ref || null, reported_at: new Date().toISOString() });
+}
+export const addonCancelInvoice = async (id) => { const i = plusDb.invoices.find((x) => x.id === id); if (i.status !== 'due') throw new Error('Only an unpaid bill can be cancelled.'); i.status = 'cancelled'; i.note = 'Cancelled by you.'; };
+export const addonStop = async (orgId, kind) => { const a = addonMock(kind); plusDb.stopping[kind] = a.paid_through; plusDb.invoices.filter((i) => i.kind === kind && i.status === 'due').forEach((i) => { i.status = 'cancelled'; }); return a.paid_through; };
+export const addonResume = async (orgId, kind) => { delete plusDb.stopping[kind]; };
+export async function startPlusTrial() {
+  if (hasPlusMock()) throw new Error('Plus is already on.');
+  const a = addonMock('plus');
+  if (a?.trial_used_on || a?.started_on) throw new Error('This workspace has already had its free trial.');
+  const until = addDays(13);
+  if (a) Object.assign(a, { paid_through: until, trial: true, trial_used_on: today() });
+  else plusDb.addons.push({ org_id: org.id, kind: 'plus', people_max: null, billing: 'monthly', paid_through: until, trial: true, trial_used_on: today(), comped: false, started_on: null });
+  return until;
+}
+export const startAddonCheckout = async () => { throw new Error('Online card/GCash checkout is not switched on yet. Please use the GCash or bank transfer details shown instead.'); };
+
+// staff
+export const updatePersonContact = async (id, f) => { Object.assign(db.people.find((x) => x.id === id), { email: f.email || null, mobile: f.mobile || null, remind_worker: f.remind_worker !== false }); };
+export async function workerLink(reqId) {
+  const r = db.requirements.find((x) => x.id === reqId);
+  if (db.people.find((p) => p.id === r.person_id)?.paused_at) throw new Error("This person is paused because your staff licences don't cover them. Add licences under Settings > Plan.");
+  let l = plusDb.links.find((x) => x.requirement_id === reqId && !x.used_at);
+  if (!l) { l = { token: uid(), requirement_id: reqId, person_id: r.person_id, used_at: null }; plusDb.links.push(l); }
+  return l.token;
+}
+export async function workerPage(token) {
+  const l = plusDb.links.find((x) => x.token === token);
+  if (!l) return { state: 'invalid' };
+  const r = statusRows().find((x) => x.id === l.requirement_id);
+  if (l.used_at) return { state: 'sent', org_name: org.name, permit: r.name };
+  return { state: 'open', first_name: (db.people.find((p) => p.id === l.person_id)?.full_name || '').split(' ')[0], org_name: org.name, permit: r.name, expires: r.expires, expires_on: r.expires_on, folder: `o1/worker/${token}`, today: today() };
+}
+export async function workerSend(page, token, f) {
+  const l = plusDb.links.find((x) => x.token === token);
+  if (!l || l.used_at) throw new Error('This link has already been used or has expired. Ask your employer for a new one.');
+  if (page.expires && !f.expires_on) throw new Error("Enter the new expiry date (it's printed on the licence).");
+  l.used_at = new Date().toISOString();
+  plusDb.submissions.push({ id: uid(), org_id: org.id, person_id: l.person_id, requirement_id: l.requirement_id, token, storage_path: `o1/worker/${token}/${f.file.name}`, file_name: f.file.name, mime_type: f.file.type,
+    expires_on: f.expires_on, issued_on: f.issued_on || null, reference_no: f.reference_no || null, note: f.note || null, status: 'pending', created_at: new Date().toISOString() });
+  return { ok: true };
+}
+export async function workerDecide(id, approve, f = {}) {
+  const sub = plusDb.submissions.find((x) => x.id === id);
+  if (!approve) { sub.status = 'rejected'; sub.decision_note = f.note || null; return null; }
+  const r = db.requirements.find((x) => x.id === sub.requirement_id);
+  const c = { id: uid(), requirement_id: r.id, seq: ++seq, created_at: new Date().toISOString(), reference_no: f.reference_no || sub.reference_no, issued_on: f.issued_on || sub.issued_on, expires_on: f.expires_on || sub.expires_on };
+  db.cycles.push(c);
+  db.documents.push({ id: uid(), requirement_id: r.id, cycle_id: c.id, file_name: sub.file_name, storage_path: sub.storage_path, mime_type: sub.mime_type, size_bytes: 1000, created_at: new Date().toISOString(), deleted_at: null });
+  sub.status = 'approved';
+  return c.id;
+}
+export async function saveStaffRole(orgId, name, typesIn) {
+  const codes = [...new Set(typesIn)].filter((c) => types.some((t) => t.code === c && t.subject === 'person'));
+  const ex = plusDb.roles.find((r) => r.name.trim().toLowerCase() === name.trim().toLowerCase());
+  if (ex) { ex.type_codes = codes; return ex.id; }
+  const r = { id: uid(), org_id: org.id, name: name.trim(), type_codes: codes };
+  plusDb.roles.push(r);
+  return r.id;
+}
+export const deleteStaffRole = async (id) => { plusDb.roles = plusDb.roles.filter((r) => r.id !== id); };
+export async function applyStaffRole(id) {
+  const ro = plusDb.roles.find((r) => r.id === id);
+  let n = 0;
+  for (const p of db.people.filter((x) => !x.deleted_at && x.role_title?.trim().toLowerCase() === ro.name.toLowerCase())) {
+    for (const c of ro.type_codes) if (!db.requirements.some((r) => r.person_id === p.id && r.type_code === c && !r.deleted_at)) { addReq('person', p.id, null, types.find((t) => t.code === c)); n++; }
+  }
+  return n;
+}
+
+// public permit page
+export const trustPages = async () => plusDb.pages.map((p) => ({ ...p, hidden: [...p.hidden] }));
+export async function trustPageSave(orgId, f) {
+  if (!hasPlusMock()) throw notPlus('Your public permit page');
+  let p = plusDb.pages.find((x) => (x.business_id || null) === (f.business_id || null));
+  if (!p) { p = { id: uid(), org_id: org.id, business_id: f.business_id || null, code: Math.random().toString(36).slice(2, 12).replace(/[^a-z0-9]/g, 'x').padEnd(10, 'k'), created_at: new Date().toISOString() }; plusDb.pages.push(p); }
+  Object.assign(p, { title: f.title, intro: f.intro || null, show_vehicles: !!f.show_vehicles, show_staff: !!f.show_staff, show_refs: !!f.show_refs, files: f.files || 'off', hidden: f.hidden || [], live: f.live !== false });
+  return { ...p, hidden: [...p.hidden] };
+}
+export const trustNewCode = async (id) => { const p = plusDb.pages.find((x) => x.id === id); p.code = Math.random().toString(36).slice(2, 12).padEnd(10, 'q'); return p.code; };
+export const trustDelete = async (id) => { plusDb.pages = plusDb.pages.filter((x) => x.id !== id); };
+export const trustRecipients = async (pageId) => plusDb.recipients.filter((r) => r.page_id === pageId && r.status !== 'removed').map((r) => ({ ...r }));
+export async function trustAddRecipient(pageId, f) {
+  if (!/^[^@\s<>"]+@[^@\s<>"]+\.[a-z]{2,}$/i.test(f.email || '')) throw new Error('Enter a valid email address.');
+  const r = { id: uid(), page_id: pageId, org_id: org.id, name: f.name, company: f.company || null, email: f.email.toLowerCase(), status: 'active', source: 'owner', created_at: new Date().toISOString(), open_count: 0, last_opened_at: null, last_sent_at: null };
+  plusDb.recipients.unshift(r);
+  return r.id;
+}
+export const trustRemoveRecipient = async (id) => { plusDb.recipients.find((r) => r.id === id).status = 'removed'; };
+export const trustDecide = async (id, yes) => { plusDb.recipients.find((r) => r.id === id).status = yes ? 'active' : 'declined'; };
+export const trustViews = async (pageId) => plusDb.views.filter((v) => v.page_id === pageId).map((v) => ({ ...v }));
+
+// the permit check
+export async function runPermitCheck() {
+  const rows = statusRows().filter((r) => !(r.person_id && db.people.find((p) => p.id === r.person_id)?.paused_at));
+  const found = [];
+  const who = (r) => r.subject_name + (r.plate_no ? ' · ' + r.plate_no : '');
+  const fd = (iso) => new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  for (const r of rows) {
+    if (r.status === 'action_required') found.push({ key: 'expired:' + r.id, kind: 'expired', severity: 'fix', title: `${r.name} expired ${fd(r.expires_on)}`, detail: `${who(r)}. Renew it, or if it's already renewed, add the new expiry date and copy.`, action: 'renew', requirement_id: r.id });
+    if (!r.cycle_id) found.push({ key: 'nodetails:' + r.id, kind: 'no_details', severity: 'fix', title: `No details for ${r.name} yet`, detail: `${who(r)}. Add the reference number, expiry date and a copy, or remove it if it doesn't apply.`, action: 'add_details', requirement_id: r.id });
+    else if (!r.document_count && !(r.expires && !r.expires_on)) found.push({ key: 'nocopy:' + r.id, kind: 'no_copy', severity: 'fix', title: `No copy uploaded: ${r.name}`, detail: `${who(r)}. Upload a photo or scan, so it's ready when an inspector or client asks.`, action: 'upload', requirement_id: r.id });
+    if (r.expires && r.expires_on && r.days_left >= 0 && r.days_left <= 60 && r.status !== 'in_progress') found.push({ key: 'soon:' + r.id, kind: 'due_soon', severity: 'soon', title: `${r.name} expires ${fd(r.expires_on)} (in ${r.days_left} days)`, detail: `${who(r)}. Start the renewal early: offices get busy near deadlines.`, action: 'renew', requirement_id: r.id });
+  }
+  if (globalThis.PP_DEMO || globalThis.PP_TEAM) {
+    found.push({ key: 'common:b1:l1:sanitary_permit', kind: 'missing_common', severity: 'confirm', title: 'Do you need a Sanitary Permit?', detail: "Most restaurants and food businesses need one, and it isn't on Corner <Bakery> & Co's list. Add it, or tell us it doesn't apply.", action: 'add_permit', business_id: 'b1', location_id: 'l1', type_code: 'sanitary_permit' });
+  }
+  const now = new Date().toISOString();
+  for (const f of found) {
+    const ex = plusDb.findings.find((x) => x.key === f.key);
+    if (ex) Object.assign(ex, f, { status: ex.status === 'dismissed' ? 'dismissed' : 'open', last_seen_at: now });
+    else plusDb.findings.push({ id: uid(), org_id: org.id, ...f, status: 'open', first_seen_at: now, last_seen_at: now, note: null });
+  }
+  for (const f of plusDb.findings) if (f.status === 'open' && !found.some((x) => x.key === f.key)) f.status = 'fixed';
+  const open = plusDb.findings.filter((f) => f.status === 'open');
+  const run = { ran_at: now, fix: open.filter((f) => f.severity === 'fix').length, confirm: open.filter((f) => f.severity === 'confirm').length, soon: open.filter((f) => f.severity === 'soon').length,
+    items: rows.length, in_order: rows.filter((r) => r.status === 'compliant' || (r.status === 'in_progress' && (r.days_left ?? 0) >= 0)).length };
+  plusDb.runs.unshift(run);
+  return { ...run, plus: hasPlusMock() };
+}
+export const findings = async () => (hasPlusMock() ? plusDb.findings.filter((f) => ['open', 'dismissed'].includes(f.status)).map((f) => ({ ...f })) : []);
+export async function dismissFinding(id, note) { const f = plusDb.findings.find((x) => x.id === id); if (f.severity === 'fix') throw new Error("This one closes by itself once it's fixed."); f.status = 'dismissed'; f.note = note || null; }
+export const reopenFinding = async (id) => { plusDb.findings.find((x) => x.id === id).status = 'open'; };
+export const saveDocumentReading = async () => {};
+export const unreadPhotos = async () => [];
+
+// templates
+const TEMPLATES = [
+  { code: 'authorization_letter', title: 'Authorization letter', category: 'Letters', summary: 'Lets someone file, pay for and claim a permit for your business.', use_when: 'When an employee goes to the city hall or barangay for you.', notarize: false, sort: 10, version: 1,
+    fields: [{ key: 'date', label: 'Date', source: 'today' }, { key: 'office', label: 'Office', required: true, hint: 'e.g. Business Permits and Licensing Office' }, { key: 'owner_name', label: 'Your name', source: 'me_name', required: true },
+      { key: 'business_name', label: 'Business name', source: 'business_name', required: true }, { key: 'rep_name', label: 'Person you authorize', required: true }, { key: 'permit_name', label: 'Permit', source: 'permit_name', required: true }],
+    body: '{{date}}\n\n{{office}}\n\nTo whom it may concern:\n\nI, {{owner_name}}, of {{business_name}}, authorize {{rep_name}} to process, pay for and claim the {{permit_name}} of {{business_name}} on our behalf.\n\nRespectfully,\n\n\n_____________________________\n{{owner_name}}' },
+  { code: 'affidavit_of_loss', title: 'Affidavit of Loss', category: 'Sworn and notarized', summary: 'For a lost permit, certificate, official receipt or registration paper.', use_when: 'When you need a replacement of a lost document.', notarize: true, sort: 40, version: 1,
+    fields: [{ key: 'owner_name', label: 'Your full name', source: 'me_name', required: true }, { key: 'business_name', label: 'Business name', source: 'business_name', required: true }, { key: 'lost_document', label: 'Document lost', source: 'permit_name', required: true }, { key: 'lost_no', label: 'Its number', source: 'permit_no' }],
+    body: 'AFFIDAVIT OF LOSS\n\nI, {{owner_name}}, of legal age, Filipino, state that:\n\n1. {{business_name}} was issued a {{lost_document}}, No. {{lost_no}};\n\n2. The document is now lost.\n\n_____________________________\n{{owner_name}}\nAffiant' },
+];
+export const listTemplates = async () => TEMPLATES.map((t) => ({ code: t.code, title: t.title, category: t.category, summary: t.summary, use_when: t.use_when, notarize: t.notarize, sort: t.sort, version: t.version,
+  preview: t.body.replace(/\{\{[a-z0-9_]+\}\}/g, '______').split('\n').slice(0, 7).join('\n') }));
+export async function getTemplate(orgId, code) {
+  if (!hasPlusMock()) throw notPlus('Ready-to-use templates');
+  const t = TEMPLATES.find((x) => x.code === code);
+  return { code: t.code, title: t.title, body: t.body, fields: t.fields, notarize: t.notarize, version: t.version, use_when: t.use_when };
+}
+
+// staff (PermitPal): bills to confirm, giving time
+export const adminAddonInvoices = async () => plusDb.invoices.map((i) => ({ ...i, orgs: { name: org.name } }));
+export const adminAddons = async () => plusDb.addons.map((a) => ({ ...a, orgs: { name: org.name } }));
+export async function adminConfirmAddonPayment(id, okPaid, note) {
+  const i = plusDb.invoices.find((x) => x.id === id);
+  if (!okPaid) { i.status = 'due'; i.note = note || 'We could not find this payment.'; return; }
+  paidMock(i);
+}
+export const adminVoidAddonInvoice = async (id, note) => { const i = plusDb.invoices.find((x) => x.id === id); i.status = 'cancelled'; i.note = note; };
+export async function adminSetAddon(orgId, kind, people, until) {
+  let a = addonMock(kind);
+  if (!a) { a = { org_id: org.id, kind, started_on: today() }; plusDb.addons.push(a); }
+  Object.assign(a, { people_max: kind === 'staff' ? people : null, billing: 'monthly', paid_through: until, comped: true, trial: false });
+  syncPeople();
+}
+
+// The demo shows Plus on (a free trial), a public page with visits and recipients, staff with one photo to check.
+if (PLUS_ON && (globalThis.PP_DEMO || globalThis.PP_PLUS)) {
+  plusDb.addons.push({ org_id: org.id, kind: 'plus', people_max: null, billing: 'monthly', paid_through: addDays(9), trial: true, trial_used_on: addDays(-4), comped: false, started_on: null });
+  const p = { id: 'tp1', org_id: org.id, business_id: 'b1', code: 'k7m2q9xd4p', title: 'Corner <Bakery> & Co', intro: 'Neighbourhood bakery in Makati since 2011', show_vehicles: false, show_staff: true, show_refs: true, files: 'recipients', hidden: [], live: true, created_at: daysAgoIso(20) };
+  plusDb.pages.push(p);
+  const src = ['qr', 'qr', 'qr', 'link', 'qr', 'badge', 'sign', 'qr', 'link', 'email', 'qr', 'pack'];
+  for (let i = 0; i < 46; i++) plusDb.views.push({ page_id: p.id, viewed_at: daysAgoIso(i % 28, i), source: src[i % src.length], recipient_id: null });
+  plusDb.recipients.push({ id: 'tr1', page_id: p.id, org_id: org.id, name: 'Ana Reyes', company: 'SM Supermalls, vendor accreditation', email: 'vendors@smmalls.ph', status: 'active', source: 'owner', created_at: daysAgoIso(18), open_count: 3, last_opened_at: daysAgoIso(2), last_sent_at: daysAgoIso(9) });
+  plusDb.recipients.push({ id: 'tr2', page_id: p.id, org_id: org.id, name: 'Ramon Cruz', company: 'Robinsons Supermarket', email: 'ramon@robinsons.ph', status: 'requested', source: 'request', note: 'For your supplier accreditation', created_at: daysAgoIso(1), open_count: 0, last_opened_at: null, last_sent_at: null });
+  plusDb.roles.push({ id: 'ro1', org_id: org.id, name: 'Driver', type_codes: ['drivers_license', 'nbi_clearance'] });
+  // staff: a driver whose health card lapsed and who sent the renewed one from their link; a cashier with a link to use
+  if (!db.people.some((x) => x.id === 'pp1')) {
+    db.people.push({ id: 'pp1', org_id: org.id, full_name: 'Jun Reyes', role_title: 'Driver', business_id: 'b1', deleted_at: null });
+    addReq('person', 'pp1', null, types.find((t) => t.code === 'drivers_license'), { reference_no: 'N01-23-456789', expires_on: addDays(48) });
+    addReq('person', 'pp1', null, types.find((t) => t.code === 'health_certificate'), { reference_no: 'HC-2291', expires_on: addDays(-3) });
+  }
+  Object.assign(db.people.find((x) => x.id === 'pp1'), { email: 'jun.reyes@example.ph', mobile: '0917 555 0101', remind_worker: true, created_at: daysAgoIso(30) });
+  db.people.push({ id: 'pp2', org_id: org.id, full_name: 'Liza Santos', role_title: 'Cashier', business_id: 'b1', deleted_at: null, email: null, mobile: '0918 222 3344', remind_worker: true, created_at: daysAgoIso(10) });
+  const nbi = addReq('person', 'pp2', null, types.find((t) => t.code === 'nbi_clearance'), { reference_no: 'NBI-7781', expires_on: addDays(12) });
+  const hc = db.requirements.find((r) => r.person_id === 'pp1' && r.type_code === 'health_certificate');
+  plusDb.submissions.push({ id: 'ws1', org_id: org.id, person_id: 'pp1', requirement_id: hc.id, token: uid(), storage_path: 'o1/worker/x/health-card.jpg', file_name: 'health-card.jpg', mime_type: 'image/jpeg',
+    expires_on: addDays(362), issued_on: today(), reference_no: 'HC-3310', note: 'Renewed at the city health office', status: 'pending', created_at: daysAgoIso(0, 3) });
+  plusDb.links.push({ token: '11111111-2222-4333-8444-555555555555', requirement_id: nbi.id, person_id: 'pp2', used_at: null });
+}
+function daysAgoIso(d, h = 0) { return new Date(Date.now() - d * 864e5 - h * 3600e3).toISOString(); }

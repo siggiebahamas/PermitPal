@@ -74,6 +74,8 @@ export function wireScan(form, { fields, attach = 'file', expect = null }) {
     if (fileInput && !fileInput.files.length) {
       try { const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files; attached = true; } catch { /* older browsers: they can pick it themselves */ }
     }
+    // Kept with the form while this photo is the one attached (the permit check compares it with what's saved).
+    if (attached) form.dataset.scanReading = JSON.stringify({ expires: found.expires.map((d) => d.value).slice(0, 4), kind: found.kind, chars: found.chars });
     status.innerHTML = String(html`<div class="scan-result">
       ${mismatch ? html`<p class="banner warn"><b>Is this the right photo?</b> It looks like a ${kindName}, not a ${expectName}.</p>` : ''}
       <p><b>${filled.length ? `We filled in ${plural(filled.length, 'box', 'boxes')} from the photo` : 'Here is what we found'}.</b> Check each one against the document: photos can be misread.</p>
@@ -86,7 +88,8 @@ export function wireScan(form, { fields, attach = 'file', expect = null }) {
       el.value = b.dataset.v; el.classList.add('from-scan'); el.dispatchEvent(new Event('input', { bubbles: true }));
       b.closest('li').querySelector('.scan-val').innerHTML = String(html`using <b>${el.type === 'date' ? fmtDate(b.dataset.v) : b.dataset.v}</b>`);
     }));
-    status.querySelector('[data-scan-detach]')?.addEventListener('click', (e) => { fileInput.value = ''; e.target.closest('p').remove(); });
+    status.querySelector('[data-scan-detach]')?.addEventListener('click', (e) => { fileInput.value = ''; delete form.dataset.scanReading; e.target.closest('p').remove(); });
+    fileInput?.addEventListener('change', () => { delete form.dataset.scanReading; }, { once: true });
   }
   // Typing over a filled box removes its highlight.
   form.addEventListener('input', (e) => { if (e.isTrusted) { e.target.classList?.remove('from-scan'); if (e.target.dataset) delete e.target.dataset.prefill; } });

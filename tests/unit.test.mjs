@@ -318,3 +318,20 @@ test('money: chart ticks are round numbers that cover the top', () => {
 test('csv: a name that looks like a formula stays text in Excel; numbers stay numbers', () => {
   assert.equal(toCsv([['=HYPERLINK("x")', '+1', '@cmd', '-2000', '-12.5', 'ok']]), `"'=HYPERLINK(""x"")",'+1,'@cmd,-2000,-12.5,ok`);
 });
+
+// Staff licences and Plus: the same prices as the database (private.staff_monthly / private.addon_price,
+// checked in supabase/tests/14_plus.sql), so the price on screen is the price charged.
+import { staffMonthly, staffBands, addonPrice, addonLabel, FREE_PEOPLE } from '../web/js/prices.js';
+test('prices: 3 people free, ₱100 to the 20th, ₱60 to the 100th, ₱40 after', () => {
+  assert.equal(FREE_PEOPLE, 3);
+  for (const [n, p] of [[0, 0], [3, 0], [4, 100], [20, 1700], [21, 1760], [25, 2000], [100, 6500], [101, 6540], [200, 10500]]) assert.equal(staffMonthly(n), p, `${n} people`);
+  for (let n = 3; n < 600; n++) assert.ok(staffMonthly(n + 1) > staffMonthly(n), `one more than ${n} never costs less`);
+  assert.deepEqual(staffBands(25).map((b) => [b.count, b.each, b.amount]), [[17, 100, 1700], [5, 60, 300]]);
+});
+test('prices: yearly is 10 months; Plus is ₱199 or ₱1,990', () => {
+  assert.equal(addonPrice('staff', 25, 'yearly'), 20000);
+  assert.equal(addonPrice('plus', null, 'monthly'), 199);
+  assert.equal(addonPrice('plus', null, 'yearly'), 1990);
+  assert.equal(addonLabel('staff', 25, 'monthly'), 'Staff licences, up to 25 people (monthly)');
+  assert.equal(addonLabel('plus', null, 'yearly'), 'PermitPal Plus (yearly)');
+});

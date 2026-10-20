@@ -210,7 +210,7 @@ function wireSuggestion(form, r) {
   update();
 }
 
-async function saveRecord(r, f, { cycleId, file }) {
+async function saveRecord(r, f, { cycleId, file, reading = null }) {
   const noExpiry = !!f.no_expiry;
   if (!noExpiry && f.expires_on && f.issued_on && f.expires_on < f.issued_on) throw new Error('The expiry date is before the issue date.');
   if (noExpiry === r.expires) await db.updateRequirement(r.id, { expires: !noExpiry });
@@ -218,9 +218,16 @@ async function saveRecord(r, f, { cycleId, file }) {
     cycleId, orgId: r.org_id, requirementId: r.id,
     reference_no: f.reference_no, issuer: f.issuer, issued_on: f.issued_on, expires_on: noExpiry ? null : f.expires_on, amount_paid: f.amount_paid,
   });
-  if (file && file.size) await db.uploadDocument({ orgId: r.org_id, requirementId: r.id, cycleId: id, file });
+  if (file && file.size) {
+    const doc = await db.uploadDocument({ orgId: r.org_id, requirementId: r.id, cycleId: id, file });
+    // What "Fill from a photo" read on this photo, for the permit check (it asks if the saved date differs).
+    if (reading && has('plus') && doc?.id) await db.saveDocumentReading(doc.id, reading).catch(() => {});
+  }
   return id;
 }
+
+// The photo "Fill from a photo" read, if that same photo is the one being saved.
+const scanReading = (form) => { try { return form?.dataset.scanReading ? JSON.parse(form.dataset.scanReading) : null; } catch { return null; } };
 
 async function afterChange(message) {
   detail = null;
@@ -239,11 +246,11 @@ export function openEdit(r) {
     ${when(!r.cycle_id, fileField())}`, {
     submitLabel: 'Save',
     onOpen: (form) => { wireSuggestion(form, r); wireScan(form, { fields: SCAN_FIELDS, expect: r.type_code }); },
-    onSubmit: async (fd) => {
+    onSubmit: async (fd, form) => {
       const f = formObject(fd);
       const problem = fd.get('file')?.size ? db.checkFile(fd.get('file')) : null;
       if (problem) throw new Error(problem);
-      await saveRecord(r, f, { cycleId: r.cycle_id, file: r.cycle_id ? null : fd.get('file') });
+      await saveRecord(r, f, { cycleId: r.cycle_id, file: r.cycle_id ? null : fd.get('file'), reading: scanReading(form) });
       await afterChange('Saved.');
     },
   });
@@ -263,12 +270,12 @@ export function openRenew(r) {
       const issued = form.querySelector('[name=issued_on]');
       if (!issued.value) { issued.value = todayPH(); issued.dataset.prefill = '1'; issued.dispatchEvent(new Event('input', { bubbles: true })); }
     },
-    onSubmit: async (fd) => {
+    onSubmit: async (fd, form) => {
       const f = formObject(fd);
       if (!f.no_expiry && !f.expires_on) throw new Error('Please enter the new expiry date.');
       const problem = fd.get('file')?.size ? db.checkFile(fd.get('file')) : null;
       if (problem) throw new Error(problem);
-      await saveRecord(r, f, { cycleId: null, file: fd.get('file') });
+      await saveRecord(r, f, { cycleId: null, file: fd.get('file'), reading: scanReading(form) });
       await afterChange(fd.get('file')?.size ? 'Renewal recorded.' : 'Renewal recorded. Upload the new document to mark it compliant.');
     },
   });

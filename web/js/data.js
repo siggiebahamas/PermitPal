@@ -65,10 +65,10 @@ export async function avatarUrl(path) {
 // ---------------------------------------------------------------- workspace data
 let typesCache = null;
 let servicesCache = null;
-export async function loadOrgData(orgId, { revenue = false } = {}) {
+export async function loadOrgData(orgId, { revenue = false, plus = false } = {}) {
   if (!typesCache) typesCache = ok(await sb.from('requirement_types').select('*').order('sort'));
   if (!servicesCache) servicesCache = ok(await sb.from('services').select('*').eq('active', true).order('sort'));
-  const [businesses, locations, vehicles, people, reqs, requests, members, care] = await Promise.all([
+  const [businesses, locations, vehicles, people, reqs, requests, members, care, plusData] = await Promise.all([
     sb.from('businesses').select('*').eq('org_id', orgId).is('deleted_at', null).order('name').then(ok),
     sb.from('business_locations').select('*').eq('org_id', orgId).is('deleted_at', null).order('is_main', { ascending: false }).order('name').then(ok),
     sb.from('vehicles').select('*').eq('org_id', orgId).is('deleted_at', null).order('make_model').then(ok),
@@ -77,8 +77,9 @@ export async function loadOrgData(orgId, { revenue = false } = {}) {
     sb.from('assistance_requests').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(ok),
     loadMembers(orgId),
     revenue ? loadCare(orgId) : { plans: [], invoices: [], coverage: [], claims: [], tiers: [], staff: [] },
+    plus ? loadPlus(orgId) : { addons: [], invoices: [], roles: [], submissions: [], stopping: {} },
   ]);
-  return { types: typesCache, services: servicesCache, businesses, locations, vehicles, people, reqs, requests, members, care };
+  return { types: typesCache, services: servicesCache, businesses, locations, vehicles, people, reqs, requests, members, care, plus: plusData };
 }
 
 // The team, with each teammate's profile (org_members points at auth.users, so profiles come separately).
@@ -186,6 +187,12 @@ export async function uploadDocument({ orgId, requirementId, cycleId, file }) {
   }).select('*').single());
 }
 
+// A file's contents (for the .zip packs and reading photos), straight from private storage.
+export async function fileBlob(path) {
+  const { data, error } = await sb.storage.from('documents').download(path);
+  if (error) throw error;
+  return data;
+}
 export async function fileUrl(path, downloadName) {
   const { data, error } = await sb.storage.from('documents').createSignedUrl(path, 300, downloadName ? { download: downloadName } : undefined);
   if (error) throw error;
@@ -569,3 +576,102 @@ export const adminStatementVoid = async (id, note) => ok(await sb.rpc('admin_sta
 export const adminApplications = async () => ok(await sb.from('partner_applications').select('*').order('created_at', { ascending: false }).limit(200));
 export const adminApplicationToPartner = async (id) => ok(await sb.rpc('admin_application_to_partner', { p_app: id }));
 export const adminSetApplication = async (id, patch) => ok(await sb.from('partner_applications').update(patch).eq('id', id));
+
+// ---------------------------------------------------------------- PermitPal Plus and staff licences
+// Plans you add on, their bills, licences by role and photos workers sent (small lists, loaded with the workspace).
+export async function loadPlus(orgId) {
+  const [addons, invoices, roles, submissions, stopping] = await Promise.all([
+    sb.from('addons').select('*').eq('org_id', orgId).then(ok),
+    sb.from('addon_invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(24).then(ok),
+    sb.from('staff_roles').select('*').eq('org_id', orgId).order('name').then(ok),
+    sb.from('worker_submissions').select('*').eq('org_id', orgId).eq('status', 'pending').order('created_at').then(ok),
+    sb.rpc('addon_stopping', { p_org: orgId }).then(ok),
+  ]);
+  return { addons, invoices, roles, submissions, stopping: stopping || {} };
+}
+export const addonPreview = async (orgId, kind, people, billing) => ok(await sb.rpc('addon_preview', { p_org: orgId, p_kind: kind, p_people: people ?? null, p_billing: billing }));
+export const addonCheckout = async (orgId, kind, people, billing) => ok(await sb.rpc('addon_checkout', { p_org: orgId, p_kind: kind, p_people: people ?? null, p_billing: billing }));
+export const addonCancelInvoice = async (id) => ok(await sb.rpc('addon_cancel_invoice', { p_invoice: id }));
+export const addonStop = async (orgId, kind) => ok(await sb.rpc('addon_stop', { p_org: orgId, p_kind: kind }));
+export const addonResume = async (orgId, kind) => ok(await sb.rpc('addon_resume', { p_org: orgId, p_kind: kind }));
+export const startPlusTrial = async (orgId) => ok(await sb.rpc('start_plus_trial', { p_org: orgId }));
+export async function addonReportPayment(inv, { method, ref, file }) {
+  let proof = null;
+  if (file && file.size) {
+    const problem = checkFile(file);
+    if (problem) throw new Error(problem);
+    proof = { path: `${inv.org_id}/billing/${inv.id}/${rand()}-${safeName(file.name)}`, name: file.name.slice(0, 255) };
+    ok(await sb.storage.from('documents').upload(proof.path, file, { contentType: file.type || 'image/jpeg', upsert: false }));
+  }
+  return ok(await sb.rpc('addon_report_payment', { p_invoice: inv.id, p_method: method, p_ref: ref || null, p_proof_path: proof?.path || null, p_proof_name: proof?.name || null }));
+}
+// Online checkout (GCash, Maya, card) for a bill: the same checkout as team plans, with the bill as the "plan".
+export async function startAddonCheckout(inv) {
+  const { data, error } = await sb.functions.invoke('create-checkout', { body: { org_id: inv.org_id, plan_id: `addon:${inv.id}`, months: inv.months } });
+  if (error) {
+    let msg = error.message;
+    try { msg = (await error.context.json()).error || msg; } catch { /* keep default */ }
+    throw new Error(msg);
+  }
+  return data.checkout_url;
+}
+
+// Staff: contact details, the worker's upload link, photos they sent, licences by role.
+export const updatePersonContact = async (id, f) => ok(await sb.from('people').update({ email: f.email || null, mobile: f.mobile || null, remind_worker: f.remind_worker !== false }).eq('id', id));
+export const workerLink = async (reqId) => ok(await sb.rpc('worker_link', { p_requirement: reqId }));
+export const workerDecide = async (id, approve, f = {}) => ok(await sb.rpc('worker_decide', {
+  p_submission: id, p_approve: !!approve, p_expires: f.expires_on || null, p_issued: f.issued_on || null, p_ref: f.reference_no || null, p_note: f.note || null,
+}));
+export const saveStaffRole = async (orgId, name, types) => ok(await sb.rpc('save_staff_role', { p_org: orgId, p_name: name, p_types: types || [] }));
+export const deleteStaffRole = async (id) => ok(await sb.rpc('delete_staff_role', { p_id: id }));
+export const applyStaffRole = async (id) => ok(await sb.rpc('apply_staff_role', { p_id: id }));
+// The worker's page (no account): what to send, the upload, and sending it.
+export const workerPage = async (token) => ok(await sb.rpc('worker_page', { p_token: token }));
+export async function workerSend(page, token, { file, expires_on, issued_on, reference_no, note }) {
+  const problem = checkFile(file);
+  if (problem) throw new Error(problem);
+  const path = `${page.folder}/${rand()}-${safeName(file.name)}`;
+  const contentType = file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg');
+  ok(await sb.storage.from('documents').upload(path, file, { contentType, upsert: false }));
+  return ok(await sb.rpc('worker_submit', {
+    p_token: token, p_path: path, p_file_name: file.name.slice(0, 255), p_mime: contentType, p_size: file.size,
+    p_expires: expires_on || null, p_issued: issued_on || null, p_ref: reference_no || null, p_note: note || null,
+  }));
+}
+
+// The public permit page, who gets the updates, and who looked.
+export const trustPages = async (orgId) => ok(await sb.from('trust_pages').select('*').eq('org_id', orgId).order('created_at'));
+export const trustPageSave = async (orgId, f) => ok(await sb.rpc('trust_page_save', {
+  p_org: orgId, p_business: f.business_id || null, p_title: f.title, p_intro: f.intro || null, p_show_vehicles: !!f.show_vehicles,
+  p_show_staff: !!f.show_staff, p_show_refs: !!f.show_refs, p_files: f.files || 'off', p_hidden: f.hidden || [], p_live: f.live !== false,
+}));
+export const trustNewCode = async (id) => ok(await sb.rpc('trust_page_new_code', { p_page: id }));
+export const trustDelete = async (id) => ok(await sb.rpc('trust_page_delete', { p_page: id }));
+export const trustRecipients = async (pageId) => ok(await sb.from('trust_recipients').select('*').eq('page_id', pageId).order('created_at', { ascending: false }));
+export const trustAddRecipient = async (pageId, f) => ok(await sb.rpc('trust_add_recipient', { p_page: pageId, p_name: f.name, p_company: f.company || null, p_email: f.email }));
+export const trustRemoveRecipient = async (id) => ok(await sb.rpc('trust_remove_recipient', { p_id: id }));
+export const trustDecide = async (id, yes) => ok(await sb.rpc('trust_decide_request', { p_id: id, p_ok: !!yes }));
+export const trustViews = async (pageId, sinceIso) => ok(await sb.from('trust_page_views').select('viewed_at, source, recipient_id').eq('page_id', pageId)
+  .gte('viewed_at', sinceIso).order('viewed_at', { ascending: false }).limit(5000));
+
+// The automatic permit check.
+export const runPermitCheck = async (orgId) => ok(await sb.rpc('run_permit_check', { p_org: orgId }));
+export const findings = async (orgId) => ok(await sb.from('audit_findings').select('*').eq('org_id', orgId).in('status', ['open', 'dismissed'])
+  .order('first_seen_at', { ascending: false }).limit(500));
+export const dismissFinding = async (id, note) => ok(await sb.rpc('dismiss_finding', { p_id: id, p_note: note || null }));
+export const reopenFinding = async (id) => ok(await sb.rpc('reopen_finding', { p_id: id }));
+export const saveDocumentReading = async (docId, reading) => ok(await sb.rpc('save_document_reading', { p_doc: docId, p_reading: reading }));
+export const unreadPhotos = async (orgId) => ok(await sb.from('documents').select('id, requirement_id, cycle_id, storage_path, file_name, mime_type')
+  .eq('org_id', orgId).is('deleted_at', null).is('read_at', null).like('mime_type', 'image/%').order('created_at', { ascending: false }).limit(200));
+
+// Templates.
+export const listTemplates = async () => ok(await sb.rpc('list_templates'));
+export const getTemplate = async (orgId, code) => ok(await sb.rpc('get_template', { p_org: orgId, p_code: code }));
+
+// Staff (PermitPal): bills to confirm, plans, giving time.
+export const adminAddonInvoices = async () => ok(await sb.from('addon_invoices').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
+export const adminAddons = async () => ok(await sb.from('addons').select('*, orgs(name)').order('updated_at', { ascending: false }).limit(1000));
+export const adminConfirmAddonPayment = async (id, okPaid, note, invoiceNo) => ok(await sb.rpc('admin_confirm_addon_payment', {
+  p_invoice: id, p_ok: !!okPaid, p_note: note || null, p_invoice_no: invoiceNo || null }));
+export const adminVoidAddonInvoice = async (id, note) => ok(await sb.rpc('admin_void_addon_invoice', { p_invoice: id, p_note: note }));
+export const adminSetAddon = async (orgId, kind, people, until, note) => ok(await sb.rpc('admin_set_addon', { p_org: orgId, p_kind: kind, p_people: people ?? null, p_until: until, p_note: note || null }));

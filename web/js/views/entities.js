@@ -9,6 +9,8 @@ import { plateSchedule, suggestDue } from '../rules.js';
 import * as db from 'pp/data';
 import { scanBox, wireScan } from './scan.js';
 import { careLine } from './care.js';
+import { staffTop, personBanner, askCard, contactFields, saveContact, roleTypes, canAddPerson, blockedAddPerson } from './staff.js';
+import { handlePlanError } from './plus.js';
 
 const tabs = { business: 'requirements', vehicle: 'requirements', person: 'requirements' };
 const optionList = (items, cur) => items.map(([v, l]) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`);
@@ -81,7 +83,7 @@ const entityCard = (subject) => (x) => {
   return html`<section class="card entity">
     <a class="card-head entity-head" href="${href}"><div class="${subject === 'business' ? '' : 'with-ava'}">${subject === 'business' ? '' : avatar(subject, x)}
       <h2>${subject === 'business' ? x.name : subject === 'person' ? x.full_name : x.make_model}${subject === 'vehicle' && x.plate_no ? html` <span class="plate">${x.plate_no}</span>` : ''}</h2>
-      <p class="card-sub">${meta}</p>
+      <p class="card-sub">${meta}${subject === 'person' && x.paused_at ? html` <span class="tag">Paused</span>` : ''}</p>
       <div class="chips">${['action_required', 'renew_soon', 'in_progress', 'needs_information', 'compliant'].map((k) =>
         c[k] ? html`<span class="chip ${STATUS[k].cls}">${c[k]} ${STATUS[k].label.toLowerCase()}</span>` : '')}</div></div></a>
     ${reqs.map((r) => html`<a class="line" href="#/requirement/${r.id}"><span class="line-main"><b>${r.name}</b>${locs.length > 1 && r.location_id ? html`<small>${location_(r.location_id)?.name}</small>` : ''}</span>
@@ -532,6 +534,7 @@ export function personList(el, params) {
     <div class="page-head"><div><h1>People</h1><p class="muted">Driver's licenses, PRC licenses, health cards and clearances your staff need.</p></div>
       ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-ghost" data-act="imp-open" data-kind="staff">${ICON.upload} Import from spreadsheet</button>
         <button class="btn btn-primary" data-act="person-add">+ Add person</button></div>`)}</div>
+    ${staffTop()}
     ${list.length ? html`${timeline('person', list)}<h3 class="section-label">Your people</h3><div class="cards">${list.map(entityCard('person'))}</div>`
       : empty('No people yet', 'Add drivers, cooks, pharmacists and other staff whose licences must stay valid.',
         when(canEdit(), html`<div class="btn-row"><button class="btn btn-primary" data-act="person-add">Add a person</button><button class="btn btn-ghost" data-act="imp-open" data-kind="staff">Import from spreadsheet</button></div>`))}`);
@@ -539,23 +542,50 @@ export function personList(el, params) {
 }
 
 function addPerson() {
+  if (!canAddPerson()) return blockedAddPerson();
   const types = S.data.types.filter((t) => t.subject === 'person');
+  const roles = has('plus') ? [...new Set([...(S.data.plus?.roles || []).map((r) => r.name), ...(S.data.people || []).map((p) => p.role_title).filter(Boolean)])] : [];
   openModal('Add a person', html`
     <label class="field"><span>Full name</span><input name="full_name" required maxlength="160" placeholder="e.g. Juan dela Cruz"></label>
     <div class="grid2">
-      <label class="field"><span>Role <small>(optional)</small></span><input name="role_title" maxlength="120" placeholder="e.g. Driver, Cook, Pharmacist"></label>
+      <label class="field"><span>Role <small>(optional)</small></span><input name="role_title" maxlength="120" placeholder="e.g. Driver, Cook, Pharmacist" ${roles.length ? 'list=person-roles' : ''}>
+        ${when(roles.length, html`<datalist id="person-roles">${roles.map((r) => html`<option value="${r}"></option>`)}</datalist>`)}</label>
       <label class="field"><span>Works at <small>(optional)</small></span><select name="business_id"><option value="">—</option>${S.data.businesses.map((b) => html`<option value="${b.id}">${b.name}</option>`)}</select></label>
     </div>
     <h4>Which licences should we track?</h4>
     ${types.map((t) => html`<label class="check"><input type="checkbox" name="types" value="${t.code}"> <span>${t.name}${t.agency ? html` <small class="muted">· ${t.agency}</small>` : ''}</span></label>`)}
     <p class="muted small">You'll enter each expiry date from the card itself. You can add more later.</p>
-    <label class="check"><input type="checkbox" name="consent" required> This person knows we'll keep their licence details in PermitPal to track renewals.</label>`, {
+    ${when(has('plus'), html`<label class="check" data-remember hidden><input type="checkbox" name="remember_role" checked> <span>Use these licences for everyone in this role</span></label>
+      <div class="grid2">
+        <label class="field"><span>Their email <small>(optional: we remind them too)</small></span><input type="email" name="email" maxlength="254" placeholder="name@example.com"></label>
+        <label class="field"><span>Their mobile <small>(optional)</small></span><input name="mobile" maxlength="20" inputmode="tel" placeholder="0917 123 4567"></label>
+      </div>`)}
+    <label class="check"><input type="checkbox" name="consent" required> This person knows we'll keep their licence details in PermitPal to track renewals${has('plus') ? ', and may email them reminders' : ''}.</label>`, {
     submitLabel: 'Add person',
+    onOpen: (form) => {
+      if (!has('plus')) return;
+      // A saved role ticks its licences; a new role with licences ticked can be remembered.
+      const role = form.querySelector('[name=role_title]');
+      const remember = form.querySelector('[data-remember]');
+      const sync = () => {
+        const t = roleTypes(role.value);
+        if (t) form.querySelectorAll('[name=types]').forEach((c) => { c.checked = t.includes(c.value); });
+        remember.hidden = !role.value.trim() || !!t;
+      };
+      role.addEventListener('input', sync);
+      role.addEventListener('change', sync);
+    },
     onSubmit: async (fd) => {
       const f = formObject(fd);
       if (!f.full_name) throw new Error('Please enter the name.');
       if (!f.consent) throw new Error("Please confirm this person knows we'll keep their licence details. Licence numbers are protected personal information.");
-      const id = await db.createPerson(S.org.id, { ...f, types: fd.getAll('types') });
+      const picked = fd.getAll('types');
+      let id;
+      try { id = await db.createPerson(S.org.id, { ...f, types: picked }); } catch (e) { if (handlePlanError(e)) return; throw e; }
+      if (has('plus')) {
+        if (f.email || f.mobile) await saveContact({ id }, { ...f, remind_worker: 'on' }).catch((e) => toastError(e));
+        if (f.remember_role && f.role_title?.trim() && picked.length && !roleTypes(f.role_title)) await db.saveStaffRole(S.org.id, f.role_title.trim(), picked).catch(() => {});
+      }
       await reload();
       go(`#/people/${id}`);
       toast(`${f.full_name} added. Now add each licence's expiry date.`);
@@ -577,6 +607,7 @@ export function personDetail(el, id) {
       <p class="muted">${[p.role_title, p.business_id && business(p.business_id)?.name].filter(Boolean).join(' · ') || 'Staff member'}</p></div>
       <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="person" data-id="${id}">+ Licence</button>`)}
         <button class="btn btn-ghost" data-act="share-open" data-scope="person" data-id="${id}">${ICON.share} Share proof</button></div></div>
+    ${personBanner(p)}
     ${statTiles(c, `person:${id}`)}
     <div class="tabs">${tabBtn('requirements', 'Licences')}${tabBtn('documents', 'Documents')}${tabBtn('details', 'Details')}</div>
     <div id="tab-body"></div>`);
@@ -586,6 +617,7 @@ export function personDetail(el, id) {
       ${reqs.length ? reqs.map((r) => reqRow(r, { showSubject: false })) : html`<p class="muted pad">No licences tracked yet.</p>`}
       ${when(canEdit(), html`<button class="line add" data-act="req-add" data-subject="person" data-id="${id}"><span class="plus">+</span>Add a licence</button>`)}
       ${when(reqs.length, html`<div class="sheet-foot">${c.compliant} of ${c.total} valid</div>`)}</section>
+      ${askCard(p)}
       ${suggestions('person', id)}`);
   } else if (tab === 'documents') filesTab(body, reqs, 'person', id);
   else {
@@ -595,7 +627,7 @@ export function personDetail(el, id) {
         <div class="grid2">
           <label class="field"><span>Role</span><input name="role_title" maxlength="120" value="${p.role_title}"></label>
           <label class="field"><span>Works at</span><select name="business_id"><option value="">—</option>${S.data.businesses.map((b) => html`<option value="${b.id}" ${b.id === p.business_id ? 'selected' : ''}>${b.name}</option>`)}</select></label>
-        </div><button class="btn btn-primary">Save changes</button></form>`
+        </div>${contactFields(p)}<button class="btn btn-primary">Save changes</button></form>`
         : html`<dl class="kv"><dt>Name</dt><dd>${p.full_name}</dd><dt>Role</dt><dd>${p.role_title || '—'}</dd></dl>`}</section>
       ${when(isOrgAdmin(), html`<div class="danger-zone"><button class="btn btn-ghost danger" data-act="person-delete" data-id="${id}">Remove this person</button>
         <span class="muted small">Left the company? Their records are kept and can be restored from Trash.</span></div>`)}`);
@@ -604,7 +636,7 @@ export function personDetail(el, id) {
       e.preventDefault();
       const f = formObject(new FormData(form));
       if (!f.full_name) return toast('Name cannot be empty.', 'error');
-      try { await db.updatePerson(id, { full_name: f.full_name, role_title: f.role_title, business_id: f.business_id || null }); await reload(); toast('Saved.'); } catch (err) { toastError(err); }
+      try { await saveContact(p, f); await db.updatePerson(id, { full_name: f.full_name, role_title: f.role_title, business_id: f.business_id || null }); await reload(); toast('Saved.'); } catch (err) { toastError(err); }
     });
   }
 }

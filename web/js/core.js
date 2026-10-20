@@ -39,6 +39,32 @@ export function effectivePlan() {
   return S.plans.find((p) => p.id === (lapsed ? 'free' : o.plan_id)) || S.plans[0];
 }
 
+// ---------------------------------------------------------------- PermitPal Plus and staff licences
+// The database decides (it refuses anything not paid for); these only decide what to show.
+export const TEAM_PLANS = ['fleet', 'firm', 'head_office', 'property'];
+const todayISO = () => new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 10);
+export const plusOf = () => S.data?.plus || { addons: [], invoices: [], roles: [], submissions: [], stopping: {} };
+export const addonOf = (kind) => plusOf().addons.find((a) => a.kind === kind) || null;
+export const addonActive = (a) => !!a && !!a.paid_through && a.paid_through >= todayISO();
+// Plus comes with every team plan (and its free trial).
+export function plusIncluded() {
+  const o = S.org;
+  if (!o || o.kind === 'business') return false;
+  return (o.trial_ends_at && new Date(o.trial_ends_at) > new Date()) || TEAM_PLANS.includes(effectivePlan()?.id);
+}
+export const hasPlus = () => has('plus') && (addonActive(addonOf('plus')) || plusIncluded());
+export const FREE_PEOPLE_N = 3;
+// People the workspace may track today, and the most that can be added (a move down that starts next period counts already).
+export function peopleAllowed() {
+  const a = addonOf('staff');
+  return Math.max(FREE_PEOPLE_N, addonActive(a) ? a.people_max : 0);
+}
+export function peopleCap() {
+  const a = addonOf('staff');
+  const allowed = peopleAllowed();
+  return addonActive(a) && a.next_people_max ? Math.min(allowed, Math.max(FREE_PEOPLE_N, a.next_people_max)) : allowed;
+}
+
 // ---------------------------------------------------------------- lookups
 export const business = (id) => S.data?.businesses.find((b) => b.id === id);
 export const vehicle = (id) => S.data?.vehicles.find((v) => v.id === id);

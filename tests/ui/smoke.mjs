@@ -1184,7 +1184,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await go('#/admin');
   check('online only: staff have no Care tab', (await page.locator('[data-act=admin-tab][data-tab=care]').count()) === 0);
   await page.click('[data-act=money-view][data-v=earnings]'); await page.waitForTimeout(350);
-  check('online only: Money doesn\'t show a care stream', !/Monthly care plans/.test(await page.textContent('main')) && /Team subscriptions/.test(await page.textContent('main')));
+  check('online only: Money doesn\'t show a care stream', !/Monthly care plans/.test(await page.textContent('main')) && /Subscriptions/.test(await page.textContent('main')));
   await page.click('[data-act=admin-tab][data-tab=services]'); await page.waitForTimeout(400);
   check('online only: staff see which services are hidden', (await page.locator('main .chip', { hasText: 'In person: hidden' }).count()) >= 10);
   check('online only: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
@@ -1195,6 +1195,225 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('online only: the sign-in page doesn\'t sell Year-round care', !/Or let us do it all|Year-round care/.test(await out.textContent('.landing')));
   await out.close();
   inPerson = true;
+}
+
+// PermitPal Plus and staff licences: plans and bills, the free 3 people, the permit check, templates,
+// the public permit page (and the page itself), the worker's upload link, and staff confirming payments.
+{
+  const newPage = async (g, vp = { width: 1280, height: 860 }) => {
+    const page = await browser.newPage({ viewport: vp });
+    await page.addInitScript((v) => { for (const [k, x] of Object.entries(v)) globalThis[k] = x; }, g);
+    const errs = [];
+    page.on('pageerror', (e) => errs.push(e.message));
+    page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+    const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(450); };
+    return { page, errs, go };
+  };
+  const mainText = (page) => page.textContent('main');
+
+  // ---- a free workspace
+  {
+    const { page, errs, go } = await newPage({ PP_TEAM: true });
+    await page.goto('http://localhost:4173/#/settings/billing'); await page.waitForSelector('main h1');
+    await page.waitForSelector('[data-staff-calc]');
+    check('plus: Plan shows Plus with a free trial, and staff licences', (await page.locator('[data-act=plus-trial]').count()) === 1 && /Staff licences/.test(await mainText(page)));
+    await page.fill('[data-staff-calc] [name=people]', '25'); await page.waitForTimeout(100);
+    const calc = await page.textContent('[data-staff-calc] .calc-out');
+    check('plus: the price for 25 people is shown band by band (₱2,000 a month)', /17 people × ₱100/.test(calc) && /5 people × ₱60/.test(calc) && /₱2,000/.test(calc), calc.replace(/\s+/g, ' ').slice(0, 160));
+    await page.click('[data-staff-calc] [name=billing][value=yearly]', { force: true }); await page.waitForTimeout(100);
+    check('plus: yearly is 10 months\' price (₱20,000)', /₱20,000/.test(await page.textContent('[data-staff-calc] .calc-out')));
+    await page.click('[data-staff-calc] [name=billing][value=monthly]', { force: true });
+    await page.fill('[data-staff-calc] [name=people]', '10');
+    await page.click('[data-staff-calc] button.btn-primary'); await page.waitForSelector('#modal-root .modal');
+    check('plus: before any bill, the database\'s own price is confirmed (₱700)', /Get the bill: ₱700/.test(await page.textContent('#modal-root')));
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+    check('plus: the bill opens to pay, with GCash and bank details', /Pay bill PPA-/.test(await page.textContent('#modal-root')) && /GCash/.test(await page.textContent('#modal-root')));
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(200);
+    check('plus: paying needs a reference or a screenshot', /reference number or a screenshot/.test(await page.textContent('#modal-root .modal-error')));
+    await page.fill('#modal-root [name=ref]', '1009 234 567'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+    check('plus: reported: the bill waits for one check', /Checking your payment/.test(await mainText(page)));
+    // staff confirm it
+    await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=plus]'); await page.waitForTimeout(500);
+    check('plus: staff see the payment to confirm', /Payments to confirm/.test(await mainText(page)) && (await page.locator('[data-act=addon-confirm]').count()) === 1);
+    await page.click('[data-act=addon-confirm]'); await page.waitForSelector('#modal-root .modal');
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+    check('plus: confirmed: the plan shows as on', /Staff, up to 10/.test(await mainText(page)));
+    await page.evaluate(async () => (await import('/js/core.js')).reload()); await go('#/settings/billing'); await page.waitForTimeout(300);
+    check('plus: the customer sees licences for up to 10 people', /Up to 10 people until/.test(await mainText(page)));
+    // the free 3, then licences
+    await go('#/people');
+    for (let i = 0; i < 10; i++) await page.evaluate(async (n) => (await import('/__mock/mock-data.js')).createPerson('o1', { full_name: 'Worker ' + n, types: [] }), i).catch(() => {});
+    await page.evaluate(async () => (await import('/js/core.js')).reload()); await go('#/'); await go('#/people');
+    check('plus: People shows how many of the licences are used', /10 of 10/.test(await mainText(page)));
+    await page.click('main [data-act=person-add]'); await page.waitForTimeout(300);
+    check('plus: at the limit, Add person explains and offers licences instead of failing', /Track more people/.test(await page.textContent('#modal-root')) && /Add staff licences/.test(await page.textContent('#modal-root')));
+    await page.click('#modal-root [data-modal-close]');
+    // templates and the check, without Plus
+    await go('#/templates');
+    check('plus: everyone sees the templates', (await page.locator('main .tpl-card').count()) >= 2 && (await page.locator('[data-act=tpl-preview]').count()) >= 2);
+    await page.click('[data-act=tpl-preview]'); await page.waitForTimeout(200);
+    check('plus: free: a preview of the first lines only', /comes with PermitPal Plus|filled in with your business/.test(await page.textContent('#modal-root')) && !/\{\{/.test(await page.textContent('#modal-root')));
+    await page.click('#modal-root [data-modal-close]');
+    await go('#/check'); await page.waitForSelector('.check-score');
+    check('plus: free: the check says how many it found, and offers Plus for the list', /to fix/.test(await mainText(page)) && (await page.locator('.plus-teaser').count()) === 1 && (await page.locator('.finding').count()) === 0);
+    // the trial
+    await page.click('[data-act=plus-upsell]'); await page.waitForSelector('#modal-root .modal');
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+    check('plus: the 14-day trial starts from the pop-up', /Plus is on, free until/.test(await page.textContent('#toast')));
+    await go('#/check'); await page.waitForSelector('.check-score');
+    check('plus: with Plus the check lists each item with a fix', (await page.locator('.finding').count()) >= 1 && (await page.locator('.finding a.btn, .finding button.btn').count()) >= 1);
+    check('plus: free → trial: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ---- a Plus workspace (trial on, sample page, a photo a worker sent)
+  for (const [label, vp] of [['phone', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 860 }]]) {
+    const { page, errs, go } = await newPage({ PP_TEAM: true, PP_PLUS: true }, vp);
+    await page.goto('http://localhost:4173/#/templates'); await page.waitForSelector('main .tpl-card');
+    await page.click('[data-act=tpl-fill][data-code=authorization_letter]'); await page.waitForSelector('#modal-root .tpl-doc');
+    let doc = await page.textContent('#modal-root .tpl-doc');
+    check(`plus ${label}: a template fills in the business and the person`, doc.includes('Corner <Bakery> & Co') && doc.includes('Sadie Luna') && !doc.includes('{{'), doc.slice(0, 120));
+    await page.fill('#modal-root [name=f_rep_name]', 'Ramon <b>Cruz</b>'); await page.waitForTimeout(100);
+    doc = await page.textContent('#modal-root .tpl-doc');
+    check(`plus ${label}: typing updates the letter, as plain text`, doc.includes('authorize Ramon <b>Cruz</b>') && (await page.locator('#modal-root .tpl-doc b').count()) === 0);
+    const dl = page.waitForEvent('download', { timeout: 3000 }).catch(() => null);
+    await page.click('#modal-root [data-tpl-doc]');
+    const d = await dl;
+    check(`plus ${label}: the letter downloads for Word`, !!d && /Authorization letter - .*\.doc$/.test(d.suggestedFilename()), d?.suggestedFilename());
+    await page.click('#modal-root [data-modal-close]');
+    // the check: answer a question
+    await go('#/check'); await page.waitForSelector('.check-score');
+    await page.click('[data-act=finding-dismiss]'); await page.waitForSelector('#modal-root .modal');
+    await page.fill('#modal-root [name=note]', 'The building has one'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(700);
+    check(`plus ${label}: "Doesn't apply" moves it to your answers, with Undo`, /You answered/.test(await mainText(page)) && (await page.locator('[data-act=finding-reopen]').count()) === 1);
+    // people: the worker's photo, the not-cleared list, the link, roles
+    await go('#/people');
+    check(`plus ${label}: a lapsed licence shows under Not cleared to work`, /Not cleared to work/.test(await mainText(page)) && /Jun Reyes/.test(await page.textContent('.not-cleared')));
+    await page.click('[data-act=wsub-open]'); await page.waitForSelector('#modal-root .modal');
+    check(`plus ${label}: the photo and its dates are shown to check`, (await page.locator('#modal-root .wsub-img').count()) === 1 && (await page.inputValue('#modal-root [name=reference_no]')) === 'HC-3310');
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
+    check(`plus ${label}: approved: it counts, and Jun is cleared`, /now shows the new dates/.test(await page.textContent('#toast')) && (await page.locator('.worker-subs').count()) === 0 && (await page.locator('.not-cleared').count()) === 0);
+    await go('#/people/pp2'); await page.waitForSelector('.ask-card');
+    await page.click('[data-act=wlink]'); await page.waitForSelector('#modal-root textarea');
+    check(`plus ${label}: HR gets a message with the worker's own link`, /Hi Liza, please send a photo of your renewed NBI Clearance here/.test(await page.inputValue('#modal-root textarea')) && /#\/w\/[0-9a-f-]{36}/.test(await page.inputValue('#modal-root textarea')));
+    await page.click('#modal-root [data-modal-close]');
+    await go('#/people');
+    await page.click('[data-act=staff-roles]'); await page.waitForSelector('#modal-root .modal');
+    await page.fill('#modal-root [name=role]', 'Cook'); await page.check('#modal-root [name=types][value=health_certificate]');
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+    check(`plus ${label}: licences by role are saved`, /People who are Cook need: Health Certificate/.test(await page.textContent('#toast')));
+    // the public permit page, from Share proof
+    await go('#/sharing'); await page.waitForSelector('.trust-card');
+    check(`plus ${label}: the page shows its address, a QR code and both badges`, (await page.locator('.trust-card .qr-mini svg').count()) === 1 && (await page.locator('.trust-card .pp-badge').count()) === 1
+      && (await page.locator('.trust-card .badge-preview').count()) === 1 && /p\.html\?c=k7m2q9xd4p/.test(await page.textContent('.trust-card')));
+    const qrDl = page.waitForEvent('download', { timeout: 3000 }).catch(() => null);
+    await page.click('[data-act=trust-qr-png]');
+    check(`plus ${label}: the QR image downloads`, /permits QR\.png$/.test((await qrDl)?.suggestedFilename() || ''));
+    await page.click('[data-act=trust-tab][data-tab=people]'); await page.waitForTimeout(400);
+    check(`plus ${label}: requests and recipients are listed`, /Asked for updates/.test(await mainText(page)) && /Ana Reyes/.test(await mainText(page)));
+    await page.click('[data-act=trust-yes]'); await page.waitForTimeout(400);
+    check(`plus ${label}: saying yes adds them`, (await page.locator('[data-act=trust-yes]').count()) === 0 && /Ramon Cruz/.test(await mainText(page)));
+    await page.fill('[data-trust-add] [name=name]', 'Bea Lim'); await page.fill('[data-trust-add] [name=email]', 'bea@landlord.ph');
+    await page.click('[data-trust-add] button'); await page.waitForTimeout(400);
+    check(`plus ${label}: adding a recipient`, /Bea Lim/.test(await mainText(page)));
+    await page.click('[data-act=trust-tab][data-tab=views]'); await page.waitForTimeout(400);
+    check(`plus ${label}: who looked: counts by where they came from`, /Last 30 days/.test(await mainText(page)) && /QR poster/.test(await mainText(page)));
+    await page.click('[data-act=trust-tab][data-tab=settings]'); await page.waitForTimeout(200);
+    await page.check('[data-trust-settings] [name=files][value=everyone]'); await page.click('[data-trust-settings] button.btn-primary'); await page.waitForTimeout(400);
+    check(`plus ${label}: settings save`, /Saved\. The page shows it now/.test(await page.textContent('#toast')));
+    await page.click('[data-act=trust-tab][data-tab=pack]'); await page.waitForTimeout(200);
+    await page.fill('[data-trust-pack] [name=company]', 'Robinsons Supermarket');
+    const packDl = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
+    await page.click('[data-trust-pack] button');
+    check(`plus ${label}: the accreditation pack downloads`, /accreditation pack for Robinsons Supermarket\.zip$/.test((await packDl)?.suggestedFilename() || ''));
+    // paying for Plus after the trial keeps the free days
+    await go('#/settings/billing'); await page.waitForSelector('[data-act=addon-choose][data-kind=plus]');
+    await page.click('[data-act=addon-choose][data-kind=plus][data-billing=monthly]'); await page.waitForSelector('#modal-root .modal');
+    check(`plus ${label}: paying during the trial keeps the free days`, /Your free days are kept/.test(await page.textContent('#modal-root')));
+    await page.click('#modal-root [data-modal-close]');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    check(`plus ${label}: no sideways scroll`, overflow <= 1, `overflow ${overflow}px`);
+    check(`plus ${label}: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ---- the worker's link (no account)
+  {
+    const { page, errs } = await newPage({ PP_PLUS: true, PP_LOGGED_OUT: true }, { width: 390, height: 844 });
+    await page.goto('http://localhost:4173/#/w/11111111-2222-4333-8444-555555555555'); await page.waitForSelector('#worker-form');
+    check('worker: the link greets them by first name and names the licence', /Hi Liza!/.test(await page.textContent('main')) && /NBI Clearance/.test(await page.textContent('main')) && !/Santos/.test(await page.textContent('main')));
+    await page.click('#worker-form button.btn-primary'); await page.waitForTimeout(200);
+    check('worker: a photo is needed', /Add a photo/.test(await page.textContent('#worker-form .form-error')));
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    await page.setInputFiles('#worker-form [name=file]', { name: 'nbi.png', mimeType: 'image/png', buffer: png });
+    await page.click('#worker-form button.btn-primary'); await page.waitForTimeout(200);
+    check('worker: the new expiry date is needed', /expiry date/.test(await page.textContent('#worker-form .form-error')));
+    const next = await page.evaluate(() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().slice(0, 10); });
+    await page.fill('#worker-form [name=expires_on]', next);
+    await page.click('#worker-form button.btn-primary'); await page.waitForTimeout(500);
+    check('worker: sent', /Sent\. Thank you, Liza!/.test(await page.textContent('main')));
+    await page.goto('http://localhost:4173/#/w/not-a-real-link'); await page.waitForTimeout(500);
+    check('worker: a broken link says so', /isn't valid/.test(await page.textContent('main')));
+    check('worker: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ---- the public page and the badge (the database answers are stubbed)
+  {
+    const { page, errs } = await newPage({}, { width: 390, height: 844 });
+    const H = '<img src=x onerror="window.__xss=1">';
+    const live = { state: 'live', title: `Lorna's Kitchen ${H}`, intro: 'Family restaurant', business: "Lorna's Kitchen", city: 'Pasig City', as_of: '2026-10-20', now: new Date().toISOString(), checked_at: new Date().toISOString(),
+      files: 'everyone', can_download: true, recipient: null, since: '2026-10-01', staff: { people: 12, licences: 14, ok: 13, due: 1, expired: 0 },
+      items: [
+        { id: 'a', name: "Mayor's / Business Permit", group: "Lorna's Kitchen", state: 'ok', in_progress: false, expires: true, expires_on: '2027-01-20', issuer: 'City of Pasig', ref: '•••• 0042', on_file: true, files: [{ path: 'o/a/mp.pdf', name: 'mp.pdf' }] },
+        { id: 'b', name: `Fire Safety Inspection Certificate ${H}`, group: "Lorna's Kitchen", state: 'expired', in_progress: false, expires: true, expires_on: '2026-10-10', issuer: null, ref: null, on_file: false, files: null },
+        { id: 'c', name: 'Sanitary Permit', group: "Lorna's Kitchen", state: 'due', in_progress: true, expires: true, expires_on: '2026-11-05', issuer: null, ref: null, on_file: true, files: null },
+      ] };
+    let asked = null;
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    await page.route('**/rest/v1/rpc/get_trust_page', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(live) }));
+    await page.route('**/rest/v1/rpc/trust_request_updates', (r) => { asked = r.request().postDataJSON(); r.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }); });
+    await page.route('**/rest/v1/rpc/trust_unsubscribe', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: 'true' }));
+    await page.route('**/rest/v1/rpc/trust_badge', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ state: 'live', title: 'x', items: 3, ok: 1, due: 1, expired: 1, pending: 0, checked_at: new Date().toISOString() }) }));
+    await page.goto('http://localhost:4173/p.html?c=k7m2q9xd4p&s=qr'); await page.waitForSelector('.tp-head');
+    const t = await page.textContent('main');
+    check('public page: the headline is honest (1 permit expired)', /1 permit expired/.test(t));
+    check('public page: each permit shows its state and date', /Valid until Jan 20, 2027/.test(t) && /Expired/.test(t) && /Being renewed/.test(t) && /•••• 0042/.test(t));
+    check('public page: says what PermitPal does, and doesn\'t', /checked automatically by PermitPal/.test(t) && /does not issue permits or verify them with the government/.test(t));
+    check('public page: names are shown as text, never run', !(await page.evaluate(() => window.__xss)) && (await page.locator('main img[src=x]').count()) === 0);
+    check('public page: copies can be downloaded when allowed', (await page.locator('.tp-files [data-path]').count()) === 1);
+    check('public page: staff licences as counts only', /14 for 12 people: 13 current, 1 due soon/.test(t));
+    await page.fill('#ask-form [name=name]', 'Ramon'); await page.fill('#ask-form [name=email]', 'ramon@robinsons.ph');
+    await page.click('#ask-form button'); await page.waitForTimeout(400);
+    check('public page: asking for updates', /Request sent/.test(await page.textContent('main')) && asked?.p_email === 'ramon@robinsons.ph' && asked?.p_code === 'k7m2q9xd4p');
+    await page.goto('http://localhost:4173/p.html?c=k7m2q9xd4p&r=11111111-2222-4333-8444-555555555555&stop=1'); await page.waitForSelector('#stop');
+    check('public page: "Stop these emails" waits for a tap (email apps open links by themselves)', /Stop update emails\?/.test(await page.textContent('main')));
+    await page.click('#stop'); await page.waitForTimeout(400);
+    check('public page: stopped', /won't get these emails/.test(await page.textContent('main')));
+    await page.unroute('**/rest/v1/rpc/get_trust_page');
+    await page.route('**/rest/v1/rpc/get_trust_page', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ state: 'paused', title: 'Lorna' }) }));
+    await page.goto('http://localhost:4173/p.html?c=k7m2q9xd4p'); await page.waitForTimeout(600);
+    check('public page: paused shows no statuses', /not available right now/.test(await page.textContent('main')) && (await page.locator('.tp-line').count()) === 0);
+    await page.goto('http://localhost:4173/p.html?c=BAD'); await page.waitForTimeout(400);
+    check('public page: a broken link says so', /incomplete/.test(await page.textContent('main')));
+    await page.goto('http://localhost:4173/badge.html#k7m2q9xd4p'); await page.waitForTimeout(600);
+    check('badge: shows the live headline and links to the page', /1 permit expired/.test(await page.textContent('#badge')) && /p\.html\?c=k7m2q9xd4p&s=badge/.test(await page.getAttribute('#badge', 'href')));
+    check('public page and badge: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ---- an older database: nothing from Plus shows
+  {
+    const { page, errs, go } = await newPage({ PP_FEATURES: 'none', PP_TEAM: true });
+    await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+    check('plus off: no Permit check or Templates in the menu', (await page.locator('.sidebar a[data-nav=check], .sidebar a[data-nav=templates]').count()) === 0);
+    await go('#/settings/billing');
+    check('plus off: no add-ons on the Plan page', (await page.locator('#addons').count()) === 0);
+    await go('#/sharing');
+    check('plus off: Share proof has no public page section', (await page.locator('#trust-root').count()) === 0);
+    check('plus off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
 }
 
 await browser.close();

@@ -22,6 +22,9 @@ import { partnerApplyPage } from './views/partner-apply.js';
 import { leadPage } from './views/lead.js';
 import { filings, forgetFilings } from './views/filings.js';
 import { mfaChallenge, mfaRequired } from './views/mfa.js';
+import { checkPage } from './views/check.js';
+import { templatesPage } from './views/templates.js';
+import { workerPage } from './views/worker.js';
 
 // Never run inside another website's frame (a trick to make people click hidden buttons). GitHub Pages
 // cannot send the header that blocks this, so the page checks for itself; our own frames are fine.
@@ -37,9 +40,11 @@ let unsubscribe = null;
 const T = {
   en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
         filings: 'Taxes & contributions', pros: 'Find a professional', services: 'Done for you', care: 'Year-round care', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
+        check: 'Permit check', templates: 'Templates',
         notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact PermitPal', tools: 'Tools', account: 'Account' },
   tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
         filings: 'Buwis at kontribusyon', pros: 'Maghanap ng Propesyonal', services: 'Ipaasikaso sa amin', care: 'Alaga buong taon', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
+        check: 'Pagsusuri ng permit', templates: 'Mga template',
         notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang PermitPal', tools: 'Mga Tool', account: 'Account' },
 };
 const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k] || k;
@@ -73,6 +78,7 @@ async function start() {
     if (parts[0] === 'contact') return contactPage(app, { signedIn: false });
     if (parts[0] === 'list-your-firm' && has('revenue')) return partnerApplyPage(app, { signedIn: false });
     if (parts[0] === 'lead' && has('leads')) return leadPage(app, parts[1], { signedIn: false });
+    if (parts[0] === 'w' && has('plus')) return workerPage(app, parts[1], { signedIn: false });
     const mode = ['signup', 'forgot'].includes(parts[0]) ? parts[0] : 'login';
     return authPage(app, mode);
   }
@@ -119,7 +125,7 @@ async function start() {
 }
 
 async function loadData() {
-  S.data = await db.loadOrgData(S.org.id, { revenue: has('revenue') });
+  S.data = await db.loadOrgData(S.org.id, { revenue: has('revenue'), plus: has('plus') });
   lastLoad = Date.now();
 }
 
@@ -154,7 +160,8 @@ function buildNav() {
   const base = has('filings') ? [...BASE_NAV.slice(0, 4), ['filings', 'filings', ICON.calendar], ...BASE_NAV.slice(4)] : BASE_NAV;
   NAV = k?.nav ? [base[0], ['network', k.nav, k.icon], ...base.slice(1)] : base;
   // Below Notifications the menu has two color-coded groups: Tools (pine) and Account (navy).
-  TOOLS = [...(has('services') ? [['services', 'services']] : []), ...(has('revenue') && IN_PERSON ? [['care', 'care']] : []), ['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'], ...(k?.nav ? [] : [['network', 'team_tools']])];
+  TOOLS = [...(has('plus') ? [['check', 'check']] : []), ...(has('services') ? [['services', 'services']] : []), ...(has('revenue') && IN_PERSON ? [['care', 'care']] : []), ['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'],
+    ...(has('plus') ? [['templates', 'templates']] : []), ...(k?.nav ? [] : [['network', 'team_tools']])];
   ACCOUNT = [['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings'], ['contact', 'contact']];
   MORE = [['notifications', 'notifications'], ...TOOLS, ...ACCOUNT];
 }
@@ -240,6 +247,9 @@ async function renderPage() {
     else if (a === 'care') { location.hash = '#/services'; return; }
     else if (a === 'list-your-firm' && has('revenue')) partnerApplyPage(main, { signedIn: true });
     else if (a === 'lead' && has('leads')) await leadPage(main, b, { signedIn: true });
+    else if (a === 'w' && has('plus')) await workerPage(main, b, { signedIn: true });
+    else if (a === 'check' && has('plus')) await checkPage(main);
+    else if (a === 'templates' && has('plus')) await templatesPage(main);
     else if (['pros', 'partners', 'services', 'help'].includes(a)) await partners(main, params);
     else if (a === 'contact') contactPage(main, { signedIn: true });
     else if (a === 'costs') await costs(main);

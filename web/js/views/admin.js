@@ -11,6 +11,7 @@ import * as db from 'pp/data';
 import { moneyTab } from './admin-money.js';
 import { careTab } from './admin-care.js';
 import { partnersTab as partnersTab2, billingTab } from './admin-partners.js';
+import { plusTab } from './admin-plus.js';
 
 let tab = null; // Money first once the revenue features are on, else the Inbox
 const KIND_NAMES = { business: 'Business', head_office: 'Head office', firm: 'Accounting firm', property: 'Property', fleet: 'Fleet' };
@@ -27,6 +28,7 @@ export async function admin(el) {
     if (tab === 'money' && rev) body = await moneyTab((t) => { tab = t; openOrder = null; rerender(); });
     else if (tab === 'care' && rev && IN_PERSON) body = await careTab();
     else if (tab === 'billing' && rev) body = await billingTab();
+    else if (tab === 'plus' && has('plus')) body = await plusTab();
     else if (tab === 'partners' && rev) body = await partnersTab2();
     else if (tab === 'orders' && has('services')) body = await ordersTab();
     else if (tab === 'services' && has('services')) body = servicesTab(await db.adminServices());
@@ -40,7 +42,7 @@ export async function admin(el) {
   } catch (e) { toastError(e); }
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>PermitPal admin</h1><p class="muted">Staff tools. Customers never see this page.</p></div></div>
-    <div class="tabs">${rev ? tabBtn('money', 'Money') : ''}${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${rev && IN_PERSON ? tabBtn('care', 'Care') : ''}${tabBtn('services', 'Services & prices')}` : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${rev ? tabBtn('billing', 'Partner billing') : tabBtn('referrals', 'Quote requests')}
+    <div class="tabs">${rev ? tabBtn('money', 'Money') : ''}${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${rev && IN_PERSON ? tabBtn('care', 'Care') : ''}${tabBtn('services', 'Services & prices')}` : ''}${has('plus') ? tabBtn('plus', 'Plus & staff') : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${rev ? tabBtn('billing', 'Partner billing') : tabBtn('referrals', 'Quote requests')}
       ${tabBtn('payments', 'Payment details')}${tabBtn('outbox', 'Messages')}${has('errors') ? tabBtn('errors', 'Errors') : ''}</div>
     ${body}`);
   wire(el);

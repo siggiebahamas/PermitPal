@@ -61,10 +61,10 @@ function homeView() {
   const owed = owedLanes.reduce((t, l) => t + l.total, 0);
   const owedWho = new Set(owedLanes.flatMap((l) => l.items.map((x) => x.who))).size;
   const goal = Number(s.goal) || 0;
-  const pays = Number(s.order_payments_to_check) + Number(s.care_payments_to_check);
+  const pays = Number(s.order_payments_to_check) + Number(s.care_payments_to_check) + (Number(s.addon_payments_to_check) || 0);
   const n = (x) => Number(x) || 0;
   const todo = [
-    [pays, `Check ${plural(pays, 'payment')} in your GCash or bank app, then confirm ${pays === 1 ? 'it' : 'them'}`, 'Confirm', { tab: n(s.order_payments_to_check) ? 'orders' : 'care' }],
+    [pays, `Check ${plural(pays, 'payment')} in your GCash or bank app, then confirm ${pays === 1 ? 'it' : 'them'}`, 'Confirm', { tab: n(s.order_payments_to_check) ? 'orders' : n(s.care_payments_to_check) ? 'care' : 'plus' }],
     [n(s.quotes_to_send), `Send a price to ${plural(n(s.quotes_to_send), 'customer')} who asked`, 'Send prices', { tab: 'orders' }],
     [n(s.claims_to_pay), `Send money for ${plural(n(s.claims_to_pay), 'approved late-fee claim')}`, 'Pay out', { tab: 'care' }],
     [n(s.claims_to_decide), `Decide on ${plural(n(s.claims_to_decide), 'late-fee claim')} (customers wait up to 5 days)`, 'Review', { tab: 'care' }],

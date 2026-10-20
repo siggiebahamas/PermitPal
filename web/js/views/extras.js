@@ -1,9 +1,11 @@
 // Smaller tools: partners & introductions, costs & yearly budget,
 // shareable proof-of-compliance links, the inspection pack (.zip) and calendar export (.ics).
 import { html, fmtDate, fmtDateTime, peso, toast, toastError, when, plural, timeAgo, openModal, formObject, normalizePhone, todayPH, download, confirmDialog } from '../util.js';
-import { S, on, go, reload, canEdit, business, vehicle, person, reqsOf, empty, has } from '../core.js';
+import { S, on, go, reload, canEdit, business, vehicle, person, reqsOf, empty, has, hasPlus } from '../core.js';
 import { STATUS, byPriority, subjectLabel, dueShort, ICON, counts } from '../components.js';
 import * as db from 'pp/data';
+import { makeZip } from '../zip.js';
+import { trustSection } from './trust.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -265,6 +267,7 @@ export async function shares(el) {
   };
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Share proof</h1><p class="muted">Someone asking if your permits are up to date? Send them one link instead of photocopies.</p></div></div>
+    ${when(has('plus'), html`<div id="trust-root"></div>${when(hasPlus(), html`<h3 class="section-label">Or a link that expires</h3>`)}`)}
 
     <section class="card proof-how">
       <div class="card-head"><div><h2>How it works</h2><p class="card-sub">No account needed on their side</p></div></div>
@@ -293,6 +296,8 @@ export async function shares(el) {
     <section class="card"><div class="card-head"><div><h2>Your links</h2><p class="card-sub">${plural(active.length, 'link')} working now</p></div></div>
       ${list.length ? html`${active.map(row)}${old.map(row)}` : html`<p class="muted">No links yet. Create one above.</p>`}
     </section>`);
+  const tr = el.querySelector('#trust-root');
+  if (tr) trustSection(tr);
 }
 on('share-pick', () => {
   const [scope, id] = document.getElementById('proof-what').value.split(':');
@@ -306,35 +311,6 @@ on('share-revoke', async (ds) => {
 
 // ================================================================ inspection pack (.zip)
 // Every current document, named by permit, plus a one-page summary - ready for an inspector or auditor.
-const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
-const crc32 = (u8) => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
-export function makeZip(files) {
-  const enc = new TextEncoder();
-  const parts = [], central = [];
-  let offset = 0;
-  const d = new Date();
-  const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
-  const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
-  for (const f of files) {
-    const name = enc.encode(f.name), data = f.data, crc = crc32(data);
-    const h = new DataView(new ArrayBuffer(30));
-    [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, time, 2], [12, date, 2], [14, crc, 4], [18, data.length, 4], [22, data.length, 4], [26, name.length, 2], [28, 0, 2]]
-      .forEach(([o, v, n]) => (n === 4 ? h.setUint32(o, v, true) : h.setUint16(o, v, true)));
-    const c = new DataView(new ArrayBuffer(46));
-    [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, time, 2], [14, date, 2], [16, crc, 4], [20, data.length, 4], [24, data.length, 4],
-      [28, name.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, offset, 4]]
-      .forEach(([o, v, n]) => (n === 4 ? c.setUint32(o, v, true) : c.setUint16(o, v, true)));
-    parts.push(new Uint8Array(h.buffer), name, data);
-    central.push(new Uint8Array(c.buffer), name);
-    offset += 30 + name.length + data.length;
-  }
-  const cdSize = central.reduce((t, p) => t + p.length, 0);
-  const end = new DataView(new ArrayBuffer(22));
-  [[0, 0x06054b50, 4], [4, 0, 2], [6, 0, 2], [8, files.length, 2], [10, files.length, 2], [12, cdSize, 4], [16, offset, 4], [20, 0, 2]]
-    .forEach(([o, v, n]) => (n === 4 ? end.setUint32(o, v, true) : end.setUint16(o, v, true)));
-  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: 'application/zip' });
-}
-
 on('inspection-pack', async (ds, btn) => {
   const scope = ds.scope || 'org';
   const reqs = scope === 'org' ? S.data.reqs : reqsOf(scope, ds.id);
@@ -353,9 +329,9 @@ on('inspection-pack', async (ds, btn) => {
       let name = `${clean(subjectLabel(r))}/${clean(r.name)} - ${clean(d.file_name)}`;
       while (used.has(name)) name = name.replace(/(\.[^.]*)?$/, '-2$1');
       used.add(name);
-      const res = await fetch(await db.fileUrl(d.storage_path));
-      if (!res.ok) throw new Error(`Couldn't download ${d.file_name}. Please try again.`);
-      files.push({ name, data: new Uint8Array(await res.arrayBuffer()) });
+      let blob;
+      try { blob = await db.fileBlob(d.storage_path); } catch { throw new Error(`Couldn't download ${d.file_name}. Please try again.`); }
+      files.push({ name, data: new Uint8Array(await blob.arrayBuffer()) });
     }
     const summary = String(html`<!doctype html><html><head><meta charset="utf-8"><title>Compliance summary</title>
       <style>body{font-family:system-ui,sans-serif;max-width:860px;margin:32px auto;padding:0 16px;color:#111}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;padding:8px;text-align:left;font-size:14px}</style></head><body>
@@ -391,4 +367,4 @@ on('calendar-export', () => {
   toast(`${plural(items.length, 'deadline')} saved. Open the file to add them to your calendar.`);
 });
 
-export { counts };
+export { counts, makeZip };
