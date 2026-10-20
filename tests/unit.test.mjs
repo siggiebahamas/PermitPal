@@ -335,3 +335,8 @@ test('prices: yearly is 10 months; Plus is ₱199 or ₱1,990', () => {
   assert.equal(addonLabel('staff', 25, 'monthly'), 'Staff licences, up to 25 people (monthly)');
   assert.equal(addonLabel('plus', null, 'yearly'), 'PermitPal Plus (yearly)');
 });
+test('prices: White-label is ₱1,000 a month or ₱10,000 a year (supabase/tests/15_whitelabel.sql checks the same)', () => {
+  assert.equal(addonPrice('brand', null, 'monthly'), 1000);
+  assert.equal(addonPrice('brand', null, 'yearly'), 10000);
+  assert.equal(addonLabel('brand', null, 'monthly'), 'White-label (monthly)');
+});

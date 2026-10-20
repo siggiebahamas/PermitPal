@@ -20,6 +20,8 @@ type Msg = {
   body_html: string | null;
   template: string | null;
   template_params: string[] | null;
+  from_name?: string | null; // White-label: the accounting firm's name
+  reply_to?: string | null; // ...and where replies go
 };
 type Result = { result: "sent" | "error" | "skipped"; providerId?: string; error?: string };
 
@@ -30,13 +32,24 @@ const configured = {
   whatsapp: !!env("WHATSAPP_TOKEN") && !!env("WHATSAPP_PHONE_ID"),
 };
 
+// "Firm name via PermitPal <reminders@...>": the firm's name, PermitPal's own sending address.
+function fromHeader(name?: string | null) {
+  const base = env("EMAIL_FROM");
+  const clean = (name ?? "").replace(/["<>\\\r\n]/g, "").trim().slice(0, 60);
+  if (!clean) return base;
+  const addr = base.match(/<([^>]+)>/)?.[1] ?? base.trim();
+  return `"${clean} via PermitPal" <${addr}>`;
+}
+const replyTo = (r?: string | null) => (r && /^[^@\s<>",]+@[^@\s<>",]+\.[a-z]{2,}$/i.test(r) ? [r] : undefined);
+
 async function sendEmail(m: Msg): Promise<Result> {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${env("RESEND_API_KEY")}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: env("EMAIL_FROM"),
+      from: fromHeader(m.from_name),
       to: [m.to_address],
+      reply_to: replyTo(m.reply_to),
       subject: m.subject ?? "PermitPal",
       text: m.body_text,
       html: m.body_html ?? undefined,

@@ -15,7 +15,7 @@ export const KIND_NAMES = {
   service_fee: 'Our fee', gov_fees_in: 'Government fee from customer', gov_fees_out: 'Government fee paid to the office', refund: 'Refund',
   care_fee: 'Monthly care bill', guarantee: 'Late-fee payout (guarantee)', lead: 'Quote request fee', sale: 'Sale fee', placement: 'Checklist ad',
   listing: 'Monthly listing', other: 'Other charge', team_plan: 'Team subscription', credit_topup: 'Prepaid credit from a firm',
-  plus: 'PermitPal Plus', staff_licences: 'Staff licences',
+  plus: 'PermitPal Plus', staff_licences: 'Staff licences', white_label: 'White-label',
 };
 export const STATE_NAMES = {
   collected: 'Received', to_collect: 'Owed to you', pipeline: 'Waiting for a yes', unbilled: 'Not billed yet',

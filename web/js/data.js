@@ -668,6 +668,26 @@ export const unreadPhotos = async (orgId) => ok(await sb.from('documents').selec
 export const listTemplates = async () => ok(await sb.rpc('list_templates'));
 export const getTemplate = async (orgId, code) => ok(await sb.rpc('get_template', { p_org: orgId, p_code: code }));
 
+// White-label (accounting firms): the firm's look, its logo file, and the look a client workspace shows.
+export const brandSettings = async (orgId) => ok(await sb.from('org_brands').select('*').eq('org_id', orgId).maybeSingle());
+export const brandSave = async (orgId, f) => ok(await sb.rpc('brand_save', {
+  p_org: orgId, p_name: f.display_name, p_logo_path: f.logo_path || null, p_color: f.color, p_reply_to: f.reply_to || null, p_phone: f.phone || null,
+  p_tagline: f.tagline || null, p_client_report: f.client_report !== false }));
+export const startBrandTrial = async (orgId) => ok(await sb.rpc('start_brand_trial', { p_org: orgId }));
+export const clientBrand = async (orgId) => ok(await sb.rpc('client_brand', { p_org: orgId }));
+export const linkBrand = async (token) => ok(await sb.rpc('link_brand', { p_token: token }));
+export const LOGO_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg' }; // what email apps (Outlook too) can show
+export const LOGO_MAX_BYTES = 512 * 1024;
+export async function uploadBrandLogo(orgId, file) {
+  if (!LOGO_TYPES[file.type]) throw new Error('Use a PNG or JPG image for the logo.');
+  if (file.size > LOGO_MAX_BYTES) throw new Error('That logo is over 512 KB. Save it smaller (about 400 pixels wide is plenty) and try again.');
+  const path = `${orgId}/logo-${rand()}.${LOGO_TYPES[file.type]}`;
+  ok(await sb.storage.from('brand').upload(path, file, { contentType: file.type, upsert: false, cacheControl: '31536000' }));
+  return path;
+}
+export const removeBrandLogo = async (path) => { if (path) await sb.storage.from('brand').remove([path]); };
+export const brandLogoUrl = (path) => (path ? sb.storage.from('brand').getPublicUrl(path).data.publicUrl : null);
+
 // Staff (PermitPal): bills to confirm, plans, giving time.
 export const adminAddonInvoices = async () => ok(await sb.from('addon_invoices').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
 export const adminAddons = async () => ok(await sb.from('addons').select('*, orgs(name)').order('updated_at', { ascending: false }).limit(1000));

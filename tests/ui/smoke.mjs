@@ -1416,6 +1416,119 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   }
 }
 
+// White-label: an accounting firm puts its name, logo and colour on what its clients see, with
+// "Powered by PermitPal" always there.
+{
+  const newPage = async (g, vp = { width: 1280, height: 860 }) => {
+    const page = await browser.newPage({ viewport: vp });
+    await page.addInitScript((v) => { for (const [k, x] of Object.entries(v)) globalThis[k] = x; }, g);
+    const errs = [];
+    page.on('pageerror', (e) => errs.push(e.message));
+    page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+    const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(450); };
+    return { page, errs, go };
+  };
+  const mainText = (page) => page.textContent('main');
+  const logo = fs.readFileSync(path.join(root, 'web/img/logo.png'));
+  const sideways = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+
+  // ---- the firm sets it up, tries it, and gets a bill
+  for (const [label, vp] of [['phone', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 860 }]]) {
+    const { page, errs, go } = await newPage({ PP_TEAM: true }, vp);
+    await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+    await go('#/settings/billing');
+    check(`brand ${label}: a business doesn't see White-label`, (await page.locator('#white-label').count()) === 0 && (await page.locator('.subnav a[href="#/settings/brand"]').count()) === 0);
+    await page.evaluate(async () => { await (await import('/__mock/mock-data.js')).setOrgProfile('o1', { kind: 'firm' }); await (await import('/js/core.js')).reload(); });
+    await go('#/settings/billing'); await page.waitForSelector('#white-label');
+    const card = await page.textContent('#white-label');
+    check(`brand ${label}: a firm sees White-label on the Plan page, ₱1,000 a month, 14 days free`, /₱1,000/.test(card) && /Powered by PermitPal/.test(card) && (await page.locator('#white-label [data-act=brand-trial]').count()) === 1, card.replace(/\s+/g, ' ').slice(0, 120));
+    check(`brand ${label}: Settings has a "Your brand" tab`, (await page.locator('.subnav a[href="#/settings/brand"]').count()) === 1);
+    await go('#/settings/brand'); await page.waitForSelector('#brand-form');
+    check(`brand ${label}: before it's on, the page says clients see it once White-label is on`, /once White-label is on/.test(await mainText(page)));
+    check(`brand ${label}: the firm's name is filled in to start`, (await page.inputValue('#brand-form [name=display_name]')) === 'Aligned Solutions');
+    await page.fill('#brand-form [name=color]', '#FFE066'); await page.waitForTimeout(80);
+    check(`brand ${label}: a light colour is flagged as hard to read`, /Too light/.test(await page.textContent('#color-msg')));
+    await page.click('#brand-form button.btn-primary'); await page.waitForTimeout(200);
+    check(`brand ${label}: ...and can't be saved`, /Pick a darker colour/.test(await page.textContent('#toast')));
+    await page.fill('#brand-form [name=color]', '#0F5132');
+    await page.fill('#brand-form [name=display_name]', 'Dela Cruz <b>& Co.</b>');
+    await page.fill('#brand-form [name=reply_to]', 'hello@delacruz.ph');
+    await page.fill('#brand-form [name=phone]', '(02) 8123 4567');
+    await page.fill('#brand-form [name=tagline]', 'Tax, books & permits'); await page.waitForTimeout(80);
+    const prev = await page.textContent('.mail-prev');
+    check(`brand ${label}: the email preview shows the firm as sender, replies to the firm, Powered by PermitPal`,
+      /Dela Cruz <b>& Co\.<\/b> via PermitPal/.test(prev) && /replies to hello@delacruz\.ph/.test(prev) && /Powered by PermitPal/.test(prev) && /Questions\? Email hello@delacruz\.ph or call \(02\) 8123 4567/.test(prev), prev.replace(/\s+/g, ' ').slice(0, 160));
+    check(`brand ${label}: names show as typed, never as code`, (await page.locator('.mail-prev b b, .side-prev b b').count()) === 0);
+    check(`brand ${label}: the preview button takes the colour`, /rgb\(15, 81, 50\)/.test(await page.locator('.mail-prev .mp-btn').evaluate((e) => getComputedStyle(e).backgroundColor)));
+    await page.setInputFiles('#brand-form [name=logo]', { name: 'big.png', mimeType: 'image/png', buffer: Buffer.alloc(600 * 1024, 1) }); await page.waitForTimeout(150);
+    check(`brand ${label}: a logo over 512 KB is refused before upload`, /over 512 KB/.test(await page.textContent('#toast')) && (await page.locator('[data-logo-box] img').count()) === 0);
+    await page.setInputFiles('#brand-form [name=logo]', { name: 'logo.png', mimeType: 'image/png', buffer: logo }); await page.waitForTimeout(150);
+    check(`brand ${label}: a chosen logo shows in the previews`, (await page.locator('[data-logo-box] img').count()) === 1 && (await page.locator('.mail-prev img').count()) === 1 && (await page.locator('.side-prev img').count()) === 1);
+    await page.click('#brand-form button.btn-primary'); await page.waitForTimeout(500);
+    check(`brand ${label}: saved, to show once it's on`, /Your clients see it once White-label is on/.test(await page.textContent('#toast')));
+    check(`brand ${label}: saving keeps what was typed (and the logo)`, (await page.inputValue('#brand-form [name=display_name]')) === 'Dela Cruz <b>& Co.</b>' && (await page.locator('[data-logo-box] img').count()) === 1
+      && (await page.inputValue('#brand-form [name=color]')) === '#0F5132');
+    check(`brand ${label}: no sideways scroll on the brand page`, (await sideways(page)) <= 1, `${await sideways(page)}px`);
+    await go('#/settings/billing'); await page.waitForSelector('#white-label');
+    await page.click('#white-label [data-act=brand-trial]'); await page.waitForTimeout(700);
+    check(`brand ${label}: the trial starts and goes to the brand page`, /White-label is on, free until/.test(await page.textContent('#toast')) && (await page.evaluate(() => location.hash)) === '#/settings/brand');
+    await page.waitForSelector('#brand-form');
+    check(`brand ${label}: now clients see the brand`, /Your clients see your brand/.test(await mainText(page)) && (await page.locator('.subnav a.active[href="#/settings/brand"]').count()) === 1);
+    await go('#/settings/billing'); await page.waitForSelector('#white-label');
+    check(`brand ${label}: the card shows the trial days left`, /Free trial: 14 days left/.test(await page.textContent('#white-label')) && (await page.locator('#white-label [data-act=brand-trial]').count()) === 0);
+    await page.click('#white-label [data-act=addon-choose][data-billing=monthly]'); await page.waitForSelector('#modal-root .modal');
+    const m = await page.textContent('#modal-root');
+    check(`brand ${label}: paying keeps the free days and costs ₱1,000`, /White-label \(monthly\)/.test(m) && /when your trial ends/.test(m) && /Get the bill: ₱1,000/.test(m), m.replace(/\s+/g, ' ').slice(0, 160));
+    await page.click('#modal-root [data-modal-close]');
+    check(`brand ${label}: the firm's own app keeps PermitPal's look`, (await page.locator('.sidebar .co-brand').count()) === 0);
+    check(`brand ${label}: firm set-up: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ---- a client of the firm
+  for (const [label, vp] of [['phone', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 860 }]]) {
+    const { page, errs, go } = await newPage({ PP_TEAM: true, PP_BRAND: true }, vp);
+    await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+    check(`brand ${label}: the client's menu shows the firm, Powered by PermitPal`, /Dela Cruz & Co\./.test(await page.textContent('.sidebar .co-brand')) && /Powered by PermitPal/.test(await page.textContent('.sidebar .powered-by')));
+    if (label === 'phone') check('brand phone: the top bar shows the firm', await page.locator('.topbar .co-brand').isVisible());
+    const vars = await page.evaluate(() => ['--brand', '--link', '--accent-soft'].map((v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()));
+    check(`brand ${label}: the app takes the firm's colour (links a shade darker)`, vars[0] === '#0F5132' && /^#[0-9A-F]{6}$/.test(vars[1]) && /^#[0-9A-F]{6}$/.test(vars[2]), vars.join(' '));
+    const fc = await page.textContent('.firm-card');
+    check(`brand ${label}: the dashboard shows "Your accountant" with email and phone`, /Your accountant/.test(fc) && (await page.getAttribute('.firm-card a[href^="mailto:"]', 'href')) === 'mailto:hello@delacruz.ph'
+      && (await page.getAttribute('.firm-card a[href^="tel:"]', 'href')) === 'tel:0281234567');
+    check(`brand ${label}: ...and that the account stays theirs`, /Your PermitPal account stays yours, free/.test(fc));
+    check(`brand ${label}: no sideways scroll`, (await sideways(page)) <= 1, `${await sideways(page)}px`);
+    await go('#/settings');
+    check(`brand ${label}: a client has no "Your brand" tab`, (await page.locator('.subnav a[href="#/settings/brand"]').count()) === 0);
+    await go('#/connect/tokfirm'); await page.waitForSelector('main h1');
+    check(`brand ${label}: the invitation shows the firm's name and logo`, /Connect with Dela Cruz & Co\./.test(await page.textContent('main h1')) && (await page.locator('.connect-logo img').count()) === 1);
+    check(`brand ${label}: client: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ---- invited by the firm, no account yet
+  {
+    const { page, errs } = await newPage({ PP_BRAND: true, PP_LOGGED_OUT: true }, { width: 390, height: 844 });
+    await page.goto('http://localhost:4173/#/connect/tokfirm'); await page.waitForSelector('.auth-firm');
+    check('brand: the sign-up page from the invitation shows the firm', /Dela Cruz & Co\./.test(await page.textContent('.auth-firm')) && (await page.locator('.auth-firm img').count()) === 1
+      && /Dela Cruz & Co\. invited you to connect on PermitPal/.test(await page.textContent('.auth-card .banner')));
+    check('brand: sign-up page: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ---- a database without the White-label file yet: nothing of it shows
+  {
+    const { page, errs, go } = await newPage({ PP_TEAM: true, PP_BRAND: true, PP_FEATURES: ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus'] });
+    await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+    check('brand off: clients see PermitPal\'s own look', (await page.locator('.co-brand, .firm-card').count()) === 0);
+    await page.evaluate(async () => { await (await import('/__mock/mock-data.js')).setOrgProfile('o1', { kind: 'firm' }); await (await import('/js/core.js')).reload(); });
+    await go('#/settings/billing'); await page.waitForSelector('#addons');
+    check('brand off: firms see no White-label card or tab', (await page.locator('#white-label, .subnav a[href="#/settings/brand"]').count()) === 0);
+    check('brand off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+}
+
 await browser.close();
 server.close();
 for (const [s, n, e] of results) console.log(`${s} ${n}${s === 'FAIL' && e ? ' -> ' + e : ''}`);

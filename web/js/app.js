@@ -25,6 +25,7 @@ import { mfaChallenge, mfaRequired } from './views/mfa.js';
 import { checkPage } from './views/check.js';
 import { templatesPage } from './views/templates.js';
 import { workerPage } from './views/worker.js';
+import { applyBrand, sideBrand, poweredBy, connectBrand } from './views/brand.js';
 
 // Never run inside another website's frame (a trick to make people click hidden buttons). GitHub Pages
 // cannot send the header that blocks this, so the page checks for itself; our own frames are fine.
@@ -71,7 +72,12 @@ async function start() {
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (parts[0] === 'invite' && parts[1]) return invitePage(app, parts[1], false);
     // Invited to connect (franchisor, accountant, mall): remember it through sign-up / log-in.
-    if (parts[0] === 'connect' && parts[1]) { sessionStorageSet('pp-connect', parts[1]); return authPage(app, 'signup', { connect: true }); }
+    if (parts[0] === 'connect' && parts[1]) {
+      sessionStorageSet('pp-connect', parts[1]);
+      authPage(app, 'signup', { connect: true });
+      if (has('brand')) connectBrand(parts[1]);
+      return;
+    }
     const kindParam = new URLSearchParams(location.hash.split('?')[1] || '').get('type');
     if (kindParam && KINDS[kindParam]) sessionStorageSet('pp-kind', kindParam);
     if (!parts[0] || parts[0] === 'welcome') return landing(app);
@@ -126,6 +132,11 @@ async function start() {
 
 async function loadData() {
   S.data = await db.loadOrgData(S.org.id, { revenue: has('revenue'), plus: has('plus') });
+  // A client of an accounting firm with White-label sees the firm's logo and colour (Powered by PermitPal).
+  const prev = JSON.stringify(S.brand);
+  S.brand = has('brand') && S.org.kind === 'business' ? await db.clientBrand(S.org.id).catch(() => null) : null;
+  applyBrand(S.brand);
+  if (prev !== JSON.stringify(S.brand) && document.querySelector('.shell')) paintBrand();
   lastLoad = Date.now();
 }
 
@@ -173,8 +184,9 @@ function renderShell() {
     <div class="shell">
       <button class="skip-link" data-act="skip-main">Skip to content</button>
       <aside class="sidebar" id="side-menu" aria-label="Menu">
-        <div class="side-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
+        <div class="side-top"><span data-brand-slot="side">${S.brand ? sideBrand(S.brand) : ppBrand()}</span>
           <button class="icon-btn menu-close" data-act="menu-close" aria-label="Close menu">${ICON.close}</button></div>
+        <span data-brand-slot="powered">${S.brand ? poweredBy() : ''}</span>
         ${S.orgs.length > 1 ? html`<select class="org-switch" id="org-switch">${S.orgs.map((o) => html`<option value="${o.id}" ${o.id === S.org.id ? 'selected' : ''}>${o.name}</option>`)}</select>`
           : html`<div class="org-name">${S.org.name}</div>`}
         <nav aria-label="Main">${NAV.map(([p, k, ic]) => html`<a class="nav" href="#/${p}" data-nav="${p}">${ic}<span>${t(k)}</span></a>`)}</nav>
@@ -193,7 +205,7 @@ function renderShell() {
       <div class="main-col">
         <header class="topbar">
           <button class="icon-btn menu-btn" data-act="menu-open" aria-label="Open menu" aria-controls="side-menu" aria-expanded="false">${ICON.menu}</button>
-          <a class="brand mobile-only" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
+          <span class="mobile-only" data-brand-slot="top">${S.brand ? sideBrand(S.brand) : ppBrand()}</span>
           <div class="spacer"></div>
           <button class="icon-btn bell" data-act="bell-open" aria-label="Notifications" aria-haspopup="dialog">${ICON.bell}<b class="badge" data-badge></b></button>
         </header>
@@ -205,6 +217,15 @@ function renderShell() {
     try { await db.setCurrentOrg(S.user.id, e.target.value); location.hash = '#/'; location.reload(); } catch (err) { toastError(err); }
   });
   renderPage();
+}
+
+const ppBrand = () => html`<a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>`;
+// The firm's look switched on or off while the app was open (it comes and goes with the add-on).
+function paintBrand() {
+  const set = (slot, v) => { const el = document.querySelector(`[data-brand-slot="${slot}"]`); if (el) el.innerHTML = String(v); };
+  set('side', S.brand ? sideBrand(S.brand) : ppBrand());
+  set('top', S.brand ? sideBrand(S.brand) : ppBrand());
+  set('powered', S.brand ? poweredBy() : '');
 }
 
 hooks.paintBadges = () => paintBadges();

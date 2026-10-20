@@ -6,6 +6,7 @@ import { html, openModal, confirmDialog, toast, toastError, when, fmtDate, peso,
 import { S, on, reload, isOrgAdmin, has, addonOf, addonActive, plusOf, plusIncluded, hasPlus, peopleAllowed, effectivePlan } from '../core.js';
 import { FREE_PEOPLE, PLUS_MONTHLY, YEAR_MONTHS, staffBands, staffMonthly, addonPrice, addonLabel } from '../prices.js';
 import { payDetails, paySettings } from './services.js';
+import { brandCard } from './brand.js';
 import * as db from 'pp/data';
 
 const BILL_STATUS = { due: ['To pay', 'soon'], pending_verification: ['Checking your payment', 'progress'], paid: ['Paid', 'ok'], cancelled: ['Replaced or cancelled', 'needinfo'] };
@@ -97,6 +98,7 @@ export function addonSection(pay) {
         <ul class="svc-inc">${PLUS_PERKS.map(([t]) => html`<li>${t}</li>`)}</ul>
         ${plusActions}
       </section>
+      ${has('brand') && S.org.kind === 'firm' ? brandCard() : ''}
       <section class="card svc staff-card ${staffOn ? 'plan-current' : ''}" id="staff-licences">
         <div class="svc-top"><h2>Staff licences</h2><div class="svc-price"><b>₱100</b><small>per extra person a month</small></div></div>
         <p>${staffStatus}</p>
@@ -158,6 +160,12 @@ export function wireAddons(root) {
     choose('staff', n, form.querySelector('[name=billing]:checked')?.value || 'monthly');
   });
   if (new URLSearchParams(location.hash.split('?')[1] || '').get('staff')) setTimeout(() => form.people.focus(), 50);
+}
+// Arriving from "Turn it on" on the brand page: show the White-label card.
+export function showBrandCard(root) {
+  if (!new URLSearchParams(location.hash.split('?')[1] || '').get('brand')) return;
+  const card = root.querySelector('#white-label');
+  if (card) setTimeout(() => { card.scrollIntoView({ block: 'center' }); card.querySelector('button, a')?.focus({ preventScroll: true }); }, 50);
 }
 
 // ---------------------------------------------------------------- choosing: the database prices it, then you confirm
@@ -229,6 +237,8 @@ on('addon-stop', async (ds) => {
   const a = addonOf(ds.kind);
   const msg = ds.kind === 'plus'
     ? `Plus stays on until ${fmtDate(a.paid_through)}. Then your public page shows "paused" and the monthly check stops. Nothing is deleted, and you can turn it on again anytime.`
+    : ds.kind === 'brand'
+    ? `White-label stays on until ${fmtDate(a.paid_through)}. Then your clients' emails and app show PermitPal's own look again. Your brand settings are kept.`
     : `Your licences stay on until ${fmtDate(a.paid_through)}. Then reminders pause for everyone above the free ${FREE_PEOPLE}. Nothing is deleted.`;
   if (!(await confirmDialog('Stop at the end of the period?', msg, { confirmLabel: 'Stop it then', cancelLabel: 'Keep it' }))) return;
   try { const d = await db.addonStop(S.org.id, ds.kind); await reload(); toast(`It ends on ${fmtDate(d)}.`); } catch (e) { toastError(e); }

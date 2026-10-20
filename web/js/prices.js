@@ -1,7 +1,8 @@
-// Prices for PermitPal Plus and staff licences. The database works out every bill the same way
+// Prices for PermitPal Plus, staff licences and White-label. The database works out every bill the same way
 // (private.staff_monthly / private.addon_price); these only show the price before asking it.
 export const FREE_PEOPLE = 3;
 export const PLUS_MONTHLY = 199;
+export const BRAND_MONTHLY = 1000; // White-label, for accounting firms
 export const YEAR_MONTHS = 10; // yearly = 10 months' price (2 months free)
 
 // People 1-3 free; each person from the 4th to the 20th ₱100 a month, the 21st to the 100th ₱60,
@@ -17,6 +18,6 @@ export function staffBands(people) {
     .map((b) => ({ ...b, amount: b.count * b.each }));
 }
 export const staffMonthly = (people) => staffBands(people).reduce((t, b) => t + b.amount, 0);
-export const addonPrice = (kind, people, billing) => (kind === 'plus' ? PLUS_MONTHLY : staffMonthly(people)) * (billing === 'yearly' ? YEAR_MONTHS : 1);
+export const addonPrice = (kind, people, billing) => (kind === 'plus' ? PLUS_MONTHLY : kind === 'brand' ? BRAND_MONTHLY : staffMonthly(people)) * (billing === 'yearly' ? YEAR_MONTHS : 1);
 export const addonLabel = (kind, people, billing) =>
-  `${kind === 'plus' ? 'PermitPal Plus' : `Staff licences, up to ${people} people`} (${billing === 'yearly' ? 'yearly' : 'monthly'})`;
+  `${kind === 'plus' ? 'PermitPal Plus' : kind === 'brand' ? 'White-label' : `Staff licences, up to ${people} people`} (${billing === 'yearly' ? 'yearly' : 'monthly'})`;

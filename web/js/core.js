@@ -12,6 +12,7 @@ export const S = {
   data: null,      // { types, services, businesses, locations, vehicles, people, reqs, requests, members }
   unread: 0,
   features: {},   // newer features this database supports: { errors, assign, filings, ... }
+  brand: null,    // a client workspace's accounting firm look (White-label), or null for PermitPal's own
 };
 // Is a newer feature switched on for this database?
 export const has = (name) => !!S.features?.[name];
@@ -53,6 +54,9 @@ export function plusIncluded() {
   return (o.trial_ends_at && new Date(o.trial_ends_at) > new Date()) || TEAM_PLANS.includes(effectivePlan()?.id);
 }
 export const hasPlus = () => has('plus') && (addonActive(addonOf('plus')) || plusIncluded());
+// White-label: accounting firms (on the firm plan or its trial) put their look on what their clients see.
+export const brandEligible = () => S.org?.kind === 'firm' && ((S.org.trial_ends_at && new Date(S.org.trial_ends_at) > new Date()) || effectivePlan()?.id === 'firm');
+export const brandOn = () => has('brand') && brandEligible() && addonActive(addonOf('brand'));
 export const FREE_PEOPLE_N = 3;
 // People the workspace may track today, and the most that can be added (a move down that starts next period counts already).
 export function peopleAllowed() {

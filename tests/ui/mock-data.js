@@ -586,6 +586,8 @@ if (globalThis.PP_DEMO) {
 
 // ---------------------------------------------------------------- team tools
 db.links = [];
+// An accounting firm's open invitation to this business (the White-label tests open it).
+if (globalThis.PP_BRAND) db.links.push({ link_id: 'lf1', id: 'lf1', org_id: null, relation: 'client', label: '', status: 'pending', share_files: false, invited_email: 'sadie@test.ph', token: 'tokfirm', created_at: new Date().toISOString(), name: null, items: [] });
 export const listPlans = async () => plans;
 export async function setOrgProfile(id, patch) {
   const target = id === org.id ? org : db.managed.find((o) => o.id === id);
@@ -611,7 +613,13 @@ export async function linkInvite(owner, relation, email, label) {
   return l.link_id;
 }
 export const linkToken = async (id) => db.links.find((l) => l.link_id === id).token;
-export const linkPreview = async (token) => { const l = db.links.find((x) => x.token === token); return l ? { owner_name: 'Sample Franchisor Inc.', owner_kind: 'head_office', relation: l.relation, label: l.label, status: l.status, required_types: [] } : null; };
+export const linkPreview = async (token) => {
+  const l = db.links.find((x) => x.token === token);
+  if (!l) return null;
+  const firm = globalThis.PP_BRAND;
+  return { owner_name: firm ? 'Dela Cruz Accounting' : 'Sample Franchisor Inc.', owner_kind: firm ? 'firm' : 'head_office', relation: firm ? 'client' : l.relation, label: l.label, status: l.status,
+    required_types: [], brand: firm && l.status === 'pending' ? { ...SAMPLE_BRAND } : null };
+};
 export async function linkAccept(token) { const l = db.links.find((x) => x.token === token); Object.assign(l, { status: 'active', accepted_at: new Date().toISOString() }); return l.link_id; }
 export async function linkDecline(token) { db.links.find((x) => x.token === token).status = 'declined'; }
 export async function linkEnd(id) {
@@ -743,8 +751,9 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus'];
-export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries(ALL_FEATURES.map((f) => [f, true])));
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand'];
+// A list in PP_FEATURES switches on only those (a database part-way through the manual files).
+export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 
 db.clientErrors = [];
 let errSeq = 0;
@@ -1474,6 +1483,7 @@ function checkArgs(kind, people, billing) {
   if (org.role !== 'owner' && org.role !== 'admin') throw new Error('Only the workspace owner or an admin can change the plan.');
   if (!['monthly', 'yearly'].includes(billing)) throw new Error('Choose monthly or yearly.');
   if (kind === 'plus' && plusIncludedMock()) throw new Error('Plus is already included in your team plan.');
+  if (kind === 'brand' && !brandEligibleMock()) throw new Error('White-label is for Accounting firm workspaces with the firm plan (or its free trial).');
   if (kind === 'staff') {
     if (!(people >= FREE_PEOPLE + 1 && people <= 5000)) throw new Error(`Choose from ${FREE_PEOPLE + 1} to 5,000 people. The first ${FREE_PEOPLE} are free.`);
     const n = db.people.filter((p) => !p.deleted_at).length;
@@ -1694,3 +1704,43 @@ if (PLUS_ON && (globalThis.PP_DEMO || globalThis.PP_PLUS)) {
   plusDb.links.push({ token: '11111111-2222-4333-8444-555555555555', requirement_id: nbi.id, person_id: 'pp2', used_at: null });
 }
 function daysAgoIso(d, h = 0) { return new Date(Date.now() - d * 864e5 - h * 3600e3).toISOString(); }
+
+// ---------------------------------------------------------------- White-label (accounting firms)
+// PP_BRAND shows a client workspace whose accountant has White-label on (logo, colour, "Powered by PermitPal").
+export const SAMPLE_BRAND = { firm_org: 'f1', name: 'Dela Cruz & Co.', color: '#0F5132', reply_to: 'hello@delacruz.ph', phone: '(02) 8123 4567',
+  tagline: 'Tax, books & permits for small businesses', logo_url: 'img/logo.png' };
+const brandEligibleMock = () => org.kind === 'firm' && ((org.trial_ends_at && new Date(org.trial_ends_at) > new Date()) || org.plan_id === 'firm');
+let brandRow = null;
+export const brandSettings = async () => (brandRow ? { ...brandRow } : null);
+export async function brandSave(orgId, f) {
+  if (org.role !== 'owner' && org.role !== 'admin') throw new Error('Only the workspace owner or an admin can change the brand.');
+  if (org.kind !== 'firm') throw new Error('White-label is for Accounting firm workspaces.');
+  if (!String(f.display_name || '').trim() || f.display_name.length > 80) throw new Error('Enter the name your clients know you by (up to 80 characters).');
+  const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  if (!/^#[0-9a-f]{6}$/i.test(f.color || '') || 1.05 / (lum(f.color) + 0.05) < 4.5) throw new Error('Pick a darker colour, so white text on it stays easy to read.');
+  if (f.reply_to && !/^[^@\s<>"]+@[^@\s<>"]+\.[a-z]{2,}$/i.test(f.reply_to)) throw new Error('Enter a valid email address for replies.');
+  brandRow = { org_id: org.id, display_name: f.display_name.trim(), logo_path: f.logo_path || null, color: f.color.toUpperCase(), reply_to: f.reply_to ? f.reply_to.toLowerCase() : null,
+    phone: f.phone || null, tagline: f.tagline || null, client_report: f.client_report !== false, updated_at: new Date().toISOString() };
+  return { ...brandRow };
+}
+export async function startBrandTrial() {
+  if (!brandEligibleMock()) throw new Error('White-label is for Accounting firm workspaces with the firm plan (or its free trial).');
+  const a = addonMock('brand');
+  if (active(a)) throw new Error('White-label is already on.');
+  if (a?.trial_used_on || a?.started_on) throw new Error('This workspace has already had its free trial.');
+  const until = addDays(13);
+  if (a) Object.assign(a, { paid_through: until, trial: true, trial_used_on: today() });
+  else plusDb.addons.push({ org_id: org.id, kind: 'brand', people_max: null, billing: 'monthly', paid_through: until, trial: true, trial_used_on: today(), comped: false, started_on: null });
+  return until;
+}
+export const clientBrand = async () => (globalThis.PP_BRAND && org.kind === 'business' ? { ...SAMPLE_BRAND } : null);
+export const linkBrand = async (token) => (globalThis.PP_BRAND && db.links.some((l) => l.token === token && l.status === 'pending') ? { ...SAMPLE_BRAND } : null);
+export const LOGO_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg' };
+export const LOGO_MAX_BYTES = 512 * 1024;
+export async function uploadBrandLogo(orgId, file) {
+  if (!LOGO_TYPES[file.type]) throw new Error('Use a PNG or JPG image for the logo.');
+  if (file.size > LOGO_MAX_BYTES) throw new Error('That logo is over 512 KB. Save it smaller (about 400 pixels wide is plenty) and try again.');
+  return `${orgId}/logo-${uid()}.${LOGO_TYPES[file.type]}`;
+}
+export const removeBrandLogo = async () => {};
+export const brandLogoUrl = (path) => (path ? 'img/logo.png' : null);

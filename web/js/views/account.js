@@ -10,7 +10,8 @@ import { handledCount } from './assign.js';
 import { avatar, ICON } from '../components.js';
 import { KINDS, teamAccess, connectionsCard } from './network.js';
 import { mfaSection, requireCard } from './mfa.js';
-import { addonSection, wireAddons } from './plus.js';
+import { addonSection, wireAddons, showBrandCard } from './plus.js';
+import { brandPage, brandTabShown } from './brand.js';
 import * as db from 'pp/data';
 
 // ================================================================ history
@@ -193,7 +194,11 @@ on('member-leave', async () => {
 });
 
 // ================================================================ settings
+const settingsNav = () => html`<nav class="subnav"><a href="#/settings">Profile & reminders</a><a href="#/settings/billing">Plan</a>${brandTabShown() ? html`<a href="#/settings/brand">Your brand</a>` : ''}<a href="#/settings/workspace">Workspace & data</a></nav>`;
+const markNav = (el) => el.querySelectorAll('.subnav a').forEach((a) => { if (a.getAttribute('href') === location.hash.split('?')[0]) a.classList.add('active'); });
+
 export async function settings(el, section) {
+  if (section === 'brand' && brandTabShown()) return brandPage(el, settingsNav());
   const p = S.profile;
   const prefs = S.prefs || {};
   let channels = {};
@@ -216,7 +221,7 @@ export async function settings(el, section) {
 
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Settings</h1></div></div>
-    <nav class="subnav"><a href="#/settings">Profile & reminders</a><a href="#/settings/billing">Plan</a><a href="#/settings/workspace">Workspace & data</a></nav>
+    ${settingsNav()}
 
     ${when(!section, html`
     <section class="card"><h2>Profile</h2>
@@ -321,7 +326,7 @@ export async function settings(el, section) {
                <button class="btn btn-danger" data-act="org-delete">Delete workspace</button>`}</section>`)}`)}
   `);
 
-  el.querySelectorAll('.subnav a').forEach((a) => { if (a.getAttribute('href') === location.hash.split('?')[0]) a.classList.add('active'); });
+  markNav(el);
   mfaSection(el.querySelector('#mfa-section'));
   el.querySelectorAll('[data-profile-pref]').forEach((i) => i.addEventListener('change', async () => {
     try { await db.updateProfile(S.user.id, { [i.dataset.profilePref]: i.checked }); S.profile[i.dataset.profilePref] = i.checked; toast('Saved.'); } catch (e) { i.checked = !i.checked; toastError(e); }
@@ -329,7 +334,7 @@ export async function settings(el, section) {
   el.querySelectorAll('[data-pref]').forEach((i) => i.addEventListener('change', async () => {
     try { await db.updatePrefs(S.user.id, { [i.dataset.pref]: i.checked }); S.prefs[i.dataset.pref] = i.checked; toast('Saved.'); } catch (e) { i.checked = !i.checked; toastError(e); }
   }));
-  if (section === 'billing') wireAddons(el);
+  if (section === 'billing') { wireAddons(el); showBrandCard(el); }
   const pf = el.querySelector('#profile-form');
   if (pf) pf.addEventListener('submit', async (e) => {
     e.preventDefault();

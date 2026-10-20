@@ -4,6 +4,7 @@ import { S, on, hooks, canEdit, empty, has, memberName, serviceFor, careOf, serv
 import { assignable, bulk, bulkBar } from './assign.js';
 import { filingsBrief } from './filings.js';
 import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
+import { accountantCard } from './brand.js';
 import * as db from 'pp/data';
 
 // ---------------------------------------------------------------- dashboard
@@ -18,7 +19,8 @@ export function dashboard(el) {
         <a class="onboard-card" href="#/vehicles?add=1">${ICON.car}<b>Add a vehicle</b><span>Track LTO registration, CTPL, emission and inspection. We'll work out the renewal month from the plate.</span></a>
         ${when_(has('revenue') && canEdit() && service('setup_from_paper'), html`<button class="onboard-card" data-act="svc-request" data-code="setup_from_paper">${ICON.briefcase}<b>Have a box of papers?</b>
           <span>Send us photos of your permits and we'll set everything up for you, with the right dates and reminders. ${service('setup_from_paper')?.price_from != null ? 'From ₱' + Number(service('setup_from_paper').price_from).toLocaleString() : ''}.</span></button>`)}
-      </div>`);
+      </div>
+      ${accountantCard()}`);
     return;
   }
   const c = counts(reqs);
@@ -34,6 +36,7 @@ export function dashboard(el) {
       ${open.length ? open.slice(0, 8).map((r) => reqRow(r)) : html`<div class="all-good">${ICON.check} Everything is compliant. Nice work.</div>`}
       ${when_(open.length, html`<div class="sheet-foot">${plural(open.length, 'open item')} across your businesses and vehicles</div>`)}
     </section>
+    ${accountantCard()}
   `);
   filingsBrief(el.querySelector('[data-filings-brief]'));
 }

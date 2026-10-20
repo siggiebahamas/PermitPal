@@ -428,8 +428,10 @@ export async function connectPage(el, token) {
   const mine = S.orgs.filter((o) => ['owner', 'admin'].includes(o.role) && o.kind === 'business');
   const what = { franchisee: 'a branch or franchisee', client: 'a client', tenant: 'a tenant' }[inv.relation];
   const req = (inv.required_types || []).map(typeName);
+  const who = inv.brand?.name || inv.owner_name; // a firm with White-label goes by the name its clients know
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Connect with ${inv.owner_name}</h1><p class="muted">${inv.owner_name} would like to see your permit status as ${what}${inv.label ? ` (${inv.label})` : ''}.</p></div></div>
+    ${inv.brand?.logo_url ? html`<div class="connect-logo"><img src="${inv.brand.logo_url}" alt="${who}"></div>` : ''}
+    <div class="page-head"><div><h1>Connect with ${who}</h1><p class="muted">${who} would like to see your permit status as ${what}${inv.label ? ` (${inv.label})` : ''}.</p></div></div>
     <section class="card proof-how">
       <div class="proof-see">
         <div class="yes"><b>${ICON.check} What they will see</b><p>The names, status and expiry dates of the permits in the workspace you choose${req.length ? `, including ${req.join(', ')}` : ''}.</p></div>
@@ -439,7 +441,7 @@ export async function connectPage(el, token) {
     </section>
     ${mine.length ? html`<section class="card"><form id="connect-form">
       <label class="field"><span>Which workspace?</span><select name="org">${mine.map((o) => html`<option value="${o.id}" ${o.id === S.org.id ? 'selected' : ''}>${o.name}</option>`)}</select></label>
-      <label class="check"><input type="checkbox" name="share" ${inv.relation === 'tenant' ? 'checked' : ''}> Also let ${inv.owner_name} download copies of my current permits${inv.relation === 'tenant' ? ' (malls usually require these)' : ''}</label>
+      <label class="check"><input type="checkbox" name="share" ${inv.relation === 'tenant' ? 'checked' : ''}> Also let ${who} download copies of my current permits${inv.relation === 'tenant' ? ' (malls usually require these)' : ''}</label>
       <div class="btn-row between"><button type="button" class="btn btn-ghost" data-act="connect-decline" data-token="${token}">Decline</button>
         <button class="btn btn-primary">Connect</button></div></form></section>`
       : html`<section class="card"><p>You need a business workspace that you own to connect. Create one first, then open the link again.</p></section>`}`);
@@ -449,7 +451,7 @@ export async function connectPage(el, token) {
     const btn = e.target.querySelector('button.btn-primary'); btn.disabled = true;
     try {
       await db.linkAccept(token, fd.get('org'), !!fd.get('share'));
-      toast(`Connected. ${inv.owner_name} now sees your permit status.`);
+      toast(`Connected. ${who} now sees your permit status.`);
       if (fd.get('org') !== S.org.id) { await db.setCurrentOrg(S.user.id, fd.get('org')); location.hash = '#/'; location.reload(); return; }
       await reload(); go('#/');
     } catch (err) { btn.disabled = false; toastError(err); }

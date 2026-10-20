@@ -374,6 +374,7 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .banner.warn { background: var(--amber-bg); color: #7A5410; }
 .banner.danger { background: var(--red-bg); color: #8A2A25; }
 .banner-actions { display: flex; gap: 8px; }
+.banner a:not(.btn) { text-decoration: underline; text-underline-offset: 2px; }
 
 .kv { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 8px 14px; margin: 0 0 10px; font-size: 16px; }
 .kv dt { color: var(--muted); font-weight: 600; }
@@ -1455,3 +1456,50 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .pp-text b { font-size: 14px; font-weight: 750; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pp-text small { font-size: 11.5px; color: #4B5568; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qr-mini svg, .qr-mini svg * { stroke: none; }
+
+/* White-label: an accounting firm's look for its clients (always with "Powered by PermitPal") */
+.banner.ok { background: var(--green-bg); color: #1D5A3C; }
+.co-brand { min-width: 0; }
+.co-brand img { width: auto; max-width: 120px; max-height: 34px; object-fit: contain; }
+.co-brand .cb-name { font-weight: 800; font-size: 16px; line-height: 1.2; color: var(--heading); overflow-wrap: anywhere; }
+.powered-by { margin: -6px 12px 12px; font-size: 12px; color: var(--muted); }
+.powered-by .wordmark { font-size: 12px; }
+.topbar .co-brand img { max-height: 28px; max-width: 90px; }
+.topbar .co-brand .cb-name { font-size: 15px; max-width: 46vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.firm-card .firm-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.firm-card .firm-top b { font-size: 17px; color: var(--heading); }
+.firm-logo { max-height: 44px; max-width: 120px; object-fit: contain; }
+.brand-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (min-width: 1100px) { .brand-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
+.brand-side .card + .card { margin-top: 16px; }
+.logo-row { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.logo-box { width: 150px; height: 70px; border: 1px dashed var(--border); border-radius: 12px; display: flex; align-items: center; justify-content: center; background: #fff; flex-shrink: 0; }
+.logo-box img { max-width: 136px; max-height: 58px; object-fit: contain; }
+.color-row { display: flex; gap: 8px; align-items: center; }
+.color-row input[type=color] { width: 52px; height: 44px; padding: 3px; border-radius: 10px; flex-shrink: 0; cursor: pointer; }
+.color-row input[name=color] { width: 130px; font-variant-numeric: tabular-nums; text-transform: uppercase; }
+.ok-text { color: var(--green-ink); font-weight: 600; }
+.warn-text { color: var(--heading); font-weight: 700; }
+.warn-text::before { content: "⚠ "; }
+.mail-prev { background: #F4F6FA; border-radius: 12px; padding: 14px; margin-bottom: 14px; font-family: Arial, Helvetica, sans-serif; color: #28303C; }
+.mp-from { font-size: 13px; margin-bottom: 10px; overflow-wrap: anywhere; }
+.mp-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.mp-head img { max-height: 28px; max-width: 110px; object-fit: contain; }
+.mp-head b { font-size: 16px; }
+.mp-head small { flex-basis: 100%; color: #4A5464; font-size: 12px; }
+.mp-card { background: #fff; border: 1px solid #E5E9F0; border-top: 4px solid; border-radius: 10px; padding: 12px; }
+.mp-card p { margin: 4px 0 10px; color: #4A5464; }
+.mp-btn { display: inline-block; color: #fff; padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 13px; }
+.mp-foot { font-size: 12px; color: #4A5464; margin: 10px 0 0; }
+.side-prev { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--side-bg); }
+.side-prev .powered-by { margin: 2px 0 10px; }
+.sp-top { display: flex; align-items: center; gap: 8px; }
+.sp-top img { max-height: 28px; max-width: 100px; object-fit: contain; }
+.sp-top b { color: var(--heading); }
+.sp-nav span { display: block; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text); }
+.auth-firm { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 4px 0 12px; text-align: center; }
+.auth-firm img { max-height: 56px; max-width: 200px; object-fit: contain; }
+.auth-firm b { font-size: 18px; color: var(--heading); }
+.connect-logo img { max-height: 56px; max-width: 220px; object-fit: contain; margin-bottom: 6px; }
+.plain-list { padding-left: 18px; margin: 0 0 10px; }
+.plain-list li { margin: 4px 0; }
