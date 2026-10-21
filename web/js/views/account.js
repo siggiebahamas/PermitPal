@@ -12,6 +12,8 @@ import { KINDS, teamAccess, connectionsCard } from './network.js';
 import { mfaSection, requireCard } from './mfa.js';
 import { addonSection, wireAddons, showBrandCard } from './plus.js';
 import { brandPage, brandTabShown } from './brand.js';
+import { billToggle, freeCard, planCard, PLAN_ORDER, compareTable } from './pricing.js';
+import { planTotal } from '../prices.js';
 import * as db from 'pp/data';
 
 // ================================================================ history
@@ -409,41 +411,68 @@ function billingSection(pay) {
   const acc = teamAccess();
   const k = KINDS[org.kind || 'business'];
   const plan = S.plans.find((p) => p.id === k?.plan);
-  const teamPlans = ['fleet', 'firm', 'property'].map((id) => S.plans.find((p) => p.id === id)).filter(Boolean);
+  const price = (id) => Number(S.plans.find((p) => p.id === id)?.price_php_monthly || 0);
   const status = org.kind === 'business' ? html`<p>This workspace is a <b>single business</b>: PermitPal is <b>free</b>, with no limits on businesses, vehicles or team members.</p>`
     : acc.why === 'plan' ? html`<p>You're on the <b>${plan?.name}</b> plan${org.plan_expires_at ? html`, paid until <b>${fmtDate(org.plan_expires_at.slice(0, 10))}</b>` : ''}.</p>`
-    : acc.why === 'trial' ? html`<p>You're on a <b>free trial</b> of ${plan?.name}: ${plural(acc.days, 'day')} left. Choose the plan below to keep your board after the trial.</p>`
+    : acc.why === 'trial' ? html`<p>You're on a <b>free trial</b> of ${plan?.name}: ${plural(acc.days, 'day')} left. Choose how to pay below to keep your board after the trial.</p>`
     : acc.why === 'staff' ? html`<p>Staff access: team tools are on.</p>`
-    : html`<p>Your free trial of ${plan?.name} has ended. Your data is safe; choose the plan below to open your board again.</p>`;
-  const payBox = (p) => html`<div class="plan-pay">
-      ${pay.online_payments === 'on' && isOwner() ? html`<div class="btn-row"><select name="months" data-months="${p.id}"><option value="1">1 month</option><option value="3">3 months</option><option value="12">12 months</option></select>
-        <button class="btn btn-primary btn-sm" data-act="plan-checkout" data-plan="${p.id}">Pay online (GCash, Maya, card)</button></div>`
+    : html`<p>Your free trial of ${plan?.name} has ended. Your data is safe; pay below to open your board again.</p>`;
+  const cta = (id) => {
+    if (id === k?.plan) return html`<span class="chip ok">Your plan</span>`;
+    if (!isOrgAdmin()) return '';
+    return html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${id}">Try free for 30 days</button>`;
+  };
+  return html`<section class="card"><h2>Your plan</h2>${status}
+      ${org.kind !== 'business' && plan && acc.why !== 'plan' && acc.why !== 'staff' ? payBox(plan, pay) : ''}</section>
+    <h3 class="section-label">Plans</h3>
+    <p class="pp-lead">Free for your own business, forever. Team plans are for people who look after many businesses, vehicles or tenants.</p>
+    ${billToggle('How often to pay for a team plan')}
+    <div class="pp-grid four">${freeCard(org.kind === 'business' ? html`<span class="chip ok">Your plan</span>` : '')}
+      ${PLAN_ORDER.map((id) => planCard(id, price(id), cta(id), { current: id === k?.plan }))}</div>
+    ${compareTable()}
+    <p class="fineprint">Single businesses stay free. Nothing is charged by itself, and you can stop anytime: your data is never locked or deleted, and you can always export it.</p>
+    ${addonSection(pay)}`;
+}
+// Paying for the team plan: a month, or a year with 2 months free.
+function payBox(p, pay) {
+  const m = Number(p.price_php_monthly);
+  const y = planTotal(m, 12);
+  const online = pay.online_payments === 'on' && isOwner();
+  return html`<div class="plan-pay">
+    <div class="pay-choice">
+      <div class="pay-opt"><span class="pay-opt-t">1 month</span><b>${peso(m)}</b><small>less than ${peso(Math.floor((m * 12) / 365) + 1)} a day</small></div>
+      <div class="pay-opt best"><span class="pp-ribbon">2 months FREE</span><span class="pay-opt-t">12 months</span><b>${peso(y)}</b><small><s>${peso(m * 12)}</s> · you save ${peso(m * 2)}</small></div>
+    </div>
+    ${online ? html`<div class="btn-row">
+        ${has('yearly') ? html`<button class="btn btn-primary" data-act="plan-checkout" data-plan="${p.id}" data-months="12">Pay ${peso(y)} for 12 months</button>` : ''}
+        <button class="btn ${has('yearly') ? 'btn-soft' : 'btn-primary'}" data-act="plan-checkout" data-plan="${p.id}" data-months="1">Pay ${peso(m)} for 1 month</button></div>
+        <p class="muted small">GCash, Maya or card.</p>`
       : html`${when(pay.gcash_number || pay.bank_account_number, html`<div class="paywiths">
           ${when(pay.gcash_number, html`<div class="paywith"><b>GCash</b><span>${pay.gcash_number}${pay.gcash_name ? ' · ' + pay.gcash_name : ''}</span></div>`)}
           ${when(pay.bank_account_number, html`<div class="paywith"><b>${pay.bank_name || 'Bank transfer'}</b><span>${pay.bank_account_number}${pay.bank_account_name ? ' · ' + pay.bank_account_name : ''}</span></div>`)}</div>`)}
-        <p class="muted small">${pay.payment_note || 'Pay the monthly amount, then press the button so we can activate your plan within 1 business day.'}</p>
-        ${when(isOrgAdmin(), html`<button class="btn btn-primary btn-sm" data-act="plan-request" data-plan="${p.id}">I've paid / activate ${p.name}</button>`)}`}
-    </div>`;
-  return html`<section class="card"><h2>Your plan</h2>${status}
-      ${org.kind !== 'business' && plan && acc.why !== 'plan' && acc.why !== 'staff' ? payBox(plan) : ''}</section>
-    <h3 class="section-label">Team plans</h3>
-    <div class="svc-grid">${teamPlans.map((p) => html`<section class="card svc ${p.id === k?.plan ? 'plan-current' : ''}">
-      <div class="svc-top"><h2>${p.name}</h2><div class="svc-price"><b>₱${Number(p.price_php_monthly).toLocaleString()}</b><small>per month</small></div></div>
-      <ul class="svc-inc">${p.features.map((f) => html`<li>${f}</li>`)}</ul>
-      <div class="svc-foot"><span class="muted small">30-day free trial</span>
-        ${p.id === k?.plan ? html`<span class="chip ok">Your plan</span>` : when(isOrgAdmin(), html`<button class="btn btn-sm btn-soft" data-act="nb-set-kind" data-kind="${p.id}">Start free trial</button>`)}</div>
-    </section>`)}</div>
-    <p class="fineprint">Single businesses stay free. Cancel anytime: your data is never locked or deleted, and you can always export it.</p>
-    ${addonSection(pay)}`;
+        <p class="muted small">${pay.payment_note || `Send ${peso(m)} for a month or ${peso(y)} for a year, then press the button. We turn your plan on within 1 business day.`}</p>
+        ${when(isOrgAdmin(), html`<button class="btn btn-primary" data-act="plan-request" data-plan="${p.id}">I've paid: turn on ${p.name}</button>`)}`}
+  </div>`;
 }
-on('plan-request', async (ds) => {
+on('plan-request', (ds) => {
   const p = S.plans.find((x) => x.id === ds.plan);
-  if (!(await confirmDialog(`Activate ${p.name}?`, "We'll match your payment and turn the plan on within 1 business day. You'll get a notification when it's active.", { confirmLabel: 'Send', danger: false }))) return;
-  try { await db.requestPlan(S.org.id, ds.plan); toast("Thanks! We'll confirm and activate your plan within 1 business day."); } catch (e) { toastError(e); }
+  const m = Number(p.price_php_monthly);
+  const y = planTotal(m, 12);
+  openModal(`Turn on ${p.name}`, html`<p>What did you pay for?</p>
+    <div class="radio-cards">
+      <label class="radio-card on"><input type="radio" name="months" value="12" checked><span><b>12 months: ${peso(y)}</b><small>2 months free</small></span></label>
+      <label class="radio-card"><input type="radio" name="months" value="1"><span><b>1 month: ${peso(m)}</b></span></label></div>
+    <p class="muted small">We match your payment and turn the plan on within 1 business day. You get a notification when it's on.</p>`, {
+    submitLabel: 'Send', danger: false,
+    onSubmit: async (fd) => {
+      const months = Number(fd.get('months'));
+      await db.requestPlan(S.org.id, ds.plan, months === 12 ? `Paid for 12 months (${peso(y)}, 2 months free)` : `Paid for 1 month (${peso(m)})`);
+      toast("Thanks! We'll confirm and turn your plan on within 1 business day.");
+    },
+  });
 });
 on('plan-checkout', async (ds) => {
-  const months = Number(document.querySelector(`[data-months="${ds.plan}"]`)?.value || 1);
-  try { location.href = await db.startCheckout(S.org.id, ds.plan, months); } catch (e) { toastError(e); }
+  try { location.href = await db.startCheckout(S.org.id, ds.plan, Number(ds.months || 1)); } catch (e) { toastError(e); }
 });
 
 // ---------------------------------------------------------------- text messages

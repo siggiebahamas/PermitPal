@@ -4,7 +4,9 @@
 // database works the bill out itself (addon_preview), and that's what the confirmation shows.
 import { html, openModal, confirmDialog, toast, toastError, when, fmtDate, peso, plural, todayPH, daysBetween } from '../util.js';
 import { S, on, reload, isOrgAdmin, has, addonOf, addonActive, plusOf, plusIncluded, hasPlus, peopleAllowed, effectivePlan } from '../core.js';
-import { FREE_PEOPLE, PLUS_MONTHLY, YEAR_MONTHS, staffBands, staffMonthly, addonPrice, addonLabel } from '../prices.js';
+import { FREE_PEOPLE, PLUS_MONTHLY, YEAR_MONTHS, BANDS, staffBands, staffMonthly, addonPrice, addonLabel } from '../prices.js';
+import { ICON } from '../components.js';
+import { addonCard, billButton, billToggle, checks, getBilling, paintPrices, PLUS_CHECKS, staffLadder, staffExamples } from './pricing.js';
 import { payDetails, paySettings } from './services.js';
 import { brandCard } from './brand.js';
 import * as db from 'pp/data';
@@ -25,8 +27,8 @@ export function openUpsell(what = 'Plus') {
   const plus = addonOf('plus');
   const canTrial = isOrgAdmin() && !plus?.trial_used_on && !plus?.started_on && !hasPlus();
   openModal(`${what} comes with PermitPal Plus`, html`
-    <p><b>₱${PLUS_MONTHLY} a month</b> <span class="muted">(or ₱${(PLUS_MONTHLY * YEAR_MONTHS).toLocaleString()} a year: 2 months free)</span>. Included in every team plan.</p>
-    <ul class="plus-perks">${PLUS_PERKS.map(([t, d]) => html`<li><b>${t}.</b> ${d}</li>`)}</ul>
+    <p class="pp-upsell-price"><b>${peso(PLUS_MONTHLY)}</b> a month: less than ₱7 a day. <span class="muted">Or ${peso(PLUS_MONTHLY * YEAR_MONTHS)} a year: 2 months free.</span></p>
+    ${checks(PLUS_CHECKS)}
     ${isOrgAdmin() ? '' : html`<p class="muted small">Ask your workspace owner to turn it on under Settings > Plan.</p>`}`, {
     submitLabel: canTrial ? 'Try it free for 14 days' : 'See Plus',
     cancelLabel: 'Not now',
@@ -68,57 +70,52 @@ export function addonSection(pay) {
   const plusOn = addonActive(plus);
   const included = plusIncluded();
   const n = activePeople();
-  const allowed = peopleAllowed();
   const staffOn = addonActive(staff);
 
   const plusStatus = included ? html`<span class="chip ok">Included in your ${effectivePlan()?.name || 'team'} plan</span>`
     : plusOn && plus.trial ? html`<span class="chip progress">Free trial: ${plural(Math.max(0, daysBetween(todayPH(), plus.paid_through) + 1), 'day')} left</span>`
-    : plusOn ? html`<span class="chip ok">On until ${fmtDate(plus.paid_through)}</span>`
-    : html`<span class="chip needinfo">Off</span>`;
+    : plusOn ? html`<span class="chip ok">On until ${fmtDate(plus.paid_through)}</span>` : '';
+  const turnOn = (kind, monthly, cls) => billButton(`data-act="addon-choose" data-kind="${kind}"`,
+    `${plusOn && kind === 'plus' ? 'Keep it' : 'Turn on'}: ${peso(monthly)} a month`, `${plusOn && kind === 'plus' ? 'Keep it' : 'Turn on'}: ${peso(monthly * YEAR_MONTHS)} a year (2 months free)`, cls);
   const plusActions = included || !admin ? '' : plusOn && !plus.trial ? html`
       ${stopping.plus ? html`<p class="small">Ends on ${fmtDate(stopping.plus)}. <button class="linklike" data-act="addon-resume" data-kind="plus">Keep it</button></p>`
-        : html`<div class="btn-row">${when(plus.billing === 'monthly', html`<button class="btn btn-sm btn-soft" data-act="addon-choose" data-kind="plus" data-billing="yearly">Switch to yearly (2 months free)</button>`)}
+        : html`<div class="btn-row">${when(plus.billing === 'monthly', html`<button class="btn btn-sm btn-soft" data-act="addon-choose" data-kind="plus" data-billing="yearly">Switch to yearly: 2 months free</button>`)}
           <button class="btn btn-sm btn-ghost" data-act="addon-stop" data-kind="plus">Stop at the end of the period</button></div>`}`
     : html`<div class="btn-row">
         ${when(!plus?.trial_used_on && !plus?.started_on && !plusOn, html`<button class="btn btn-primary" data-act="plus-trial">Try free for 14 days</button>`)}
-        <button class="btn ${plusOn ? 'btn-primary' : 'btn-soft'}" data-act="addon-choose" data-kind="plus" data-billing="monthly">${plusOn ? 'Keep it' : 'Turn on'}: ₱${PLUS_MONTHLY}/month</button>
-        <button class="btn btn-ghost" data-act="addon-choose" data-kind="plus" data-billing="yearly">₱${(PLUS_MONTHLY * YEAR_MONTHS).toLocaleString()}/year</button></div>`;
+        ${turnOn('plus', PLUS_MONTHLY, plusOn || plus?.trial_used_on ? 'btn btn-primary' : 'btn btn-soft')}</div>`;
 
   const staffStatus = staffOn
     ? html`<span class="chip ok">Up to ${staff.people_max} people until ${fmtDate(staff.paid_through)}</span>`
-    : html`<span class="chip ${n >= FREE_PEOPLE ? 'soon' : 'needinfo'}">Free: ${n} of ${FREE_PEOPLE} people</span>`;
+    : html`<span class="chip ${n >= FREE_PEOPLE ? 'soon' : 'ok'}">Free: ${n} of ${FREE_PEOPLE} people</span>`;
   const startAt = Math.max(FREE_PEOPLE + 1, n, staffOn ? staff.people_max + 5 : 0);
+  const staffBody = html`${staffLadder()}${staffExamples()}
+    ${staffOn && staff.next_people_max ? html`<p class="small">From ${fmtDate(staff.paid_through)}: up to ${staff.next_people_max} people (${peso(addonPrice('staff', staff.next_people_max, staff.next_billing || staff.billing))} a ${staff.next_billing === 'yearly' ? 'year' : 'month'}).</p>` : ''}
+    ${stopping.staff ? html`<p class="small">Ends on ${fmtDate(stopping.staff)}: then reminders pause for everyone above the free ${FREE_PEOPLE}. <button class="linklike" data-act="addon-resume" data-kind="staff">Keep it</button></p>` : ''}
+    ${admin ? html`<form class="staff-calc" data-staff-calc>
+        <label class="field"><span>How many people do you want to track?</span>
+          <input type="number" name="people" min="${Math.max(FREE_PEOPLE + 1, n)}" max="5000" step="1" inputmode="numeric" value="${startAt}"></label>
+        ${billToggle('How often to pay for staff licences')}
+        <div class="calc-out" aria-live="polite"></div>
+        <div class="btn-row"><button class="btn btn-primary">${staffOn ? 'Change' : 'Continue'}</button>
+        ${when(staffOn && !stopping.staff, html`<button type="button" class="btn btn-ghost" data-act="addon-stop" data-kind="staff">Stop at the end of the period</button>`)}</div>
+      </form>` : html`<p class="muted small">Your workspace owner or an admin can add licences.</p>`}`;
   return html`
     <h3 class="section-label" id="addons">Add-ons</h3>
+    <p class="pp-lead">Small extras, from ${peso(PLUS_MONTHLY)} a month. Pay yearly and 2 months are free.</p>
+    ${billToggle('How often to pay for add-ons')}
     ${open.length ? html`<section class="card bills-due"><div class="card-head"><h2>To pay</h2></div>${open.map(billRow)}</section>` : ''}
-    <div class="svc-grid">
-      <section class="card svc plus-card ${plusOn || included ? 'plan-current' : ''}">
-        <div class="svc-top"><h2>PermitPal Plus</h2><div class="svc-price"><b>₱${PLUS_MONTHLY}</b><small>per month</small></div></div>
-        <p>${plusStatus}</p>
-        <ul class="svc-inc">${PLUS_PERKS.map(([t]) => html`<li>${t}</li>`)}</ul>
-        ${plusActions}
-      </section>
+    <div class="pp-grid">
+      ${addonCard({ id: 'plus-card', icon: ICON.share, name: 'PermitPal Plus', who: 'Show customers you are legit, and let PermitPal check your permits for you',
+        monthly: included ? 0 : PLUS_MONTHLY, list: PLUS_CHECKS, status: plusStatus, cta: plusActions, current: plusOn || included,
+        note: included ? '' : plus?.trial_used_on || plusOn ? '' : 'Try it free for 14 days. Nothing is charged after.' })}
       ${has('brand') && S.org.kind === 'firm' ? brandCard() : ''}
-      <section class="card svc staff-card ${staffOn ? 'plan-current' : ''}" id="staff-licences">
-        <div class="svc-top"><h2>Staff licences</h2><div class="svc-price"><b>₱100</b><small>per extra person a month</small></div></div>
-        <p>${staffStatus}</p>
-        <p class="muted small">Track ${FREE_PEOPLE} people free: their licences, reminders to them and to you, and their own upload link. More people: ₱100 each a month up to the 20th, ₱60 each from the 21st, ₱40 each from the 101st. Yearly is 10 months' price.</p>
-        ${staffOn && staff.next_people_max ? html`<p class="small">From ${fmtDate(staff.paid_through)}: up to ${staff.next_people_max} people (${peso(addonPrice('staff', staff.next_people_max, staff.next_billing || staff.billing))} a ${staff.next_billing === 'yearly' ? 'year' : 'month'}).</p>` : ''}
-        ${stopping.staff ? html`<p class="small">Ends on ${fmtDate(stopping.staff)}: then reminders pause for everyone above the free ${FREE_PEOPLE}. <button class="linklike" data-act="addon-resume" data-kind="staff">Keep it</button></p>` : ''}
-        ${admin ? html`<form class="staff-calc" data-staff-calc>
-            <label class="field"><span>How many people do you need to track?</span>
-              <input type="number" name="people" min="${Math.max(FREE_PEOPLE + 1, n)}" max="5000" step="1" inputmode="numeric" value="${startAt}"></label>
-            <div class="paytoggle" role="radiogroup" aria-label="How often to pay">
-              <label><input type="radio" name="billing" value="monthly" ${!staffOn || staff.billing === 'monthly' ? 'checked' : ''}><span>Monthly</span></label>
-              <label><input type="radio" name="billing" value="yearly" ${staffOn && staff.billing === 'yearly' ? 'checked' : ''}><span>Yearly (2 months free)</span></label></div>
-            <div class="calc-out" aria-live="polite"></div>
-            <button class="btn btn-primary">${staffOn ? 'Change' : 'Continue'}</button>
-            ${when(staffOn && !stopping.staff, html`<button type="button" class="btn btn-ghost" data-act="addon-stop" data-kind="staff">Stop at the end of the period</button>`)}
-          </form>` : html`<p class="muted small">Your workspace owner or an admin can add licences.</p>`}
-      </section>
+      ${addonCard({ id: 'staff-licences', icon: ICON.person, name: 'Staff licences', who: "Track your staff's health cards, NBI clearances and driver's licences",
+        status: staffStatus, body: staffBody, current: staffOn,
+        note: `Each person gets a reminder before their licence runs out, and a link to send the new one. The first ${FREE_PEOPLE} people are always free.` })}
     </div>
     ${bills.length ? html`<details class="card bills-all"><summary><b>Your bills</b> <span class="muted small">${plural(bills.length, 'bill')}</span></summary>${bills.map(billRow)}</details>` : ''}
-    <p class="fineprint">Prices include everything; there's nothing else to pay. Moving up starts a new period today, less what's unused of the current one. Moving down starts with your next bill. Stopping keeps everything on until the end of what you paid, and nothing is ever deleted.${pay?.online_payments === 'on' ? '' : ' Pay by GCash, Maya or bank transfer; we confirm within 1 business day.'}</p>`;
+    <p class="fineprint">Prices include everything; there's nothing else to pay. Nothing is charged by itself: we send a bill a week before each period. Moving up starts a new period today, less what's unused of the current one. Moving down starts with your next bill. Stopping keeps everything on until the end of what you paid, and nothing is ever deleted.${pay?.online_payments === 'on' ? '' : ' Pay by GCash, Maya or bank transfer; we confirm within 1 business day.'}</p>`;
 }
 
 function billRow(i) {
@@ -132,32 +129,43 @@ function billRow(i) {
       <button class="btn btn-sm btn-ghost" data-act="addon-cancel-bill" data-id="${i.id}" aria-label="Cancel bill ${i.number}">Cancel</button></div>`)}</div>`;
 }
 
-// Live price under the people box (the same rule the database uses).
+// Live price under the people box (the same rule the database uses): the total, what each person comes
+// to, and what the lower prices save against ₱100 each.
 function paintCalc(form) {
   const n = Math.floor(Number(form.people.value));
-  const billing = form.querySelector('[name=billing]:checked')?.value || 'monthly';
+  const billing = getBilling();
   const out = form.querySelector('.calc-out');
   const min = Number(form.people.min);
   if (!(n >= min) || n > 5000) { out.innerHTML = String(html`<p class="small muted">Enter ${min} to 5,000.</p>`); return; }
   const bands = staffBands(n);
   const monthly = staffMonthly(n);
-  out.innerHTML = String(html`<div class="calc-lines">
+  const save = (n - FREE_PEOPLE) * BANDS[0].each - monthly;
+  const yearly = monthly * YEAR_MONTHS;
+  out.innerHTML = String(html`<div class="calc-big">
+      ${billing === 'yearly' ? html`<b>${peso(yearly)}</b><span>a year</span>` : html`<b>${peso(monthly)}</b><span>a month</span>`}</div>
+    ${billing === 'yearly' ? html`<p class="pp-billed"><s>${peso(monthly * 12)}</s> 2 months free: you save ${peso(monthly * 2)}</p>` : html`<p class="small">That's ${peso(Math.round((monthly / n) * 100) / 100)} a person, counting the ${FREE_PEOPLE} free.</p>`}
+    ${save > 0 ? html`<p class="pp-save">${ICON.check} The lower prices save you ${peso(billing === 'yearly' ? save * YEAR_MONTHS : save)} ${billing === 'yearly' ? 'a year' : 'a month'} against ${peso(BANDS[0].each)} each</p>` : ''}
+    <div class="calc-lines">
       <div><span>People 1 to ${FREE_PEOPLE}</span><span>Free</span></div>
       ${bands.map((b) => html`<div><span>${b.count} ${b.count === 1 ? 'person' : 'people'} × ₱${b.each} (the ${ordinal(b.from)}${b.count > 1 ? ` to ${ordinal(b.from + b.count - 1)}` : ''})</span><span>${peso(b.amount)}</span></div>`)}
-      <div class="calc-total"><span>${billing === 'yearly' ? `A year (10 months' price)` : 'A month'}</span><b>${peso(billing === 'yearly' ? monthly * YEAR_MONTHS : monthly)}</b></div>
-      <p class="muted small">That's about ${peso(Math.round((monthly / Math.max(1, n - FREE_PEOPLE)) * 100) / 100)} per paid person a month.</p></div>`);
+      <div class="calc-total"><span>${billing === 'yearly' ? `A year (10 months' price)` : 'A month'}</span><b>${peso(billing === 'yearly' ? yearly : monthly)}</b></div></div>`);
 }
 const ordinal = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+let calcOnSwitch = null;
 export function wireAddons(root) {
+  paintPrices(root);
   const form = root.querySelector('[data-staff-calc]');
   if (!form) return;
   paintCalc(form);
   form.addEventListener('input', () => paintCalc(form));
+  if (calcOnSwitch) document.removeEventListener('pp-billing', calcOnSwitch); // one listener, for the form on screen
+  calcOnSwitch = () => { if (form.isConnected) paintCalc(form); };
+  document.addEventListener('pp-billing', calcOnSwitch);
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const n = Math.floor(Number(form.people.value));
     if (!(n >= Number(form.people.min)) || n > 5000) return toast(`Enter ${form.people.min} to 5,000 people.`, 'error');
-    choose('staff', n, form.querySelector('[name=billing]:checked')?.value || 'monthly');
+    choose('staff', n, getBilling());
   });
   if (new URLSearchParams(location.hash.split('?')[1] || '').get('staff')) setTimeout(() => form.people.focus(), 50);
 }

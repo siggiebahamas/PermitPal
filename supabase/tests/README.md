@@ -24,6 +24,7 @@ that is expected to fail). A run is good when every line in the message says PAS
 | `13_leads.sql` | Firms paid per quote request from prepaid credit (paused at zero), no per-sale fees, no website for customers, the firm's 7-day report link and staff decisions, "Did you hire them?" |
 | `14_plus.sql` | PermitPal Plus and staff licences: prices, the free 3 people and paid licences, bills (moving up with credit, moving down next period, renewals a week ahead, paying late, online checkout), pausing when a plan ends, the public permit page (statuses, hidden permits, copies, paused), recipients, the worker's upload link, licences by role, the automatic permit check, templates, money views |
 | `15_whitelabel.sql` | White-label for accounting firms: price, who can turn it on, the brand settings and logo files, the firm's look on clients' reminder, deadline, nudge, invitation and Monday emails, the client's app, the monthly client report, lapsing and disconnecting, money views |
+| `16_yearly.sql` | Yearly team plans: 12 months cost 10 (2 months free), other lengths cost what they say, only the owner pays, a paid year runs 12 months |
 
 Files 06 and later end with `rollback` and print a table instead: every row should say `ok = t`.
 

@@ -1003,14 +1003,28 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('billing: marking it paid', /Marked paid/.test(await page.textContent('#toast')));
   // Professionals: application, fee model, checklist line stats
   await page.click('[data-act=admin-tab][data-tab=partners]'); await page.waitForTimeout(400);
-  check('partners admin: checklist lines show honest counts', /41 people saw it/.test(await page.textContent('main')) && /6 opened it/.test(await page.textContent('main')));
+  check('partners admin: one short row per firm, no forms on the page', (await page.locator('main [data-pro-row]').count()) >= 3 && (await page.locator('main form').count()) === 0);
+  await page.locator('main [data-pro-row]', { hasText: 'Metro Fire Safety' }).locator('[data-act=pro-details]').click(); await page.waitForTimeout(300);
+  check('partners admin: checklist lines show honest counts', /41 people saw it/.test(await page.textContent('#modal-root')) && /6 opened it/.test(await page.textContent('#modal-root')));
+  await page.click('#modal-root [data-modal-close]');
   await page.locator('main [data-act=app-list]').click(); await page.waitForTimeout(400);
-  check('partners admin: an application becomes a hidden draft listing', (await page.locator('main .card', { hasText: 'Cebu Pest Busters' }).locator('.chip', { hasText: 'Hidden' }).count()) === 1);
-  const form = page.locator('main .card', { hasText: 'Cebu Pest Busters' }).locator('form.admin-partner');
+  const cebu = page.locator('main [data-pro-row]', { hasText: 'Cebu Pest Busters' });
+  check('partners admin: an application becomes a hidden draft listing', (await cebu.locator('.chip', { hasText: 'Hidden' }).count()) === 1);
+  await page.fill('main [data-pro-search]', 'cebu pest'); await page.waitForTimeout(100);
+  check('partners admin: search finds a firm by name', (await page.locator('main [data-pro-row]:not([hidden])').count()) === 1);
+  await page.fill('main [data-pro-search]', ''); await page.click('main [data-pro-filter=hidden]'); await page.waitForTimeout(100);
+  check('partners admin: "Hidden" shows only hidden firms', (await page.locator('main [data-pro-row]:not([hidden])').count()) === 1 && await cebu.isVisible());
+  await page.click('main [data-pro-filter=all]');
+  await cebu.locator('[data-act=pro-edit]').click(); await page.waitForSelector('#modal-root [name=fee_model]');
+  const form = page.locator('#modal-root form');
+  check('partners admin: one email for quote requests and statements; the extras are tucked under More', (await form.locator('[name=contact_email]').isVisible()) && !(await form.locator('[name=billing_email]').isVisible()) && !(await form.locator('[name=licence]').isVisible()));
+  check('partners admin: permits are picked by name, not typed as codes', (await form.locator('[name=type_codes]').count()) === 0 && (await form.locator('[name=types]').count()) > 10);
   await form.locator('[name=fee_model]').selectOption('monthly'); await page.waitForTimeout(100);
   check('partners admin: choosing "Flat monthly listing" shows only that fee box', await form.locator('[data-fee=monthly]').isVisible() && await form.locator('[data-fee=per_lead]').isHidden());
   await form.locator('[name=category]').selectOption('insurance'); await page.waitForTimeout(100);
   check('partners admin: insurers get the Insurance Code note', await form.locator('[data-ins-note]').isVisible());
+  await page.fill('#modal-root [name=monthly_fee_php]', '1500'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+  check('partners admin: saving from the pop-up updates the row', /₱1,500 a month/.test(await cebu.textContent()), (await cebu.textContent()).replace(/\s+/g, ' ').slice(0, 120));
   // a team plan paid by GCash
   await page.click('[data-act=admin-tab][data-tab=orgs]'); await page.waitForTimeout(400);
   await page.locator('main [data-act=plan-pay]').first().click(); await page.waitForTimeout(250);
@@ -1107,20 +1121,24 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('leads: answering yes marks it Hired', (await page.locator('main .chip', { hasText: 'Hired' }).count()) >= 1 && /Thanks/.test(await page.textContent('#toast')));
   await go('#/admin');
   await page.click('[data-act=admin-tab][data-tab=partners]'); await page.waitForTimeout(500);
-  const p1 = page.locator('main section.card', { hasText: 'Sample Liaison Services' }).first();
-  check('leads admin: credit and requests left are shown', /credit · \d+ quote requests? left at ₱500/.test(await p1.textContent()), (await p1.textContent()).slice(0, 200));
+  const p1 = page.locator('main [data-pro-row]', { hasText: 'Sample Liaison Services' }).first();
+  check('leads admin: credit and requests left are shown', /₱[\d,]+\s*\d+ requests? left at ₱500/.test(await p1.textContent()), (await p1.textContent()).replace(/\s+/g, ' ').slice(0, 200));
   check('leads admin: how often customers hired the firm', /Last 90 days: \d+ quote requests · \d+ hired/.test(await p1.textContent()));
-  await p1.locator('.credit-hist summary').click(); await page.waitForTimeout(150);
-  check('leads admin: the credit history lists top-ups and requests with the balance', (await p1.locator('.credit-hist tbody tr').count()) >= 8 && /Paid in/.test(await p1.locator('.credit-hist').textContent()));
-  const desk = page.locator('main section.card', { hasText: 'Sample Permit Desk' }).first();
+  await p1.locator('[data-act=pro-details]').click(); await page.waitForTimeout(300);
+  await page.locator('#modal-root .credit-hist summary').click(); await page.waitForTimeout(150);
+  check('leads admin: the credit history lists top-ups and requests with the balance', (await page.locator('#modal-root .credit-hist tbody tr').count()) >= 8 && /Paid in/.test(await page.locator('#modal-root .credit-hist').textContent()));
+  await page.click('#modal-root [data-modal-close]');
+  const desk = page.locator('main [data-pro-row]', { hasText: 'Sample Permit Desk' }).first();
   check('leads admin: a firm out of credit shows "Paused: no credit"', (await desk.locator('.chip', { hasText: 'Paused: no credit' }).count()) === 1);
-  check('leads admin: per-sale fees are gone', (await page.locator('main [name=fee_model] option[value=per_sale_flat]').count()) === 0
-    && (await page.locator('main [name=fee_model] option[value=per_lead]').first().textContent()).includes('prepaid credit'));
+  await desk.locator('[data-act=pro-edit]').click(); await page.waitForSelector('#modal-root [name=fee_model]');
+  check('leads admin: per-sale fees are gone', (await page.locator('#modal-root [name=fee_model] option[value=per_sale_flat]').count()) === 0
+    && (await page.locator('#modal-root [name=fee_model] option[value=per_lead]').first().textContent()).includes('prepaid credit'));
+  await page.click('#modal-root [data-modal-close]');
   await desk.locator('[data-act=credit-add]').click(); await page.waitForTimeout(250);
   await page.fill('#modal-root [name=amount]', '2500'); await page.fill('#modal-root [name=method]', 'GCash'); await page.fill('#modal-root [name=ref]', '1009 22');
   await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
   check('leads admin: adding credit puts the firm back live', /Added/.test(await page.textContent('#toast'))
-    && (await page.locator('main section.card', { hasText: 'Sample Permit Desk' }).first().locator('.chip', { hasText: 'Live' }).count()) === 1);
+    && (await page.locator('main [data-pro-row]', { hasText: 'Sample Permit Desk' }).first().locator('.chip', { hasText: 'Live' }).count()) === 1);
   await page.click('[data-act=admin-tab][data-tab=billing]'); await page.waitForTimeout(500);
   check('leads admin: the reported lead waits with its reason', /Reported leads/.test(await page.textContent('main')) && /A duplicate/.test(await page.textContent('main')) && (await page.locator('main [data-act=dispute-accept]').count()) === 1);
   await page.click('main [data-act=dispute-accept]'); await page.waitForTimeout(250);
@@ -1220,9 +1238,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.fill('[data-staff-calc] [name=people]', '25'); await page.waitForTimeout(100);
     const calc = await page.textContent('[data-staff-calc] .calc-out');
     check('plus: the price for 25 people is shown band by band (₱2,000 a month)', /17 people × ₱100/.test(calc) && /5 people × ₱60/.test(calc) && /₱2,000/.test(calc), calc.replace(/\s+/g, ' ').slice(0, 160));
-    await page.click('[data-staff-calc] [name=billing][value=yearly]', { force: true }); await page.waitForTimeout(100);
+    await page.click('[data-staff-calc] .bill-toggle input[value=yearly]', { force: true }); await page.waitForTimeout(100);
     check('plus: yearly is 10 months\' price (₱20,000)', /₱20,000/.test(await page.textContent('[data-staff-calc] .calc-out')));
-    await page.click('[data-staff-calc] [name=billing][value=monthly]', { force: true });
+    await page.click('[data-staff-calc] .bill-toggle input[value=monthly]', { force: true });
     await page.fill('[data-staff-calc] [name=people]', '10');
     await page.click('[data-staff-calc] button.btn-primary'); await page.waitForSelector('#modal-root .modal');
     check('plus: before any bill, the database\'s own price is confirmed (₱700)', /Get the bill: ₱700/.test(await page.textContent('#modal-root')));
@@ -1525,6 +1543,95 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await go('#/settings/billing'); await page.waitForSelector('#addons');
     check('brand off: firms see no White-label card or tab', (await page.locator('#white-label, .subnav a[href="#/settings/brand"]').count()) === 0);
     check('brand off: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+}
+
+// Prices: plans with checkmarks, monthly or yearly (pay 10 months, get 12), add-ons and the staff price
+// ladder, on the website and under Settings > Plan; paying a team plan for a year.
+{
+  const newPage = async (g, vp = { width: 1280, height: 860 }) => {
+    const page = await browser.newPage({ viewport: vp });
+    await page.addInitScript((v) => {
+      for (const [k, x] of Object.entries(v)) globalThis[k] = x;
+      try { if (!sessionStorage.getItem('pp-t')) { localStorage.removeItem('pp-billing'); sessionStorage.setItem('pp-t', '1'); } } catch { /* none */ } // start monthly, keep the choice on reload
+    }, g);
+    const errs = [];
+    page.on('pageerror', (e) => errs.push(e.message));
+    page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+    const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(450); };
+    return { page, errs, go };
+  };
+  const firm = (page) => page.locator('[data-plan-card=firm]').first();
+  for (const [label, vp] of [['phone', { width: 360, height: 760 }], ['desktop', { width: 1280, height: 860 }]]) {
+    const { page, errs } = await newPage({ PP_LOGGED_OUT: true }, vp);
+    await page.goto('http://localhost:4173/#/welcome'); await page.waitForSelector('#pricing [data-plan-card=property] .pp-amount');
+    check(`prices ${label}: the website lists Free and the 3 team plans, each with checkmarks`, (await page.locator('#pricing .pp-plan.pp-free').count()) === 1
+      && (await page.locator('#pricing [data-plan-card]').count()) === 3 && (await page.locator('#pricing [data-plan-card=firm] .pp-checks li').count()) >= 8);
+    const f = await firm(page).textContent();
+    check(`prices ${label}: monthly shows the price, a day and per client`, /₱1,990\s*\/month/.test(f) && /less than ₱66 a day/.test(f) && /With 40 clients: less than ₱50 a client/.test(f), f.replace(/\s+/g, ' ').slice(0, 200));
+    check(`prices ${label}: monthly also offers yearly with the saving`, /Pay yearly and get 2 months FREE: save ₱3,980/.test(f));
+    const prop = await page.locator('#pricing [data-plan-card=property]').textContent();
+    check(`prices ${label}: the property plan says why it costs more`, /Why it costs more/.test(prop) && /full-time admin/.test(prop) && /₱9,990/.test(prop));
+    await page.locator('#pricing .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
+    const y = await firm(page).textContent();
+    check(`prices ${label}: yearly shows 2 months free, the old price crossed out and the saving`, /2 months FREE/i.test(y) && /₱1,658\s*\/month/.test(y) && /₱23,880\s*₱19,900 once a year/.test(y) && /You save ₱3,980/.test(y), y.replace(/\s+/g, ' ').slice(0, 220));
+    check(`prices ${label}: a strip of 12 months, 10 paid and 2 free`, (await firm(page).locator('.year-strip .ys-paid').count()) === 10 && /2 FREE/.test(await firm(page).locator('.ys-free').textContent()));
+    check(`prices ${label}: every switch on the page moved to yearly`, (await page.locator('.bill-toggle input[value=yearly]:checked').count()) === (await page.locator('.bill-toggle').count()));
+    check(`prices ${label}: add-ons show the staff price ladder with savings`, /FREE/.test(await page.locator('#lp-staff .ladder').textContent()) && /40% off/.test(await page.locator('#lp-staff').textContent())
+      && /60% off/.test(await page.locator('#lp-staff').textContent()) && /save ₱9,200/.test(await page.locator('#lp-staff .staff-ex').textContent()));
+    check(`prices ${label}: Plus yearly is ₱1,990 with ₱398 saved`, /₱1,990 once a year/.test(await page.locator('#lp-plus').textContent()) && /You save ₱398/.test(await page.locator('#lp-plus').textContent()));
+    await page.locator('#pricing .pp-compare summary').click(); await page.waitForTimeout(100);
+    check(`prices ${label}: everything side by side`, (await page.locator('#pricing .pp-table tbody tr').count()) >= 15);
+    await page.reload(); await page.waitForSelector('#pricing [data-plan-card=firm] .pp-amount');
+    check(`prices ${label}: the choice is remembered on this device`, /₱1,658/.test(await firm(page).textContent()));
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    check(`prices ${label}: no sideways scroll on the website`, over <= 1, `${over}px`);
+    check(`prices ${label}: website: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // In the app: the Plan page, the add-ons switch, paying a team plan for a year.
+  {
+    const { page, errs, go } = await newPage({ PP_TEAM: true });
+    await page.goto('http://localhost:4173/#/settings/billing'); await page.waitForSelector('#addons');
+    check('prices app: the Plan page shows the plan cards', (await page.locator('main [data-plan-card]').count()) === 3 && (await page.locator('main .pp-free .chip', { hasText: 'Your plan' }).count()) === 1);
+    const plusBtn = page.locator('#plus-card [data-act=addon-choose][data-kind=plus]');
+    check('prices app: Plus is offered monthly', /₱199 a month/.test(await plusBtn.textContent()));
+    await page.locator('main .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
+    check('prices app: switching to yearly changes the button too', /₱1,990 a year \(2 months free\)/.test(await plusBtn.textContent()) && (await plusBtn.getAttribute('data-billing')) === 'yearly');
+    await plusBtn.click(); await page.waitForSelector('#modal-root .modal');
+    check('prices app: the yearly bill is ₱1,990', /PermitPal Plus \(yearly\)/.test(await page.textContent('#modal-root')) && /Get the bill: ₱1,990/.test(await page.textContent('#modal-root')));
+    await page.click('#modal-root [data-modal-close]');
+    await page.fill('[data-staff-calc] [name=people]', '50'); await page.waitForTimeout(100);
+    const calc = await page.textContent('[data-staff-calc] .calc-out');
+    check('prices app: the staff calculator shows the year and what the lower prices save', /₱35,000\s*a year/.test(calc) && /save you ₱12,000 a year/.test(calc), calc.replace(/\s+/g, ' ').slice(0, 200));
+    await page.locator('main .bill-toggle input[value=monthly]').first().check({ force: true }); await page.waitForTimeout(100);
+    // a firm in its trial pays for the year
+    await page.evaluate(async () => { await (await import('/__mock/mock-data.js')).setOrgProfile('o1', { kind: 'firm' }); const c = await import('/js/core.js'); await c.reload(); c.S.profile.is_platform_admin = false; });
+    await go('#/settings'); await go('#/settings/billing'); await page.waitForSelector('.pay-choice');
+    const box = await page.textContent('.plan-pay');
+    check('prices app: paying the plan offers a month or 12 months with 2 free', /1 month\s*₱1,990/.test(box) && /2 months FREE/i.test(box) && /12 months\s*₱19,900/.test(box) && /you save ₱3,980/.test(box), box.replace(/\s+/g, ' ').slice(0, 200));
+    await page.click('[data-act=plan-request]'); await page.waitForSelector('#modal-root .modal');
+    check('prices app: "I\'ve paid" asks what for, a year first', await page.isChecked('#modal-root [name=months][value="12"]'));
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+    check('prices app: the request is sent', /turn your plan on within 1 business day/.test(await page.textContent('#toast')));
+    // staff record a yearly payment: 12 months cost 10
+    await page.evaluate(async () => { (await import('/js/core.js')).S.profile.is_platform_admin = true; });
+    await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=orgs]'); await page.waitForTimeout(400);
+    await page.locator('main [data-act=plan-pay]').first().click(); await page.waitForSelector('#modal-root [name=months]');
+    await page.selectOption('#modal-root [name=plan]', 'firm'); await page.fill('#modal-root [name=months]', '12'); await page.waitForTimeout(100);
+    check('prices admin: a year of a team plan fills in 10 months\' price', Number(await page.inputValue('#modal-root [name=amount]')) === 19900);
+    await page.click('#modal-root [data-modal-close]');
+    check('prices app: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // Team tools, for a business: the same cards, with a free trial button each.
+  {
+    const { page, errs } = await newPage({ PP_TEAM: true }, { width: 390, height: 844 });
+    await page.goto('http://localhost:4173/#/network'); await page.waitForSelector('main [data-plan-card]');
+    check('prices team tools: the plans with checkmarks and a trial button each', (await page.locator('main [data-plan-card]').count()) === 3 && (await page.locator('main [data-act=nb-set-kind]').count()) === 3);
+    check('prices team tools: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
     await page.close();
   }
 }

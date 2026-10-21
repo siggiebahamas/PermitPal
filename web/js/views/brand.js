@@ -3,16 +3,13 @@
 // the 1st. Clients keep their own free accounts and always see "Powered by PermitPal"; when the add-on
 // or the firm plan lapses, or the firm disconnects, everything goes back to PermitPal's look by itself
 // (the database works the look out each time, so nothing here has to switch it off).
-import { html, when, toast, toastError, fmtDate, plural, todayPH, daysBetween } from '../util.js';
+import { html, when, toast, toastError, fmtDate, plural, todayPH, daysBetween, peso } from '../util.js';
+import { ICON } from '../components.js';
+import { addonCard, billButton, BRAND_CHECKS } from './pricing.js';
 import { S, on, reload, has, isOrgAdmin, addonOf, addonActive, plusOf, brandEligible } from '../core.js';
 import { BRAND_MONTHLY, YEAR_MONTHS } from '../prices.js';
 import * as db from 'pp/data';
 
-export const BRAND_PERKS = [
-  ['Your name on every client email', 'Permit reminders, tax deadlines, the Monday summary and your nudges come from "your firm via PermitPal", and replies go to you.'],
-  ['Your logo in their app', 'Clients see your logo, colour and contact details each time they open PermitPal.'],
-  ['A report to each client on the 1st', "What's overdue, what's due and what's missing, under your name. Switch it off anytime."],
-];
 const DEFAULT_COLOR = '#1B4DB5';
 
 // ---------------------------------------------------------------- colours
@@ -78,31 +75,27 @@ export function brandCard() {
   const stopping = plusOf().stopping || {};
   const status = !eligible ? html`<span class="chip needinfo">Needs the Accounting firm plan</span>`
     : live && a.trial ? html`<span class="chip progress">Free trial: ${plural(Math.max(0, daysBetween(todayPH(), a.paid_through) + 1), 'day')} left</span>`
-    : live ? html`<span class="chip ok">On until ${fmtDate(a.paid_through)}</span>`
-    : html`<span class="chip needinfo">Off</span>`;
+    : live ? html`<span class="chip ok">On until ${fmtDate(a.paid_through)}</span>` : '';
   const setup = html`<a class="btn btn-sm btn-ghost" href="#/settings/brand">Your brand</a>`;
   let actions = '';
   if (admin && eligible && live && !a.trial) {
     actions = stopping.brand
       ? html`<p class="small">Ends on ${fmtDate(stopping.brand)}. <button class="linklike" data-act="addon-resume" data-kind="brand">Keep it</button></p>`
-      : html`<div class="btn-row">${setup}${a.billing === 'monthly' ? html`<button class="btn btn-sm btn-soft" data-act="addon-choose" data-kind="brand" data-billing="yearly">Switch to yearly (2 months free)</button>` : ''}
+      : html`<div class="btn-row">${setup}${a.billing === 'monthly' ? html`<button class="btn btn-sm btn-soft" data-act="addon-choose" data-kind="brand" data-billing="yearly">Switch to yearly: 2 months free</button>` : ''}
           <button class="btn btn-sm btn-ghost" data-act="addon-stop" data-kind="brand">Stop at the end of the period</button></div>`;
   } else if (admin && eligible) {
     actions = html`<div class="btn-row">
       ${!a?.trial_used_on && !a?.started_on && !live ? html`<button class="btn btn-primary" data-act="brand-trial">Try free for 14 days</button>` : ''}
-      <button class="btn ${live ? 'btn-primary' : 'btn-soft'}" data-act="addon-choose" data-kind="brand" data-billing="monthly">${live ? 'Keep it' : 'Turn on'}: ₱${BRAND_MONTHLY.toLocaleString()}/month</button>
-      <button class="btn btn-ghost" data-act="addon-choose" data-kind="brand" data-billing="yearly">₱${(BRAND_MONTHLY * YEAR_MONTHS).toLocaleString()}/year</button>${live ? setup : ''}</div>`;
+      ${billButton('data-act="addon-choose" data-kind="brand"', `${live ? 'Keep it' : 'Turn on'}: ${peso(BRAND_MONTHLY)} a month`,
+        `${live ? 'Keep it' : 'Turn on'}: ${peso(BRAND_MONTHLY * YEAR_MONTHS)} a year (2 months free)`, live ? 'btn btn-primary' : 'btn btn-soft')}${live ? setup : ''}</div>`;
   } else if (!eligible) {
     actions = html`<p class="muted small">Choose the Accounting firm plan above (or start its free trial) to add White-label.</p>`;
   } else {
     actions = html`<p class="muted small">Your workspace owner or an admin can turn it on.</p>`;
   }
-  return html`<section class="card svc brand-card ${live && eligible ? 'plan-current' : ''}" id="white-label">
-    <div class="svc-top"><h2>White-label</h2><div class="svc-price"><b>₱${BRAND_MONTHLY.toLocaleString()}</b><small>per month</small></div></div>
-    <p>${status}</p>
-    <ul class="svc-inc">${BRAND_PERKS.map(([t]) => html`<li>${t}</li>`)}</ul>
-    <p class="muted small">Your clients keep their own free PermitPal accounts and see "Powered by PermitPal".</p>
-    ${actions}</section>`;
+  return addonCard({ id: 'white-label', icon: ICON.briefcase, name: 'White-label', who: 'For accounting firms: your brand on everything your clients see',
+    monthly: BRAND_MONTHLY, list: BRAND_CHECKS, status, cta: actions, current: live && eligible,
+    note: 'Your clients keep their own free PermitPal accounts and see "Powered by PermitPal".' });
 }
 on('brand-trial', async (ds, btn) => {
   btn.disabled = true;

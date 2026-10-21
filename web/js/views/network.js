@@ -7,6 +7,7 @@
 import { html, fmtDate, toast, toastError, when, plural, timeAgo, openModal, formObject, confirmDialog, download, toCsv, todayPH } from '../util.js';
 import { S, on, go, reload, canEdit, isOrgAdmin, empty } from '../core.js';
 import { STATUS, ICON } from '../components.js';
+import { billToggle, planCard, compareTable, paintPrices } from './pricing.js';
 import * as db from 'pp/data';
 
 export const KINDS = {
@@ -218,16 +219,17 @@ function fleetBoard(el, k, acc) {
 
 // ---------------------------------------------------------------- chooser & locked states
 function chooser(el) {
+  const price = (id) => Number(S.plans.find((p) => p.id === id)?.price_php_monthly || 0);
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Team tools</h1><p class="muted">For businesses that are responsible for more than their own permits. Free for 30 days, no card needed.</p></div></div>
-    <div class="nb-kinds">${['firm', 'property', 'fleet'].map((kind) => {
-      const k = KINDS[kind]; const plan = S.plans.find((p) => p.id === k.plan);
-      return html`<section class="card nb-kind">${k.icon}<h2>${k.title}</h2><p>${k.pitch}</p>
-        <div class="nb-kind-foot"><span class="muted small">${plan?.price_php_monthly ? `₱${Number(plan.price_php_monthly).toLocaleString()}/month after the trial` : ''}</span>
-          ${when(isOrgAdmin(), html`<button class="btn btn-primary btn-sm" data-act="nb-set-kind" data-kind="${kind}">Start free trial</button>`)}</div></section>`;
-    })}</div>
+    <div class="page-head"><div><h1>Team tools</h1><p class="muted">For people who look after more than their own permits: clients, vehicles or tenants. Free for 30 days, no card needed.</p></div></div>
+    <h2 class="section-label">Pick what fits you</h2>
+    ${billToggle('How often to pay for a team plan')}
+    <div class="pp-grid">${['firm', 'fleet', 'property'].map((kind) => planCard(kind, price(kind),
+      isOrgAdmin() ? html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${kind}">Try free for 30 days</button>` : ''))}</div>
+    ${compareTable()}
     ${when(!isOrgAdmin(), html`<p class="muted">Ask your workspace owner to switch this on.</p>`)}
     <p class="fineprint">Your own businesses, vehicles and documents stay exactly as they are. You can switch back anytime in Settings → Workspace.</p>`);
+  paintPrices(el);
 }
 
 function locked(el, k) {

@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     const { data, error } = await asUser.rpc("billing_start", { p_org: org_id, p_plan: plan_id, p_months: months ?? 1 });
     if (error) return json({ error: error.message }, 400);
     start = data;
-    lineName = `PermitPal ${data.plan_name} - ${data.months} month${data.months > 1 ? "s" : ""}`;
+    lineName = `PermitPal ${data.plan_name} - ${data.months} month${data.months > 1 ? "s" : ""}${data.months_free ? ` (${data.months_free} free)` : ""}`;
     lineDesc = data.org_name; back = "#/settings/billing";
   }
 

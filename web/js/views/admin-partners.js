@@ -3,7 +3,7 @@
 // honest counts, their credit, how often customers hire them, the leads they reported, what each firm
 // owes, the statements sent, and the quote requests behind them.
 import { html, fmtDate, timeAgo, peso, toast, toastError, openModal, plural, when, todayPH, formObject, confirmDialog } from '../util.js';
-import { S, on, rerender, empty, has } from '../core.js';
+import { S, on, actions, rerender, empty, has } from '../core.js';
 import { PARTNER_CATEGORIES } from './extras.js';
 import * as db from 'pp/data';
 
@@ -24,6 +24,19 @@ let cache = { partners: [], placements: [], stats: [], charges: [], statements: 
 const types = () => S.data?.types || [];
 
 // ---------------------------------------------------------------- professionals (listings)
+// One short row per firm (search and filter at the top); everything else opens in a pop-up.
+// Which permits a firm shows on, to start with, by what it does (staff can change it).
+const CATEGORY_TYPES = {
+  liaison: ['mayors_permit', 'barangay_clearance', 'fsic', 'sanitary_permit', 'signage_permit', 'dti_business_name', 'sec_registration'],
+  bookkeeping: ['bir_cor', 'dti_business_name', 'sss_employer', 'philhealth_employer', 'pagibig_employer', 'bmbe_certificate'],
+  fire_safety: ['fsic', 'annual_building_inspection'], pest_control: ['sanitary_permit'], health_clinic: ['health_certificate'],
+  emission_testing: ['emission_test'], vehicle_inspection: ['mvir', 'lto_registration'], insurance: ['ctpl', 'comprehensive_insurance'], notary: [], other: [],
+};
+const stateOf = (p) => (paused(p) ? 'paused' : p.published ? 'live' : 'hidden');
+const STATE = { live: ['Live', 'ok'], paused: ['Paused: no credit', 'soon'], hidden: ['Hidden', 'needinfo'] };
+let proFilter = 'all';
+let proSearch = '';
+
 export async function partnersTab() {
   const from = new Date(Date.parse(todayPH()) - 29 * 864e5).toISOString().slice(0, 10);
   const leads = has('leads');
@@ -31,29 +44,164 @@ export async function partnersTab() {
     leads ? db.adminCredits() : [], leads ? db.adminReferrals() : []]);
   Object.assign(cache, { partners, placements, stats, apps, credits, referrals });
   const fresh = apps.filter((a) => a.status === 'new');
+  const count = (st) => partners.filter((p) => stateOf(p) === st).length;
+  const filters = [['all', 'All', partners.length], ['live', 'Live', count('live')], ['paused', 'Need credit', count('paused')], ['hidden', 'Hidden', count('hidden')]];
   return html`<div data-partners-tab>
-    ${when(fresh.length, html`<section class="card"><div class="card-head"><div><h2>Firms asking to be listed</h2><p class="card-sub">From the "For service providers" page. Check their business permit (and licence) first.</p></div>
+    ${when(fresh.length, html`<section class="card"><div class="card-head"><div><h2>Firms asking to be listed</h2><p class="card-sub">From the "For service providers" page. Look once at their DTI/SEC registration or business permit before you list them.</p></div>
       <span class="chip progress">${fresh.length} new</span></div>
       ${fresh.map((a) => html`<div class="row"><div class="row-main"><div class="row-title">${a.name} · ${PARTNER_CATEGORIES[a.category] || a.category}</div>
         <div class="row-sub">${a.contact_name} · <a href="mailto:${a.email}">${a.email}</a>${a.phone ? ' · ' + a.phone : ''}${a.cities ? ' · ' + a.cities : ''} · ${timeAgo(a.created_at)}</div>
         <div class="row-sub">${[a.licence, a.services, a.message].filter(Boolean).join(' · ')}${a.website ? html` · <a href="${a.website}" target="_blank" rel="noopener noreferrer">website</a>` : ''}</div></div>
         <div class="row-side"><button class="btn btn-sm btn-primary" data-act="app-list" data-id="${a.id}">Make a draft listing</button>
           <button class="btn btn-sm btn-ghost" data-act="app-decline" data-id="${a.id}">Decline</button></div></div>`)}</section>`)}
-    <section class="card"><h2>Add a professional</h2><p class="muted small">List only registered firms. Tick "Licence checked" after you've seen their business permit and, for accountants, their PRC licence. Quote requests are emailed to their email below.</p>${partnerForm()}</section>
-    ${partners.map((p) => {
-      const mine = placements.filter((x) => x.partner_id === p.id);
-      return html`<section class="card"><div class="card-head"><div><h2>${p.name}</h2><p class="card-sub">${feeText(p)}</p></div>
-          <span class="chip ${paused(p) ? 'soon' : p.published ? 'ok' : 'needinfo'}">${paused(p) ? 'Paused: no credit' : p.published ? 'Live' : 'Hidden'}</span></div>
-        ${when(leads, outcomes(p))}
-        ${when(prepaid(p), creditBox(p))}
-        ${partnerForm(p)}
-        <h3 class="h4">Checklist lines</h3>
-        <p class="muted small">One quiet line, labelled "Partner", on a matching checklist step. One firm per step per city. People can switch these off.</p>
-        ${mine.map((x) => placementRow(x))}
-        <details><summary class="linklike">Add a checklist line</summary>${placementForm(p.id)}</details>
-      </section>`;
-    })}</div>`;
+    <section class="card"><div class="card-head"><div><h2>Professionals</h2>
+        <p class="card-sub">${plural(partners.length, 'firm')} · ${count('live')} live${count('paused') ? ` · ${count('paused')} need credit` : ''}</p></div>
+        <button class="btn btn-primary" data-act="pro-edit">+ Add a professional</button></div>
+      ${partners.length > 1 ? html`<div class="pro-tools">
+        <input type="search" data-pro-search placeholder="Search by name, city or what they do" aria-label="Search professionals" value="${proSearch}">
+        <div class="pro-filters" role="group" aria-label="Show">${filters.map(([k, l, n]) => html`<button type="button" class="pro-filter" data-pro-filter="${k}" aria-pressed="${proFilter === k}">${l} <b>${n}</b></button>`)}</div></div>` : ''}
+      <div class="pro-list">${partners.length ? partners.map(proRow) : html`<p class="muted">No professionals yet. Add one, or turn an application above into a draft listing.</p>`}</div>
+      <p class="pro-none muted" ${partners.length && !partners.some(proShown) ? '' : 'hidden'}>No firm matches. Clear the search or pick "All".</p>
+    </section></div>`;
 }
+const proShown = (p) => (proFilter === 'all' || stateOf(p) === proFilter)
+  && (!proSearch || [p.name, PARTNER_CATEGORIES[p.category], (p.cities || []).join(' '), p.services].filter(Boolean).join(' ').toLowerCase().includes(proSearch.toLowerCase()));
+function proRow(p) {
+  const st = stateOf(p);
+  const [label, cls] = STATE[st];
+  const lines = cache.placements.filter((x) => x.partner_id === p.id && x.active).length;
+  const since = new Date(Date.now() - 90 * 864e5).toISOString();
+  const refs = cache.referrals.filter((r) => r.partner_id === p.id && r.created_at >= since);
+  const hired = refs.filter((r) => r.status === 'converted').length;
+  const find = [p.name, PARTNER_CATEGORIES[p.category], (p.cities || []).join(' '), p.services].filter(Boolean).join(' ').toLowerCase();
+  return html`<div class="pro-row" data-pro-row data-state="${st}" data-find="${find}" ${proShown(p) ? '' : 'hidden'}>
+    <div class="pro-main"><b>${p.name}</b>
+      <small>${PARTNER_CATEGORIES[p.category] || 'Other'}${p.cities?.length ? ' · ' + p.cities.join(', ') : ' · all cities'}</small>
+      ${refs.length ? html`<small>Last 90 days: ${plural(refs.length, 'quote request')} · ${hired} hired</small>` : ''}</div>
+    <div class="pro-money">${prepaid(p) ? html`<b>${peso(p.credit_php || 0)}</b><small>${plural(leadsLeft(p), 'request')} left at ${peso(p.lead_fee_php)}</small>` : html`<b>${feeText(p)}</b>`}</div>
+    <span class="chip ${cls}">${label}</span>
+    <div class="btn-row pro-acts">
+      ${prepaid(p) ? html`<button class="btn btn-sm ${st === 'paused' ? 'btn-primary' : 'btn-soft'}" data-act="credit-add" data-id="${p.id}">Add credit</button>` : ''}
+      <button class="btn btn-sm btn-ghost" data-act="pro-edit" data-id="${p.id}" aria-label="Edit ${p.name}">Edit</button>
+      <button class="btn btn-sm btn-ghost" data-act="pro-details" data-id="${p.id}" aria-label="History and checklist lines for ${p.name}">${lines ? `Lines (${lines})` : 'More'}</button></div>
+  </div>`;
+}
+function applyProFilter(root) {
+  let shown = 0;
+  root.querySelectorAll('[data-pro-row]').forEach((r) => {
+    const ok = (proFilter === 'all' || r.dataset.state === proFilter) && (!proSearch || r.dataset.find.includes(proSearch.toLowerCase()));
+    r.hidden = !ok; if (ok) shown++;
+  });
+  const none = root.querySelector('.pro-none');
+  if (none) none.hidden = shown > 0 || !root.querySelector('[data-pro-row]');
+  root.querySelectorAll('[data-pro-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.proFilter === proFilter)));
+}
+document.addEventListener('input', (e) => { if (e.target.matches?.('[data-pro-search]')) { proSearch = e.target.value.trim(); applyProFilter(e.target.closest('[data-partners-tab]')); } });
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('[data-pro-filter]');
+  if (b) { proFilter = b.dataset.proFilter; applyProFilter(b.closest('[data-partners-tab]')); }
+});
+
+// ---- add or edit a firm: what customers see, how to reach them, how they pay; the rest under "More"
+function permitPicker(selected) {
+  const groups = [['business', 'Business permits'], ['person', 'Staff licences'], ['vehicle', 'Vehicles']];
+  const names = types().filter((t) => selected.includes(t.code)).map((t) => t.name.replace(/ \(.*\)$/, ''));
+  return html`<details class="pro-permits"><summary><span>Shows on: <b data-permits-sum>${names.length ? names.join(', ') : 'business permits (filing firms only)'}</b></span> <span class="linklike">Change</span></summary>
+    ${groups.map(([subj, label]) => html`<fieldset><legend>${label}</legend><div class="pro-permit-grid">
+      ${types().filter((t) => t.subject === subj).map((t) => html`<label class="check"><input type="checkbox" name="types" value="${t.code}" ${selected.includes(t.code) ? 'checked' : ''}> ${t.name.replace(/ \(.*\)$/, '')}</label>`)}</div></fieldset>`)}</details>`;
+}
+function editPro(p = {}) {
+  const fm = p.fee_model || 'per_lead';
+  const isNew = !p.id;
+  const selected = p.type_codes?.length ? p.type_codes : (isNew ? CATEGORY_TYPES.liaison : []);
+  openModal(isNew ? 'Add a professional' : `Edit ${p.name}`, html`
+    <h4 class="pro-h">What customers see</h4>
+    <div class="grid2">
+      <label class="field"><span>Business name</span><input name="name" required maxlength="160" value="${p.name || ''}"></label>
+      <label class="field"><span>What they do</span><select name="category">${Object.entries(PARTNER_CATEGORIES).map(([k, v]) => html`<option value="${k}" ${k === (p.category || 'liaison') ? 'selected' : ''}>${v}</option>`)}</select></label>
+      <label class="field"><span>What they handle</span><input name="services" maxlength="600" value="${p.services || ''}" placeholder="Mayor's Permit renewal, FSIC filing"></label>
+      <label class="field"><span>Cities they serve <small>(empty = everywhere)</small></span><input name="cities" value="${(p.cities || []).join(', ')}" placeholder="Makati City, Taguig City"></label>
+    </div>
+    ${permitPicker(selected)}
+    <h4 class="pro-h">How to reach them</h4>
+    <div class="grid2">
+      <label class="field"><span>Contact person</span><input name="contact_name" maxlength="120" value="${p.contact_name || ''}"></label>
+      <label class="field"><span>Email <small>(quote requests and statements go here)</small></span><input type="email" name="contact_email" maxlength="160" value="${p.contact_email || ''}"></label>
+      <label class="field"><span>Phone</span><input name="contact_phone" maxlength="60" value="${p.contact_phone || ''}"></label>
+    </div>
+    <h4 class="pro-h">How they pay you</h4>
+    <div class="grid2">
+      <label class="field"><span>Fee</span><select name="fee_model" data-fee-model>${Object.entries(feeModels()).map(([k, v]) => html`<option value="${k}" ${k === fm ? 'selected' : ''}>${v}</option>`)}</select></label>
+      <label class="field" data-fee="per_lead" ${fm === 'per_lead' ? '' : 'hidden'}><span>₱ per quote request${has('leads') ? html` <small>(taken from their credit)</small>` : ''}</span><input name="lead_fee_php" type="number" min="0" step="1" value="${p.lead_fee_php ?? ''}"></label>
+      <label class="field" data-fee="per_sale_flat" ${fm === 'per_sale_flat' ? '' : 'hidden'}><span>₱ per sale</span><input name="sale_fee_php" type="number" min="0" step="1" value="${p.sale_fee_php ?? ''}"></label>
+      <label class="field" data-fee="per_sale_percent" ${fm === 'per_sale_percent' ? '' : 'hidden'}><span>Share of each sale (%)</span><input name="sale_pct" type="number" min="0" max="50" step="0.5" value="${p.sale_pct ?? ''}"></label>
+      <label class="field" data-fee="monthly" ${fm === 'monthly' ? '' : 'hidden'}><span>₱ a month</span><input name="monthly_fee_php" type="number" min="0" step="1" value="${p.monthly_fee_php ?? ''}"></label>
+    </div>
+    <p class="muted small" data-ins-note ${p.category === 'insurance' ? '' : 'hidden'}>Insurers: without your Insurance Commission licence on file (Money → Today → Settings), only "Flat monthly listing" or "No fee" is allowed.</p>
+    <label class="check"><input type="checkbox" name="verified" ${p.verified ? 'checked' : ''}> <span>I looked once at their DTI/SEC registration or business permit <small class="muted">(and the PRC licence of an accountant). Customers see "Checked when listed". No need to track renewals.</small></span></label>
+    <label class="check"><input type="checkbox" name="published" ${p.published ? 'checked' : ''}> <span>Show to customers</span></label>
+    <details class="pro-more"><summary><b>More</b> <span class="muted small">licence shown to customers, description, website, a separate email for statements, notes</span></summary>
+      <div class="grid2">
+        <label class="field"><span>Licence or accreditation <small>(optional, shown)</small></span><input name="licence" maxlength="200" value="${p.licence || ''}" placeholder="e.g. CPA, PRC no. 0123456"></label>
+        <label class="field"><span>Website <small>(only you see it)</small></span><input name="website" maxlength="300" value="${p.website || ''}" placeholder="https://"></label>
+        <label class="field"><span>Send statements to <small>(only if not the email above)</small></span><input type="email" name="billing_email" maxlength="160" value="${p.billing_email || ''}"></label>
+        <label class="field"><span>Agreement notes <small>(only you see it)</small></span><input name="commission_terms" maxlength="500" value="${p.commission_terms || ''}" placeholder="e.g. Signed 1 Nov 2026"></label>
+      </div>
+      <label class="field"><span>Short description <small>(optional, shown)</small></span><textarea name="description" rows="2" maxlength="600">${p.description || ''}</textarea></label>
+    </details>`, {
+    wide: true, submitLabel: isNew ? 'Add professional' : 'Save', danger: false,
+    onOpen: (form) => {
+      let touched = !isNew;
+      const sum = form.querySelector('[data-permits-sum]');
+      const paintSum = () => {
+        const names = [...form.querySelectorAll('[name=types]:checked')].map((i) => i.parentElement.textContent.trim());
+        sum.textContent = names.length ? names.join(', ') : 'business permits (filing firms only)';
+      };
+      form.querySelectorAll('[name=types]').forEach((i) => i.addEventListener('change', () => { touched = true; paintSum(); }));
+      form.category.addEventListener('change', () => {
+        form.querySelector('[data-ins-note]').hidden = form.category.value !== 'insurance';
+        if (touched) return; // a new firm's permits follow what it does, until staff pick them by hand
+        const want = CATEGORY_TYPES[form.category.value] || [];
+        form.querySelectorAll('[name=types]').forEach((i) => { i.checked = want.includes(i.value); });
+        paintSum();
+      });
+    },
+    onSubmit: async (fd) => {
+      const row = Object.fromEntries(['name', 'category', 'licence', 'website', 'contact_name', 'contact_phone', 'contact_email', 'billing_email', 'commission_terms', 'description', 'services', 'fee_model'].map((k) => [k, String(fd.get(k) || '').trim()]));
+      if (!row.name) throw new Error('Enter the firm name.');
+      if (row.website && !/^https:\/\//.test(row.website)) throw new Error('The website must start with https://');
+      row.type_codes = fd.getAll('types').map(String);
+      row.cities = String(fd.get('cities') || '').split(',').map((x) => x.trim()).filter(Boolean);
+      const n = (k) => { const v = fd.get(k); return v === '' || v == null ? null : Number(v); };
+      row.lead_fee_php = n('lead_fee_php') ?? 0; // blank = no fee
+      row.sale_fee_php = n('sale_fee_php'); row.sale_pct = n('sale_pct'); row.monthly_fee_php = n('monthly_fee_php');
+      if (row.fee_model === 'monthly' && !(row.monthly_fee_php > 0)) throw new Error('Enter the monthly listing fee, or choose "No fee".');
+      if (row.fee_model === 'per_sale_flat' && !(row.sale_fee_php > 0)) throw new Error('Enter the fee per sale.');
+      if (row.fee_model === 'per_sale_percent' && !(row.sale_pct > 0)) throw new Error('Enter the share of each sale.');
+      row.published = fd.get('published') === 'on';
+      row.verified = fd.get('verified') === 'on';
+      if (row.published && !row.contact_email) throw new Error('Add their email before showing the firm to customers: quote requests go there.');
+      await db.adminSavePartner(p.id || null, row);
+      toast(isNew ? 'Added.' : 'Saved.'); rerender();
+    },
+  });
+}
+on('pro-edit', (ds) => editPro(ds.id ? cache.partners.find((x) => x.id === ds.id) : {}));
+
+// ---- a firm's history: how customers did with them, credit, and their checklist lines
+on('pro-details', (ds) => {
+  const p = cache.partners.find((x) => x.id === ds.id);
+  if (!p) return;
+  const mine = cache.placements.filter((x) => x.partner_id === p.id);
+  openModal(p.name, html`<div data-partners-tab data-pro-detail="${p.id}">
+    <p class="muted small">${PARTNER_CATEGORIES[p.category] || ''} · ${feeText(p)}${p.contact_email ? ` · ${p.contact_email}` : ''}</p>
+    ${when(has('leads'), outcomes(p))}
+    ${when(prepaid(p), creditBox(p))}
+    <h4 class="pro-h">Checklist lines</h4>
+    <p class="muted small">One quiet line, labelled "Partner", on a matching checklist step. One firm per step per city. People can switch these off.</p>
+    ${mine.length ? mine.map((x) => placementRow(x)) : html`<p class="muted small">None yet.</p>`}
+    <button type="button" class="btn btn-sm btn-soft" data-act="pl-new" data-id="${p.id}">+ Add a checklist line</button></div>`, { wide: true });
+});
 
 // How customers did with this firm in the last 90 days: the honest number to show them at renewal time.
 function outcomes(p) {
@@ -78,33 +226,6 @@ function creditBox(p) {
   </div>`;
 }
 
-function partnerForm(p = {}) {
-  const fm = p.fee_model || 'per_lead';
-  return html`<form class="admin-partner" data-id="${p.id || ''}"><div class="grid2">
-    <label class="field"><span>Name</span><input name="name" required maxlength="160" value="${p.name || ''}"></label>
-    <label class="field"><span>Category</span><select name="category">${Object.entries(PARTNER_CATEGORIES).map(([k, v]) => html`<option value="${k}" ${k === p.category ? 'selected' : ''}>${v}</option>`)}</select></label>
-    <label class="field"><span>Licence / accreditation <small>(shown)</small></span><input name="licence" maxlength="200" value="${p.licence || ''}" placeholder="e.g. CPA, PRC no. 0123456"></label>
-    <label class="field"><span>Cities served <small>(comma separated, shown)</small></span><input name="cities" value="${(p.cities || []).join(', ')}" placeholder="Makati City, Taguig City"></label>
-    <label class="field"><span>How they pay you <small>(internal)</small></span><select name="fee_model" data-fee-model>${Object.entries(feeModels()).map(([k, v]) => html`<option value="${k}" ${k === fm ? 'selected' : ''}>${v}</option>`)}</select></label>
-    <label class="field" data-fee="per_lead" ${fm === 'per_lead' ? '' : 'hidden'}><span>Fee per quote request (₱)${has('leads') ? html` <small>(taken from their credit)</small>` : ''}</span><input name="lead_fee_php" type="number" min="0" step="1" value="${p.lead_fee_php ?? ''}"></label>
-    <label class="field" data-fee="per_sale_flat" ${fm === 'per_sale_flat' ? '' : 'hidden'}><span>Fee per sale (₱)</span><input name="sale_fee_php" type="number" min="0" step="1" value="${p.sale_fee_php ?? ''}"></label>
-    <label class="field" data-fee="per_sale_percent" ${fm === 'per_sale_percent' ? '' : 'hidden'}><span>Share of each sale (%)</span><input name="sale_pct" type="number" min="0" max="50" step="0.5" value="${p.sale_pct ?? ''}"></label>
-    <label class="field" data-fee="monthly" ${fm === 'monthly' ? '' : 'hidden'}><span>Monthly listing fee (₱)</span><input name="monthly_fee_php" type="number" min="0" step="1" value="${p.monthly_fee_php ?? ''}"></label>
-    <label class="field"><span>Website <small>(internal, never shown to customers)</small></span><input name="website" maxlength="300" value="${p.website || ''}" placeholder="https://"></label>
-    <label class="field"><span>Shown on permits <small>(type codes, comma separated)</small></span><input name="type_codes" value="${(p.type_codes || []).join(', ')}" placeholder="ctpl, emission_test"></label>
-    <label class="field"><span>Contact person <small>(internal)</small></span><input name="contact_name" maxlength="120" value="${p.contact_name || ''}"></label>
-    <label class="field"><span>Phone <small>(internal)</small></span><input name="contact_phone" maxlength="60" value="${p.contact_phone || ''}"></label>
-    <label class="field"><span>Email for quote requests <small>(internal)</small></span><input name="contact_email" maxlength="160" value="${p.contact_email || ''}"></label>
-    <label class="field"><span>Email for statements <small>(if different)</small></span><input name="billing_email" maxlength="160" value="${p.billing_email || ''}"></label>
-    <label class="field"><span>Agreement notes <small>(internal, never shown)</small></span><input name="commission_terms" maxlength="500" value="${p.commission_terms || ''}" placeholder="e.g. Signed 1 Nov 2026, billed monthly"></label></div>
-    <p class="muted small" data-ins-note ${p.category === 'insurance' ? '' : 'hidden'}>Insurers: without your Insurance Commission licence on file (Money → Today → Settings), only "Flat monthly listing" or "No fee" is allowed.</p>
-    <label class="field"><span>What they handle <small>(shown)</small></span><input name="services" maxlength="600" value="${p.services || ''}" placeholder="Mayor's Permit renewal, barangay clearance, FSIC filing"></label>
-    <label class="field"><span>Description</span><textarea name="description" rows="2" maxlength="600">${p.description || ''}</textarea></label>
-    <div class="btn-row"><label class="check"><input type="checkbox" name="published" ${p.published ? 'checked' : ''}> Show to customers</label>
-      <label class="check"><input type="checkbox" name="verified" ${p.verified ? 'checked' : ''}> <span>Licence checked <small class="muted">(only after seeing their permit and licence)</small></span></label>
-      <button class="btn btn-sm btn-primary">${p.id ? 'Save' : 'Add professional'}</button></div></form>`;
-}
-
 function placementRow(x) {
   const t = types().find((y) => y.code === x.type_code);
   const step = (t?.checklist || []).find((i) => i.k === x.item_key);
@@ -116,23 +237,32 @@ function placementRow(x) {
     <div class="row-side"><span class="chip ${live ? 'ok' : 'needinfo'}">${live ? 'Showing' : x.active ? 'Scheduled or ended' : 'Off'}</span>
       <button class="btn btn-sm btn-ghost" data-act="pl-toggle" data-id="${x.id}" data-on="${x.active ? '' : '1'}">${x.active ? 'Turn off' : 'Turn on'}</button></div></div>`;
 }
-function placementForm(partnerId) {
+// A new checklist line for a firm (its own pop-up).
+on('pl-new', (ds) => {
   const withSteps = types().filter((t) => (t.checklist || []).length);
-  return html`<form class="admin-placement" data-partner="${partnerId}"><div class="grid2">
+  openModal('Add a checklist line', html`<div class="grid2">
     <label class="field"><span>Permit</span><select name="type_code" data-pl-type required>${withSteps.map((t) => html`<option value="${t.code}">${t.name}</option>`)}</select></label>
     <label class="field"><span>Checklist step</span><select name="item_key" data-pl-step>${stepOptions(withSteps[0])}</select></label>
     <label class="field"><span>Line shown <small>(5–90 characters, plain, no hype)</small></span><input name="headline" required minlength="5" maxlength="90" placeholder="Extinguishers refilled and tagged within the week"></label>
     <label class="field"><span>Cities <small>(empty = everywhere)</small></span><input name="cities" placeholder="Makati City, Pasig City"></label>
     <label class="field"><span>From</span><input name="starts_on" type="date" required value="${todayPH()}"></label>
     <label class="field"><span>To</span><input name="ends_on" type="date" required></label>
-    <label class="field"><span>Monthly fee (₱)</span><input name="monthly_fee_php" type="number" min="0" step="1" required></label></div>
-    <button class="btn btn-sm btn-soft">Add line</button></form>`;
-}
+    <label class="field"><span>Monthly fee (₱)</span><input name="monthly_fee_php" type="number" min="0" step="1" required></label></div>`, {
+    submitLabel: 'Add line', danger: false,
+    onSubmit: async (fd) => {
+      const v = formObject(fd);
+      if (!v.ends_on || v.ends_on < v.starts_on) throw new Error('The end date must be on or after the start date.');
+      if (String(v.headline || '').trim().length < 5) throw new Error('Write a line of at least 5 characters.');
+      await db.adminSavePlacement(null, { partner_id: ds.id, type_code: v.type_code, item_key: v.item_key || null, headline: v.headline,
+        cities: String(v.cities || '').split(',').map((x) => x.trim()).filter(Boolean), starts_on: v.starts_on, ends_on: v.ends_on, monthly_fee_php: Number(v.monthly_fee_php) || 0 });
+      toast('Line added. It is charged once a month while it shows.'); rerender();
+    },
+  });
+});
 const stepOptions = (t) => html`<option value="">Whole checklist (at the bottom)</option>${(t?.checklist || []).map((i) => html`<option value="${i.k}">${i.t}</option>`)}`;
 document.addEventListener('change', (e) => {
   if (e.target.matches?.('[data-pl-type]')) e.target.form.querySelector('[data-pl-step]').innerHTML = String(stepOptions(types().find((t) => t.code === e.target.value)));
   if (e.target.matches?.('[data-fee-model]')) e.target.form.querySelectorAll('[data-fee]').forEach((x) => { x.hidden = x.dataset.fee !== e.target.value; });
-  if (e.target.matches?.('.admin-partner [name=category]')) e.target.form.querySelector('[data-ins-note]').hidden = e.target.value !== 'insurance';
 });
 on('credit-add', (ds) => {
   const p = cache.partners.find((x) => x.id === ds.id);
@@ -158,9 +288,17 @@ on('credit-adjust', (ds) => {
     onSubmit: async (fd) => { const f = formObject(fd); const bal = await db.adminAdjustCredit(ds.id, Number(f.amount), f.note); toast(`Saved. Balance: ${peso(bal)}.`); rerender(); },
   });
 });
-on('pl-toggle', async (ds) => { try { await db.adminSavePlacement(ds.id, { active: !!ds.on }); toast(ds.on ? 'Turned on.' : 'Turned off.'); rerender(); } catch (e) { toastError(e); } });
+on('pl-toggle', async (ds) => {
+  const partner = cache.placements.find((x) => x.id === ds.id)?.partner_id;
+  try {
+    await db.adminSavePlacement(ds.id, { active: !!ds.on });
+    toast(ds.on ? 'Turned on.' : 'Turned off.');
+    await rerender();
+    if (partner && document.querySelector('[data-pro-detail]')) actions['pro-details']({ id: partner }); // show the line's new state
+  } catch (e) { toastError(e); }
+});
 on('app-list', async (ds) => {
-  try { await db.adminApplicationToPartner(ds.id); toast('Draft listing made (hidden). Check the details, tick "Licence checked", agree the fee, then "Show to customers".'); rerender(); } catch (e) { toastError(e); }
+  try { await db.adminApplicationToPartner(ds.id); toast('Draft listing made (hidden). Press Edit to check the details and the fee, then tick "Show to customers".'); rerender(); } catch (e) { toastError(e); }
 });
 on('app-decline', (ds) => openModal('Decline this application?', html`<label class="field"><span>Note <small>(internal)</small></span><input name="note" maxlength="500" placeholder="e.g. No business permit"></label>
   <p class="muted small">Reply to them by email yourself; nothing is sent automatically.</p>`, {
@@ -168,45 +306,6 @@ on('app-decline', (ds) => openModal('Decline this application?', html`<label cla
   onSubmit: async (fd) => { await db.adminSetApplication(ds.id, { status: 'declined', note: String(fd.get('note') || '').trim() || null, decided_at: new Date().toISOString() }); toast('Declined.'); rerender(); },
 }));
 
-document.addEventListener('submit', async (e) => {
-  const f = e.target;
-  if (!f.closest?.('[data-partners-tab]')) return;
-  if (f.matches?.('.admin-partner')) {
-    e.preventDefault();
-    const fd = new FormData(f);
-    const btn = f.querySelector('button:not([type=button])');
-    try {
-      const row = Object.fromEntries(['name', 'category', 'licence', 'website', 'contact_name', 'contact_phone', 'contact_email', 'billing_email', 'commission_terms', 'description', 'services', 'fee_model'].map((k) => [k, String(fd.get(k) || '').trim()]));
-      if (!row.name) throw new Error('Enter the firm name.');
-      if (row.website && !/^https:\/\//.test(row.website)) throw new Error('The website must start with https://');
-      for (const k of ['contact_email', 'billing_email']) if (row[k] && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(row[k])) throw new Error('Enter a valid email address.');
-      row.type_codes = String(fd.get('type_codes') || '').split(',').map((x) => x.trim()).filter(Boolean);
-      row.cities = String(fd.get('cities') || '').split(',').map((x) => x.trim()).filter(Boolean);
-      const n = (k) => { const v = fd.get(k); return v === '' || v == null ? null : Number(v); };
-      row.lead_fee_php = n('lead_fee_php') ?? 0; // blank = no fee
-      row.sale_fee_php = n('sale_fee_php'); row.sale_pct = n('sale_pct'); row.monthly_fee_php = n('monthly_fee_php');
-      if (row.fee_model === 'monthly' && !(row.monthly_fee_php > 0)) throw new Error('Enter the monthly listing fee, or choose "No fee".');
-      if (row.fee_model === 'per_sale_flat' && !(row.sale_fee_php > 0)) throw new Error('Enter the fee per sale.');
-      if (row.fee_model === 'per_sale_percent' && !(row.sale_pct > 0)) throw new Error('Enter the share of each sale.');
-      row.published = fd.get('published') === 'on';
-      row.verified = fd.get('verified') === 'on';
-      if (row.published && !row.contact_email) throw new Error('Add the email for quote requests before showing the firm to customers.');
-      if (btn) btn.disabled = true;
-      await db.adminSavePartner(f.dataset.id || null, row);
-      toast('Saved.'); rerender();
-    } catch (err) { toastError(err); if (btn) btn.disabled = false; }
-  }
-  if (f.matches?.('.admin-placement')) {
-    e.preventDefault();
-    const v = formObject(new FormData(f));
-    try {
-      if (!v.ends_on || v.ends_on < v.starts_on) throw new Error('The end date must be on or after the start date.');
-      await db.adminSavePlacement(null, { partner_id: f.dataset.partner, type_code: v.type_code, item_key: v.item_key || null, headline: v.headline,
-        cities: String(v.cities || '').split(',').map((x) => x.trim()).filter(Boolean), starts_on: v.starts_on, ends_on: v.ends_on, monthly_fee_php: Number(v.monthly_fee_php) || 0 });
-      toast('Line added. It is charged once a month while it shows.'); rerender();
-    } catch (err) { toastError(err); }
-  }
-});
 
 // ---------------------------------------------------------------- partner billing
 export async function billingTab() {

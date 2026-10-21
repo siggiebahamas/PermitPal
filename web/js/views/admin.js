@@ -12,6 +12,7 @@ import { moneyTab } from './admin-money.js';
 import { careTab } from './admin-care.js';
 import { partnersTab as partnersTab2, billingTab } from './admin-partners.js';
 import { plusTab } from './admin-plus.js';
+import { planTotal } from '../prices.js';
 
 let tab = null; // Money first once the revenue features are on, else the Inbox
 const KIND_NAMES = { business: 'Business', head_office: 'Head office', firm: 'Accounting firm', property: 'Property', fleet: 'Fleet' };
@@ -476,14 +477,14 @@ on('admin-join', async (ds) => {
 });
 on('plan-pay', (ds) => openModal(`Record a team plan payment: ${ds.name}`, html`<p class="muted small">After the customer pays by GCash or bank transfer. This records the payment (for Money) and extends their plan.</p>
   <div class="grid2"><label class="field"><span>Plan</span><select name="plan">${S.plans.filter((p) => Number(p.price_php_monthly) > 0 && p.available !== false).map((p) => html`<option value="${p.id}" data-price="${p.price_php_monthly}">${p.name} (${peso(p.price_php_monthly)}/month)</option>`)}</select></label>
-  <label class="field"><span>Months paid</span><input name="months" type="number" min="1" max="12" value="1" required></label>
+  <label class="field"><span>Months paid <small>(12 = a year, priced as 10)</small></span><input name="months" type="number" min="1" max="12" value="1" required></label>
   <label class="field"><span>Amount received (₱)</span><input name="amount" type="number" min="1" step="0.01" required></label>
   <label class="field"><span>Paid by</span><input name="method" maxlength="60" placeholder="GCash / BPI"></label>
   <label class="field"><span>Reference no.</span><input name="ref" maxlength="120"></label>
   <label class="field"><span>BIR invoice number</span><input name="invoice_no" maxlength="60"></label></div>`, {
   submitLabel: 'Record payment',
   onOpen: (form) => {
-    const fill = () => { const o = form.plan.selectedOptions[0]; if (o) form.amount.value = Number(o.dataset.price) * Number(form.months.value || 1); };
+    const fill = () => { const o = form.plan.selectedOptions[0]; if (o) form.amount.value = planTotal(o.dataset.price, form.months.value || 1); };
     form.plan.addEventListener('change', fill); form.months.addEventListener('input', fill); fill();
   },
   onSubmit: async (fd) => {
