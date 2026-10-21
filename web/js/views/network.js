@@ -7,7 +7,7 @@
 import { html, fmtDate, toast, toastError, when, plural, timeAgo, openModal, formObject, confirmDialog, download, toCsv, todayPH } from '../util.js';
 import { S, on, go, reload, canEdit, isOrgAdmin, empty } from '../core.js';
 import { STATUS, ICON } from '../components.js';
-import { billToggle, planCard, compareTable, paintPrices } from './pricing.js';
+import { billToggle, planCard, compareTable, paintPrices, PLAN_ORDER, PLANS } from './pricing.js';
 import * as db from 'pp/data';
 
 export const KINDS = {
@@ -38,7 +38,7 @@ export const KINDS = {
     cols: ['lto_registration', 'ctpl', 'emission_test', 'mvir'],
   },
 };
-const TEAM_PLANS = ['head_office', 'firm', 'property', 'fleet'];
+const TEAM_PLANS = ['head_office', 'firm', 'property', 'property_s', 'fleet'];
 export const kindOf = () => S.org?.kind || 'business';
 // Is the paid side switched on for this workspace (trial, plan, or PermitPal staff)?
 export function teamAccess(org = S.org) {
@@ -132,6 +132,8 @@ function orgBoard(el, k, acc) {
         <button class="btn btn-ghost btn-sm" data-act="nb-export">Export</button>
         <button class="btn btn-primary" data-act="nb-add">+ Add ${k.one}</button></div>`)}</div>
     ${trialNote(acc)}
+    ${kind === 'property' && acc.why === 'plan' && S.org.plan_id === 'property_s' ? html`<div class="banner info"><div><b>${all.length} of 20 tenants</b> on Small property.${all.length >= 18 ? ' Need more? Move to Mall & property, nothing to set up again.' : ''}</div>
+      <a class="btn btn-sm btn-soft" href="#/settings/billing">Plans</a></div>` : ''}
     <div class="stats nb-stats">
       <a class="stat" href="#/network" data-act="nb-filter" data-f="all"><div class="stat-n">${live.length}</div><div class="stat-l">${k.many[0].toUpperCase() + k.many.slice(1)}</div></a>
       <a class="stat overdue" href="#/network" data-act="nb-filter" data-f="attention"><div class="stat-n">${overdue}</div><div class="stat-l">With something overdue</div></a>
@@ -224,8 +226,8 @@ function chooser(el) {
     <div class="page-head"><div><h1>Team tools</h1><p class="muted">For people who look after more than their own permits: clients, vehicles or tenants. Free for 30 days, no card needed.</p></div></div>
     <h2 class="section-label">Pick what fits you</h2>
     ${billToggle('How often to pay for a team plan')}
-    <div class="pp-grid">${['firm', 'fleet', 'property'].map((kind) => planCard(kind, price(kind),
-      isOrgAdmin() ? html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${kind}">Try free for 30 days</button>` : ''))}</div>
+    <div class="pp-grid four">${PLAN_ORDER.map((id) => planCard(id, price(id),
+      isOrgAdmin() ? html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${PLANS[id].kind}">Try free for 30 days</button>` : ''))}</div>
     ${compareTable()}
     ${when(!isOrgAdmin(), html`<p class="muted">Ask your workspace owner to switch this on.</p>`)}
     <p class="fineprint">Your own businesses, vehicles and documents stay exactly as they are. You can switch back anytime in Settings → Workspace.</p>`);
@@ -233,11 +235,11 @@ function chooser(el) {
 }
 
 function locked(el, k) {
-  const plan = S.plans.find((p) => p.id === k.plan);
+  const plan = kindOf() === 'property' ? S.plans.find((p) => p.id === 'property_s') || S.plans.find((p) => p.id === k.plan) : S.plans.find((p) => p.id === k.plan);
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>${k.page}</h1><p class="muted">${k.sub}</p></div></div>
     <section class="card nb-empty">${k.icon}<div><h2>Your free trial has ended</h2>
-      <p>Your ${k.many} and their data are kept safe. Choose the ${plan?.name || ''} plan${plan?.price_php_monthly ? ` (₱${Number(plan.price_php_monthly).toLocaleString()}/month)` : ''} to open the board again.</p>
+      <p>Your ${k.many} and their data are kept safe. Choose a plan${plan?.price_php_monthly ? ` (from ₱${Number(plan.price_php_monthly).toLocaleString()}/month)` : ''} to open the board again.</p>
       <a class="btn btn-primary" href="#/settings/billing">Choose a plan</a></div></section>`);
 }
 

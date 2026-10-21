@@ -1,7 +1,7 @@
--- PermitPal Plus and staff licences: prices, the free 3 people and paid licences, bills (moving up with
+-- PermitPal Plus and staff licenses: prices, the free 3 people and paid licenses, bills (moving up with
 -- credit, moving down next period, renewals made ahead, paying late, online checkout), pauses when a plan
 -- ends, the public permit page (statuses, hidden permits, copies, paused), recipients, the worker's upload
--- link, licences by role, the automatic permit check, templates and the money views. Rolled back at the end.
+-- link, licenses by role, the automatic permit check, templates and the money views. Rolled back at the end.
 begin;
 create temp table t_res (n serial primary key, step text, ok boolean, info text);
 grant all on t_res to authenticated, anon; grant all on sequence t_res_n_seq to authenticated, anon;
@@ -72,8 +72,8 @@ reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); en
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000b2');
 set local role authenticated;
 do $$ begin perform public.create_person((select org from t_ids), 'Dina Lim', 'Server', null, null);
-  perform pg_temp.res('a 4th person needs staff licences', false, 'was allowed');
-exception when others then perform pg_temp.res('a 4th person needs staff licences', sqlerrm like 'You''re tracking 3 people: the free limit is 3.%', sqlerrm); end $$;
+  perform pg_temp.res('a 4th person needs staff licenses', false, 'was allowed');
+exception when others then perform pg_temp.res('a 4th person needs staff licenses', sqlerrm like 'You''re tracking 3 people: the free limit is 3.%', sqlerrm); end $$;
 update public.people set paused_at = now() where id = (select p1 from t_ids);
 select pg_temp.res('nobody can mark a person paused by hand', (select paused_at is null from public.people where id = (select p1 from t_ids)), '');
 update public.people set deleted_at = now() where id = (select p3 from t_ids);
@@ -84,7 +84,7 @@ do $$ begin update public.people set deleted_at = null where id = (select p3 fro
 exception when others then perform pg_temp.res('restoring someone from Trash counts too', sqlerrm like 'You''re tracking 3 people%', sqlerrm); end $$;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 
--- ---------------------------------------------------------------- choosing staff licences
+-- ---------------------------------------------------------------- choosing staff licenses
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000b2');
 set local role authenticated;
 do $$ begin perform public.addon_checkout((select org from t_ids), 'staff', 10, 'monthly');
@@ -138,7 +138,7 @@ select pg_temp.res('confirmed: 10 people until the end of the month', a.people_m
   and i.bir_invoice_no = 'INV-501' and private.people_allowed(a.org_id) = 10, a.paid_through::text)
   from public.addons a join public.addon_invoices i on i.id = (select inv1 from t_ids) where a.org_id = (select org from t_ids) and a.kind = 'staff';
 select pg_temp.res('the owner gets a receipt', exists (select 1 from public.notifications where user_id = 'd1000000-0000-4000-8000-0000000000a1'
-  and title = 'Payment received: thank you' and body like 'Staff licences, up to 10 people (monthly) is on until%'), '');
+  and title = 'Payment received: thank you' and body like 'Staff licenses, up to 10 people (monthly) is on until%'), '');
 
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
@@ -146,8 +146,8 @@ update t_ids set p5 = public.create_person(org, 'Eli Santos', 'Driver', null, ar
 select public.create_person(org, 'Person ' || n, '', null, null) from t_ids, generate_series(6, 11) n;
 select pg_temp.res('now up to 10 people', private.active_people((select org from t_ids)) = 10, '');
 do $$ begin perform public.create_person((select org from t_ids), 'Eleventh', '', null, null);
-  perform pg_temp.res('the 11th needs more licences', false, 'was allowed');
-exception when others then perform pg_temp.res('the 11th needs more licences', sqlerrm like 'You''re tracking 10 people, the most your staff licences cover.%', sqlerrm); end $$;
+  perform pg_temp.res('the 11th needs more licenses', false, 'was allowed');
+exception when others then perform pg_temp.res('the 11th needs more licenses', sqlerrm like 'You''re tracking 10 people, the most your staff licenses cover.%', sqlerrm); end $$;
 
 -- moving up: a new month from today, less the unused days (all of them, today)
 select pg_temp.res('moving up to 25: ₱2,000 less ₱700 unused = ₱1,300',
@@ -156,7 +156,7 @@ select pg_temp.res('moving up to 25: ₱2,000 less ₱700 unused = ₱1,300',
 update t_ids set inv2 = (public.addon_checkout(org, 'staff', 25, 'monthly') ->> 'id')::uuid;
 -- online checkout: the existing checkout function takes the bill as plan "addon:<id>"
 select pg_temp.res('online checkout gets the bill''s amount and a clear name',
-  (s ->> 'amount_php')::numeric = 1300 and s ->> 'plan_name' = 'Staff licences, up to 25 people (monthly), less ₱700.00 unused' and (s ->> 'months')::int = 1, s::text)
+  (s ->> 'amount_php')::numeric = 1300 and s ->> 'plan_name' = 'Staff licenses, up to 25 people (monthly), less ₱700.00 unused' and (s ->> 'months')::int = 1, s::text)
   from (select public.billing_start(org, 'addon:' || inv2, 1) as s from t_ids) x;
 update t_ids set pay = (select id from public.payments where addon_invoice_id = (select inv2 from t_ids));
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
@@ -190,7 +190,7 @@ update t_ids set inv3 = (select id from public.addon_invoices where org_id = (se
 select pg_temp.res('a week ahead: next month''s bill for 12 people (₱900)', i.people_max = 12 and i.amount_php = 900 and i.period_start = private.today_ph() + 6
   and i.valid_until = private.today_ph() + 19, coalesce(i.amount_php::text, 'none')) from public.addon_invoices i where i.id = (select inv3 from t_ids);
 select pg_temp.res('...the owner is told', exists (select 1 from public.notifications where user_id = 'd1000000-0000-4000-8000-0000000000a1'
-  and title like 'Staff licences, up to 12 people (monthly) renews on%'), '');
+  and title like 'Staff licenses, up to 12 people (monthly) renews on%'), '');
 select private.plus_daily();
 select pg_temp.res('...only once', (select count(*) from public.addon_invoices where org_id = (select org from t_ids) and renewal) = 1, '');
 
@@ -204,11 +204,11 @@ select private.plus_daily();
 select pg_temp.res('ended: 9 of 12 people paused, the oldest 3 stay on', (select count(*) from public.people where org_id = (select org from t_ids) and deleted_at is null and paused_at is not null) = 9
   and (select paused_at is null from public.people where id = (select p1 from t_ids)) and (select paused_at is not null from public.people where id = (select p5 from t_ids)), '');
 select pg_temp.res('...and the owner is told', exists (select 1 from public.notifications where user_id = 'd1000000-0000-4000-8000-0000000000a1'
-  and title = 'Your staff licences have ended' and body like 'Reminders for 9 of your 12 people are paused%'), '');
+  and title = 'Your staff licenses have ended' and body like 'Reminders for 9 of your 12 people are paused%'), '');
 insert into public.requirement_cycles (org_id, requirement_id, reference_no, expires_on)
   select org, (select id from public.requirements where person_id = (select p5 from t_ids) and type_code = 'drivers_license'), 'DL-1', private.today_ph() + 1 from t_ids;
 select private.queue_due_reminders();
-select pg_temp.res('a paused person''s licence sends no reminder', not exists (select 1 from public.notifications n join public.requirements r on r.id = n.requirement_id
+select pg_temp.res('a paused person''s license sends no reminder', not exists (select 1 from public.notifications n join public.requirements r on r.id = n.requirement_id
   where r.person_id = (select p5 from t_ids)), '');
 select pg_temp.res('...while the others still do', exists (select 1 from public.notifications n where n.requirement_id = (select hc from t_ids)), '');
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000a1');
@@ -321,7 +321,7 @@ exception when others then perform pg_temp.res('another workspace can''t touch t
 select pg_temp.res('...or see the findings', not exists (select 1 from public.audit_findings where org_id = (select org from t_ids)), '');
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 
--- licences by role
+-- licenses by role
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000b2');
 set local role authenticated;
 select public.save_staff_role(org, 'Cook', array['health_certificate', 'not_a_type']) from t_ids;
@@ -331,7 +331,7 @@ select pg_temp.as_user('d1000000-0000-4000-8000-0000000000b2');
 set local role authenticated;
 select pg_temp.res('a cook without a health card is pointed out (the business''s own rule)',
   exists (select 1 from public.audit_findings where person_id = (select p2 from t_ids) and kind = 'role_missing' and type_code = 'health_certificate' and severity = 'fix'), '');
-select pg_temp.res('roles keep only real licence types', (select type_codes = array['health_certificate'] from public.staff_roles where org_id = (select org from t_ids)), '');
+select pg_temp.res('roles keep only real license types', (select type_codes = array['health_certificate'] from public.staff_roles where org_id = (select org from t_ids)), '');
 select pg_temp.res('one tap adds it to everyone in the role who lacks it', public.apply_staff_role(id) = 1, '') from public.staff_roles where org_id = (select org from t_ids);
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select private.run_audit((select org from t_ids), 'manual');
@@ -474,7 +474,7 @@ select pg_temp.as_user('d1000000-0000-4000-8000-0000000000c3');
 set local role authenticated;
 do $$ begin perform public.worker_link((select hc from t_ids));
   perform pg_temp.res('viewers can''t make upload links', false, 'was allowed');
-exception when others then perform pg_temp.res('viewers can''t make upload links', sqlerrm = 'Licence not found.', sqlerrm); end $$;
+exception when others then perform pg_temp.res('viewers can''t make upload links', sqlerrm = 'License not found.', sqlerrm); end $$;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000b2');
 set local role authenticated;
@@ -482,7 +482,7 @@ select pg_temp.res('HR gets the same open link to send by Viber or SMS', public.
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 set local role anon;
-select pg_temp.res('the worker sees only their first name, the business and the licence',
+select pg_temp.res('the worker sees only their first name, the business and the license',
   w ->> 'state' = 'open' and w ->> 'first_name' = 'Ana' and w ->> 'permit' = 'Health Certificate / Health Card' and w::text not like '%Cruz%', w::text)
   from (select public.worker_page((select tok from t_ids)) as w) x;
 select pg_temp.res('a made-up link shows nothing', public.worker_page(gen_random_uuid()) ->> 'state' = 'invalid', '');
@@ -497,7 +497,7 @@ do $$ begin insert into storage.objects (bucket_id, name) select 'documents', or
 exception when others then perform pg_temp.res('...nor with a made-up link', sqlerrm like '%row-level security%', sqlerrm); end $$;
 do $$ begin perform public.worker_submit((select tok from t_ids), (select org || '/worker/' || tok || '/x-hc.jpg' from t_ids), 'hc.jpg', 'image/jpeg', 5000, pg_temp.today() + 365);
   perform pg_temp.res('a photo has to be uploaded first', false, 'was allowed');
-exception when others then perform pg_temp.res('a photo has to be uploaded first', sqlerrm = 'Add a photo of the new licence first.', sqlerrm); end $$;
+exception when others then perform pg_temp.res('a photo has to be uploaded first', sqlerrm = 'Add a photo of the new license first.', sqlerrm); end $$;
 insert into storage.objects (bucket_id, name) select 'documents', org || '/worker/' || tok || '/x-hc.jpg' from t_ids;
 select pg_temp.res('the worker uploads into their link''s folder (and can see it)', pg_temp.visible((select org || '/worker/' || tok || '/x-hc.jpg' from t_ids)), '');
 do $$ declare i int; begin for i in 1..5 loop insert into storage.objects (bucket_id, name) select 'documents', org || '/worker/' || tok || '/extra' || i || '.jpg' from t_ids; end loop;
@@ -598,7 +598,7 @@ reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); en
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000f5');
 set local role authenticated;
 create temp table t_money as select * from public.admin_money(private.today_ph() - 5, private.today_ph());
-select pg_temp.res('Money counts staff licences as income, and open bills as to collect',
+select pg_temp.res('Money counts staff licenses as income, and open bills as to collect',
   (select sum(amount) from t_money where kind = 'staff_licences' and state = 'collected') = 700 + 1300 + 900
   and exists (select 1 from t_money where kind = 'plus' and state = 'to_collect' and amount = 1990), '');
 select pg_temp.res('the summary shows what to confirm and the monthly income', (s ->> 'addon_payments_to_check')::int = 1 and (s ->> 'mrr_addons')::numeric = 900

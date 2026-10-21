@@ -132,10 +132,10 @@ function homeView() {
     <details class="card mh-settings"><summary>Settings</summary>
       <form class="grid2 money-settings">
         <label class="field"><span>Monthly goal (₱) <small>(only you see it)</small></span><input name="goal" type="number" min="0" step="1000" value="${s.goal ?? ''}"></label>
-        <label class="field"><span>Insurance Commission licence no. <small>(only if you have one)</small></span><input name="ic" maxlength="60" value="${s.ic_licence_no || ''}" placeholder="Leave empty if you don't have one"></label>
+        <label class="field"><span>Insurance Commission license no. <small>(only if you have one)</small></span><input name="ic" maxlength="60" value="${s.ic_licence_no || ''}" placeholder="Leave empty if you don't have one"></label>
         <div><button class="btn btn-sm btn-soft">Save</button></div>
       </form>
-      <p class="muted small">Without an Insurance Commission licence, insurance companies can only pay you a flat listing fee, never per customer (Insurance Code, Sec. 307). The app enforces this.</p>
+      <p class="muted small">Without an Insurance Commission license, insurance companies can only pay you a flat listing fee, never per customer (Insurance Code, Sec. 307). The app enforces this.</p>
     </details>`;
 }
 

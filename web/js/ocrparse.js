@@ -64,7 +64,7 @@ export function datesFor(text, today) {
 }
 
 // Reference numbers next to the labels permits use.
-const REF_LABELS = /(permit|reference|ref|control|certificate|cert|fsic|policy|coc|license|licence|or|receipt|clearance|registration|account|series|serial|business\s*id|bin|plate)?\s*(no|number|num|#)\.?\s*[:.]?\s*/gi;
+const REF_LABELS = /(permit|reference|ref|control|certificate|cert|fsic|policy|coc|license|license|or|receipt|clearance|registration|account|series|serial|business\s*id|bin|plate)?\s*(no|number|num|#)\.?\s*[:.]?\s*/gi;
 export function findReferences(text) {
   const out = [];
   for (const line of String(text || '').split(/\r?\n/)) {

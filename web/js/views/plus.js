@@ -1,4 +1,4 @@
-// PermitPal Plus and staff licences: the cards under Settings > Plan, bills and paying them, the free
+// PermitPal Plus and staff licenses: the cards under Settings > Plan, bills and paying them, the free
 // trial, and the "this comes with Plus" pop-up used wherever a Plus feature is opened without it.
 // Every price shown comes from the same rule the database uses; before anything is charged the
 // database works the bill out itself (addon_preview), and that's what the confirmation shows.
@@ -6,7 +6,7 @@ import { html, openModal, confirmDialog, toast, toastError, when, fmtDate, peso,
 import { S, on, reload, isOrgAdmin, has, addonOf, addonActive, plusOf, plusIncluded, hasPlus, peopleAllowed, effectivePlan } from '../core.js';
 import { FREE_PEOPLE, PLUS_MONTHLY, YEAR_MONTHS, BANDS, staffBands, staffMonthly, addonPrice, addonLabel } from '../prices.js';
 import { ICON } from '../components.js';
-import { addonCard, billButton, billToggle, checks, getBilling, paintPrices, PLUS_CHECKS, staffLadder, staffExamples } from './pricing.js';
+import { addonCard, billButton, billToggle, checks, getBilling, paintPrices, PLUS_CHECKS, STAFF_CHECKS, staffTracks, staffLadder, staffExamples } from './pricing.js';
 import { payDetails, paySettings } from './services.js';
 import { brandCard } from './brand.js';
 import * as db from 'pp/data';
@@ -52,7 +52,7 @@ export function handlePlanError(err, what) {
 export function openSeatLimit(message) {
   openModal('Track more people', html`<p>${message || `You've reached the people your plan covers.`}</p>
     ${peopleNote()}`, {
-    submitLabel: isOrgAdmin() ? 'Add staff licences' : 'OK',
+    submitLabel: isOrgAdmin() ? 'Add staff licenses' : 'OK',
     onSubmit: () => { if (isOrgAdmin()) location.hash = '#/settings/billing?staff=1'; },
   });
 }
@@ -89,17 +89,17 @@ export function addonSection(pay) {
     ? html`<span class="chip ok">Up to ${staff.people_max} people until ${fmtDate(staff.paid_through)}</span>`
     : html`<span class="chip ${n >= FREE_PEOPLE ? 'soon' : 'ok'}">Free: ${n} of ${FREE_PEOPLE} people</span>`;
   const startAt = Math.max(FREE_PEOPLE + 1, n, staffOn ? staff.people_max + 5 : 0);
-  const staffBody = html`${staffLadder()}${staffExamples()}
+  const staffBody = html`${staffTracks()}${checks(STAFF_CHECKS)}${staffLadder()}${staffExamples()}
     ${staffOn && staff.next_people_max ? html`<p class="small">From ${fmtDate(staff.paid_through)}: up to ${staff.next_people_max} people (${peso(addonPrice('staff', staff.next_people_max, staff.next_billing || staff.billing))} a ${staff.next_billing === 'yearly' ? 'year' : 'month'}).</p>` : ''}
     ${stopping.staff ? html`<p class="small">Ends on ${fmtDate(stopping.staff)}: then reminders pause for everyone above the free ${FREE_PEOPLE}. <button class="linklike" data-act="addon-resume" data-kind="staff">Keep it</button></p>` : ''}
     ${admin ? html`<form class="staff-calc" data-staff-calc>
         <label class="field"><span>How many people do you want to track?</span>
           <input type="number" name="people" min="${Math.max(FREE_PEOPLE + 1, n)}" max="5000" step="1" inputmode="numeric" value="${startAt}"></label>
-        ${billToggle('How often to pay for staff licences')}
+        ${billToggle('How often to pay for staff licenses')}
         <div class="calc-out" aria-live="polite"></div>
         <div class="btn-row"><button class="btn btn-primary">${staffOn ? 'Change' : 'Continue'}</button>
         ${when(staffOn && !stopping.staff, html`<button type="button" class="btn btn-ghost" data-act="addon-stop" data-kind="staff">Stop at the end of the period</button>`)}</div>
-      </form>` : html`<p class="muted small">Your workspace owner or an admin can add licences.</p>`}`;
+      </form>` : html`<p class="muted small">Your workspace owner or an admin can add licenses.</p>`}`;
   return html`
     <h3 class="section-label" id="addons">Add-ons</h3>
     <p class="pp-lead">Small extras, from ${peso(PLUS_MONTHLY)} a month. Pay yearly and 2 months are free.</p>
@@ -110,9 +110,9 @@ export function addonSection(pay) {
         monthly: included ? 0 : PLUS_MONTHLY, list: PLUS_CHECKS, status: plusStatus, cta: plusActions, current: plusOn || included,
         note: included ? '' : plus?.trial_used_on || plusOn ? '' : 'Try it free for 14 days. Nothing is charged after.' })}
       ${has('brand') && S.org.kind === 'firm' ? brandCard() : ''}
-      ${addonCard({ id: 'staff-licences', icon: ICON.person, name: 'Staff licences', who: "Track your staff's health cards, NBI clearances and driver's licences",
+      ${addonCard({ id: 'staff-licenses', icon: ICON.person, name: 'Staff licenses', who: 'Every license your team needs, tracked for you. They renew, you approve.',
         status: staffStatus, body: staffBody, current: staffOn,
-        note: `Each person gets a reminder before their licence runs out, and a link to send the new one. The first ${FREE_PEOPLE} people are always free.` })}
+        note: `The first ${FREE_PEOPLE} people are always free. Everyone after that gets the same done-for-you tracking.` })}
     </div>
     ${bills.length ? html`<details class="card bills-all"><summary><b>Your bills</b> <span class="muted small">${plural(bills.length, 'bill')}</span></summary>${bills.map(billRow)}</details>` : ''}
     <p class="fineprint">Prices include everything; there's nothing else to pay. Nothing is charged by itself: we send a bill a week before each period. Moving up starts a new period today, less what's unused of the current one. Moving down starts with your next bill. Stopping keeps everything on until the end of what you paid, and nothing is ever deleted.${pay?.online_payments === 'on' ? '' : ' Pay by GCash, Maya or bank transfer; we confirm within 1 business day.'}</p>`;
@@ -247,7 +247,7 @@ on('addon-stop', async (ds) => {
     ? `Plus stays on until ${fmtDate(a.paid_through)}. Then your public page shows "paused" and the monthly check stops. Nothing is deleted, and you can turn it on again anytime.`
     : ds.kind === 'brand'
     ? `White-label stays on until ${fmtDate(a.paid_through)}. Then your clients' emails and app show PermitPal's own look again. Your brand settings are kept.`
-    : `Your licences stay on until ${fmtDate(a.paid_through)}. Then reminders pause for everyone above the free ${FREE_PEOPLE}. Nothing is deleted.`;
+    : `Your licenses stay on until ${fmtDate(a.paid_through)}. Then reminders pause for everyone above the free ${FREE_PEOPLE}. Nothing is deleted.`;
   if (!(await confirmDialog('Stop at the end of the period?', msg, { confirmLabel: 'Stop it then', cancelLabel: 'Keep it' }))) return;
   try { const d = await db.addonStop(S.org.id, ds.kind); await reload(); toast(`It ends on ${fmtDate(d)}.`); } catch (e) { toastError(e); }
 });
@@ -260,9 +260,9 @@ export function seatLine() {
   const allowed = peopleAllowed();
   const paused = (S.data.people || []).filter((p) => p.paused_at).length;
   return html`<div class="seat-line ${n >= allowed ? 'full' : ''}"><div class="seat-meter" role="img" aria-label="${n} of ${allowed} people"><span style="width:${Math.min(100, Math.round((n / Math.max(1, allowed)) * 100))}%"></span></div>
-    <span class="small"><b>${n} of ${allowed}</b> people ${allowed === FREE_PEOPLE ? '(free)' : `(licences until ${fmtDate(addonOf('staff')?.paid_through)})`}</span>
-    ${when(isOrgAdmin(), html`<a class="btn btn-sm btn-soft" href="#/settings/billing?staff=1">${n >= allowed ? 'Add licences' : 'Licences'}</a>`)}</div>
-    ${when(paused, html`<div class="banner warn"><div><b>${plural(paused, 'person is', 'people are')} paused.</b> Their reminders are off because your staff licences ended or don't cover them. Nothing was deleted.</div>
-      ${when(isOrgAdmin(), html`<a class="btn btn-sm btn-primary" href="#/settings/billing?staff=1">Add licences</a>`)}</div>`)}`;
+    <span class="small"><b>${n} of ${allowed}</b> people ${allowed === FREE_PEOPLE ? '(free)' : `(licenses until ${fmtDate(addonOf('staff')?.paid_through)})`}</span>
+    ${when(isOrgAdmin(), html`<a class="btn btn-sm btn-soft" href="#/settings/billing?staff=1">${n >= allowed ? 'Add licenses' : 'Licenses'}</a>`)}</div>
+    ${when(paused, html`<div class="banner warn"><div><b>${plural(paused, 'person is', 'people are')} paused.</b> Their reminders are off because your staff licenses ended or don't cover them. Nothing was deleted.</div>
+      ${when(isOrgAdmin(), html`<a class="btn btn-sm btn-primary" href="#/settings/billing?staff=1">Add licenses</a>`)}</div>`)}`;
 }
 

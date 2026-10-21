@@ -204,7 +204,7 @@ export const KINDS = {
   },
 
   staff: {
-    label: 'Staff and their licences', one: 'staff member', many: 'staff members', unit: 'One person per row, with any licences they carry.',
+    label: 'Staff and their licenses', one: 'staff member', many: 'staff members', unit: 'One person per row, with any licenses they carry.',
     cols: [
       ['full_name', 'Full name', 'Juan dela Cruz', ['fullname', 'name', 'employee', 'employeename', 'staff', 'staffname', 'driver', 'drivername']],
       ['role_title', 'Position', 'Driver', ['position', 'role', 'jobtitle', 'title', 'designation']],
@@ -240,12 +240,12 @@ export const KINDS = {
         if (d.value && d.value < ctx.today) notes.push(`${t.name} already expired (${d.value}).`);
       }
       const k = key(f.full_name);
-      if (k && ctx.people.some((x) => key(x.full_name) === k)) problems.push('Already in PermitPal. To add licence dates for existing staff, import "Permit records" instead');
+      if (k && ctx.people.some((x) => key(x.full_name) === k)) problems.push('Already in PermitPal. To add license dates for existing staff, import "Permit records" instead');
       else if (k && seen.has(k)) problems.push('This person appears twice in the file');
       if (k) seen.add(k);
-      return { f, problems, notes, show: [f.full_name || '—', f.role_title || '—', f.licences.map((l) => l.name).join(', ') || 'No licences'] };
+      return { f, problems, notes, show: [f.full_name || '—', f.role_title || '—', f.licences.map((l) => l.name).join(', ') || 'No licenses'] };
     },
-    head: ['Name', 'Position', 'Licences'],
+    head: ['Name', 'Position', 'Licenses'],
   },
 
   permits: {

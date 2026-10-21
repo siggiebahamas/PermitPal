@@ -278,7 +278,7 @@ function partnerForm(p = {}) {
   return html`<form class="admin-partner" data-id="${p.id || ''}"><div class="grid2">
     <label class="field"><span>Name</span><input name="name" required maxlength="160" value="${p.name || ''}"></label>
     <label class="field"><span>Category</span><select name="category">${Object.entries(PARTNER_CATEGORIES).map(([k, v]) => html`<option value="${k}" ${k === p.category ? 'selected' : ''}>${v}</option>`)}</select></label>
-    <label class="field"><span>Licence / accreditation <small>(shown)</small></span><input name="licence" maxlength="200" value="${p.licence || ''}" placeholder="e.g. CPA, PRC no. 0123456"></label>
+    <label class="field"><span>License / accreditation <small>(shown)</small></span><input name="licence" maxlength="200" value="${p.licence || ''}" placeholder="e.g. CPA, PRC no. 0123456"></label>
     <label class="field"><span>Cities served <small>(comma separated, shown)</small></span><input name="cities" value="${(p.cities || []).join(', ')}" placeholder="Makati City, Taguig City"></label>
     <label class="field"><span>Fee per quote request (₱) <small>(internal)</small></span><input name="lead_fee_php" type="number" min="0" step="1" value="${p.lead_fee_php ?? ''}"></label>
     <label class="field"><span>Website</span><input name="website" maxlength="300" value="${p.website || ''}" placeholder="https://"></label>
@@ -290,11 +290,11 @@ function partnerForm(p = {}) {
     <label class="field"><span>What they handle <small>(shown)</small></span><input name="services" maxlength="600" value="${p.services || ''}" placeholder="Mayor's Permit renewal, barangay clearance, FSIC filing"></label>
     <label class="field"><span>Description</span><textarea name="description" rows="2" maxlength="600">${p.description || ''}</textarea></label>
     <div class="btn-row"><label class="check"><input type="checkbox" name="published" ${p.published ? 'checked' : ''}> Show to customers</label>
-      <label class="check"><input type="checkbox" name="verified" ${p.verified ? 'checked' : ''}> <span>Licence checked <small class="muted">(only after seeing their permit and licence)</small></span></label>
+      <label class="check"><input type="checkbox" name="verified" ${p.verified ? 'checked' : ''}> <span>The firm confirmed it is registered and licensed <small class="muted">(you don't check papers)</small></span></label>
       <button class="btn btn-sm btn-primary">${p.id ? 'Save' : 'Add professional'}</button></div></form>`;
 }
 function partnersTab(list) {
-  return html`<section class="card"><h2>Add a professional</h2><p class="muted small">List only registered firms. Tick "Licence checked" after you've seen their business permit and, for accountants, their PRC licence. Quote requests are emailed to their email below.</p>${partnerForm()}</section>
+  return html`<section class="card"><h2>Add a professional</h2><p class="muted small">List only registered firms. Tick "License checked" after you've seen their business permit and, for accountants, their PRC license. Quote requests are emailed to their email below.</p>${partnerForm()}</section>
     ${list.map((p) => html`<section class="card"><div class="card-head"><h2>${p.name}</h2><span class="chip ${p.published ? 'ok' : 'needinfo'}">${p.published ? 'Live' : 'Hidden'}</span></div>${partnerForm(p)}</section>`)}`;
 }
 

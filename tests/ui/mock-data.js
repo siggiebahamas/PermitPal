@@ -19,6 +19,7 @@ const plans = [
   { id: 'fleet', name: 'Fleet', available: true, paid_channels: true, price_php_monthly: 1490, features: ['Fleet board: every vehicle\'s registration, CTPL, emission and inspection', 'Import vehicles from a spreadsheet', 'Export for your records', 'Everything in Free'] },
   { id: 'firm', name: 'Accounting firm', available: true, price_php_monthly: 1990, features: ['Client board: every client\'s permits on one screen', 'One-click reminders to clients', 'Everything in Free'] },
   { id: 'head_office', name: 'Head office', available: true, price_php_monthly: 4990, features: ['Branch board: every branch and franchisee on one screen', 'One-click reminders to branches', 'Everything in Free'] },
+  { id: 'property_s', name: 'Small property', available: true, price_php_monthly: 2990, paid_channels: true, features: ['Up to 20 tenants'] },
   { id: 'property', name: 'Property', available: true, price_php_monthly: 9990, features: ['Tenant board: every tenant\'s permits on one screen', 'Download tenants\' shared copies', 'Everything in Free'] },
 ];
 const types = [
@@ -315,11 +316,11 @@ export const startCheckout = async () => { throw new Error('Payments are off in 
 
 // ---------------------------------------------------------------- people
 export async function createPerson(orgId, f) {
-  // Same rule as the database: 3 people free, more need staff licences.
+  // Same rule as the database: 3 people free, more need staff licenses.
   if (PLUS_ON && db.people.filter((p) => !p.deleted_at).length >= peopleCapMock()) {
     const n = db.people.filter((p) => !p.deleted_at).length;
-    throw Object.assign(new Error(peopleCapMock() <= FREE_PEOPLE ? `You're tracking ${n} people: the free limit is ${FREE_PEOPLE}. Add staff licences (from ₱100 a month per person) under Settings > Plan to track more.`
-      : `You're tracking ${n} people, the most your staff licences cover. Add more under Settings > Plan.`), { hint: 'seat_limit', code: 'P0001' });
+    throw Object.assign(new Error(peopleCapMock() <= FREE_PEOPLE ? `You're tracking ${n} people: the free limit is ${FREE_PEOPLE}. Add staff licenses (from ₱100 a month per person) under Settings > Plan to track more.`
+      : `You're tracking ${n} people, the most your staff licenses cover. Add more under Settings > Plan.`), { hint: 'seat_limit', code: 'P0001' });
   }
   const x = { id: uid(), org_id: orgId, full_name: f.full_name, role_title: f.role_title || '', business_id: f.business_id || null, deleted_at: null, paused_at: null, email: null, mobile: null, remind_worker: true, created_at: new Date().toISOString() };
   db.people.push(x);
@@ -751,7 +752,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 
@@ -1184,6 +1185,7 @@ export async function logPlacement(ids, kind) {
 }
 export async function applyAsPartner(f) {
   if (f.trap) return;
+  if (f.attested === false) throw new Error('Please confirm your business is registered and holds the licenses its work needs.');
   if (db.apps.some((a) => a.email === f.email.toLowerCase() && Date.now() - Date.parse(a.created_at) < 864e5)) throw new Error("We already have your application. We'll reply within 3 business days.");
   db.apps.unshift({ id: uid(), ...f, email: f.email.toLowerCase(), status: 'new', created_at: now() });
 }
@@ -1400,7 +1402,7 @@ if (REV && globalThis.PP_DEMO) {
     { id: uid(), partner_id: 'p3', kind: 'placement', description: 'Featured on the "Fire Safety Inspection Certificate (FSIC)" checklist, this month', amount_php: 2500, occurred_on: today().slice(0, 8) + '01', status: 'unbilled' });
   for (let m = 6; m >= 0; m--) db.planPayments.push({ id: uid(), org_name: ['Pacific Fleet Rentals', 'Reyes & Co. CPAs', 'Kape Uno Head Office'][m % 3], plan_id: ['fleet', 'firm', 'head_office'][m % 3], plan_name: ['Fleet', 'Accounting firm', 'Head office'][m % 3],
     months: 1, amount_php: [1490, 1990, 4990][m % 3], paid_at: daysAgo(30 * m + 3), bir_invoice_no: m ? 'INV-T' + m : null });
-  // a licence Care doesn't renew (quoted per job), on the branch with the All-in plan
+  // a license Care doesn't renew (quoted per job), on the branch with the All-in plan
   addReq('business', 'b2', 'l2', { code: null, name: 'FDA License to Operate', expires: true }, { reference_no: 'FDA-LTO-3301', expires_on: addDays(140) });
   // this workspace: the All-in plan on the Cebu main branch (paid), a pickup on pay per renewal, a renewal the plan started
   if (globalThis.PP_IN_PERSON) {
@@ -1443,7 +1445,7 @@ if (REV && globalThis.PP_DEMO) {
 }
 
 
-// ---------------------------------------------------------------- PermitPal Plus and staff licences
+// ---------------------------------------------------------------- PermitPal Plus and staff licenses
 // The same rules as the database, in memory: prices, the free 3 people, bills, the public page, the check.
 const PLUS_ON = globalThis.PP_FEATURES !== 'none';
 const plusDb = { addons: [], invoices: [], roles: [], submissions: [], stopping: {}, pages: [], recipients: [], views: [], findings: [], runs: [], links: [] };
@@ -1540,7 +1542,7 @@ export const startAddonCheckout = async () => { throw new Error('Online card/GCa
 export const updatePersonContact = async (id, f) => { Object.assign(db.people.find((x) => x.id === id), { email: f.email || null, mobile: f.mobile || null, remind_worker: f.remind_worker !== false }); };
 export async function workerLink(reqId) {
   const r = db.requirements.find((x) => x.id === reqId);
-  if (db.people.find((p) => p.id === r.person_id)?.paused_at) throw new Error("This person is paused because your staff licences don't cover them. Add licences under Settings > Plan.");
+  if (db.people.find((p) => p.id === r.person_id)?.paused_at) throw new Error("This person is paused because your staff licenses don't cover them. Add licenses under Settings > Plan.");
   let l = plusDb.links.find((x) => x.requirement_id === reqId && !x.used_at);
   if (!l) { l = { token: uid(), requirement_id: reqId, person_id: r.person_id, used_at: null }; plusDb.links.push(l); }
   return l.token;
@@ -1555,7 +1557,7 @@ export async function workerPage(token) {
 export async function workerSend(page, token, f) {
   const l = plusDb.links.find((x) => x.token === token);
   if (!l || l.used_at) throw new Error('This link has already been used or has expired. Ask your employer for a new one.');
-  if (page.expires && !f.expires_on) throw new Error("Enter the new expiry date (it's printed on the licence).");
+  if (page.expires && !f.expires_on) throw new Error("Enter the new expiry date (it's printed on the license).");
   l.used_at = new Date().toISOString();
   plusDb.submissions.push({ id: uid(), org_id: org.id, person_id: l.person_id, requirement_id: l.requirement_id, token, storage_path: `o1/worker/${token}/${f.file.name}`, file_name: f.file.name, mime_type: f.file.type,
     expires_on: f.expires_on, issued_on: f.issued_on || null, reference_no: f.reference_no || null, note: f.note || null, status: 'pending', created_at: new Date().toISOString() });
@@ -1706,7 +1708,7 @@ if (PLUS_ON && (globalThis.PP_DEMO || globalThis.PP_PLUS)) {
 function daysAgoIso(d, h = 0) { return new Date(Date.now() - d * 864e5 - h * 3600e3).toISOString(); }
 
 // ---------------------------------------------------------------- White-label (accounting firms)
-// PP_BRAND shows a client workspace whose accountant has White-label on (logo, colour, "Powered by PermitPal").
+// PP_BRAND shows a client workspace whose accountant has White-label on (logo, color, "Powered by PermitPal").
 export const SAMPLE_BRAND = { firm_org: 'f1', name: 'Dela Cruz & Co.', color: '#0F5132', reply_to: 'hello@delacruz.ph', phone: '(02) 8123 4567',
   tagline: 'Tax, books & permits for small businesses', logo_url: 'img/logo.png' };
 const brandEligibleMock = () => org.kind === 'firm' && ((org.trial_ends_at && new Date(org.trial_ends_at) > new Date()) || org.plan_id === 'firm');
@@ -1717,7 +1719,7 @@ export async function brandSave(orgId, f) {
   if (org.kind !== 'firm') throw new Error('White-label is for Accounting firm workspaces.');
   if (!String(f.display_name || '').trim() || f.display_name.length > 80) throw new Error('Enter the name your clients know you by (up to 80 characters).');
   const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
-  if (!/^#[0-9a-f]{6}$/i.test(f.color || '') || 1.05 / (lum(f.color) + 0.05) < 4.5) throw new Error('Pick a darker colour, so white text on it stays easy to read.');
+  if (!/^#[0-9a-f]{6}$/i.test(f.color || '') || 1.05 / (lum(f.color) + 0.05) < 4.5) throw new Error('Pick a darker color, so white text on it stays easy to read.');
   if (f.reply_to && !/^[^@\s<>"]+@[^@\s<>"]+\.[a-z]{2,}$/i.test(f.reply_to)) throw new Error('Enter a valid email address for replies.');
   brandRow = { org_id: org.id, display_name: f.display_name.trim(), logo_path: f.logo_path || null, color: f.color.toUpperCase(), reply_to: f.reply_to ? f.reply_to.toLowerCase() : null,
     phone: f.phone || null, tagline: f.tagline || null, client_report: f.client_report !== false, updated_at: new Date().toISOString() };

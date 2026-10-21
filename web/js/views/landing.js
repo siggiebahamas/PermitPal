@@ -5,11 +5,11 @@ import { html } from '../util.js';
 import { ICON } from '../components.js';
 import { has, IN_PERSON } from '../core.js';
 import { PLUS_MONTHLY, BRAND_MONTHLY } from '../prices.js';
-import { billToggle, freeCard, planCard, PLAN_ORDER, compareTable, paintPrices, addonCard, PLUS_CHECKS, BRAND_CHECKS, staffLadder, staffExamples } from './pricing.js';
+import { billToggle, freeCard, planCard, PLAN_ORDER, PLANS, compareTable, paintPrices, addonCard, checks, PLUS_CHECKS, BRAND_CHECKS, STAFF_CHECKS, staffTracks, staffLadder, staffExamples } from './pricing.js';
 import * as db from 'pp/data';
 
 const FEATURES = [
-  [ICON.calendar, 'Every deadline in one place', 'Business permits, vehicle registration and staff licences, each with its own month-by-month timeline.'],
+  [ICON.calendar, 'Every deadline in one place', 'Business permits, vehicle registration and staff licenses, each with its own month-by-month timeline.'],
   [ICON.bell, 'Reminders before anything expires', 'Email reminders 30, 7 and 1 day before, then weekly while overdue. A weekly summary every Monday.'],
   [ICON.file, 'Your documents, safe for years', 'Every permit and receipt kept with its history. Nothing is ever hard-deleted.'],
   [ICON.share, 'Proof in one link', 'Send a read-only compliance summary to a landlord, mall, franchisor or bank. Turn it off anytime.'],
@@ -26,15 +26,15 @@ const FAQ = [
 // The plans and add-ons, with a "start" button for each (sign-up remembers which plan they picked).
 function pricingCards(plans) {
   const price = (id) => Number(plans.find((p) => p.id === id)?.price_php_monthly || 0);
-  const start = (id) => html`<a class="btn btn-primary btn-block" href="#/signup?type=${id}">Try free for 30 days</a>`;
+  const start = (id) => html`<a class="btn btn-primary btn-block" href="#/signup?type=${PLANS[id].kind}">Try free for 30 days</a>`;
   return html`<div class="pp-grid four">${freeCard(html`<a class="btn btn-primary btn-block" href="#/signup">Start free</a>`)}${PLAN_ORDER.map((id) => planCard(id, price(id), start(id)))}</div>`;
 }
 const addons = () => (has('plus') ? html`<h3 class="lp-h3">Add-ons for any workspace</h3>
   <div class="pp-grid">
     ${addonCard({ id: 'lp-plus', icon: ICON.share, name: 'PermitPal Plus', who: 'Show customers you are legit, and let PermitPal check your permits for you', monthly: PLUS_MONTHLY, list: PLUS_CHECKS,
       cta: html`<a class="btn btn-soft btn-block" href="#/signup">Try free for 14 days</a>` })}
-    ${addonCard({ id: 'lp-staff', icon: ICON.person, name: 'Staff licences', who: "Track your staff's health cards, NBI clearances and driver's licences",
-      body: html`${staffLadder()}${staffExamples()}`, cta: html`<a class="btn btn-soft btn-block" href="#/signup">Start free with 3 people</a>` })}
+    ${addonCard({ id: 'lp-staff', icon: ICON.person, name: 'Staff licenses', who: 'Every license your team needs, tracked for you. They renew, you approve.',
+      body: html`${staffTracks()}${checks(STAFF_CHECKS)}${staffLadder()}${staffExamples()}`, cta: html`<a class="btn btn-soft btn-block" href="#/signup">Start free with 3 people</a>` })}
     ${has('brand') ? addonCard({ id: 'lp-brand', icon: ICON.briefcase, name: 'White-label', who: 'For accounting firms: your brand on everything your clients see', monthly: BRAND_MONTHLY, list: BRAND_CHECKS,
       cta: html`<a class="btn btn-soft btn-block" href="#/signup?type=firm">Try free for 14 days</a>` }) : ''}
   </div>` : '');
@@ -51,7 +51,7 @@ export async function landing(app) {
 
       <section class="lp-hero">
         <h1>Never miss a permit renewal again.</h1>
-        <p>PermitPal keeps every business permit, vehicle registration and staff licence in one place, and reminds you before anything expires.</p>
+        <p>PermitPal keeps every business permit, vehicle registration and staff license in one place, and reminds you before anything expires.</p>
         <div class="btn-row lp-cta"><a class="btn btn-primary" href="#/signup">Start free</a><a class="btn btn-ghost" href="demo/">See the demo</a></div>
         <p class="muted small">Free for every business: unlimited businesses, vehicles and team members.</p>
       </section>

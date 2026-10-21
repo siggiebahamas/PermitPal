@@ -83,7 +83,7 @@ const SHORT = { mayors_permit: "Mayor's Permit", barangay_clearance: 'Barangay C
   lto_registration: 'LTO Registration', ctpl: 'CTPL Insurance', emission_test: 'Emission Test', mvir: 'MVIR' };
 export const shortName = (r) => SHORT[r.type_code] || r.name.replace(/\s*\(.*\)$/, '');
 
-// Short, plain status line shown in colour next to each item (never greyed out).
+// Short, plain status line shown in color next to each item (never greyed out).
 export function dueShort(r) {
   const d = r.days_left;
   if (r.status === 'in_progress') return d !== null && d < 0 ? `Renewal started · ${plural(-d, 'day')} overdue` : 'Renewal in progress';
@@ -99,7 +99,7 @@ export function dueShort(r) {
 }
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-// The coloured date tile at the start of each row: when it's due, coloured by status.
+// The colored date tile at the start of each row: when it's due, colored by status.
 export function dateTile(r) {
   const s = STATUS[r.status] || STATUS.needs_information;
   if (!r.expires_on) {

@@ -167,7 +167,7 @@ export function compliance(el, params) {
       </div>
       <details class="more-filters" ${extra || moreOpen ? 'open' : ''}><summary>More filters${extra ? ` (${extra} on)` : ''}</summary>
         <div class="more-filters-body">
-          <select name="subject">${opt('all', people.length ? 'Businesses, vehicles & staff' : 'Businesses + vehicles', filters.subject)}${opt('business', 'Businesses', filters.subject)}${opt('vehicle', 'Vehicles', filters.subject)}${when_(people.length, opt('person', 'Staff licences', filters.subject))}</select>
+          <select name="subject">${opt('all', people.length ? 'Businesses, vehicles & staff' : 'Businesses + vehicles', filters.subject)}${opt('business', 'Businesses', filters.subject)}${opt('vehicle', 'Vehicles', filters.subject)}${when_(people.length, opt('person', 'Staff licenses', filters.subject))}</select>
           <select name="entity">${opt('all', people.length ? 'All businesses, vehicles & staff' : 'All businesses & vehicles', filters.entity)}
             ${businesses.map((b) => opt('business:' + b.id, b.name, filters.entity))}
             ${vehicles.map((v) => opt('vehicle:' + v.id, `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`, filters.entity))}
@@ -256,7 +256,7 @@ export async function documents(el) {
   };
 
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Documents</h1><p class="muted">Proof of compliance for every business, vehicle and staff licence, with past years kept on file.</p></div>
+    <div class="page-head"><div><h1>Documents</h1><p class="muted">Proof of compliance for every business, vehicle and staff license, with past years kept on file.</p></div>
       <button class="btn btn-soft" data-act="inspection-pack" data-scope="org">${ICON.download} Inspection pack</button></div>
     <div class="stats four">
       <div class="stat ok"><div class="stat-n">${onFile}<small>/${needDoc.length}</small></div><div class="stat-l">On file</div></div>

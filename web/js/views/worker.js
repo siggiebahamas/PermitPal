@@ -1,5 +1,5 @@
-// A worker's own page for sending a renewed licence (opened from the reminder email or a link HR sent
-// by Viber, SMS or email). No account: the link is the key, works once, and only for that licence.
+// A worker's own page for sending a renewed license (opened from the reminder email or a link HR sent
+// by Viber, SMS or email). No account: the link is the key, works once, and only for that license.
 // They add a photo and the new dates; the business checks it before it counts.
 import { html, fmtDate, toast } from '../util.js';
 import { scanBox, wireScan } from './scan.js';
@@ -14,7 +14,7 @@ export async function workerPage(el, token, { signedIn = false } = {}) {
   let w = null;
   if (UUID.test(token || '')) w = await db.workerPage(token).catch(() => null);
   const msg = (title, text) => { el.innerHTML = String(wrap(html`<div class="page-head"><div><h1>${title}</h1></div></div><section class="card"><p>${text}</p></section>`)); };
-  if (!w || w.state === 'invalid') return msg('Send your renewed licence', "This link isn't valid. Ask your employer to send it again.");
+  if (!w || w.state === 'invalid') return msg('Send your renewed license', "This link isn't valid. Ask your employer to send it again.");
   if (w.state === 'sent') return msg('Already sent', `Your ${w.permit} was sent to ${w.org_name}. They'll check it. Thank you!`);
   if (w.state === 'expired') return msg('This link has expired', `Ask ${w.org_name} for a new link to send your ${w.permit}.`);
   el.innerHTML = String(wrap(html`
@@ -22,12 +22,12 @@ export async function workerPage(el, token, { signedIn = false } = {}) {
       <p class="muted">${w.org_name} asked for a photo of your renewed <b>${w.permit}</b>${w.expires_on ? html` (the one on file expires ${fmtDate(w.expires_on)})` : ''}.</p></div></div>
     <section class="card"><form id="worker-form" novalidate>
       ${scanBox()}
-      <label class="field"><span>Photo of the new licence</span><input type="file" name="file" accept="image/*,.pdf" capture="environment" required></label>
+      <label class="field"><span>Photo of the new license</span><input type="file" name="file" accept="image/*,.pdf" capture="environment" required></label>
       <div class="grid2">
         ${w.expires ? html`<label class="field"><span>New expiry date</span><input type="date" name="expires_on" min="${w.today}" required></label>` : ''}
         <label class="field"><span>Date issued <small>(optional)</small></span><input type="date" name="issued_on" max="${w.today}"></label>
       </div>
-      <label class="field"><span>Licence number <small>(optional)</small></span><input name="reference_no" maxlength="100"></label>
+      <label class="field"><span>License number <small>(optional)</small></span><input name="reference_no" maxlength="100"></label>
       <label class="field"><span>Message <small>(optional)</small></span><input name="note" maxlength="300" placeholder="e.g. Renewed at the city health office"></label>
       <p class="form-error" role="alert" hidden></p>
       <button class="btn btn-primary btn-block">Send to ${w.org_name}</button>
@@ -43,10 +43,10 @@ export async function workerPage(el, token, { signedIn = false } = {}) {
     const file = fd.get('file');
     const f = { file, expires_on: fd.get('expires_on') || null, issued_on: fd.get('issued_on') || null, reference_no: String(fd.get('reference_no') || '').trim(), note: String(fd.get('note') || '').trim() };
     const fail = (m) => { err.textContent = m; err.hidden = false; };
-    if (!(file && file.size)) return fail('Add a photo of the new licence.');
-    if (w.expires && !f.expires_on) return fail("Enter the new expiry date (it's printed on the licence).");
+    if (!(file && file.size)) return fail('Add a photo of the new license.');
+    if (w.expires && !f.expires_on) return fail("Enter the new expiry date (it's printed on the license).");
     if (f.issued_on && f.expires_on && f.issued_on > f.expires_on) return fail('The date issued is after the expiry date. Please check both.');
-    if (form.querySelector('[name=scan_ok]') && !form.querySelector('[name=scan_ok]').checked) return fail('Tick the box to say you checked the filled-in details against the licence.');
+    if (form.querySelector('[name=scan_ok]') && !form.querySelector('[name=scan_ok]').checked) return fail('Tick the box to say you checked the filled-in details against the license.');
     const btn = form.querySelector('button.btn-primary');
     btn.disabled = true; btn.textContent = 'Sending…';
     try {

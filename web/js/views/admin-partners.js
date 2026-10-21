@@ -47,7 +47,7 @@ export async function partnersTab() {
   const count = (st) => partners.filter((p) => stateOf(p) === st).length;
   const filters = [['all', 'All', partners.length], ['live', 'Live', count('live')], ['paused', 'Need credit', count('paused')], ['hidden', 'Hidden', count('hidden')]];
   return html`<div data-partners-tab>
-    ${when(fresh.length, html`<section class="card"><div class="card-head"><div><h2>Firms asking to be listed</h2><p class="card-sub">From the "For service providers" page. Look once at their DTI/SEC registration or business permit before you list them.</p></div>
+    ${when(fresh.length, html`<section class="card"><div class="card-head"><div><h2>Firms asking to be listed</h2><p class="card-sub">From the "For service providers" page. Each firm confirmed it is registered and licensed; you don't need to check papers.</p></div>
       <span class="chip progress">${fresh.length} new</span></div>
       ${fresh.map((a) => html`<div class="row"><div class="row-main"><div class="row-title">${a.name} · ${PARTNER_CATEGORIES[a.category] || a.category}</div>
         <div class="row-sub">${a.contact_name} · <a href="mailto:${a.email}">${a.email}</a>${a.phone ? ' · ' + a.phone : ''}${a.cities ? ' · ' + a.cities : ''} · ${timeAgo(a.created_at)}</div>
@@ -104,7 +104,7 @@ document.addEventListener('click', (e) => {
 
 // ---- add or edit a firm: what customers see, how to reach them, how they pay; the rest under "More"
 function permitPicker(selected) {
-  const groups = [['business', 'Business permits'], ['person', 'Staff licences'], ['vehicle', 'Vehicles']];
+  const groups = [['business', 'Business permits'], ['person', 'Staff licenses'], ['vehicle', 'Vehicles']];
   const names = types().filter((t) => selected.includes(t.code)).map((t) => t.name.replace(/ \(.*\)$/, ''));
   return html`<details class="pro-permits"><summary><span>Shows on: <b data-permits-sum>${names.length ? names.join(', ') : 'business permits (filing firms only)'}</b></span> <span class="linklike">Change</span></summary>
     ${groups.map(([subj, label]) => html`<fieldset><legend>${label}</legend><div class="pro-permit-grid">
@@ -137,12 +137,12 @@ function editPro(p = {}) {
       <label class="field" data-fee="per_sale_percent" ${fm === 'per_sale_percent' ? '' : 'hidden'}><span>Share of each sale (%)</span><input name="sale_pct" type="number" min="0" max="50" step="0.5" value="${p.sale_pct ?? ''}"></label>
       <label class="field" data-fee="monthly" ${fm === 'monthly' ? '' : 'hidden'}><span>₱ a month</span><input name="monthly_fee_php" type="number" min="0" step="1" value="${p.monthly_fee_php ?? ''}"></label>
     </div>
-    <p class="muted small" data-ins-note ${p.category === 'insurance' ? '' : 'hidden'}>Insurers: without your Insurance Commission licence on file (Money → Today → Settings), only "Flat monthly listing" or "No fee" is allowed.</p>
-    <label class="check"><input type="checkbox" name="verified" ${p.verified ? 'checked' : ''}> <span>I looked once at their DTI/SEC registration or business permit <small class="muted">(and the PRC licence of an accountant). Customers see "Checked when listed". No need to track renewals.</small></span></label>
+    <p class="muted small" data-ins-note ${p.category === 'insurance' ? '' : 'hidden'}>Insurers: without your Insurance Commission license on file (Money → Today → Settings), only "Flat monthly listing" or "No fee" is allowed.</p>
+    <label class="check"><input type="checkbox" name="verified" ${p.verified ? 'checked' : ''}> <span>The firm confirmed it is registered and licensed <small class="muted">(in its application, or to you in writing). You don't check papers, and customers are told PermitPal doesn't.</small></span></label>
     <label class="check"><input type="checkbox" name="published" ${p.published ? 'checked' : ''}> <span>Show to customers</span></label>
-    <details class="pro-more"><summary><b>More</b> <span class="muted small">licence shown to customers, description, website, a separate email for statements, notes</span></summary>
+    <details class="pro-more"><summary><b>More</b> <span class="muted small">license shown to customers, description, website, a separate email for statements, notes</span></summary>
       <div class="grid2">
-        <label class="field"><span>Licence or accreditation <small>(optional, shown)</small></span><input name="licence" maxlength="200" value="${p.licence || ''}" placeholder="e.g. CPA, PRC no. 0123456"></label>
+        <label class="field"><span>License or accreditation <small>(optional, shown)</small></span><input name="licence" maxlength="200" value="${p.licence || ''}" placeholder="e.g. CPA, PRC no. 0123456"></label>
         <label class="field"><span>Website <small>(only you see it)</small></span><input name="website" maxlength="300" value="${p.website || ''}" placeholder="https://"></label>
         <label class="field"><span>Send statements to <small>(only if not the email above)</small></span><input type="email" name="billing_email" maxlength="160" value="${p.billing_email || ''}"></label>
         <label class="field"><span>Agreement notes <small>(only you see it)</small></span><input name="commission_terms" maxlength="500" value="${p.commission_terms || ''}" placeholder="e.g. Signed 1 Nov 2026"></label>

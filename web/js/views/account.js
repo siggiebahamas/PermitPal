@@ -12,7 +12,7 @@ import { KINDS, teamAccess, connectionsCard } from './network.js';
 import { mfaSection, requireCard } from './mfa.js';
 import { addonSection, wireAddons, showBrandCard } from './plus.js';
 import { brandPage, brandTabShown } from './brand.js';
-import { billToggle, freeCard, planCard, PLAN_ORDER, compareTable } from './pricing.js';
+import { billToggle, freeCard, planCard, PLAN_ORDER, PLANS, compareTable } from './pricing.js';
 import { planTotal } from '../prices.js';
 import * as db from 'pp/data';
 
@@ -297,7 +297,7 @@ export async function settings(el, section) {
 
     <section class="card"><div class="card-head"><div><h2>What this workspace is for</h2><p class="card-sub">Team types add a board for everything you're responsible for. 30-day free trial.</p></div></div>
       <form id="kind-form">${Object.entries(KINDS).filter(([k, v]) => !v.hidden || org.kind === k).map(([k, v]) => html`<label class="radio-card ${org.kind === k ? 'on' : ''}"><input type="radio" name="kind" value="${k}" ${org.kind === k ? 'checked' : ''} ${isOrgAdmin() ? '' : 'disabled'}>
-        <span><b>${v.title}</b><small>${k === 'business' ? 'Free. Track your own permits, vehicles and staff licences.' : v.pitch}</small></span></label>`)}
+        <span><b>${v.title}</b><small>${k === 'business' ? 'Free. Track your own permits, vehicles and staff licenses.' : v.pitch}</small></span></label>`)}
         ${when(isOrgAdmin(), html`<button class="btn btn-primary">Save</button>`)}</form>
     </section>
 
@@ -410,25 +410,30 @@ function billingSection(pay) {
   const org = S.org;
   const acc = teamAccess();
   const k = KINDS[org.kind || 'business'];
-  const plan = S.plans.find((p) => p.id === k?.plan);
+  // A property workspace is on Small property (up to 20 tenants) or Mall & property.
+  const planId = org.kind === 'property' && org.plan_id === 'property_s' ? 'property_s' : k?.plan;
+  const plan = S.plans.find((p) => p.id === planId);
   const price = (id) => Number(S.plans.find((p) => p.id === id)?.price_php_monthly || 0);
+  const choices = org.kind === 'property' ? ['property_s', 'property'] : [k?.plan];
   const status = org.kind === 'business' ? html`<p>This workspace is a <b>single business</b>: PermitPal is <b>free</b>, with no limits on businesses, vehicles or team members.</p>`
     : acc.why === 'plan' ? html`<p>You're on the <b>${plan?.name}</b> plan${org.plan_expires_at ? html`, paid until <b>${fmtDate(org.plan_expires_at.slice(0, 10))}</b>` : ''}.</p>`
-    : acc.why === 'trial' ? html`<p>You're on a <b>free trial</b> of ${plan?.name}: ${plural(acc.days, 'day')} left. Choose how to pay below to keep your board after the trial.</p>`
+    : acc.why === 'trial' ? html`<p>You're on a <b>free trial</b> of ${org.kind === 'property' ? 'the property plans' : plan?.name}: ${plural(acc.days, 'day')} left. Choose how to pay below to keep your board after the trial.</p>`
     : acc.why === 'staff' ? html`<p>Staff access: team tools are on.</p>`
-    : html`<p>Your free trial of ${plan?.name} has ended. Your data is safe; pay below to open your board again.</p>`;
+    : html`<p>Your free trial has ended. Your data is safe; pay below to open your board again.</p>`;
   const cta = (id) => {
-    if (id === k?.plan) return html`<span class="chip ok">Your plan</span>`;
+    if (acc.why === 'plan' && id === planId) return html`<span class="chip ok">Your plan</span>`;
+    if (PLANS[id].kind === org.kind) return html`<span class="chip progress">${acc.why === 'trial' ? 'In your free trial' : 'Pay for it above'}</span>`;
     if (!isOrgAdmin()) return '';
-    return html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${id}">Try free for 30 days</button>`;
+    return html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${PLANS[id].kind}">Try free for 30 days</button>`;
   };
   return html`<section class="card"><h2>Your plan</h2>${status}
-      ${org.kind !== 'business' && plan && acc.why !== 'plan' && acc.why !== 'staff' ? payBox(plan, pay) : ''}</section>
+      ${org.kind !== 'business' && plan && acc.why !== 'plan' && acc.why !== 'staff'
+        ? choices.map((id) => S.plans.find((p) => p.id === id)).filter(Boolean).map((p) => html`${choices.length > 1 ? html`<h3 class="h4 pay-for">${p.name}: ${PLANS[p.id]?.who.split(': ')[1] || ''}</h3>` : ''}${payBox(p, pay)}`) : ''}</section>
     <h3 class="section-label">Plans</h3>
     <p class="pp-lead">Free for your own business, forever. Team plans are for people who look after many businesses, vehicles or tenants.</p>
     ${billToggle('How often to pay for a team plan')}
     <div class="pp-grid four">${freeCard(org.kind === 'business' ? html`<span class="chip ok">Your plan</span>` : '')}
-      ${PLAN_ORDER.map((id) => planCard(id, price(id), cta(id), { current: id === k?.plan }))}</div>
+      ${PLAN_ORDER.map((id) => planCard(id, price(id), cta(id), { current: acc.why === 'plan' ? id === planId : PLANS[id].kind === org.kind, trialLine: PLANS[id].kind !== org.kind }))}</div>
     ${compareTable()}
     <p class="fineprint">Single businesses stay free. Nothing is charged by itself, and you can stop anytime: your data is never locked or deleted, and you can always export it.</p>
     ${addonSection(pay)}`;

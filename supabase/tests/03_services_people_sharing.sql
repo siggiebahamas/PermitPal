@@ -1,4 +1,4 @@
--- People (staff licences), costs, sharing, professionals and quote requests, workspaces, reminders for staff.
+-- People (staff licenses), costs, sharing, professionals and quote requests, workspaces, reminders for staff.
 -- (Done-for-you orders were retired in migration 20261007001100; their checks were removed.)
 -- Always ends in an exception so nothing is kept; read PASS/FAIL from the message.
 
@@ -27,9 +27,9 @@ insert into t_results (step, ok, detail) select 'cost is stored and shown in sta
   from public.requirement_status where id = (select req from t_ids);
 
 update t_ids set person = public.create_person(org, 'Juan Driver', 'Driver', null, array['drivers_license','nbi_clearance']);
-insert into t_results (step, ok, detail) select 'person gets the chosen licences', count(*) = 2, string_agg(name, ', ')
+insert into t_results (step, ok, detail) select 'person gets the chosen licenses', count(*) = 2, string_agg(name, ', ')
   from public.requirement_status where person_id = (select person from t_ids);
-insert into t_results (step, ok, detail) select 'person licence shows the person''s name', bool_and(subject_name = 'Juan Driver' and subject = 'person'), string_agg(subject_name, ',')
+insert into t_results (step, ok, detail) select 'person license shows the person''s name', bool_and(subject_name = 'Juan Driver' and subject = 'person'), string_agg(subject_name, ',')
   from public.requirement_status where person_id = (select person from t_ids);
 select public.add_requirement('person', person, null, 'health_certificate') from t_ids;
 insert into t_results (step, ok, detail) select 'add_requirement works for people', count(*) = 3, count(*)::text

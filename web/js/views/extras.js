@@ -11,7 +11,7 @@ const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct
 
 // ================================================================ licensed professionals
 // Firms that file and renew in person (liaison, accounting, fire safety...). Customers deal with
-// them directly; PermitPal only checks their licence, lists them, and sends them quote requests.
+// them directly; PermitPal only checks their license, lists them, and sends them quote requests.
 export const PARTNER_CATEGORIES = {
   liaison: 'Permit & registration filing', bookkeeping: 'Accounting, bookkeeping & BIR', fire_safety: 'Fire safety & extinguishers',
   pest_control: 'Pest control', health_clinic: 'Health cards & medical exams', emission_testing: 'Emission testing',
@@ -31,7 +31,7 @@ export function placementFor(r, itemKey) {
 export function placementLine(p, r) {
   return html`<div class="ck-partner" data-placement="${p.id}">
     <span class="ck-partner-tag">Partner</span>
-    <span class="ck-partner-text"><b>${p.partner_name}</b> · ${p.headline}${p.verified ? html` <small class="muted">· checked when listed</small>` : ''}</span>
+    <span class="ck-partner-text"><b>${p.partner_name}</b> · ${p.headline}</span>
     <span class="ck-partner-acts">${canEdit() ? html`<button type="button" class="linklike" data-act="placement-quote" data-id="${p.partner_id}" data-req="${r.id}" data-pl="${p.id}">Request a quote</button> · ` : ''}<button type="button" class="linklike" data-act="placement-why">Why this?</button></span>
   </div>`;
 }
@@ -53,9 +53,9 @@ on('placement-quote', async (ds) => {
   partnerIntro(ds.id, ds.req || null, ds.pl);
 });
 on('placement-why', () => openModal('Why am I seeing this?', html`
-  <p>PermitPal shows one licensed firm on a checklist step when it matches the step and your city. The firm pays PermitPal to be listed there.</p>
+  <p>PermitPal shows one firm on a checklist step when it matches the step and your city. The firm pays PermitPal to be listed there.</p>
   <ul class="small"><li>It never changes the firm's price, and you don't have to use them.</li>
-    <li>We check each firm's business permit (and professional licence, where one is needed) before listing it.</li>
+    <li>Firms tell us they are registered and licensed. PermitPal doesn't check their papers: ask to see them before you hire.</li>
     <li>We only share your details if you press "Request a quote".</li></ul>
   <p class="muted small">Rather not see these? Turn them off in <a href="#/settings">Settings</a>.</p>`));
 let proCat = 'all';
@@ -71,9 +71,9 @@ export async function partners(el, params = new URLSearchParams()) {
   const myCities = [...new Set(S.data.locations.map((l) => l.city).filter(Boolean))];
   const shown = list.filter((p) => (proCat === 'all' || p.category === proCat) && (proCity === 'all' || !p.cities?.length || p.cities.includes(proCity)));
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Find a professional</h1><p class="muted">Licensed firms that file and renew permits in person, so you don't have to queue. You deal with them directly.</p></div></div>
+    <div class="page-head"><div><h1>Find a professional</h1><p class="muted">Firms that file and renew permits in person, so you don't have to queue. You deal with them directly.</p></div></div>
     <section class="card promises pro-promises">
-      <div class="promise">${ICON.check}<div><b>Checked when listed</b><span>Firms marked "Checked when listed" showed us their business registration (and, for accountants, their PRC licence) when they joined. Each firm is responsible for keeping its licences current.</span></div></div>
+      <div class="promise">${ICON.check}<div><b>Independent firms</b><span>Each firm told us it is registered and holds the licenses its work needs. PermitPal doesn't check their papers, so ask to see them before you hire.</span></div></div>
       <div class="promise">${ICON.check}<div><b>Straight to them</b><span>Your request goes directly to the firm. They reply within 1 business day.</span></div></div>
       <div class="promise">${ICON.check}<div><b>No obligation</b><span>Compare quotes, ask questions, and only hire who you trust.</span></div></div>
     </section>
@@ -82,7 +82,7 @@ export async function partners(el, params = new URLSearchParams()) {
         ${when(cities.length, html`<select data-pro-city aria-label="City"><option value="all">All cities</option>${cities.map((c) => html`<option value="${c}" ${proCity === c ? 'selected' : ''}>${c}${myCities.includes(c) ? ' (yours)' : ''}</option>`)}</select>`)}
       </div>
       ${shown.length ? html`<div class="svc-grid">${shown.map(proCard)}</div>` : html`<p class="muted">No firms match yet. Try "All cities".</p>`}`
-      : empty("We're onboarding licensed firms", 'Liaison firms, accountants and fire-safety providers in your area will appear here once their licences are checked.')}
+      : empty("We're onboarding licensed firms", 'Liaison firms, accountants and fire-safety providers in your area will appear here once their licenses are checked.')}
     ${when(mine.length, html`<section class="card"><div class="card-head"><h2>Your quote requests</h2></div>
       ${mine.map((r) => { const p = list.find((x) => x.id === r.partner_id); return html`<div class="line"><span class="line-main"><b>${p?.name || 'Professional'}</b><small>${r.note || ''} · ${timeAgo(r.created_at)}</small></span>
         ${has('leads') && canEdit() && ['requested', 'introduced'].includes(r.status)
@@ -98,7 +98,7 @@ document.addEventListener('change', (e) => {
 
 function proCard(p) {
   return html`<section class="card svc partner">
-    <div class="svc-top"><h2>${p.name}</h2>${when(p.verified, html`<span class="chip ok pro-badge">${ICON.check} Checked when listed</span>`)}</div>
+    <div class="svc-top"><h2>${p.name}</h2></div>
     <p class="muted small pro-cat">${PARTNER_CATEGORIES[p.category] || ''}${p.licence ? ' · ' + p.licence : ''}</p>
     <p class="svc-sum">${p.description}</p>
     ${when(p.services, html`<p class="small"><b>Handles:</b> ${p.services}</p>`)}
@@ -146,7 +146,7 @@ export function partnerSuggestions(r) {
   const fit = (partnersCache || []).filter(fits).slice(0, 3);
   return html`<section class="card pro-help"><div class="card-head"><div><h2>Rather not queue for this?</h2>
       <p class="card-sub">Licensed firms${city ? ' serving ' + city : ''} can file it for you. You deal with them directly.</p></div></div>
-    ${fit.length ? fit.map((p) => html`<div class="line"><span class="line-main"><b>${p.name}${p.verified ? html` <span class="chip ok pro-badge">${ICON.check} Checked when listed</span>` : ''}</b>
+    ${fit.length ? fit.map((p) => html`<div class="line"><span class="line-main"><b>${p.name}</b>
       <small>${PARTNER_CATEGORIES[p.category] || ''}${p.cities?.length ? ' · ' + p.cities.slice(0, 3).join(', ') : ''}</small></span>
       ${when(canEdit(), html`<button class="btn btn-sm btn-soft" data-act="partner-intro" data-id="${p.id}" data-req="${r.id}">Request a quote</button>`)}</div>`)
       : html`<p class="muted small">No listed firm for this yet. <a href="#/pros">See all professionals</a>.</p>`}

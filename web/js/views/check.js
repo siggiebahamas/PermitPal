@@ -1,5 +1,5 @@
 // The automatic permit check (Plus). PermitPal runs it every morning and whenever this page opens:
-//   Fix these        facts from your own records (expired, no copy, no expiry date, a role's licence missing)
+//   Fix these        facts from your own records (expired, no copy, no expiry date, a role's license missing)
 //   Please confirm   things that look off but might be right, asked as questions ("It's right" closes them)
 //   Coming up        renewals in the next 60 days
 // It never says anything was checked with the government. Without Plus you see how many it found.

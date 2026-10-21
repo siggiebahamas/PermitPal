@@ -59,7 +59,7 @@ async function main() {
           ${(i.files || []).length ? html`<span class="tp-files">${i.files.map((f) => html`<button class="btn btn-sm btn-soft no-print" data-path="${f.path}" data-name="${f.name}">Download copy</button>`)}</span>` : ''}</div>
           <span class="chip ${cls}">${t}</span></div>`; })}`)}
       ${items.length ? '' : html`<p class="share-msg">No permits listed yet.</p>`}
-      ${data.staff && data.staff.licences ? html`<div class="line share-line"><div class="share-main"><b>Staff licences</b>
+      ${data.staff && data.staff.licences ? html`<div class="line share-line"><div class="share-main"><b>Staff licenses</b>
         <small>${data.staff.licences} for ${data.staff.people} ${data.staff.people === 1 ? 'person' : 'people'}: ${data.staff.ok} current${data.staff.due ? `, ${data.staff.due} due soon` : ''}${data.staff.expired ? `, ${data.staff.expired} expired` : ''}</small></div></div>` : ''}
     </section>
     ${data.recipient ? '' : html`<section class="card no-print" id="ask"><h2>Get an email when these are renewed</h2>

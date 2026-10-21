@@ -324,7 +324,7 @@ function coveredDetails() {
   return html`<details class="cx-covers"><summary>Which permits are included?</summary>
     ${b ? html`<p><b>For a branch:</b> ${typeNames(b.covers).join(', ')}.</p>` : ''}
     ${v ? html`<p><b>For a vehicle:</b> ${typeNames(v.covers).join(', ')}.</p>` : ''}
-    <p class="muted">Not included (we quote these separately): FDA or DOH licences, franchises, contractor licences, staff licences and health certificates, and new permits you don't have yet.</p></details>`;
+    <p class="muted">Not included (we quote these separately): FDA or DOH licenses, franchises, contractor licenses, staff licenses and health certificates, and new permits you don't have yet.</p></details>`;
 }
 
 const fineprint = () => html`<p class="muted small fineprint">Care covers our service fee for the yearly permits listed on each plan. Government fees, premiums and penalties are paid at cost with official receipts. Cancel anytime: the plan runs to the end of what you've paid, with no refund for the rest of that period.

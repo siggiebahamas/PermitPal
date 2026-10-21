@@ -1,5 +1,5 @@
 /* PermitPal — phone first. "Calendar Horizon" look on the warm cream canvas of Buzz and Nifti:
-   crisp white cards, dark-blue actions, bold sans headlines, one colour per status. */
+   crisp white cards, dark-blue actions, bold sans headlines, one color per status. */
 :root {
   --bg: #F8F6F2; --bg-grad: none; --card: #fff; --border: #E9E4DB; --text: #1F2A44; --muted: #4B5568; --heading: #0B1B3A;
   --brand: #1B4DB5; --brand-ink: #fff; --accent: #1B4DB5; --accent-soft: #E3ECFF; --accent-ink: #1B4DB5; --link: #1B4DB5;
@@ -36,7 +36,7 @@ h1, h2, h3, .card-sub, .row-title, .row-sub, .brow-name, .brow-req, .line-main, 
 .skip-link { position: absolute; left: 8px; top: -64px; z-index: 1000; background: var(--heading); color: #fff; border: 0; border-radius: 10px; padding: 10px 16px; font: inherit; font-weight: 700; }
 .skip-link:focus { top: 8px; }
 main:focus, .modal:focus { outline: none; }
-/* links inside sentences are underlined, not told apart by colour alone */
+/* links inside sentences are underlined, not told apart by color alone */
 p a:not(.btn), li a:not(.btn), .check a, .tagline a { text-decoration: underline; text-underline-offset: 2px; }
 .card-head h1 { margin: 0; font-size: 18px; }
 .folder-open { margin: 2px 10px 6px; font-size: 14.5px; }
@@ -282,7 +282,7 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .tpin.progress { background: var(--s-prog-bg); color: var(--s-prog); } .tpin.ok { background: var(--s-ok-bg); color: var(--s-ok); }
 .lundated .tpin { display: inline-block; }
 
-/* rows: coloured date tile · name / who · status in colour · action */
+/* rows: colored date tile · name / who · status in color · action */
 .row, .notif, .request, .doc-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 10px; border-radius: 14px; flex-wrap: wrap; }
 .row + .row, .doc-row + .doc-row, .notif + .notif, .request + .request { border-top: 1px solid var(--border); }
 .row { flex-wrap: nowrap; }
@@ -834,7 +834,7 @@ tr.imp-bad td { background: var(--s-over-bg); }
   .log-table td:nth-child(2) { grid-row: 2; grid-column: 1 / -1; color: var(--muted); font-size: 13.5px; }
   .log-table td:nth-child(3) { grid-row: 3; grid-column: 1 / -1; }
 }
-/* Businesses list: dot + name, the permit to deal with next (coloured like the dot), days box on the right */
+/* Businesses list: dot + name, the permit to deal with next (colored like the dot), days box on the right */
 .blist { padding: 0; }
 .blist-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 16px 20px 12px; border-bottom: 2px solid var(--heading); }
 .blist-head h2 { margin: 0; font-size: 19px; }
@@ -1339,7 +1339,7 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .lane.empty p { margin: 0; }
 .todo-n { white-space: nowrap; flex: none; }
 
-/* ---------- PermitPal Plus and staff licences ---------- */
+/* ---------- PermitPal Plus and staff licenses ---------- */
 .plus-perks { margin: 8px 0 14px; padding-left: 20px; }
 .plus-perks li { margin: 6px 0; }
 .staff-calc { margin-top: 6px; }
@@ -1547,10 +1547,6 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .pp-save { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; font-weight: 800; color: #145C3B; font-size: 15.5px; }
 .pp-save svg, .pp-checks svg { width: 18px; height: 18px; flex: none; fill: none; stroke-width: 2.6; }
 .pp-save svg { stroke: #145C3B; }
-.year-strip { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; margin: 6px 0 2px; }
-.year-strip span { height: 30px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
-.ys-paid { background: var(--accent-soft); color: var(--accent-ink); }
-.ys-free { grid-column: span 2; background: #145C3B; color: #fff; font-weight: 800 !important; letter-spacing: .3px; }
 .pp-checks { list-style: none; padding: 0; margin: 4px 0 12px; display: grid; gap: 8px; }
 .pp-checks li { display: flex; gap: 9px; align-items: flex-start; font-size: 15px; line-height: 1.35; }
 .pp-checks svg { stroke: var(--green-ink); margin-top: 1px; background: var(--green-bg); border-radius: 50%; padding: 2px; width: 20px; height: 20px; }
@@ -1571,17 +1567,7 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .pp-yes svg { width: 20px; height: 20px; stroke: var(--green-ink); fill: none; stroke-width: 2.6; vertical-align: middle; }
 .pp-no { color: var(--muted); font-weight: 700; }
 .pp-upsell-price b { font-size: 22px; color: var(--heading); }
-/* staff licences: price per person goes down as the team grows */
-.ladder { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-items: end; margin: 12px 0 4px; }
-.rung { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
-.rung-off { font-style: normal; font-size: 11.5px; font-weight: 800; color: #145C3B; background: var(--green-bg); border-radius: 999px; padding: 2px 7px; margin-bottom: 4px; white-space: nowrap; }
-.rung-blank { visibility: hidden; }
-.rung-price { font-size: 18px; font-weight: 800; color: var(--heading); }
-.rung.free .rung-price { color: #145C3B; }
-.rung-bar { width: 100%; border-radius: 8px 8px 0 0; background: var(--accent); margin-top: 4px; }
-.rung.free .rung-bar { background: #2A9D63; }
-.rung-who { font-size: 13px; font-weight: 700; color: var(--heading); margin-top: 6px; line-height: 1.2; }
-.rung small { font-size: 12px; color: var(--muted); }
+/* staff licenses: price per person goes down as the team grows */
 .ladder-cap { text-align: center; font-weight: 700; color: var(--heading); margin: 6px 0 10px; font-size: 15px; }
 .staff-ex { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
 .staff-ex > div { border: 1px solid var(--border); border-radius: 10px; padding: 8px; text-align: center; display: flex; flex-direction: column; gap: 2px; background: #fff; }
@@ -1644,3 +1630,69 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .pro-more summary { cursor: pointer; padding: 6px 0; }
 .pro-permits summary .linklike { white-space: nowrap; padding: 0; }
 @media (max-width: 380px) { .lp-top .wordmark { font-size: 17px; } .lp-top .brand img { width: 26px; height: 26px; } .lp-top .btn-sm { padding: 7px 9px; font-size: 14px; } }
+
+/* Plans: a picture of the board, the big wins with icons, everything included one tap away */
+.pp-preview { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 8px 10px; margin: 12px 0 4px; box-shadow: 0 6px 16px -14px rgba(11, 27, 58, .5); }
+.pv-head { display: flex; justify-content: space-between; align-items: center; padding: 0 2px 6px; border-bottom: 1px solid var(--rule); margin-bottom: 4px; }
+.pv-head b { font-size: 13px; color: var(--heading); }
+.pv-dots i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--border); margin-left: 3px; }
+.pv-row { display: flex; align-items: center; gap: 6px; padding: 5px 2px; font-size: 13px; }
+.pv-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 600; }
+.pv-pill { font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.pv-ok { background: var(--s-ok-bg); color: var(--s-ok); }
+.pv-soon { background: var(--s-soon-bg); color: var(--s-soon); }
+.pv-late { background: var(--s-over-bg); color: var(--s-over); }
+.pv-btn { font-size: 11px; font-weight: 800; color: var(--brand-ink); background: var(--brand); border-radius: 999px; padding: 3px 8px; }
+.pp-wins { list-style: none; padding: 0; margin: 2px 0 10px; display: grid; gap: 10px; }
+.pp-wins li { display: flex; gap: 10px; align-items: flex-start; }
+.pw-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); display: grid; place-items: center; flex: none; }
+.pw-icon svg { width: 20px; height: 20px; stroke: var(--accent-ink); fill: none; stroke-width: 1.9; }
+.pp-wins b { display: block; color: var(--heading); font-size: 15.5px; line-height: 1.25; }
+.pp-wins small { display: block; color: var(--muted); font-size: 14px; line-height: 1.35; }
+.pp-bonus { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.pp-bonus span { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: #145C3B; background: var(--green-bg); border-radius: 999px; padding: 4px 10px 4px 6px; }
+.pp-bonus svg { width: 15px; height: 15px; stroke: #145C3B; fill: none; stroke-width: 2.8; }
+.pp-bonus s { color: #3E6B55; font-weight: 600; }
+.pp-all { border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); margin: 0 0 12px; }
+.pp-all summary { cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 10px 0; font-weight: 700; color: var(--heading); font-size: 15px; list-style: none; }
+.pp-all summary::-webkit-details-marker { display: none; }
+.pp-all summary b { background: var(--accent-soft); color: var(--accent-ink); border-radius: 999px; padding: 1px 8px; font-size: 13px; }
+.pp-all summary::after { content: "Show ▾"; margin-left: auto; font-size: 13px; color: var(--link); font-weight: 700; }
+.pp-all[open] summary::after { content: "Hide ▴"; }
+.pp-word { font-size: 13px; font-weight: 700; color: var(--heading); }
+/* the free plan spans the row on wide screens */
+.pp-free { grid-column: 1 / -1; }
+@media (min-width: 900px) {
+  .pp-free { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 24px; align-items: start; }
+  .pp-free .pp-preview { margin-top: 0; }
+}
+.pp-free-a { display: flex; flex-direction: column; }
+/* yearly: the next 12 months as calendar pages, the last 2 free */
+.year-cal { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; margin: 8px 0 4px; }
+.yc { border: 1px solid var(--border); border-radius: 7px; background: #fff; overflow: hidden; display: flex; flex-direction: column; align-items: center; min-height: 44px; }
+.yc i { display: block; width: 100%; height: 7px; background: var(--accent); }
+.yc b { font-size: 12.5px; font-weight: 700; color: var(--heading); padding-top: 6px; }
+.yc.yc-free { border-color: #145C3B; background: var(--green-bg); }
+.yc.yc-free i { background: #145C3B; }
+.yc.yc-free b { color: #145C3B; padding-top: 3px; }
+.yc small { font-size: 10px; font-weight: 800; color: #fff; background: #145C3B; border-radius: 999px; padding: 0 6px; margin: 2px 0 4px; letter-spacing: .3px; }
+/* staff licenses: what's tracked, and a price ladder whose bars all stand on one line */
+.staff-tracks { margin: 10px 0 6px; }
+.staff-tracks > b { display: block; color: var(--heading); font-size: 15px; margin-bottom: 6px; }
+.staff-tracks ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.staff-tracks li { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); }
+.staff-tracks li.more { background: #fff; border: 1px dashed var(--accent-ink); }
+.ladder { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 14px 0 4px; }
+.rung { display: grid; grid-template-rows: 24px 26px 76px auto auto; justify-items: center; text-align: center; min-width: 0; }
+.rung-off-slot { display: flex; align-items: flex-start; }
+.rung-off { font-style: normal; font-size: 11.5px; font-weight: 800; color: #145C3B; background: var(--green-bg); border-radius: 999px; padding: 2px 7px; white-space: nowrap; }
+.rung-price { font-size: 18px; font-weight: 800; color: var(--heading); line-height: 26px; }
+.rung.free .rung-price { color: #145C3B; }
+.rung-track { width: 100%; height: 76px; display: flex; align-items: flex-end; border-bottom: 2px solid var(--heading); }
+.rung-bar { display: block; width: 100%; border-radius: 8px 8px 0 0; background: var(--accent); min-height: 5px; }
+.rung.free .rung-bar { background: #2A9D63; }
+.rung-who { font-size: 13.5px; font-weight: 800; color: var(--heading); margin-top: 6px; line-height: 1.2; }
+.rung small { font-size: 12px; color: var(--muted); line-height: 1.25; }
+.pay-for { margin: 14px 0 0; }
+.ladder-head { margin: 14px 0 0; font-size: 13.5px; font-weight: 700; color: var(--muted); text-align: center; }
+.ladder-head + .ladder { margin-top: 6px; }

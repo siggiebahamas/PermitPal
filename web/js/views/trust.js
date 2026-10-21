@@ -185,7 +185,7 @@ function settingsTab(page) {
     </div>
     <label class="toggle"><div><div>Page is live</div><div class="muted small">Turned off, the page and badges say it's not available.</div></div><input type="checkbox" name="live" ${page.live ? 'checked' : ''}><span class="switch"></span></label>
     <label class="toggle"><div><div>Show vehicles</div><div class="muted small">Registration and insurance of ${page.business_id ? "this business's" : 'your'} vehicles.</div></div><input type="checkbox" name="show_vehicles" ${page.show_vehicles ? 'checked' : ''}><span class="switch"></span></label>
-    <label class="toggle"><div><div>Show staff licence counts</div><div class="muted small">For example "12 staff licences: 11 current". Never names.</div></div><input type="checkbox" name="show_staff" ${page.show_staff ? 'checked' : ''}><span class="switch"></span></label>
+    <label class="toggle"><div><div>Show staff license counts</div><div class="muted small">For example "12 staff licenses: 11 current". Never names.</div></div><input type="checkbox" name="show_staff" ${page.show_staff ? 'checked' : ''}><span class="switch"></span></label>
     <label class="toggle"><div><div>Show the last 4 characters of permit numbers</div><div class="muted small">Like •••• 0042, so clients can match the paper without the full number being public.</div></div><input type="checkbox" name="show_refs" ${page.show_refs ? 'checked' : ''}><span class="switch"></span></label>
     <h3 class="h4">Who can download copies</h3>
     ${Object.entries(FILES).map(([k, [t, d]]) => html`<label class="check"><input type="radio" name="files" value="${k}" ${page.files === k ? 'checked' : ''}> <span><b>${t}</b><br><small class="muted">${d}</small></span></label>`)}

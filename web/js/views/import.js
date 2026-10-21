@@ -88,7 +88,7 @@ export function openImport(kind = 'vehicles') {
             ${when(noted.length, html` <span class="due soon">${plural(noted.length, 'row')} with a note: read ${noted.length === 1 ? 'it' : 'them'} before importing.</span>`)}
             ${when(res.missing.length, html`<br><span class="muted small">Not in your file (fine to leave out): ${res.missing.join(', ')}.</span>`)}</p>
           ${when(cur() === 'staff' && has('plus') && good.length > peopleCap() - (S.data.people || []).length, html`<p class="banner warn"><span>Your plan covers ${peopleCap()} people and you track ${(S.data.people || []).length}, so only the first ${Math.max(0, peopleCap() - (S.data.people || []).length)} of these will go in.
-            <a href="#/settings/billing?staff=1">Add staff licences</a> first to bring everyone in.</span></p>`)}
+            <a href="#/settings/billing?staff=1">Add staff licenses</a> first to bring everyone in.</span></p>`)}
           ${when(K.dates, html`<p class="muted small">Check the dates below read the way you meant before importing.</p>`)}
           <div class="table-wrap"><table class="table import-table"><thead><tr><th>Row</th>${K.head.map((h) => html`<th>${h}</th>`)}<th>Result</th></tr></thead><tbody>
           ${res.rows.map((r) => html`<tr class="${r.problems.length ? 'imp-bad' : r.f.action === 'skip' ? 'imp-same' : r.notes.length ? 'imp-note' : ''}"><td>${r.line}</td>

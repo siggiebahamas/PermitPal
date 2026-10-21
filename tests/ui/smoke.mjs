@@ -232,7 +232,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const order = await page.evaluate(() => [...document.querySelectorAll('.sidebar .nav-secondary > *')].map((e) => e.classList.contains('nav-group') ? e.textContent.trim().toUpperCase() : e.dataset.nav));
     check('menu: Notifications above TOOLS, then ACCOUNT', order[0] === 'notifications' && order[1] === 'TOOLS' && order.indexOf('ACCOUNT') > order.indexOf('sharing'), order.join(','));
 
-    // Removing a staff licence that doesn't apply returns to that staff member (it used to go to a missing vehicle page).
+    // Removing a staff license that doesn't apply returns to that staff member (it used to go to a missing vehicle page).
     await go('#/people');
     await page.click('main [data-act=person-add]');
     await page.fill('.modal [name=full_name]', 'Ana Cruz');
@@ -247,7 +247,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.waitForSelector('.modal');
     await page.click('.modal button[type=submit]');
     await page.waitForTimeout(500);
-    check('removing a staff licence returns to that staff member', personHash.startsWith('#/people/') && (await page.evaluate(() => location.hash)) === personHash, personHash);
+    check('removing a staff license returns to that staff member', personHash.startsWith('#/people/') && (await page.evaluate(() => location.hash)) === personHash, personHash);
     await go('#/people');
     check('staff cards: the name has a teal circle with initials', await page.evaluate(() =>
       [...document.querySelectorAll('main .card.entity')].some((c) => c.querySelector('h2')?.textContent.includes('Ana Cruz') && c.querySelector('.ava')?.textContent.trim() === 'AC')));
@@ -944,7 +944,10 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.fill('#apply-form [name=contact_name]', 'Ana Cruz'); await page.fill('#apply-form [name=email]', 'ana@makatifire.ph');
   await page.fill('#apply-form [name=website]', 'makatifire.ph'); await page.click('#apply-form button'); await page.waitForTimeout(200);
   check('apply: a website without https:// is caught', /https:\/\//.test(await page.textContent('#apply-form .form-error')));
-  await page.fill('#apply-form [name=website]', ''); await page.click('#apply-form button'); await page.waitForTimeout(400);
+  await page.fill('#apply-form [name=website]', ''); await page.click('#apply-form button'); await page.waitForTimeout(200);
+  check('apply: the firm must confirm it is registered and licensed (PermitPal doesn\'t check)', /confirm your business is registered and licensed/.test(await page.textContent('#apply-form .form-error'))
+    && /PermitPal doesn't check this/.test(await page.textContent('#apply-form .attest')));
+  await page.check('#apply-form [name=attested]'); await page.click('#apply-form button'); await page.waitForTimeout(400);
   check('apply: sent, with a clear next step', /Thanks, we got it/.test(await page.textContent('main')) && /3 business days/.test(await page.textContent('main')));
   check('apply: no sideways scroll on a phone', (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1);
   check('apply: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
@@ -1017,7 +1020,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.click('main [data-pro-filter=all]');
   await cebu.locator('[data-act=pro-edit]').click(); await page.waitForSelector('#modal-root [name=fee_model]');
   const form = page.locator('#modal-root form');
-  check('partners admin: one email for quote requests and statements; the extras are tucked under More', (await form.locator('[name=contact_email]').isVisible()) && !(await form.locator('[name=billing_email]').isVisible()) && !(await form.locator('[name=licence]').isVisible()));
+  check('partners admin: one email for quote requests and statements; the extras are tucked under More', (await form.locator('[name=contact_email]').isVisible()) && !(await form.locator('[name=billing_email]').isVisible()) && !(await form.locator('[name=license]').isVisible()));
   check('partners admin: permits are picked by name, not typed as codes', (await form.locator('[name=type_codes]').count()) === 0 && (await form.locator('[name=types]').count()) > 10);
   await form.locator('[name=fee_model]').selectOption('monthly'); await page.waitForTimeout(100);
   check('partners admin: choosing "Flat monthly listing" shows only that fee box', await form.locator('[data-fee=monthly]').isVisible() && await form.locator('[data-fee=per_lead]').isHidden());
@@ -1058,10 +1061,10 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   }
   check('phone: the new pages have no sideways scroll at 360px', bad.length === 0, bad.join(', '));
   await page.evaluate(() => { location.hash = '#/care'; }); await page.waitForTimeout(450);
-  check('care: a licence outside the plan is listed as "Not in Care, quoted per job"',
+  check('care: a license outside the plan is listed as "Not in Care, quoted per job"',
     /Not in Care, quoted per job: FDA License to Operate/.test(await page.textContent('main .care-row:has-text("Visayas Sari-Sari Distribution Co. · Main branch")')));
   await page.evaluate(() => { location.hash = '#/care/start'; }); await page.waitForTimeout(450);
-  check('care start: a branch with extra licences says how many are quoted separately', /1 quoted separately/.test(await page.textContent('main .care-pick:has-text("Visayas Sari-Sari Distribution Co. · Main branch")')));
+  check('care start: a branch with extra licenses says how many are quoted separately', /1 quoted separately/.test(await page.textContent('main .care-pick:has-text("Visayas Sari-Sari Distribution Co. · Main branch")')));
   await page.evaluate(() => { location.hash = '#/care'; }); await page.waitForTimeout(450);
   const hilux = page.locator('main .care-row', { hasText: 'Toyota Hilux' });
   check('care: a pay-per-renewal vehicle says "no monthly fee" and can be turned off', /no monthly fee/.test(await hilux.textContent()) && (await hilux.locator('[data-act=care-cancel]').textContent()).trim() === 'Turn off');
@@ -1215,7 +1218,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   inPerson = true;
 }
 
-// PermitPal Plus and staff licences: plans and bills, the free 3 people, the permit check, templates,
+// PermitPal Plus and staff licenses: plans and bills, the free 3 people, the permit check, templates,
 // the public permit page (and the page itself), the worker's upload link, and staff confirming payments.
 {
   const newPage = async (g, vp = { width: 1280, height: 860 }) => {
@@ -1234,7 +1237,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const { page, errs, go } = await newPage({ PP_TEAM: true });
     await page.goto('http://localhost:4173/#/settings/billing'); await page.waitForSelector('main h1');
     await page.waitForSelector('[data-staff-calc]');
-    check('plus: Plan shows Plus with a free trial, and staff licences', (await page.locator('[data-act=plus-trial]').count()) === 1 && /Staff licences/.test(await mainText(page)));
+    check('plus: Plan shows Plus with a free trial, and staff licenses', (await page.locator('[data-act=plus-trial]').count()) === 1 && /Staff licenses/.test(await mainText(page)));
     await page.fill('[data-staff-calc] [name=people]', '25'); await page.waitForTimeout(100);
     const calc = await page.textContent('[data-staff-calc] .calc-out');
     check('plus: the price for 25 people is shown band by band (₱2,000 a month)', /17 people × ₱100/.test(calc) && /5 people × ₱60/.test(calc) && /₱2,000/.test(calc), calc.replace(/\s+/g, ' ').slice(0, 160));
@@ -1257,14 +1260,14 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
     check('plus: confirmed: the plan shows as on', /Staff, up to 10/.test(await mainText(page)));
     await page.evaluate(async () => (await import('/js/core.js')).reload()); await go('#/settings/billing'); await page.waitForTimeout(300);
-    check('plus: the customer sees licences for up to 10 people', /Up to 10 people until/.test(await mainText(page)));
-    // the free 3, then licences
+    check('plus: the customer sees licenses for up to 10 people', /Up to 10 people until/.test(await mainText(page)));
+    // the free 3, then licenses
     await go('#/people');
     for (let i = 0; i < 10; i++) await page.evaluate(async (n) => (await import('/__mock/mock-data.js')).createPerson('o1', { full_name: 'Worker ' + n, types: [] }), i).catch(() => {});
     await page.evaluate(async () => (await import('/js/core.js')).reload()); await go('#/'); await go('#/people');
-    check('plus: People shows how many of the licences are used', /10 of 10/.test(await mainText(page)));
+    check('plus: People shows how many of the licenses are used', /10 of 10/.test(await mainText(page)));
     await page.click('main [data-act=person-add]'); await page.waitForTimeout(300);
-    check('plus: at the limit, Add person explains and offers licences instead of failing', /Track more people/.test(await page.textContent('#modal-root')) && /Add staff licences/.test(await page.textContent('#modal-root')));
+    check('plus: at the limit, Add person explains and offers licenses instead of failing', /Track more people/.test(await page.textContent('#modal-root')) && /Add staff licenses/.test(await page.textContent('#modal-root')));
     await page.click('#modal-root [data-modal-close]');
     // templates and the check, without Plus
     await go('#/templates');
@@ -1306,7 +1309,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`plus ${label}: "Doesn't apply" moves it to your answers, with Undo`, /You answered/.test(await mainText(page)) && (await page.locator('[data-act=finding-reopen]').count()) === 1);
     // people: the worker's photo, the not-cleared list, the link, roles
     await go('#/people');
-    check(`plus ${label}: a lapsed licence shows under Not cleared to work`, /Not cleared to work/.test(await mainText(page)) && /Jun Reyes/.test(await page.textContent('.not-cleared')));
+    check(`plus ${label}: a lapsed license shows under Not cleared to work`, /Not cleared to work/.test(await mainText(page)) && /Jun Reyes/.test(await page.textContent('.not-cleared')));
     await page.click('[data-act=wsub-open]'); await page.waitForSelector('#modal-root .modal');
     check(`plus ${label}: the photo and its dates are shown to check`, (await page.locator('#modal-root .wsub-img').count()) === 1 && (await page.inputValue('#modal-root [name=reference_no]')) === 'HC-3310');
     await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
@@ -1319,7 +1322,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('[data-act=staff-roles]'); await page.waitForSelector('#modal-root .modal');
     await page.fill('#modal-root [name=role]', 'Cook'); await page.check('#modal-root [name=types][value=health_certificate]');
     await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
-    check(`plus ${label}: licences by role are saved`, /People who are Cook need: Health Certificate/.test(await page.textContent('#toast')));
+    check(`plus ${label}: licenses by role are saved`, /People who are Cook need: Health Certificate/.test(await page.textContent('#toast')));
     // the public permit page, from Share proof
     await go('#/sharing'); await page.waitForSelector('.trust-card');
     check(`plus ${label}: the page shows its address, a QR code and both badges`, (await page.locator('.trust-card .qr-mini svg').count()) === 1 && (await page.locator('.trust-card .pp-badge').count()) === 1
@@ -1359,7 +1362,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   {
     const { page, errs } = await newPage({ PP_PLUS: true, PP_LOGGED_OUT: true }, { width: 390, height: 844 });
     await page.goto('http://localhost:4173/#/w/11111111-2222-4333-8444-555555555555'); await page.waitForSelector('#worker-form');
-    check('worker: the link greets them by first name and names the licence', /Hi Liza!/.test(await page.textContent('main')) && /NBI Clearance/.test(await page.textContent('main')) && !/Santos/.test(await page.textContent('main')));
+    check('worker: the link greets them by first name and names the license', /Hi Liza!/.test(await page.textContent('main')) && /NBI Clearance/.test(await page.textContent('main')) && !/Santos/.test(await page.textContent('main')));
     await page.click('#worker-form button.btn-primary'); await page.waitForTimeout(200);
     check('worker: a photo is needed', /Add a photo/.test(await page.textContent('#worker-form .form-error')));
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
@@ -1400,7 +1403,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check('public page: says what PermitPal does, and doesn\'t', /checked automatically by PermitPal/.test(t) && /does not issue permits or verify them with the government/.test(t));
     check('public page: names are shown as text, never run', !(await page.evaluate(() => window.__xss)) && (await page.locator('main img[src=x]').count()) === 0);
     check('public page: copies can be downloaded when allowed', (await page.locator('.tp-files [data-path]').count()) === 1);
-    check('public page: staff licences as counts only', /14 for 12 people: 13 current, 1 due soon/.test(t));
+    check('public page: staff licenses as counts only', /14 for 12 people: 13 current, 1 due soon/.test(t));
     await page.fill('#ask-form [name=name]', 'Ramon'); await page.fill('#ask-form [name=email]', 'ramon@robinsons.ph');
     await page.click('#ask-form button'); await page.waitForTimeout(400);
     check('public page: asking for updates', /Request sent/.test(await page.textContent('main')) && asked?.p_email === 'ramon@robinsons.ph' && asked?.p_code === 'k7m2q9xd4p');
@@ -1434,7 +1437,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   }
 }
 
-// White-label: an accounting firm puts its name, logo and colour on what its clients see, with
+// White-label: an accounting firm puts its name, logo and color on what its clients see, with
 // "Powered by PermitPal" always there.
 {
   const newPage = async (g, vp = { width: 1280, height: 860 }) => {
@@ -1465,9 +1468,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`brand ${label}: before it's on, the page says clients see it once White-label is on`, /once White-label is on/.test(await mainText(page)));
     check(`brand ${label}: the firm's name is filled in to start`, (await page.inputValue('#brand-form [name=display_name]')) === 'Aligned Solutions');
     await page.fill('#brand-form [name=color]', '#FFE066'); await page.waitForTimeout(80);
-    check(`brand ${label}: a light colour is flagged as hard to read`, /Too light/.test(await page.textContent('#color-msg')));
+    check(`brand ${label}: a light color is flagged as hard to read`, /Too light/.test(await page.textContent('#color-msg')));
     await page.click('#brand-form button.btn-primary'); await page.waitForTimeout(200);
-    check(`brand ${label}: ...and can't be saved`, /Pick a darker colour/.test(await page.textContent('#toast')));
+    check(`brand ${label}: ...and can't be saved`, /Pick a darker color/.test(await page.textContent('#toast')));
     await page.fill('#brand-form [name=color]', '#0F5132');
     await page.fill('#brand-form [name=display_name]', 'Dela Cruz <b>& Co.</b>');
     await page.fill('#brand-form [name=reply_to]', 'hello@delacruz.ph');
@@ -1477,7 +1480,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`brand ${label}: the email preview shows the firm as sender, replies to the firm, Powered by PermitPal`,
       /Dela Cruz <b>& Co\.<\/b> via PermitPal/.test(prev) && /replies to hello@delacruz\.ph/.test(prev) && /Powered by PermitPal/.test(prev) && /Questions\? Email hello@delacruz\.ph or call \(02\) 8123 4567/.test(prev), prev.replace(/\s+/g, ' ').slice(0, 160));
     check(`brand ${label}: names show as typed, never as code`, (await page.locator('.mail-prev b b, .side-prev b b').count()) === 0);
-    check(`brand ${label}: the preview button takes the colour`, /rgb\(15, 81, 50\)/.test(await page.locator('.mail-prev .mp-btn').evaluate((e) => getComputedStyle(e).backgroundColor)));
+    check(`brand ${label}: the preview button takes the color`, /rgb\(15, 81, 50\)/.test(await page.locator('.mail-prev .mp-btn').evaluate((e) => getComputedStyle(e).backgroundColor)));
     await page.setInputFiles('#brand-form [name=logo]', { name: 'big.png', mimeType: 'image/png', buffer: Buffer.alloc(600 * 1024, 1) }); await page.waitForTimeout(150);
     check(`brand ${label}: a logo over 512 KB is refused before upload`, /over 512 KB/.test(await page.textContent('#toast')) && (await page.locator('[data-logo-box] img').count()) === 0);
     await page.setInputFiles('#brand-form [name=logo]', { name: 'logo.png', mimeType: 'image/png', buffer: logo }); await page.waitForTimeout(150);
@@ -1510,7 +1513,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`brand ${label}: the client's menu shows the firm, Powered by PermitPal`, /Dela Cruz & Co\./.test(await page.textContent('.sidebar .co-brand')) && /Powered by PermitPal/.test(await page.textContent('.sidebar .powered-by')));
     if (label === 'phone') check('brand phone: the top bar shows the firm', await page.locator('.topbar .co-brand').isVisible());
     const vars = await page.evaluate(() => ['--brand', '--link', '--accent-soft'].map((v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()));
-    check(`brand ${label}: the app takes the firm's colour (links a shade darker)`, vars[0] === '#0F5132' && /^#[0-9A-F]{6}$/.test(vars[1]) && /^#[0-9A-F]{6}$/.test(vars[2]), vars.join(' '));
+    check(`brand ${label}: the app takes the firm's color (links a shade darker)`, vars[0] === '#0F5132' && /^#[0-9A-F]{6}$/.test(vars[1]) && /^#[0-9A-F]{6}$/.test(vars[2]), vars.join(' '));
     const fc = await page.textContent('.firm-card');
     check(`brand ${label}: the dashboard shows "Your accountant" with email and phone`, /Your accountant/.test(fc) && (await page.getAttribute('.firm-card a[href^="mailto:"]', 'href')) === 'mailto:hello@delacruz.ph'
       && (await page.getAttribute('.firm-card a[href^="tel:"]', 'href')) === 'tel:0281234567');
@@ -1567,7 +1570,14 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const { page, errs } = await newPage({ PP_LOGGED_OUT: true }, vp);
     await page.goto('http://localhost:4173/#/welcome'); await page.waitForSelector('#pricing [data-plan-card=property] .pp-amount');
     check(`prices ${label}: the website lists Free and the 3 team plans, each with checkmarks`, (await page.locator('#pricing .pp-plan.pp-free').count()) === 1
-      && (await page.locator('#pricing [data-plan-card]').count()) === 3 && (await page.locator('#pricing [data-plan-card=firm] .pp-checks li').count()) >= 8);
+      && (await page.locator('#pricing [data-plan-card]').count()) === 4 && (await page.locator('#pricing [data-plan-card=firm] .pp-checks li').count()) >= 8);
+    check(`prices ${label}: each plan shows a picture of its board and 3 big wins`, (await page.locator('#pricing [data-plan-card] .pp-preview').count()) === 4
+      && (await page.locator('#pricing [data-plan-card=fleet] .pp-wins li').count()) === 3 && /Off the road/.test(await page.locator('#pricing [data-plan-card=fleet] .pp-preview').textContent()));
+    check(`prices ${label}: the full list opens from "Everything included"`, !(await page.locator('#pricing [data-plan-card=firm] .pp-all .pp-checks').isVisible()));
+    await page.locator('#pricing [data-plan-card=firm] .pp-all summary').click(); await page.waitForTimeout(100);
+    check(`prices ${label}: ...and shows every checkmark`, await page.locator('#pricing [data-plan-card=firm] .pp-all .pp-checks').isVisible());
+    const small = await page.locator('#pricing [data-plan-card=property_s]').textContent();
+    check(`prices ${label}: a Small property plan for up to 20 tenants at ₱2,990`, /₱2,990/.test(small) && /up to 20 tenants/i.test(small) && /less than ₱150 a tenant/.test(small), small.replace(/\s+/g, ' ').slice(0, 160));
     const f = await firm(page).textContent();
     check(`prices ${label}: monthly shows the price, a day and per client`, /₱1,990\s*\/month/.test(f) && /less than ₱66 a day/.test(f) && /With 40 clients: less than ₱50 a client/.test(f), f.replace(/\s+/g, ' ').slice(0, 200));
     check(`prices ${label}: monthly also offers yearly with the saving`, /Pay yearly and get 2 months FREE: save ₱3,980/.test(f));
@@ -1576,7 +1586,12 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.locator('#pricing .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
     const y = await firm(page).textContent();
     check(`prices ${label}: yearly shows 2 months free, the old price crossed out and the saving`, /2 months FREE/i.test(y) && /₱1,658\s*\/month/.test(y) && /₱23,880\s*₱19,900 once a year/.test(y) && /You save ₱3,980/.test(y), y.replace(/\s+/g, ' ').slice(0, 220));
-    check(`prices ${label}: a strip of 12 months, 10 paid and 2 free`, (await firm(page).locator('.year-strip .ys-paid').count()) === 10 && /2 FREE/.test(await firm(page).locator('.ys-free').textContent()));
+    const cal = firm(page).locator('.year-cal');
+    check(`prices ${label}: the next 12 months as calendar pages, the last 2 free`, (await cal.locator('.yc').count()) === 12 && (await cal.locator('.yc-free').count()) === 2
+      && /FREE/.test(await cal.locator('.yc-free').first().textContent()) && /You pay \w{3} to \w{3}\. \w{3} and \w{3} are on us\./.test(await firm(page).textContent()));
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const thisMonth = months[Number(new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(5, 7)) - 1];
+    check(`prices ${label}: the calendar starts this month`, (await cal.locator('.yc b').first().textContent()) === thisMonth);
     check(`prices ${label}: every switch on the page moved to yearly`, (await page.locator('.bill-toggle input[value=yearly]:checked').count()) === (await page.locator('.bill-toggle').count()));
     check(`prices ${label}: add-ons show the staff price ladder with savings`, /FREE/.test(await page.locator('#lp-staff .ladder').textContent()) && /40% off/.test(await page.locator('#lp-staff').textContent())
       && /60% off/.test(await page.locator('#lp-staff').textContent()) && /save ₱9,200/.test(await page.locator('#lp-staff .staff-ex').textContent()));
@@ -1595,7 +1610,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   {
     const { page, errs, go } = await newPage({ PP_TEAM: true });
     await page.goto('http://localhost:4173/#/settings/billing'); await page.waitForSelector('#addons');
-    check('prices app: the Plan page shows the plan cards', (await page.locator('main [data-plan-card]').count()) === 3 && (await page.locator('main .pp-free .chip', { hasText: 'Your plan' }).count()) === 1);
+    check('prices app: the Plan page shows the plan cards', (await page.locator('main [data-plan-card]').count()) === 4 && (await page.locator('main .pp-free .chip', { hasText: 'Your plan' }).count()) === 1);
     const plusBtn = page.locator('#plus-card [data-act=addon-choose][data-kind=plus]');
     check('prices app: Plus is offered monthly', /₱199 a month/.test(await plusBtn.textContent()));
     await page.locator('main .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
@@ -1626,11 +1641,33 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check('prices app: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
     await page.close();
   }
+  // A property workspace picks Small property or Mall & property; staff licenses say what's tracked; firms vouch for themselves.
+  {
+    const { page, errs, go } = await newPage({ PP_TEAM: true, PP_DEMO: true });
+    await page.goto('http://localhost:4173/#/settings/billing'); await page.waitForSelector('#staff-licenses');
+    const staff = await page.textContent('#staff-licenses');
+    check('prices staff: every kind of staff license is named, and the people do the renewing', /Health cards/.test(staff) && /Police clearances/.test(staff) && /PRC licenses/.test(staff)
+      && /Security guard licenses/.test(staff) && /Any other you add/.test(staff) && /You just tap Approve/.test(staff));
+    const bottoms = await page.locator('#staff-licenses .rung-track').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().bottom)));
+    const heights = await page.locator('#staff-licenses .rung-bar').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+    check('prices staff: every price bar stands on the same line, getting shorter as the price drops', bottoms.length === 4 && new Set(bottoms).size === 1 && heights[1] > heights[2] && heights[2] > heights[3] && heights[3] > heights[0], `${bottoms} / ${heights}`);
+    await page.evaluate(async () => { await (await import('/__mock/mock-data.js')).setOrgProfile('o1', { kind: 'property' }); const c = await import('/js/core.js'); await c.reload(); c.S.profile.is_platform_admin = false; });
+    await go('#/settings'); await go('#/settings/billing'); await page.waitForSelector('.pay-choice');
+    const pay = await page.textContent('main section.card');
+    check('prices property: in the trial, pay for Small property or Mall & property', (await page.locator('.plan-pay').count()) === 2 && /Small property/.test(pay) && /₱2,990/.test(pay) && /₱9,990/.test(pay) && /₱29,900/.test(pay));
+    check('prices property: both property cards say they are in the trial', (await page.locator('[data-plan-card=property_s] .chip, [data-plan-card=property] .chip', { hasText: 'In your free trial' }).count()) === 2);
+    await page.evaluate(async () => { (await import('/js/core.js')).S.profile.is_platform_admin = true; });
+    await go('#/pros'); await page.waitForTimeout(300);
+    const pros = await page.textContent('main');
+    check('pros: no "checked" badge; customers are told firms vouch for themselves', !/Checked when listed/i.test(pros) && /Independent firms/.test(pros) && /doesn't check their papers/.test(pros));
+    check('prices property/pros: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // Team tools, for a business: the same cards, with a free trial button each.
   {
     const { page, errs } = await newPage({ PP_TEAM: true }, { width: 390, height: 844 });
     await page.goto('http://localhost:4173/#/network'); await page.waitForSelector('main [data-plan-card]');
-    check('prices team tools: the plans with checkmarks and a trial button each', (await page.locator('main [data-plan-card]').count()) === 3 && (await page.locator('main [data-act=nb-set-kind]').count()) === 3);
+    check('prices team tools: the plans with checkmarks and a trial button each', (await page.locator('main [data-plan-card]').count()) === 4 && (await page.locator('main [data-act=nb-set-kind]').count()) === 4);
     check('prices team tools: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
     await page.close();
   }

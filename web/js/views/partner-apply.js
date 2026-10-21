@@ -21,10 +21,10 @@ export function partnerApplyPage(el, { signedIn = false } = {}) {
     <div class="spacer"></div><a class="btn btn-ghost btn-sm" href="#/login">Sign in</a></header>${inner}</main>`);
   el.innerHTML = String(wrap(html`
     <div class="page-head"><div><h1>List your firm on PermitPal</h1>
-      <p class="muted">For licensed liaison firms, accountants, fire-safety, pest-control and water-testing providers, clinics and notaries. Get quote requests from businesses whose permits are due.</p></div></div>
+      <p class="muted">For liaison firms, accountants, fire-safety, pest-control and water-testing providers, clinics and notaries. Get quote requests from businesses whose permits are due.</p></div></div>
     <section class="card promises">${(has('leads') ? HOW_CREDIT : HOW).map(([t, d]) => html`<div class="promise"><div><b>${t}</b><span>${d}</span></div></div>`)}</section>
     <section class="card"><h2>Apply</h2>
-      <p class="muted small">We check your business permit (and PRC or BFP accreditation, where one applies) before listing you. We reply within 3 business days.</p>
+      <p class="muted small">We reply within 3 business days.</p>
       <form id="apply-form" novalidate>
         <div class="grid2">
           <label class="field"><span>Firm name</span><input name="name" required maxlength="160" autocomplete="organization"></label>
@@ -34,11 +34,12 @@ export function partnerApplyPage(el, { signedIn = false } = {}) {
           <label class="field"><span>Email</span><input name="email" type="email" required maxlength="160" autocomplete="email"></label>
           <label class="field"><span>Mobile <small>(optional)</small></span><input name="phone" maxlength="60" inputmode="tel" autocomplete="tel" placeholder="0917 123 4567"></label>
           <label class="field"><span>Cities you serve</span><input name="cities" maxlength="300" placeholder="e.g. Makati City, Taguig City, Pasig City"></label>
-          <label class="field"><span>Licence or accreditation <small>(optional)</small></span><input name="licence" maxlength="200" placeholder="e.g. CPA, PRC no. 0123456; BFP accredited"></label>
+          <label class="field"><span>License or accreditation <small>(optional)</small></span><input name="licence" maxlength="200" placeholder="e.g. CPA, PRC no. 0123456; BFP accredited"></label>
           <label class="field"><span>Website <small>(optional)</small></span><input name="website" maxlength="300" placeholder="https://"></label>
         </div>
         <label class="field"><span>What you handle</span><input name="services" maxlength="600" placeholder="e.g. Mayor's Permit renewals, FSIC filing, extinguisher refills"></label>
         <label class="field"><span>Anything else? <small>(optional)</small></span><textarea name="message" rows="3" maxlength="1500"></textarea></label>
+        ${has('property_s') ? html`<label class="check attest"><input type="checkbox" name="attested" required> <span>My business is registered (DTI, SEC or CDA) and holds every license and permit its work needs, and I'll keep them current. I understand PermitPal doesn't check this and customers rely on it.</span></label>` : ''}
         <label class="hp" aria-hidden="true">Leave this empty <input name="trap" tabindex="-1" autocomplete="off"></label>
         <p class="form-error" role="alert" hidden></p>
         <button class="btn btn-primary">Send application</button>
@@ -58,11 +59,12 @@ export function partnerApplyPage(el, { signedIn = false } = {}) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) return fail('Enter a valid email address.', 'email');
     if (f.phone && !normalizePhone(f.phone)) return fail('Enter a valid mobile number, or leave it empty.', 'phone');
     if (f.website && !/^https:\/\//i.test(f.website)) return fail('The website must start with https://', 'website');
+    if (form.attested && !form.attested.checked) return fail('Please confirm your business is registered and licensed.', 'attested');
     const btn = form.querySelector('button');
     btn.disabled = true; btn.textContent = 'Sending…';
     try {
-      await db.applyAsPartner({ ...f, phone: f.phone ? normalizePhone(f.phone) : '' });
-      form.closest('section').innerHTML = String(html`<h2>Thanks, we got it</h2><p>We'll check your details and reply to <b>${f.email}</b> within 3 business days.</p>
+      await db.applyAsPartner({ ...f, phone: f.phone ? normalizePhone(f.phone) : '', attested: form.attested ? form.attested.checked : undefined });
+      form.closest('section').innerHTML = String(html`<h2>Thanks, we got it</h2><p>We'll reply to <b>${f.email}</b> within 3 business days.</p>
         <p class="muted small">Questions in the meantime? <a href="#/contact">Contact PermitPal</a>.</p>`);
       toast('Application sent.');
     } catch (ex) { btn.disabled = false; btn.textContent = 'Send application'; fail(ex.message || 'Something went wrong. Please try again.'); }

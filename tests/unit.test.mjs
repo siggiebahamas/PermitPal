@@ -165,7 +165,7 @@ test('import: vehicles keep the old rules (plates, types, dates)', () => {
   assert.equal(dayFirst.rows[0].f.registration_expires, '2027-04-03');
 });
 
-test('import: staff with licences; existing staff are pointed to permit records', () => {
+test('import: staff with licenses; existing staff are pointed to permit records', () => {
   const res = checkImport('staff', [['Full name', 'Position', 'Business', "Driver's license number", "Driver's license expires", 'NBI clearance expires'],
     ['Ana Reyes', 'Driver', 'Kape Uno', 'N01-23-456789', '2029-05-14', '2025-01-01'], ['juan  dela cruz', '', '', '', '', ''], ['Ben', '', 'Kape Uno Inc', '', '', '']], CTX);
   const [a, b, c] = res.rows;
@@ -186,7 +186,7 @@ test('import: permit records find the right thing and never overwrite newer data
     ['NGV 5588', '', 'OR/CR', 'OR-9', '', '2027-04-30'],                                 // first record for a tracked permit
     ['Kape Uno', 'Ortigas', 'FSIC', 'F-1', '2026-11-01', '2026-10-01'],                  // expires before issued, issued in the future
     ['Kape Uno', 'Makati', 'FSIC', 'F-2', '', '2027-02-01'],                             // no such branch
-    ['Juan dela Cruz', '', 'NBI', 'N-1', '', '2027-06-30'],                              // a staff licence, added
+    ['Juan dela Cruz', '', 'NBI', 'N-1', '', '2027-06-30'],                              // a staff license, added
     ['Corner Bakery Corp.', '', 'Pest control certificate', '', '', '2027-03-01'],      // not in the library: own permit
     ['Nobody Inc', '', 'Business permit', 'X', '', '2027-01-20'],
     ['Corner Bakery Corp.', '', "Mayor's / Business Permit", 'BP-1', '', '2027-01-20'],  // same as PermitPal: skip
@@ -319,7 +319,7 @@ test('csv: a name that looks like a formula stays text in Excel; numbers stay nu
   assert.equal(toCsv([['=HYPERLINK("x")', '+1', '@cmd', '-2000', '-12.5', 'ok']]), `"'=HYPERLINK(""x"")",'+1,'@cmd,-2000,-12.5,ok`);
 });
 
-// Staff licences and Plus: the same prices as the database (private.staff_monthly / private.addon_price,
+// Staff licenses and Plus: the same prices as the database (private.staff_monthly / private.addon_price,
 // checked in supabase/tests/14_plus.sql), so the price on screen is the price charged.
 import { staffMonthly, staffBands, addonPrice, addonLabel, FREE_PEOPLE } from '../web/js/prices.js';
 test('prices: 3 people free, ₱100 to the 20th, ₱60 to the 100th, ₱40 after', () => {
@@ -332,7 +332,7 @@ test('prices: yearly is 10 months; Plus is ₱199 or ₱1,990', () => {
   assert.equal(addonPrice('staff', 25, 'yearly'), 20000);
   assert.equal(addonPrice('plus', null, 'monthly'), 199);
   assert.equal(addonPrice('plus', null, 'yearly'), 1990);
-  assert.equal(addonLabel('staff', 25, 'monthly'), 'Staff licences, up to 25 people (monthly)');
+  assert.equal(addonLabel('staff', 25, 'monthly'), 'Staff licenses, up to 25 people (monthly)');
   assert.equal(addonLabel('plus', null, 'yearly'), 'PermitPal Plus (yearly)');
 });
 test('prices: White-label is ₱1,000 a month or ₱10,000 a year (supabase/tests/15_whitelabel.sql checks the same)', () => {

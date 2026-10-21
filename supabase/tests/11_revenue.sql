@@ -205,7 +205,7 @@ update t_ids set plan = (select id from public.care_plans where location_id = (s
                  vplan = (select id from public.care_plans where vehicle_id = (select veh from t_ids));
 select pg_temp.res('the team sees its plans, bills and what each covers', (select count(*) from public.care_coverage((select org from t_ids))) >= 5, '');
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
--- Care renews a fixed list of permit types: an FDA licence or a permit the customer typed in is a one-time job.
+-- Care renews a fixed list of permit types: an FDA license or a permit the customer typed in is a one-time job.
 insert into public.requirements (org_id, subject, business_id, location_id, type_code, name, notes)
   select org, 'business', biz, loc, 'fda_lto', 'FDA License to Operate', 'scope-test' from t_ids;
 insert into public.requirements (org_id, subject, business_id, location_id, name, notes)
@@ -214,7 +214,7 @@ insert into public.requirement_cycles (org_id, requirement_id, reference_no, exp
   select r.org_id, r.id, 'X-1', private.today_ph() + 20 from public.requirements r where r.notes = 'scope-test';
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
-select pg_temp.res('Care doesn''t cover licences outside its list, or custom permits',
+select pg_temp.res('Care doesn''t cover licenses outside its list, or custom permits',
   not exists (select 1 from public.care_coverage((select org from t_ids)) c join public.requirements r on r.id = c.requirement_id where r.notes = 'scope-test')
   and exists (select 1 from public.care_coverage((select org from t_ids)) c where c.requirement_id = (select mp from t_ids)), '');
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
@@ -382,8 +382,8 @@ insert into public.partners (category, name, published, verified, fee_model, lea
 select pg_temp.res('permit filing firms (liaison) can be saved now', count(*) = 1, '') from public.partners where name = 'Pasig Permit Runners';
 update t_ids set partner = (select id from public.partners where name = 'Pasig Permit Runners');
 do $$ begin insert into public.partners (category, name, published, fee_model, sale_pct) values ('insurance', 'Some Insurer', true, 'per_sale_percent', 10);
-  perform pg_temp.res('insurers can''t pay per sale without an IC licence', false, 'was allowed');
-exception when others then perform pg_temp.res('insurers can''t pay per sale without an IC licence', sqlerrm like 'Insurance rule%', sqlerrm); end $$;
+  perform pg_temp.res('insurers can''t pay per sale without an IC license', false, 'was allowed');
+exception when others then perform pg_temp.res('insurers can''t pay per sale without an IC license', sqlerrm like 'Insurance rule%', sqlerrm); end $$;
 do $$ begin insert into public.partners (category, name, published, fee_model, lead_fee_php) values ('insurance', 'Lead Insurer', true, 'per_lead', 200);
   perform pg_temp.res('...or per quote request', false, 'was allowed');
 exception when others then perform pg_temp.res('...or per quote request', sqlerrm like 'Insurance rule%', sqlerrm); end $$;
@@ -393,7 +393,7 @@ select pg_temp.res('an insurer listed for free (no fee) is fine', count(*) = 1, 
 update t_ids set insurer = (select id from public.partners where name = 'Some Insurer');
 select public.admin_set_money_setting('ic_licence_no', 'IC-AG-12345');
 update public.partners set fee_model = 'per_lead', lead_fee_php = 200 where id = (select insurer from t_ids);
-select pg_temp.res('with the licence on file, insurers can pay per quote request', fee_model = 'per_lead', fee_model) from public.partners where id = (select insurer from t_ids);
+select pg_temp.res('with the license on file, insurers can pay per quote request', fee_model = 'per_lead', fee_model) from public.partners where id = (select insurer from t_ids);
 select public.admin_set_money_setting('ic_licence_no', '');
 -- a checklist line
 insert into public.partner_placements (partner_id, type_code, item_key, cities, headline, starts_on, ends_on, monthly_fee_php)
@@ -480,8 +480,8 @@ reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); en
 set local role anon;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 select public.apply_as_partner('Spam Bot', 'other', '', 'Bot', 'bot@spam.ph', '', '', '', '', '', 'http://spam');
-select public.apply_as_partner('Makati Fire Safety', 'fire_safety', 'Makati City, Pasig City', 'Ana Cruz', 'Ana@MakatiFire.ph', '0917 000 1111', 'BFP accredited', 'Refills, tagging', 'https://makatifire.ph', 'We serve malls');
-do $$ begin perform public.apply_as_partner('Makati Fire Safety', 'fire_safety', '', 'Ana Cruz', 'ana@makatifire.ph', '', '', '', '', '');
+select public.apply_as_partner('Makati Fire Safety', 'fire_safety', 'Makati City, Pasig City', 'Ana Cruz', 'Ana@MakatiFire.ph', '0917 000 1111', 'BFP accredited', 'Refills, tagging', 'https://makatifire.ph', 'We serve malls', null, true);
+do $$ begin perform public.apply_as_partner('Makati Fire Safety', 'fire_safety', '', 'Ana Cruz', 'ana@makatifire.ph', '', '', '', '', '', null, true);
   perform pg_temp.res('one application per email per day', false, 'was allowed');
 exception when others then perform pg_temp.res('one application per email per day', sqlerrm like 'We already have your application%', sqlerrm); end $$;
 do $$ begin perform public.apply_as_partner('X', 'fire_safety', '', 'Ana', 'nope', '', '', '', '', '');
@@ -497,7 +497,7 @@ select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000
 set local role authenticated;
 update t_ids set app = (select id from public.partner_applications where email = 'ana@makatifire.ph');
 update t_ids set app = public.admin_application_to_partner(app);
-select pg_temp.res('staff turn it into a hidden listing to finish', (select published = false and verified = false and cities = array['Makati City','Pasig City']
+select pg_temp.res('staff turn it into a hidden listing to finish (it keeps the firm''s own confirmation)', (select published = false and verified = true and cities = array['Makati City','Pasig City']
   from public.partners where id = (select app from t_ids)), '');
 
 -- ================================================================ 4) the money ledger

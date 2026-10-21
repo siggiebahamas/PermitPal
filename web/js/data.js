@@ -529,6 +529,7 @@ export const logPlacement = async (ids, kind) => ok(await sb.rpc('log_placement'
 export const applyAsPartner = async (f) => ok(await sb.rpc('apply_as_partner', {
   p_name: f.name, p_category: f.category, p_cities: f.cities || '', p_contact_name: f.contact_name, p_email: f.email, p_phone: f.phone || '',
   p_licence: f.licence || '', p_services: f.services || '', p_website: f.website || '', p_message: f.message || '', p_trap: f.trap || null,
+  ...(f.attested === undefined ? {} : { p_attested: !!f.attested }), // the firm vouches for itself (databases with the Small property file)
 }));
 
 // ---------------------------------------------------------------- staff: money, care, firms
@@ -577,8 +578,8 @@ export const adminApplications = async () => ok(await sb.from('partner_applicati
 export const adminApplicationToPartner = async (id) => ok(await sb.rpc('admin_application_to_partner', { p_app: id }));
 export const adminSetApplication = async (id, patch) => ok(await sb.from('partner_applications').update(patch).eq('id', id));
 
-// ---------------------------------------------------------------- PermitPal Plus and staff licences
-// Plans you add on, their bills, licences by role and photos workers sent (small lists, loaded with the workspace).
+// ---------------------------------------------------------------- PermitPal Plus and staff licenses
+// Plans you add on, their bills, licenses by role and photos workers sent (small lists, loaded with the workspace).
 export async function loadPlus(orgId) {
   const [addons, invoices, roles, submissions, stopping] = await Promise.all([
     sb.from('addons').select('*').eq('org_id', orgId).then(ok),
@@ -616,7 +617,7 @@ export async function startAddonCheckout(inv) {
   return data.checkout_url;
 }
 
-// Staff: contact details, the worker's upload link, photos they sent, licences by role.
+// Staff: contact details, the worker's upload link, photos they sent, licenses by role.
 export const updatePersonContact = async (id, f) => ok(await sb.from('people').update({ email: f.email || null, mobile: f.mobile || null, remind_worker: f.remind_worker !== false }).eq('id', id));
 export const workerLink = async (reqId) => ok(await sb.rpc('worker_link', { p_requirement: reqId }));
 export const workerDecide = async (id, approve, f = {}) => ok(await sb.rpc('worker_decide', {

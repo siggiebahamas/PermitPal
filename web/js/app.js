@@ -132,7 +132,7 @@ async function start() {
 
 async function loadData() {
   S.data = await db.loadOrgData(S.org.id, { revenue: has('revenue'), plus: has('plus') });
-  // A client of an accounting firm with White-label sees the firm's logo and colour (Powered by PermitPal).
+  // A client of an accounting firm with White-label sees the firm's logo and color (Powered by PermitPal).
   const prev = JSON.stringify(S.brand);
   S.brand = has('brand') && S.org.kind === 'business' ? await db.clientBrand(S.org.id).catch(() => null) : null;
   applyBrand(S.brand);

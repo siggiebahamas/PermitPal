@@ -1,6 +1,6 @@
 // "Contact PermitPal": questions, problems, plan and payment questions, and privacy requests
 // (the Data Protection Officer reads these). Works signed in, or signed out for people without an
-// account (e.g. staff whose licence details an employer added). The message is emailed to the team.
+// account (e.g. staff whose license details an employer added). The message is emailed to the team.
 import { html, when } from '../util.js';
 import { S } from '../core.js';
 import { friendlyError } from '../util.js';

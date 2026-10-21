@@ -40,9 +40,9 @@ export function effectivePlan() {
   return S.plans.find((p) => p.id === (lapsed ? 'free' : o.plan_id)) || S.plans[0];
 }
 
-// ---------------------------------------------------------------- PermitPal Plus and staff licences
+// ---------------------------------------------------------------- PermitPal Plus and staff licenses
 // The database decides (it refuses anything not paid for); these only decide what to show.
-export const TEAM_PLANS = ['fleet', 'firm', 'head_office', 'property'];
+export const TEAM_PLANS = ['fleet', 'firm', 'head_office', 'property', 'property_s'];
 const todayISO = () => new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 10);
 export const plusOf = () => S.data?.plus || { addons: [], invoices: [], roles: [], submissions: [], stopping: {} };
 export const addonOf = (kind) => plusOf().addons.find((a) => a.kind === kind) || null;
@@ -120,8 +120,8 @@ export const STRUCTURES = ['Sole Proprietorship', 'Partnership', 'Corporation', 
 // How the permit library is grouped when people browse it.
 export const CATEGORY_NAMES = {
   local: 'City and barangay', national: 'National registrations', safety: 'Safety and health', employer: 'Employer registrations',
-  industry: 'Industry licences', registration: 'Registration and insurance', for_hire: 'For-hire vehicles',
-  licence: 'IDs and licences', clearance: 'Clearances and health', other: 'Other',
+  industry: 'Industry licenses', registration: 'Registration and insurance', for_hire: 'For-hire vehicles',
+  licence: 'IDs and licenses', clearance: 'Clearances and health', other: 'Other',
 };
 export const VEHICLE_TYPES = ['Sedan', 'SUV', 'Van', 'Pickup', 'Truck', 'Motorcycle', 'Tricycle', 'Bus', 'Other'];
 export const ROLES = {

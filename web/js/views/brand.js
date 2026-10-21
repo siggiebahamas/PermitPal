@@ -1,5 +1,5 @@
 // White-label for accounting firms (₱1,000 a month on top of the firm plan): the firm's name, logo and
-// colour on its clients' emails and in their app, replies to the firm, and a report to each client on
+// color on its clients' emails and in their app, replies to the firm, and a report to each client on
 // the 1st. Clients keep their own free accounts and always see "Powered by PermitPal"; when the add-on
 // or the firm plan lapses, or the firm disconnects, everything goes back to PermitPal's look by itself
 // (the database works the look out each time, so nothing here has to switch it off).
@@ -12,17 +12,17 @@ import * as db from 'pp/data';
 
 const DEFAULT_COLOR = '#1B4DB5';
 
-// ---------------------------------------------------------------- colours
+// ---------------------------------------------------------------- colors
 const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 function luminance(h) {
   const [r, g, b] = rgb(h).map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 const onWhite = (h) => 1.05 / (luminance(h) + 0.05);
-// White text on the colour stays readable (the database checks the same).
+// White text on the color stays readable (the database checks the same).
 export const colorOk = (h) => /^#[0-9a-f]{6}$/i.test(h || '') && onWhite(h) >= 4.5;
 const mix = (h, to, t) => '#' + rgb(h).map((v, i) => Math.round(v + (to[i] - v) * t).toString(16).padStart(2, '0')).join('').toUpperCase();
-// The app's colours from the firm's: buttons in its colour; text and links a shade darker when needed, so
+// The app's colors from the firm's: buttons in its color; text and links a shade darker when needed, so
 // they stay readable on the pale tint too.
 export function brandVars(color) {
   if (!colorOk(color)) return null;
@@ -102,7 +102,7 @@ on('brand-trial', async (ds, btn) => {
   try {
     const until = await db.startBrandTrial(S.org.id);
     await reload();
-    toast(`White-label is on, free until ${fmtDate(until)}. Now add your logo and colour.`);
+    toast(`White-label is on, free until ${fmtDate(until)}. Now add your logo and color.`);
     location.hash = '#/settings/brand';
   } catch (e) { toastError(e); btn.disabled = false; }
 });
@@ -135,8 +135,8 @@ export async function brandPage(el, subnav) {
               <div><input type="file" name="logo" accept="image/png,image/jpeg" aria-labelledby="logo-lbl" ${dis}>
                 <p class="muted small">PNG or JPG, up to 512 KB. A wide logo on a white or see-through background works best.</p>
                 ${logoUrl && admin ? html`<button type="button" class="linklike small" data-logo-remove>Remove the logo</button>` : ''}</div></div></div>
-          <div class="field"><span id="color-lbl">Colour</span>
-            <div class="color-row"><input type="color" name="color_pick" value="${v.color.toLowerCase()}" aria-label="Pick a colour" ${dis}>
+          <div class="field"><span id="color-lbl">Color</span>
+            <div class="color-row"><input type="color" name="color_pick" value="${v.color.toLowerCase()}" aria-label="Pick a color" ${dis}>
               <input name="color" value="${v.color}" maxlength="7" aria-labelledby="color-lbl" aria-describedby="color-msg" spellcheck="false" ${dis}></div>
             <p class="small" id="color-msg" aria-live="polite"></p></div>
           <div class="grid2">
@@ -160,7 +160,7 @@ export async function brandPage(el, subnav) {
           <ul class="plain-list small">
             <li>Permit reminders, tax and contribution deadlines, the Monday summary and your nudges, to every client you're connected to or manage.</li>
             <li>Your invitations to connect, and the sign-up page they open.</li>
-            <li>Your clients' PermitPal app: your logo, colour and contact details.</li>
+            <li>Your clients' PermitPal app: your logo, color and contact details.</li>
           </ul>
           <p class="muted small">Your clients keep their own PermitPal accounts, free, and always see "Powered by PermitPal". If White-label ends or you disconnect a client, their emails and app go back to PermitPal's look by themselves, and we tell them their account stays theirs.</p>
         </section>
@@ -176,7 +176,7 @@ export async function brandPage(el, subnav) {
     const ok = colorOk(color);
     const c = ok ? color : DEFAULT_COLOR;
     const msg = el.querySelector('#color-msg');
-    msg.textContent = ok ? 'White text is easy to read on it.' : /^#[0-9a-f]{6}$/i.test(color) ? 'Too light: white text on it would be hard to read. Pick a darker shade.' : 'Use a colour code like #0F5132.';
+    msg.textContent = ok ? 'White text is easy to read on it.' : /^#[0-9a-f]{6}$/i.test(color) ? 'Too light: white text on it would be hard to read. Pick a darker shade.' : 'Use a color code like #0F5132.';
     msg.className = `small ${ok ? 'ok-text' : 'warn-text'}`;
     const name = form.display_name.value.trim() || S.org.name;
     const reply = form.reply_to.value.trim();
@@ -226,7 +226,7 @@ export async function brandPage(el, subnav) {
     const f = Object.fromEntries(new FormData(form));
     const color = String(f.color || '').trim().toUpperCase();
     if (!String(f.display_name || '').trim()) { toast('Enter the name your clients know you by.', 'error'); form.display_name.focus(); return; }
-    if (!colorOk(color)) { toast('Pick a darker colour, so white text on it stays easy to read.', 'error'); form.color.focus(); return; }
+    if (!colorOk(color)) { toast('Pick a darker color, so white text on it stays easy to read.', 'error'); form.color.focus(); return; }
     btn.disabled = true;
     let uploaded = null;
     try {

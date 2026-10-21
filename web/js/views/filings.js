@@ -35,7 +35,7 @@ async function load(force = false) {
 }
 export const forgetFilings = () => { cache = null; };
 
-// Where an item stands, in words and colour.
+// Where an item stands, in words and color.
 function stateOf(it, today = todayPH()) {
   if (it.filed_on) return { cls: 'ok', label: 'Filed', key: 'filed' };
   const d = daysBetween(today, it.due_on);

@@ -27,7 +27,7 @@ grant execute on function pg_temp.err(text) to authenticated, anon;
 -- ---------------------------------------------------------------- price and helpers
 select pg_temp.res('₱1,000 a month or ₱10,000 a year', private.addon_price('brand', null, 'monthly') = 1000 and private.addon_price('brand', null, 'yearly') = 10000
   and private.addon_label('brand', null, 'yearly') = 'White-label (yearly)', private.addon_label('brand', null, 'monthly'));
-select pg_temp.res('white text must stay readable on the brand colour', private.color_ok('#1B4DB5') and private.color_ok('#000000') and not private.color_ok('#FFD400')
+select pg_temp.res('white text must stay readable on the brand color', private.color_ok('#1B4DB5') and private.color_ok('#000000') and not private.color_ok('#FFD400')
   and not private.color_ok('#FFFFFF') and not private.color_ok('red') and not private.color_ok('#12345'), '');
 
 -- ---------------------------------------------------------------- set-up: a firm, a connected client, a client the firm manages, an outsider
@@ -59,8 +59,8 @@ select pg_temp.res('a firm workspace in its trial can have White-label; a busine
 -- ---------------------------------------------------------------- the brand settings
 select pg_temp.as_user('e1000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
-select pg_temp.res('a colour white text can''t be read on is refused',
-  pg_temp.err(format('select public.brand_save(%L, %L, null, %L, null, null, null)', firm, 'Dela Cruz', '#FFE066')) = 'Pick a darker colour, so white text on it stays easy to read.', '') from t_ids;
+select pg_temp.res('a color white text can''t be read on is refused',
+  pg_temp.err(format('select public.brand_save(%L, %L, null, %L, null, null, null)', firm, 'Dela Cruz', '#FFE066')) = 'Pick a darker color, so white text on it stays easy to read.', '') from t_ids;
 select pg_temp.res('a bad reply-to address is refused',
   pg_temp.err(format('select public.brand_save(%L, %L, null, %L, %L, null, null)', firm, 'Dela Cruz', '#0F5132', 'not-an-email')) = 'Enter a valid email address for replies.', '') from t_ids;
 select pg_temp.res('a logo from another workspace''s folder is refused',
@@ -68,7 +68,7 @@ select pg_temp.res('a logo from another workspace''s folder is refused',
 select pg_temp.res('a business workspace has no brand',
   pg_temp.err(format('select public.brand_save(%L, %L, null, %L, null, null, null)', managed, 'Mila', '#0F5132')) = 'White-label is for Accounting firm workspaces.', '') from t_ids;
 select public.brand_save(firm, '  Dela Cruz & Co. ', firm || '/logo-1.png', '#0f5132', ' Hello@DelaCruz.ph ', '(02) 8123 4567', 'Tax & permits <i>x</i>') from t_ids;
-select pg_temp.res('the owner saves the brand (trimmed, colour in capitals, email in lower case)',
+select pg_temp.res('the owner saves the brand (trimmed, color in capitals, email in lower case)',
   b.display_name = 'Dela Cruz & Co.' and b.color = '#0F5132' and b.reply_to = 'hello@delacruz.ph' and b.client_report, b.display_name)
   from public.org_brands b where b.org_id = (select firm from t_ids);
 select pg_temp.res('nobody writes the table directly',
