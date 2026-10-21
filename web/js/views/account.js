@@ -12,7 +12,7 @@ import { KINDS, teamAccess, connectionsCard } from './network.js';
 import { mfaSection, requireCard } from './mfa.js';
 import { addonSection, wireAddons, showBrandCard } from './plus.js';
 import { brandPage, brandTabShown } from './brand.js';
-import { billToggle, freeCard, planCard, PLAN_ORDER, PLANS, compareTable } from './pricing.js';
+import { billToggle, freeCard, planCard, plansShown, PLANS, compareTable } from './pricing.js';
 import { planTotal } from '../prices.js';
 import * as db from 'pp/data';
 
@@ -250,7 +250,7 @@ export async function settings(el, section) {
       ${toggle('weekly_digest', 'Monday summary email')}
     </section>
     ${when(has('revenue'), html`<section class="card"><h2>Suggestions</h2>
-      <label class="toggle"><div><div>Show partner firms on renewal checklists</div><div class="muted small">At most one licensed firm on a checklist step, labelled "Partner". Firms pay PermitPal to be listed there.</div></div>
+      <label class="toggle"><div><div>Show partner firms on renewal checklists</div><div class="muted small">At most one partner firm on a checklist step, labelled "Partner". Firms pay PermitPal to be listed there.</div></div>
         <input type="checkbox" data-profile-pref="show_partner_offers" ${p.show_partner_offers !== false ? 'checked' : ''}><span class="switch"></span></label></section>`)}
     ${when(has('sms'), smsSection(channels))}
     ${when(has('mfa'), html`<section class="card" id="mfa-section"><h2>Two-step login</h2><p class="muted">Loading…</p></section>`)}
@@ -433,8 +433,8 @@ function billingSection(pay) {
     <p class="pp-lead">Free for your own business, forever. Team plans are for people who look after many businesses, vehicles or tenants.</p>
     ${billToggle('How often to pay for a team plan')}
     <div class="pp-grid four">${freeCard(org.kind === 'business' ? html`<span class="chip ok">Your plan</span>` : '')}
-      ${PLAN_ORDER.map((id) => planCard(id, price(id), cta(id), { current: acc.why === 'plan' ? id === planId : PLANS[id].kind === org.kind, trialLine: PLANS[id].kind !== org.kind }))}</div>
-    ${compareTable()}
+      ${plansShown(S.plans).map((id) => planCard(id, price(id), cta(id), { current: acc.why === 'plan' ? id === planId : PLANS[id].kind === org.kind, trialLine: PLANS[id].kind !== org.kind }))}</div>
+    ${compareTable(plansShown(S.plans))}
     <p class="fineprint">Single businesses stay free. Nothing is charged by itself, and you can stop anytime: your data is never locked or deleted, and you can always export it.</p>
     ${addonSection(pay)}`;
 }
@@ -495,7 +495,7 @@ function smsSection(channels) {
   let body;
   if (channels.sms === false) body = html`<p class="muted">Text reminders are being set up. Email and in-app reminders work meanwhile.</p>`;
   else if (!plan?.paid_channels) {
-    body = html`<p class="muted">Text reminders come with team plans (Fleet, Accounting firm, Head office, Property). On ${plan?.name || 'your'} plan you get email and in-app reminders.</p>
+    body = html`<p class="muted">Text reminders come with team plans (Accounting firm, Fleet, Property). On ${plan?.name || 'your'} plan you get email and in-app reminders.</p>
       ${when(isOwner(), html`<a class="btn btn-sm btn-soft" href="#/settings/billing">See plans</a>`)}`;
   } else if (smsStep) {
     body = html`<form id="sms-code" class="sms-form">

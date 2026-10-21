@@ -132,6 +132,8 @@ export const PLANS = {
   },
 };
 export const PLAN_ORDER = ['firm', 'fleet', 'property_s', 'property'];
+// The plans this database sells (Small property only once its file has run). Before the prices load: all.
+export const plansShown = (plans) => (plans?.length ? PLAN_ORDER.filter((id) => plans.some((p) => p.id === id)) : PLAN_ORDER);
 
 // ---------------------------------------------------------------- cards
 const LABEL = { ok: 'OK', soon: 'Soon', late: 'Late' };
@@ -193,11 +195,15 @@ const COMPARE = [
 ];
 const cellOf = (c) => (c === true ? html`<span class="pp-yes">${ICON.check}<span class="sr-only">Included</span></span>`
   : c === false ? html`<span class="pp-no"><span aria-hidden="true">–</span><span class="sr-only">Not included</span></span>` : html`<span class="pp-word">${c}</span>`);
-export const compareTable = () => html`<details class="card pp-compare"><summary><b>See everything side by side</b></summary>
+const COLS = ['free', ...PLAN_ORDER];
+export const compareTable = (ids = PLAN_ORDER) => {
+  const keep = COLS.map((c) => c === 'free' || ids.includes(c));
+  return html`<details class="card pp-compare"><summary><b>See everything side by side</b></summary>
   <div class="table-wrap" tabindex="0" role="region" aria-label="Plans side by side"><table class="table pp-table">
-    <thead><tr><th scope="col">What you get</th><th scope="col">Free</th><th scope="col">Accounting firm</th><th scope="col">Fleet</th><th scope="col">Small property</th><th scope="col">Mall &amp; property</th></tr></thead>
-    <tbody>${COMPARE.map(([t, ...cols]) => html`<tr><th scope="row">${t}</th>${cols.map((c) => html`<td>${cellOf(c)}</td>`)}</tr>`)}</tbody>
+    <thead><tr><th scope="col">What you get</th>${COLS.filter((c, i) => keep[i]).map((c) => html`<th scope="col">${c === 'free' ? 'Free' : PLANS[c].name}</th>`)}</tr></thead>
+    <tbody>${COMPARE.filter(([, ...cols]) => cols.some((c, i) => keep[i] && c !== false)).map(([t, ...cols]) => html`<tr><th scope="row">${t}</th>${cols.filter((c, i) => keep[i]).map((c) => html`<td>${cellOf(c)}</td>`)}</tr>`)}</tbody>
   </table></div></details>`;
+};
 
 // ---------------------------------------------------------------- add-ons
 export const PLUS_CHECKS = [

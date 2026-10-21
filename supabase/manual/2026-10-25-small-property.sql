@@ -26,6 +26,8 @@ values ('property_s', 'Small property', 2990, null, null, true,
   array['Tenant board for up to 20 tenants', 'Choose which permits tenants must keep current', 'Download tenants'' shared copies', 'One-click reminders to tenants', 'Everything in Free'], 13, true)
 on conflict (id) do update set name = excluded.name, price_php_monthly = excluded.price_php_monthly, paid_channels = true, available = true;
 update public.plans set sort = 14 where id = 'property';
+-- Head office left the app on Oct 7 (PermitPal is for small businesses); make sure nobody can buy it.
+update public.plans set available = false where id = 'head_office';
 -- How many tenants a workspace may connect (null: no limit), and how many it has (connected or invited).
 create or replace function private.tenant_cap(p_org uuid) returns int
 language sql stable security definer set search_path = '' as $$ select case when private.effective_plan_id(p_org) = 'property_s' then 20 end $$;

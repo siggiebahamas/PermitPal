@@ -1218,6 +1218,35 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   inPerson = true;
 }
 
+// The website as customers see it (online only): the free features, Plus shown once its database part is on,
+// nothing that was removed, nothing saying PermitPal checks firms, and "Prices" scrolling in place.
+{
+  inPerson = false;
+  const S2 = ['errors', 'assign', 'library2', 'services', 'filings', 'sms', 'mfa', 'revenue'];
+  for (const [label, init, vp] of [['all', {}, { width: 1280, height: 860 }], ['live', { PP_FEATURES: S2 }, { width: 390, height: 844 }], ['tiny', {}, { width: 320, height: 640 }]]) {
+    const p = await browser.newPage({ viewport: vp });
+    await p.addInitScript((i) => { Object.assign(globalThis, { PP_LOGGED_OUT: true }, i); }, init);
+    const e = [];
+    p.on('pageerror', (x) => e.push(x.message));
+    await p.goto('http://localhost:4173/'); await p.waitForSelector('#pricing [data-plan-card] .pp-amount');
+    const text = await p.textContent('.landing');
+    check(`website ${label}: 12 free features and the set-up offer`, (await p.locator('.lp-features .lp-feature:not(.lp-wide)').count()) === 12
+      && /fixed fee/.test(await p.locator('.lp-features .lp-wide').textContent()));
+    check(`website ${label}: Plus shown only once its database part is on`, (await p.locator('.lp-show').count()) === (label === 'live' ? 0 : 1));
+    check(`website ${label}: nothing removed, and nothing PermitPal doesn't do`, !/Head office|Year-round care|licensed firm|we verify|verified by PermitPal|vetted/i.test(text));
+    check(`website ${label}: no sideways scroll`, (await p.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);
+    if (label === 'all') {
+      const before = await p.evaluate(() => location.hash);
+      await p.click('.lp-nav[data-scroll-to=pricing]'); await p.waitForTimeout(800);
+      check('website: "Prices" scrolls to the prices and keeps the address', (await p.evaluate(() => location.hash)) === before
+        && (await p.evaluate(() => document.getElementById('pricing').getBoundingClientRect().top)) < 200);
+    }
+    check(`website ${label}: no JavaScript errors`, e.length === 0, e.slice(0, 3).join(' | '));
+    await p.close();
+  }
+  inPerson = true;
+}
+
 // PermitPal Plus and staff licenses: plans and bills, the free 3 people, the permit check, templates,
 // the public permit page (and the page itself), the worker's upload link, and staff confirming payments.
 {

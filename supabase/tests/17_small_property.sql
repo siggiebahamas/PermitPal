@@ -16,6 +16,7 @@ update public.profiles set is_platform_admin = true where id = 'a7000000-0000-40
 
 select pg_temp.res('Small property: ₱2,990 a month, texts included, on sale',
   (select price_php_monthly = 2990 and paid_channels and available from public.plans where id = 'property_s'), '');
+select pg_temp.res('Head office is no longer on sale', not (select available from public.plans where id = 'head_office'), '');
 
 select set_config('request.jwt.claims', '{"sub":"a7000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;

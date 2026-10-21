@@ -9,7 +9,7 @@ import { trustSection } from './trust.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// ================================================================ licensed professionals
+// ================================================================ professionals (independent firms)
 // Firms that file and renew in person (liaison, accounting, fire safety...). Customers deal with
 // them directly; PermitPal only checks their license, lists them, and sends them quote requests.
 export const PARTNER_CATEGORIES = {
@@ -82,14 +82,14 @@ export async function partners(el, params = new URLSearchParams()) {
         ${when(cities.length, html`<select data-pro-city aria-label="City"><option value="all">All cities</option>${cities.map((c) => html`<option value="${c}" ${proCity === c ? 'selected' : ''}>${c}${myCities.includes(c) ? ' (yours)' : ''}</option>`)}</select>`)}
       </div>
       ${shown.length ? html`<div class="svc-grid">${shown.map(proCard)}</div>` : html`<p class="muted">No firms match yet. Try "All cities".</p>`}`
-      : empty("We're onboarding licensed firms", 'Liaison firms, accountants and fire-safety providers in your area will appear here once their licenses are checked.')}
+      : empty("We're onboarding firms", 'Liaison firms, accountants and fire-safety providers in your area will appear here as they join.')}
     ${when(mine.length, html`<section class="card"><div class="card-head"><h2>Your quote requests</h2></div>
       ${mine.map((r) => { const p = list.find((x) => x.id === r.partner_id); return html`<div class="line"><span class="line-main"><b>${p?.name || 'Professional'}</b><small>${r.note || ''} · ${timeAgo(r.created_at)}</small></span>
         ${has('leads') && canEdit() && ['requested', 'introduced'].includes(r.status)
           ? html`<span class="hired-ask"><span class="muted small">Did you hire them?</span><button class="btn btn-sm btn-soft" data-act="ref-hired" data-id="${r.id}" data-hired="1">Yes</button><button class="btn btn-sm btn-ghost" data-act="ref-hired" data-id="${r.id}" data-hired="">No</button></span>`
           : html`<span class="chip ${r.status === 'converted' ? 'ok' : r.status === 'not_converted' ? 'needinfo' : 'progress'}">${{ requested: 'Sent', introduced: 'They replied', converted: 'Hired', not_converted: has('leads') ? "Didn't hire" : 'Closed' }[r.status] || 'Sent'}</span>`}</div>`; })}</section>`)}
     <p class="fineprint">Listed firms pay PermitPal for the quote requests we send them (or a flat monthly fee). It never changes their price, and you're free to choose anyone.${has('revenue') ? '' : ' PermitPal does not file anything with the government itself.'}</p>
-    ${when(has('revenue'), html`<p class="fineprint">Run a licensed firm? <a href="#/list-your-firm">Apply to be listed</a>.</p>`)}`);
+    ${when(has('revenue'), html`<p class="fineprint">Run a liaison, accounting or fire-safety firm? <a href="#/list-your-firm">Apply to be listed</a>.</p>`)}`);
 }
 document.addEventListener('change', (e) => {
   if (e.target.matches('[data-pro-cat]')) { proCat = e.target.value; partners(document.getElementById('main')); }
@@ -145,7 +145,7 @@ export function partnerSuggestions(r) {
     && (!city || !p.cities?.length || p.cities.includes(city));
   const fit = (partnersCache || []).filter(fits).slice(0, 3);
   return html`<section class="card pro-help"><div class="card-head"><div><h2>Rather not queue for this?</h2>
-      <p class="card-sub">Licensed firms${city ? ' serving ' + city : ''} can file it for you. You deal with them directly.</p></div></div>
+      <p class="card-sub">Independent firms${city ? ' serving ' + city : ''} can file it for you. You deal with them directly.</p></div></div>
     ${fit.length ? fit.map((p) => html`<div class="line"><span class="line-main"><b>${p.name}</b>
       <small>${PARTNER_CATEGORIES[p.category] || ''}${p.cities?.length ? ' · ' + p.cities.slice(0, 3).join(', ') : ''}</small></span>
       ${when(canEdit(), html`<button class="btn btn-sm btn-soft" data-act="partner-intro" data-id="${p.id}" data-req="${r.id}">Request a quote</button>`)}</div>`)

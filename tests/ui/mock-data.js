@@ -12,6 +12,8 @@ const days = (iso) => Math.round((new Date(iso + 'T00:00:00Z') - new Date(today(
 
 const user = { id: 'u1', email: 'sadie@test.ph' };
 const org = { id: 'o1', name: 'Aligned Solutions', plan_id: 'free', plan_expires_at: null, deleted_at: null, role: 'owner', kind: 'business', trial_ends_at: null, required_types: [], contact_name: null, contact_email: null };
+// PP_KIND opens the app as a team workspace in its free trial (the bug sweep uses it).
+if (globalThis.PP_KIND) Object.assign(org, { kind: globalThis.PP_KIND, trial_ends_at: new Date(Date.now() + 20 * 864e5).toISOString() });
 const plans = [
   { id: 'free', name: 'Free', available: true, price_php_monthly: 0, max_members: null, max_locations_per_business: null, paid_channels: false, features: ['Unlimited businesses'] },
   { id: 'business', name: 'Business', price_php_monthly: null, max_members: 5, max_locations_per_business: 1, paid_channels: true, features: ['More'] },
@@ -22,6 +24,8 @@ const plans = [
   { id: 'property_s', name: 'Small property', available: true, price_php_monthly: 2990, paid_channels: true, features: ['Up to 20 tenants'] },
   { id: 'property', name: 'Property', available: true, price_php_monthly: 9990, features: ['Tenant board: every tenant\'s permits on one screen', 'Download tenants\' shared copies', 'Everything in Free'] },
 ];
+// A database before the Small property file doesn't sell that plan.
+if (globalThis.PP_FEATURES === 'none' || (Array.isArray(globalThis.PP_FEATURES) && !globalThis.PP_FEATURES.includes('property_s'))) plans.splice(plans.findIndex((p) => p.id === 'property_s'), 1);
 const types = [
   { code: 'mayors_permit', name: "Mayor's / Business Permit", subject: 'business', expires: true, due_rule: 'jan20', per_location: true, help_text: 'Renew by Jan 20.' },
   { code: 'bir_cor', name: 'BIR Certificate of Registration (Form 2303)', subject: 'business', expires: false, due_rule: 'manual', per_location: true, help_text: 'Does not expire.' },

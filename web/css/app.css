@@ -392,7 +392,8 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 .folder summary { display: flex; gap: 8px; align-items: center; padding: 12px 10px; font-weight: 800; cursor: pointer; color: var(--heading); }
 .folder[open] summary { border-bottom: 2px solid var(--heading); margin: 0 -8px; padding: 12px 18px; }
 .folder summary .muted { margin-left: auto; font-weight: 500; }
-.doc-file { display: flex; gap: 6px; align-items: center; font-size: 14.5px; margin-top: 4px; }
+.doc-file { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14.5px; margin-top: 4px; min-width: 0; }
+.doc-file .linklike { min-width: 0; overflow-wrap: anywhere; text-align: left; }
 .doc-file svg { width: 15px; height: 15px; color: var(--accent-ink); }
 .request .note { background: var(--gray-bg); border-radius: 8px; padding: 8px 10px; margin-top: 6px; font-size: 15px; }
 .member { display: flex; gap: 10px; align-items: center; }
@@ -562,6 +563,17 @@ iframe.preview { height: 70vh; }
 .lp-feature { margin: 0; }
 .lp-feature svg { width: 26px; height: 26px; stroke: #1B4DB5; fill: none; stroke-width: 1.8; display: block; margin-bottom: 8px; }
 .lp-feature b { color: var(--heading); }
+/* the "we can do it for you" offers: one full-width strip under the free features, icon on the left */
+.lp-feature.lp-wide { grid-column: 1 / -1; display: grid; grid-template-columns: 26px 1fr; column-gap: 12px; background: var(--s-prog-bg); border-color: var(--s-prog-mid); }
+.lp-feature.lp-wide svg { grid-row: span 2; margin: 0; }
+@media (min-width: 980px) { .lp-features { grid-template-columns: repeat(4, 1fr); } }
+/* phones: compact rows (icon on the left) so the list doesn't scroll forever */
+@media (max-width: 639px) {
+  .lp-features { grid-template-columns: 1fr; gap: 8px; }
+  .lp-feature { display: grid; grid-template-columns: 24px 1fr; column-gap: 12px; padding: 12px 14px; }
+  .lp-feature svg { grid-row: span 2; width: 24px; height: 24px; margin: 1px 0 0; }
+  .lp-feature p { font-size: 14px; margin-top: 2px; }
+}
 .lp-trust { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 24px; border-top: 5px solid var(--s-ok-mid); }
 .lp-trust b { color: var(--heading); }
 .lp-final { text-align: center; padding: 30px 0 10px; }
@@ -671,12 +683,12 @@ tr.imp-bad td { background: var(--s-over-bg); }
 .nb-pick input { width: 18px; height: 18px; }
 .nb-cell { display: inline-flex; flex-direction: column; gap: 1px; border-radius: 8px; padding: 5px 9px; min-width: 104px; background: var(--s-info-bg); color: var(--s-info); }
 .nb-cell b { font-size: 14px; }
-.nb-cell small { font-size: 12px; opacity: .9; }
+.nb-cell small { font-size: 12px; }
 .nb-cell.overdue { background: var(--s-over-bg); color: var(--s-over); }
 .nb-cell.soon { background: var(--s-soon-bg); color: var(--s-soon-on); }
 .nb-cell.progress { background: var(--s-prog-bg); color: var(--s-prog); }
 .nb-cell.ok { background: var(--s-ok-bg); color: var(--s-ok); }
-.nb-cell.none { background: transparent; color: #A3A8B1; }
+.nb-cell.none { background: transparent; color: #6B7280; }
 .nb-empty { display: flex; gap: 16px; align-items: flex-start; }
 .nb-empty > svg, .nb-kind > svg { width: 34px; height: 34px; stroke: #1B4DB5; fill: none; stroke-width: 1.6; flex: none; }
 .nb-empty p { margin: 4px 0 12px; }
@@ -739,6 +751,10 @@ tr.imp-bad td { background: var(--s-over-bg); }
   .stats:not(.four) .stat { padding: 9px 11px; border-top-width: 4px; }
   .stats:not(.four) .stat-n { font-size: 24px; }
   .stats:not(.four) .stat-l { font-size: 13px; margin-top: 4px; }
+  /* four money tiles, two across: smaller figures so ₱ amounts fit a 360px screen */
+  .stats.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats.four .stat { padding: 10px 12px; }
+  .stats.four .stat-n { font-size: clamp(19px, 6.4vw, 24px); }
 }
 .nb-tip { margin: 12px 0 4px; font-size: 14px; color: var(--muted); }
 .pro-badge { align-self: flex-start; width: auto; }
@@ -774,7 +790,7 @@ tr.imp-bad td { background: var(--s-over-bg); }
 /* landing header on phones: keep Sign in + Get started on one line; "For teams" is further down the page anyway */
 @media (max-width: 560px) {
   .lp-top { gap: 6px; }
-  .lp-top [data-scroll] { display: none; }
+  .lp-top .lp-nav { display: none; }
   .lp-top .wordmark { font-size: 19px; }
   .lp-top .brand img { width: 30px; height: 30px; }
   .lp-top .btn-sm { padding: 7px 11px; }
@@ -1630,6 +1646,7 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .pro-more summary { cursor: pointer; padding: 6px 0; }
 .pro-permits summary .linklike { white-space: nowrap; padding: 0; }
 @media (max-width: 380px) { .lp-top .wordmark { font-size: 17px; } .lp-top .brand img { width: 26px; height: 26px; } .lp-top .btn-sm { padding: 7px 9px; font-size: 14px; } }
+@media (max-width: 340px) { .lp-top { gap: 4px; } .lp-top .brand { gap: 6px; } .lp-top .wordmark { font-size: 15px; } .lp-top .brand img { width: 24px; height: 24px; } .lp-top .btn-sm { padding: 6px 7px; font-size: 13px; } }
 
 /* Plans: a picture of the board, the big wins with icons, everything included one tap away */
 .pp-preview { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 8px 10px; margin: 12px 0 4px; box-shadow: 0 6px 16px -14px rgba(11, 27, 58, .5); }
@@ -1696,3 +1713,24 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .pay-for { margin: 14px 0 0; }
 .ladder-head { margin: 14px 0 0; font-size: 13.5px; font-weight: 700; color: var(--muted); text-align: center; }
 .ladder-head + .ladder { margin-top: 6px; }
+
+/* Landing: hero with a dashboard preview, the PermitPal Plus showcase */
+.lp-hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; align-items: center; }
+.lp-hero-pv { max-width: 440px; width: 100%; margin: 0 auto; text-align: left; }
+@media (min-width: 900px) {
+  .lp-hero { grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); text-align: left; }
+  .lp-hero h1, .lp-hero p { margin-left: 0; }
+  .lp-hero .lp-cta { justify-content: flex-start; }
+}
+.lp-show { display: grid; gap: 22px; margin-top: 30px; align-items: center; border-top: 5px solid var(--accent); }
+@media (min-width: 900px) { .lp-show { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); } }
+.lp-show h2 { margin: 6px 0 8px; font-size: 24px; color: var(--heading); }
+.lp-kicker { display: inline-block; font-size: 13px; font-weight: 800; color: var(--accent-ink); background: var(--accent-soft); border-radius: 999px; padding: 4px 10px; }
+.lp-tp { border: 1px solid var(--border); border-radius: 14px; background: #fff; padding: 14px; box-shadow: var(--lift); max-width: 420px; width: 100%; justify-self: center; }
+.lp-tp-top { padding-bottom: 8px; border-bottom: 1px solid var(--rule); margin-bottom: 6px; }
+.lp-tp-top b { display: block; font-size: 17px; color: var(--heading); }
+.lp-tp-top small { color: var(--muted); font-size: 12.5px; }
+.lp-tp-qr { display: flex; gap: 12px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.lp-qr { width: 56px; height: 56px; fill: var(--heading); flex: none; }
+.lp-tp-qr b { display: block; color: var(--heading); }
+.lp-tp-qr small { color: var(--muted); font-size: 13px; }

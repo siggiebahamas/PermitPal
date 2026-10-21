@@ -7,7 +7,7 @@
 import { html, fmtDate, toast, toastError, when, plural, timeAgo, openModal, formObject, confirmDialog, download, toCsv, todayPH } from '../util.js';
 import { S, on, go, reload, canEdit, isOrgAdmin, empty } from '../core.js';
 import { STATUS, ICON } from '../components.js';
-import { billToggle, planCard, compareTable, paintPrices, PLAN_ORDER, PLANS } from './pricing.js';
+import { billToggle, planCard, compareTable, paintPrices, plansShown, PLANS } from './pricing.js';
 import * as db from 'pp/data';
 
 export const KINDS = {
@@ -151,7 +151,7 @@ function orgBoard(el, k, acc) {
           ${when(isOrgAdmin(), html`<button class="btn btn-sm btn-primary" data-act="nb-nudge" ${picked.size ? '' : 'disabled'}>${ICON.bell} Send reminder${picked.size ? ` (${picked.size})` : ''}</button>`)}</div></div>
       ${when(isOrgAdmin() && !picked.size, html`<p class="nb-tip">Tick the box next to a ${k.one} to send them a reminder.</p>`)}
       <div class="nb-scroll"><table class="nb-table">
-        <thead><tr><th class="nb-pick"></th><th class="nb-name">${k.one[0].toUpperCase() + k.one.slice(1)}</th>${cols.map((c) => html`<th>${typeName(c)}</th>`)}<th>Other</th></tr></thead>
+        <thead><tr><th class="nb-pick"><span class="sr-only">Select</span></th><th class="nb-name">${k.one[0].toUpperCase() + k.one.slice(1)}</th>${cols.map((c) => html`<th>${typeName(c)}</th>`)}<th>Other</th></tr></thead>
         <tbody>${shown.map((r) => {
           const other = r.items.filter((i) => !cols.includes(i.type_code));
           const canNudge = !r.own && (r.member?.via === 'managed' ? !!r.member.contact_email : true);
@@ -226,9 +226,9 @@ function chooser(el) {
     <div class="page-head"><div><h1>Team tools</h1><p class="muted">For people who look after more than their own permits: clients, vehicles or tenants. Free for 30 days, no card needed.</p></div></div>
     <h2 class="section-label">Pick what fits you</h2>
     ${billToggle('How often to pay for a team plan')}
-    <div class="pp-grid four">${PLAN_ORDER.map((id) => planCard(id, price(id),
+    <div class="pp-grid four">${plansShown(S.plans).map((id) => planCard(id, price(id),
       isOrgAdmin() ? html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${PLANS[id].kind}">Try free for 30 days</button>` : ''))}</div>
-    ${compareTable()}
+    ${compareTable(plansShown(S.plans))}
     ${when(!isOrgAdmin(), html`<p class="muted">Ask your workspace owner to switch this on.</p>`)}
     <p class="fineprint">Your own businesses, vehicles and documents stay exactly as they are. You can switch back anytime in Settings → Workspace.</p>`);
   paintPrices(el);
