@@ -73,7 +73,8 @@ export function timeAgo(ts) {
 }
 
 export const plural = (n, word, many = word + 's') => `${n} ${n === 1 ? word : many}`;
-export const peso = (n) => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+// Whole pesos without decimals; anything with centavos shows both digits (₱14,230.50, never ₱14,230.5).
+export const peso = (n) => { const v = Number(n || 0); return '₱' + v.toLocaleString('en-PH', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 }); };
 export function fileSize(b) {
   if (!b && b !== 0) return '';
   if (b < 1024) return `${b} B`;

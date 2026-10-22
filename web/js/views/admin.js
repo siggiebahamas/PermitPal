@@ -13,6 +13,7 @@ import { careTab } from './admin-care.js';
 import { partnersTab as partnersTab2, billingTab } from './admin-partners.js';
 import { plusTab } from './admin-plus.js';
 import { loadTab } from './admin-load.js';
+import { officeTab, clockStartButton } from './admin-office.js';
 import { planTotal } from '../prices.js';
 
 let tab = null; // Money first once the revenue features are on, else the Inbox
@@ -32,6 +33,7 @@ export async function admin(el) {
     else if (tab === 'billing' && rev) body = await billingTab();
     else if (tab === 'plus' && has('plus')) body = await plusTab();
     else if (tab === 'load' && has('load')) body = await loadTab();
+    else if (tab === 'office' && (has('billpay') || has('clock'))) body = await officeTab();
     else if (tab === 'partners' && rev) body = await partnersTab2();
     else if (tab === 'orders' && has('services')) body = await ordersTab();
     else if (tab === 'services' && has('services')) body = servicesTab(await db.adminServices());
@@ -45,7 +47,7 @@ export async function admin(el) {
   } catch (e) { toastError(e); }
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>PermitPal admin</h1><p class="muted">Staff tools. Customers never see this page.</p></div></div>
-    <div class="tabs">${rev ? tabBtn('money', 'Money') : ''}${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${rev && IN_PERSON ? tabBtn('care', 'Care') : ''}${tabBtn('services', 'Services & prices')}` : ''}${has('plus') ? tabBtn('plus', 'Plus & staff') : ''}${has('load') ? tabBtn('load', 'Load') : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${rev ? tabBtn('billing', 'Partner billing') : tabBtn('referrals', 'Quote requests')}
+    <div class="tabs">${rev ? tabBtn('money', 'Money') : ''}${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${rev && IN_PERSON ? tabBtn('care', 'Care') : ''}${tabBtn('services', 'Services & prices')}` : ''}${has('plus') ? tabBtn('plus', 'Plus & staff') : ''}${has('load') ? tabBtn('load', 'Load') : ''}${has('billpay') || has('clock') ? tabBtn('office', 'Bills & clock') : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${rev ? tabBtn('billing', 'Partner billing') : tabBtn('referrals', 'Quote requests')}
       ${tabBtn('payments', 'Payment details')}${tabBtn('outbox', 'Messages')}${has('errors') ? tabBtn('errors', 'Errors') : ''}</div>
     ${body}`);
   wire(el);
@@ -93,6 +95,7 @@ async function ordersTab() {
 }
 on('admin-order', (ds) => { openOrder = ds.id; rerender(); });
 on('admin-back', () => { openOrder = null; rerender(); });
+on('admin-open-order', (ds) => { tab = 'orders'; openOrder = ds.id; rerender(); });
 
 function orderDetail(a, events) {
   const closed = ['completed', 'cancelled'].includes(a.status);
@@ -145,6 +148,7 @@ function orderDetail(a, events) {
       <form class="admin-steps" data-id="${a.id}"><ol class="job-steps">${steps.map((t, i) => html`<li class="${i < (a.steps_done || 0) ? 'done' : ''}"><label class="check"><input type="radio" name="done" value="${i + 1}" ${a.steps_done === i + 1 ? 'checked' : ''}><span>${t}</span></label></li>`)}</ol>
         <label class="check"><input type="radio" name="done" value="0" ${!a.steps_done ? 'checked' : ''}><span>None done yet</span></label>
         <button class="btn btn-sm btn-soft">Save progress</button></form></section>`)}
+    ${clockStartButton(a)}
     ${when(rev && svc?.needs_access && !closed, html`<section class="card"><h2>Their workspace</h2>
       ${a.staff_access ? html`<p class="muted small">The customer agreed to give you temporary access. You join as a plain member; it ends automatically when you mark this order completed.</p>
         <button class="btn btn-sm ${paid ? 'btn-primary' : 'btn-soft'}" data-act="admin-join" data-id="${a.id}" ${paid ? '' : 'disabled'}>${paid ? 'Join their workspace' : 'Join (after payment)'}</button>`

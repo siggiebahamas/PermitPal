@@ -1889,6 +1889,158 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await inv.close();
 }
 
+// The processing clock (starting it, a deadline passing, the follow-up letter and the ARTA complaint, closing it) and
+// city bills (paying one yourself; PermitPal paying one, from the customer's payment to staff confirming, paying and
+// filing the receipt), a teammate's view, phones.
+for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', { width: 390, height: 844 }]]) {
+  const page = await browser.newPage({ viewport: vp, acceptDownloads: true });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(500); };
+  const over = () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  const submit = async (wait = 500) => { await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(wait); };
+  await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+  const req = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.type_code === 'mayors_permit' && r.status !== 'compliant'));
+  await go('#/requirement/' + req.id); await page.waitForSelector('#clock');
+  check(`clock ${label}: a permit being renewed offers to start the clock`, /Waiting on the office/.test(await page.textContent('#clock')));
+  await page.click('[data-act=clock-start]'); await page.waitForSelector('.modal');
+  check(`clock ${label}: the office's name is guessed from the permit and the city`, /Business Permits and Licensing Office/.test(await page.inputValue('.modal [name=office]')));
+  check(`clock ${label}: it shows the legal deadline as you fill it in`, /By law, the office has until/.test(await page.textContent('.modal .clock-preview')));
+  await page.check('.modal input[name=kind][value=charter]'); await submit(200);
+  check(`clock ${label}: a Citizen's Charter time needs its days`, /Citizen's Charter/.test(await page.textContent('#modal-root .modal-error')));
+  await page.check('.modal input[name=kind][value=simple]');
+  await page.fill('.modal [name=reference_no]', 'BPLO-2027-555');
+  await submit();
+  check(`clock ${label}: started: 3 working days left, with the deadline`, /3 working days left/.test(await page.textContent('#clock .chip')) && /By law, it has until/.test(await page.textContent('#clock')));
+  await page.click('#clock [data-act=clock-edit]'); await page.waitForSelector('.modal [name=filed_on]');
+  const twoWeeks = await page.evaluate(() => { const d = new Date(Date.now() + 8 * 3600e3); d.setUTCDate(d.getUTCDate() - 14); return d.toISOString().slice(0, 10); });
+  await page.fill('.modal [name=filed_on]', twoWeeks);
+  await page.selectOption('.modal [name=fees]', 'paid'); await page.fill('.modal [name=fees_paid_on]', twoWeeks);
+  await submit();
+  check(`clock ${label}: past the deadline: late, with the follow-up letter and the ARTA complaint on offer`, /Late by/.test(await page.textContent('#clock .chip')) && /past its deadline/.test(await page.textContent('#clock'))
+    && (await page.locator('#clock [data-act=clock-letter][data-kind=followup]').count()) === 1 && (await page.locator('#clock [data-act=clock-letter][data-kind=complaint]').count()) === 1);
+  await page.click('#clock [data-act=clock-letter][data-kind=followup]'); await page.waitForSelector('.modal .letter-text');
+  const letter = await page.inputValue('.modal .letter-text');
+  check(`clock ${label}: the follow-up letter cites the law, the dates and the reference, and that it's deemed approved (fees paid)`,
+    /Republic Act No\. 11032/.test(letter) && /BPLO-2027-555/.test(letter) && /deemed approved/.test(letter) && /within one \(1\) working day/.test(letter), letter.slice(0, 160));
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('.modal [data-letter=word]')]);
+  check(`clock ${label}: the letter downloads for Word`, /^Follow-up letter - .*\.doc$/.test(dl.suggestedFilename()), dl.suggestedFilename());
+  check(`clock ${label}: the follow-up pop-up only closes (nothing to save)`, (await page.locator('#modal-root button[type=submit]').count()) === 0);
+  await page.click('.modal [data-modal-close]'); await page.waitForTimeout(500);
+  check(`clock ${label}: drafting it is remembered on the card and in the permit's activity`, /Follow-up letter drafted/.test(await page.textContent('#clock')) && /Drafted a follow-up letter/.test(await page.textContent('main')));
+  await page.click('#clock [data-act=clock-letter][data-kind=complaint]'); await page.waitForSelector('.modal .letter-text');
+  const arta = await page.inputValue('.modal .letter-text');
+  check(`clock ${label}: the ARTA complaint has what ARTA asks for, and mentions the follow-up`, /Anti-Red Tape Authority/.test(arta) && /Office concerned:/.test(arta) && /We wrote to the office on/.test(arta)
+    && (await page.getAttribute('.modal a[href^="https://ecms.arta.gov.ph"]', 'target')) === '_blank');
+  await page.fill('.modal [name=arta_ref]', 'ARTA-2027-77'); await submit();
+  check(`clock ${label}: the ARTA reference is kept`, /ARTA reference ARTA-2027-77/.test(await page.textContent('#clock')));
+  check(`clock ${label}: no sideways scroll`, (await over()) <= 0);
+  await page.click('#clock [data-act=clock-close]'); await page.waitForSelector('.modal');
+  await submit();
+  check(`clock ${label}: got it: the clock stops and says how late the office was`, /working days? late/.test(await page.textContent('#clock')) && /Waiting on the office/.test(await page.textContent('#clock')));
+
+  // bills: kept on record, paid yourself
+  await page.click('#bills [data-act=bill-add]'); await page.waitForSelector('.modal');
+  await page.fill('.modal [name=amount]', '650.5'); await page.fill('.modal [name=bill_ref]', 'BC-118');
+  await submit();
+  check(`bills ${label}: a bill kept on record: centavos shown, to pay`, /₱650\.50/.test(await page.textContent('#bills')) && /To pay/.test(await page.textContent('#bills')));
+  await page.click('#bills [data-act=bill-paid]'); await page.waitForSelector('.modal');
+  await submit(200);
+  check(`bills ${label}: paying it needs the receipt number or a photo`, /official receipt/.test(await page.textContent('#modal-root .modal-error')));
+  await page.fill('.modal [name=or_no]', 'OR-55120');
+  await page.setInputFiles('.modal input[type=file]', { name: 'or.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('x') });
+  await submit();
+  check(`bills ${label}: paid: the receipt is with the permit's files`, /official receipt OR-55120/.test(await page.textContent('#bills')) && /Official receipt OR-55120/.test(await page.textContent('main')));
+  // PermitPal pays one
+  await page.click('#bills [data-act=bill-add]'); await page.waitForSelector('.modal');
+  await page.check('.modal input[name=mode][value=permitpal]');
+  await page.fill('.modal [name=amount]', '14230.50');
+  check(`bills ${label}: PermitPal paying shows what you send (the bill plus ₱99)`, /You send ₱14,329\.50/.test(await page.textContent('.modal .bill-total')));
+  await submit(200);
+  check(`bills ${label}: ...and needs a photo of the bill`, /photo of the bill/.test(await page.textContent('#modal-root .modal-error')));
+  await page.setInputFiles('.modal input[name=file]', { name: 'soa.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('x') });
+  await page.click('#modal-root button[type=submit]'); await page.waitForSelector('.modal .quote-hint');
+  check(`bills ${label}: saved: straight to paying PermitPal, with the payment details`, /₱14,329\.50/.test(await page.textContent('.modal .quote-hint')) && (await page.locator('.modal .paywith').count()) >= 1);
+  await page.fill('.modal [name=ref]', '1009 555 0001'); await submit();
+  check(`bills ${label}: paid: we check it`, /Checking your payment/.test(await page.textContent('#bills')));
+  await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=office]'); await page.waitForTimeout(700);
+  check(`bills ${label}: staff see it to confirm`, /₱14,329\.50/.test(await page.textContent('main')));
+  await page.click('[data-act=adm-bill-ok]'); await page.waitForSelector('.modal'); await submit(700);
+  check(`bills ${label}: confirmed: it's on the list to pay, with the time we promised`, (await page.locator('[data-act=adm-bill-paid]').count()) === 1 && /By /.test(await page.textContent('main .chip.soon, main .chip.overdue')));
+  await page.click('[data-act=adm-bill-paid]'); await page.waitForSelector('.modal');
+  await submit(200);
+  check(`bills ${label}: paying needs the official receipt`, /Please fill in/.test(await page.textContent('#modal-root .modal-error')));
+  await page.fill('.modal [name=or_no]', 'OR-7731905'); await page.setInputFiles('.modal input[type=file]', { name: 'or.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('x') });
+  await submit(700);
+  await go('#/requirement/' + req.id); await page.waitForSelector('#bills');
+  check(`bills ${label}: the customer sees it paid, with the receipt on the permit`, /PermitPal paid it: official receipt OR-7731905/.test(await page.textContent('#bills')) && /Official receipt OR-7731905/.test(await page.textContent('main')));
+  check(`bills ${label}: no sideways scroll`, (await over()) <= 0);
+  await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'member'; });
+  await page.click('#bills [data-act=bill-add]'); await page.waitForSelector('.modal');
+  check(`bills ${label}: a teammate can keep a bill, but only an owner or admin has PermitPal pay`, await page.isDisabled('.modal input[name=mode][value=permitpal]'));
+  await page.click('.modal [data-modal-close]');
+  await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'owner'; });
+  check(`clock+bills ${label}: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+// Staff: a bill we can't pay goes back, the holiday calendar, the fee, the clock on an order we filed; the demo; before file 10.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await page.addInitScript(() => { globalThis.PP_DEMO = true; });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(600); };
+  const submit = async (wait = 600) => { await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(wait); };
+  await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+  const mp = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.business_id === 'b1' && r.type_code === 'mayors_permit').id);
+  await go('#/requirement/' + mp); await page.waitForSelector('#clock');
+  check('clock demo: an office past its deadline, with the letters ready', /Late by/.test(await page.textContent('#clock .chip')) && (await page.locator('#clock [data-act=clock-letter]').count()) === 2);
+  check('bills demo: a bill PermitPal is paying, and when', /We're paying it/.test(await page.textContent('#bills')) && /by .*(AM|PM)/i.test(await page.textContent('#bills')));
+  await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=office]'); await page.waitForTimeout(700);
+  check('admin: the late office is listed', /Late by/.test(await page.textContent('main')) && /Makati Business Permits and Licensing Office/.test(await page.textContent('main')));
+  await page.click('[data-act=adm-bill-refund]'); await page.waitForSelector('.modal'); await submit(200);
+  check("admin: sending a bill back needs the reason the customer will read", /Please fill in/.test(await page.textContent('#modal-root .modal-error')));
+  await page.fill('.modal [name=note]', 'Makati only takes this payment at its own window.'); await page.fill('.modal [name=ref]', 'GC-1'); await submit(700);
+  await go('#/requirement/' + mp); await page.waitForSelector('#bills');
+  check('bills demo: sent back: the customer sees why', /Sent back to you/.test(await page.textContent('#bills')) && /own window/.test(await page.textContent('#bills')));
+  await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=office]'); await page.waitForTimeout(700);
+  await page.click('[data-act=adm-holiday-add]'); await page.waitForSelector('.modal');
+  await page.fill('.modal [name=day]', '2027-06-24'); await page.fill('.modal [name=name]', 'Araw ng Maynila'); await submit(700);
+  check('admin: a day off is added to the calendar', (await page.locator('.hol-row', { hasText: 'Araw ng Maynila' }).count()) === 1);
+  await page.click('.hol-more summary'); await page.click('[data-act=adm-holiday-remove][data-day="2027-06-24"]'); await page.waitForTimeout(700);
+  check('admin: ...and removed', (await page.locator('.hol-row', { hasText: 'Araw ng Maynila' }).count()) === 0);
+  await page.fill('.adm-bill-settings [name=fee]', '120'); await page.click('[data-act=adm-bill-settings]'); await page.waitForTimeout(600);
+  await go('#/requirement/' + mp); await page.waitForSelector('#bills');
+  await page.click('#bills [data-act=bill-add]'); await page.waitForSelector('.modal');
+  check('admin: a new fee shows to customers at once', /₱120/.test(await page.textContent('.modal')));
+  await page.click('.modal [data-modal-close]');
+  await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(600);
+  await page.click('[data-act=admin-order][data-id=ord1]'); await page.waitForTimeout(500);
+  check('admin: an order we filed offers to start the clock', (await page.locator('[data-act=adm-clock-start]').count()) === 1);
+  await page.click('[data-act=adm-clock-start]'); await page.waitForSelector('.modal');
+  await page.fill('.modal [name=office]', 'BFP Mandaue'); await page.fill('.modal [name=reference_no]', 'FSIC-88'); await submit(700);
+  const fsicId = await page.evaluate(async () => (await import('/__mock/mock-data.js')).__office.filings.find((f) => f.request_id === 'ord1')?.requirement_id);
+  await go('#/requirement/' + fsicId); await page.waitForSelector('#clock');
+  check('clock: on an order we filed, the customer sees the clock and that we follow up', /BFP Mandaue/.test(await page.textContent('#clock')) && /PermitPal filed this for you/.test(await page.textContent('#clock'))
+    && (await page.locator('#clock [data-act=clock-edit]').count()) === 0);
+  check('clock+bills demo: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+  const off = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await off.addInitScript(() => { globalThis.PP_FEATURES = ['errors', 'assign', 'library2', 'services', 'filings', 'sms', 'mfa', 'revenue', 'plus', 'load']; });
+  const oerrs = [];
+  off.on('pageerror', (e) => oerrs.push(e.message));
+  await off.goto('http://localhost:4173/'); await off.waitForSelector('main h1');
+  const anyReq = await off.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.status !== 'compliant').id);
+  await off.evaluate((id) => { location.hash = '#/requirement/' + id; }, anyReq); await off.waitForTimeout(700);
+  check('clock+bills off: before database file 10, permits show neither card', (await off.locator('#clock, #bills').count()) === 0);
+  await off.evaluate(() => { location.hash = '#/admin'; }); await off.waitForTimeout(600);
+  check('clock+bills off: ...and staff have no Bills & clock tab', (await off.locator('[data-act=admin-tab][data-tab=office]').count()) === 0);
+  check('clock+bills off: no JavaScript errors', oerrs.length === 0, oerrs.slice(0, 3).join(' | '));
+  await off.close();
+}
+
 // Renewal guides (renew/): plain pages search engines can read, with the checklist, the dates, a calendar
 // file and the penalty estimate. Built by scripts/build-city-pages.mjs at the top of this file.
 {

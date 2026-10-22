@@ -39,7 +39,7 @@ on('money-all-receipts', () => { st.allReceipts = true; rerender(); });
 // Year-round care is switched off with the rest of the in-person work, so its stream isn't shown; load
 // top-ups only once the load database part is on.
 const shownKeys = () => STREAM_KEYS.filter((k) => (IN_PERSON || k !== 'care') && (has('load') || k !== 'load'));
-const noteOf = (k) => (k === 'jobs' && !IN_PERSON ? 'Account set-ups and online filings customers asked for' : STREAMS[k].note);
+const noteOf = (k) => (k === 'jobs' && !IN_PERSON ? 'Account set-ups, online filings and paying city bills, for customers who asked' : STREAMS[k].note);
 const streamDot = (k) => html`<span class="dot" style="background:${STREAMS[k].color}" aria-hidden="true"></span>`;
 const monthName = (m) => monthLabel(m, true).replace(/^(\w+)/, (x) => ({ Jan: 'January', Feb: 'February', Mar: 'March', Apr: 'April', May: 'May', Jun: 'June', Jul: 'July', Aug: 'August', Sep: 'September', Oct: 'October', Nov: 'November', Dec: 'December' })[x]);
 // "₱1,800 more than the same days last month", in words rather than a percentage.

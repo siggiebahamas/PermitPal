@@ -767,3 +767,50 @@ export const adminSaveLoadProduct = async (code, price, active) => ok(await sb.r
 export const adminWallets = async () => ok(await sb.from('load_wallets').select('*, orgs(name)').order('updated_at', { ascending: false }).limit(500));
 export const adminLoadGift = async (orgId, amount, texts, note) => ok(await sb.rpc('admin_load_gift', { p_org: orgId, p_amount: amount || 0, p_texts: texts || 0, p_note: note }));
 export const adminLoadCashout = async (orgId, amount, method, ref, note) => ok(await sb.rpc('admin_load_cashout', { p_org: orgId, p_amount: amount, p_method: method, p_ref: ref || null, p_note: note || null }));
+
+// ---------------------------------------------------------------- the processing clock and city bills
+// The clock counts an office's legal processing time after you file; bills are the office's tax bills and statements,
+// kept on the permit, or paid by PermitPal on request. Every rule is checked again by the database.
+export const filings = async (reqId) => ok(await sb.from('office_filings').select('*').eq('requirement_id', reqId).order('created_at', { ascending: false }).limit(10));
+export const holidays = async (from, to) => ok(await sb.from('ph_holidays').select('day, name, kind').gte('day', from).lte('day', to).order('day'));
+export const filingSave = async (f) => ok(await sb.rpc('filing_save', {
+  p_id: f.id || null, p_requirement: f.requirement_id || null, p_office: f.office, p_reference: f.reference_no || null, p_filed_on: f.filed_on,
+  p_kind: f.kind, p_days: f.days ? Number(f.days) : null, p_fees: f.fees, p_fees_paid_on: f.fees_paid_on || null,
+  p_extended: !!f.extended, p_extension_note: f.extension_note || null, p_closed_days: Number(f.closed_days || 0) }));
+export const filingClose = async (id, status, on) => ok(await sb.rpc('filing_close', { p_id: id, p_status: status, p_on: on || null }));
+export const filingLetter = async (id, kind, ref) => ok(await sb.rpc('filing_letter', { p_id: id, p_kind: kind, p_ref: ref || null }));
+export const bills = async (reqId) => ok(await sb.from('gov_bills').select('*').eq('requirement_id', reqId).order('created_at', { ascending: false }).limit(20));
+async function uploadBillFile(orgId, folder, file) {
+  const problem = checkFile(file);
+  if (problem) throw new Error(problem);
+  const path = `${orgId}/bills/${folder}/${rand()}-${safeName(file.name)}`;
+  ok(await sb.storage.from('documents').upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false }));
+  return { path, name: file.name.slice(0, 255) };
+}
+export async function billAdd(orgId, reqId, f, file) {
+  const up = file && file.size ? await uploadBillFile(orgId, rand(), file) : null;
+  return ok(await sb.rpc('bill_add', { p_org: orgId, p_requirement: reqId, p_office: f.office, p_ref: f.bill_ref || null, p_amount: Number(f.amount),
+    p_pay_by: f.pay_by || null, p_mode: f.mode, p_bill_path: up?.path || null, p_bill_name: up?.name || null }));
+}
+export async function billReport(b, { method, ref, file }) {
+  const up = file && file.size ? await uploadBillFile(b.org_id, b.id, file) : null;
+  return ok(await sb.rpc('bill_report', { p_bill: b.id, p_method: method, p_ref: ref || null, p_proof_path: up?.path || null, p_proof_name: up?.name || null }));
+}
+export const billCancel = async (id) => ok(await sb.rpc('bill_cancel', { p_bill: id }));
+export async function billPaidSelf(b, { or_no, or_date, file }) {
+  const up = file && file.size ? await uploadBillFile(b.org_id, b.id, file) : null;
+  return ok(await sb.rpc('bill_paid_self', { p_bill: b.id, p_or_no: or_no || null, p_or_date: or_date, p_or_path: up?.path || null, p_or_name: up?.name || null }));
+}
+// Staff: bills to confirm and pay, refunds, offices running late, the holiday calendar.
+export const adminBills = async () => ok(await sb.from('gov_bills').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
+export const adminBillReceived = async (id, okPaid, note, invoiceNo) => ok(await sb.rpc('admin_bill_received', { p_bill: id, p_ok: !!okPaid, p_note: note || null, p_invoice_no: invoiceNo || null }));
+export async function adminBillPaid(b, { or_no, or_date, file }) {
+  const up = await uploadBillFile(b.org_id, b.id, file);
+  return ok(await sb.rpc('admin_bill_paid', { p_bill: b.id, p_or_no: or_no, p_or_date: or_date, p_or_path: up.path, p_or_name: up.name }));
+}
+export const adminBillRefund = async (id, note, method, ref) => ok(await sb.rpc('admin_bill_refund', { p_bill: id, p_note: note, p_method: method || null, p_ref: ref || null }));
+export const adminFilings = async () => ok(await sb.rpc('admin_filings'));
+export const adminStartFiling = async (requestId, f) => ok(await sb.rpc('admin_start_filing', { p_request: requestId, p_office: f.office, p_reference: f.reference_no || null,
+  p_filed_on: f.filed_on, p_kind: f.kind, p_days: f.days ? Number(f.days) : null }));
+export const adminCloseFiling = async (id, status) => ok(await sb.rpc('filing_close', { p_id: id, p_status: status, p_on: null }));
+export const adminSetHoliday = async (day, name, kind, remove) => ok(await sb.rpc('admin_set_holiday', { p_day: day, p_name: name || null, p_kind: kind || 'special', p_remove: !!remove }));

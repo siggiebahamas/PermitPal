@@ -2057,3 +2057,42 @@ li a.rn-city { text-decoration: none; }
 .rn-fine { margin-top: 28px; }
 .rn-body .lp-foot { margin-bottom: 28px; }
 @media print { .rn-body .lp-top, .rn-body .lp-foot, .rn-cta, .rn-est, .rn-due .btn { display: none; } }
+
+/* ---------------------------------------------------------------- the processing clock and city bills (permit page) */
+.clock-card .card-head { align-items: flex-start; }
+.clock-meter { height: 8px; border-radius: 999px; background: var(--s-prog-bg); overflow: hidden; margin: 2px 0 14px; }
+.clock-meter span { display: block; height: 100%; border-radius: 999px; background: var(--s-prog-mid); }
+.clock-card.is-late .clock-meter { background: var(--s-over-bg); }
+.clock-card.is-late .clock-meter span { background: var(--s-over-mid); }
+.clock-facts { margin: 0 0 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px 16px; }
+.clock-facts dt { font-size: 13.5px; color: var(--muted); font-weight: 600; }
+.clock-facts dd { margin: 2px 0 0; font-size: 15.5px; }
+.clock-late { margin: 0 0 12px; }
+.clock-letters { color: var(--s-ok); font-weight: 600; margin: 0 0 10px; }
+.clock-last { margin: -6px 0 16px; }
+.clock-kinds { border: 0; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.clock-kinds legend { font-size: 14px; font-weight: 650; margin-bottom: 6px; padding: 0; }
+.clock-kinds .check { align-items: flex-start; }
+.clock-kinds .check small { display: block; }
+.clock-kinds .check.is-off { opacity: .7; }
+.clock-kinds .field { margin: 0 0 0 30px; }
+.clock-preview { margin: 4px 0 0; font-size: 15px; min-height: 1.4em; }
+.letter-text { width: 100%; font-family: 'Times New Roman', Georgia, serif; font-size: 15px; line-height: 1.5; min-height: 300px; }
+.bills-card .card-head { align-items: flex-start; }
+.bill-row { display: flex; flex-wrap: wrap; gap: 10px 16px; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--rule); }
+.bill-row:first-of-type { border-top: 0; padding-top: 4px; }
+.bill-main { flex: 1 1 260px; min-width: 0; }
+.bill-top { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.bill-amt { font-weight: 800; color: var(--heading); font-variant-numeric: tabular-nums; }
+.bill-line { margin: 6px 0 0; }
+.bill-note { color: var(--s-over); font-weight: 600; }
+.bill-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.bill-side .btn-row { justify-content: flex-end; }
+@media (max-width: 560px) { .bill-side { align-items: flex-start; } .bill-side .btn-row { justify-content: flex-start; } }
+.bill-total { margin: 4px 0 0; font-size: 15px; min-height: 1.4em; }
+.bill-total .form-error { display: block; margin-top: 4px; }
+.hol-list { display: grid; gap: 2px; }
+.hol-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--rule); font-size: 15px; }
+.hol-row:first-child { border-top: 0; }
+.hol-more { margin-top: 8px; }
+.hol-more summary { cursor: pointer; font-weight: 650; color: var(--link); padding: 6px 0; }

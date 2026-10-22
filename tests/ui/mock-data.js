@@ -339,7 +339,7 @@ const now = () => new Date().toISOString();
 function event(a, kind, message, byStaff = false, file = null) {
   db.events.push({ id: ++seq, request_id: a.id, org_id: a.org_id, by_staff: byStaff, kind, message, file_path: file, file_name: file, created_at: now() });
 }
-const settings = { gcash_name: 'PermitPal Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'PermitPal Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '' };
+const settings = { gcash_name: 'PermitPal Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'PermitPal Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '', billpay_fee: '99', billpay_max: '50000', billpay_open: 'on' };
 export const listServices = async () => SERVICES;
 export async function requestService(f) {
   // Same rules as the database: authorization ticked, one open request per permit, no flooding.
@@ -756,7 +756,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 
@@ -1316,6 +1316,20 @@ function moneyLines() {
   for (const c of db.credits.filter((x) => x.kind === 'topup')) L.push({ day: dayOf(c.created_at), stream: 'partners', kind: 'credit_topup', state: 'collected', amount: c.amount_php, label: 'Prepaid credit for quote requests',
     who: db.partners.find((p) => p.id === c.partner_id)?.name || 'Firm', ref_kind: 'credit', ref_id: c.id, invoice_no: c.bir_invoice_no || null, rush: 0 });
   for (const pm of db.planPayments) L.push({ day: dayOf(pm.paid_at), stream: 'plans', kind: 'team_plan', state: 'collected', amount: pm.amount_php, label: `${pm.plan_name} plan, ${pm.months} month${pm.months > 1 ? 's' : ''}`, who: pm.org_name, ref_kind: 'plan', ref_id: pm.id, invoice_no: pm.bir_invoice_no || null, rush: 0 });
+  // city bills PermitPal pays: the fee is ours; the bill is the customer's money passing through
+  for (const b of (globalThis.__officeBills || []).filter((x) => x.mode === 'permitpal')) {
+    const base = { stream: 'jobs', who: org.name, ref_kind: 'gbill', ref_id: b.id, rush: 0 };
+    if (b.received_at) {
+      if (b.fee_php > 0) L.push({ ...base, day: dayOf(b.received_at), kind: 'billpay_fee', state: 'collected', amount: b.fee_php, label: 'Paying a city bill, ' + b.number, invoice_no: b.bir_invoice_no || null });
+      L.push({ ...base, day: dayOf(b.received_at), kind: 'gov_fees_in', state: 'held', amount: b.amount_php, label: 'City bill ' + b.number, invoice_no: null });
+    }
+    if (b.status === 'paid') L.push({ ...base, day: dayOf(b.paid_at), kind: 'gov_fees_out', state: 'held', amount: -b.amount_php, label: `City bill ${b.number} paid to ${b.office}`, invoice_no: null });
+    if (b.status === 'refunded') {
+      L.push({ ...base, day: dayOf(b.refunded_at), kind: 'refund', state: 'held', amount: -b.amount_php, label: `City bill ${b.number} sent back`, invoice_no: null });
+      if (b.fee_php > 0) L.push({ ...base, day: dayOf(b.refunded_at), kind: 'refund', state: 'collected', amount: -b.fee_php, label: `Fee for city bill ${b.number} sent back`, invoice_no: null });
+    }
+    if (['due', 'pending_verification'].includes(b.status) && b.fee_php > 0) L.push({ ...base, day: dayOf(b.created_at), kind: 'billpay_fee', state: 'to_collect', amount: b.fee_php, label: 'Paying a city bill, ' + b.number, invoice_no: null });
+  }
   return L.sort((a, b) => String(b.day).localeCompare(String(a.day)));
 }
 export const adminMoney = async (from, to) => moneyLines().filter((l) => (l.day >= from && l.day <= to) || ['to_collect', 'pipeline', 'unbilled', 'to_pay'].includes(l.state));
@@ -1351,7 +1365,8 @@ export async function adminSetMoneySetting(key, value) {
 }
 export async function adminSetInvoiceNo(kind, id, no) {
   const target = kind === 'order' ? [...db.requests, ...db.history].find((x) => x.id === id) : kind === 'care' ? [...db.care.invoices, ...db.history].find((x) => x.id === id)
-    : kind === 'statement' ? db.statements.find((x) => x.id === id) : kind === 'credit' ? db.credits.find((x) => x.id === id) : db.planPayments.find((x) => x.id === id);
+    : kind === 'statement' ? db.statements.find((x) => x.id === id) : kind === 'credit' ? db.credits.find((x) => x.id === id)
+    : kind === 'gbill' ? (globalThis.__officeBills || []).find((x) => x.id === id) : db.planPayments.find((x) => x.id === id);
   if (!target) throw new Error('Payment not found.');
   target.bir_invoice_no = no || null;
 }
@@ -1971,4 +1986,206 @@ if (LOAD_ON && (globalThis.PP_DEMO || globalThis.PP_LOAD)) {
   loadDb.code = 'K7M2Q9XD';
   loadDb.invites.push({ joined_on: addDays(-30), status: 'rewarded', permits_with_dates: 3, my_reward: 'plus_month' }, { joined_on: addDays(-6), status: 'pending', permits_with_dates: 1, my_reward: null });
   loadDb.entries.unshift({ id: ++lseq, org_id: org.id, kind: 'bonus', paid_php: 0, bonus_php: 0, texts: 0, item: 'invite', label: 'Thank you for inviting a business: a month of PermitPal Plus', ref_id: null, created_at: daysAgoIso(22) });
+}
+
+
+// ---------------------------------------------------------------- the processing clock and city bills (the database's rules, in memory)
+const CLOCK_ON = globalThis.PP_FEATURES !== 'none' && (!Array.isArray(globalThis.PP_FEATURES) || globalThis.PP_FEATURES.includes('clock'));
+const BILLS_ON = globalThis.PP_FEATURES !== 'none' && (!Array.isArray(globalThis.PP_FEATURES) || globalThis.PP_FEATURES.includes('billpay'));
+const office = { filings: [], bills: [], seq: 200,
+  hol: [['2026-11-01', "All Saints' Day", 'special'], ['2026-11-02', "All Souls' Day", 'special'], ['2026-11-30', 'Bonifacio Day', 'regular'],
+    ['2026-12-08', 'Feast of the Immaculate Conception', 'special'], ['2026-12-24', 'Christmas Eve', 'special'], ['2026-12-25', 'Christmas Day', 'regular'],
+    ['2026-12-30', 'Rizal Day', 'regular'], ['2026-12-31', 'Last Day of the Year', 'special'], ['2027-01-01', "New Year's Day", 'regular'],
+    ['2027-02-06', 'Chinese New Year', 'special'], ['2027-03-25', 'Maundy Thursday', 'regular'], ['2027-03-26', 'Good Friday', 'regular'],
+    ['2027-03-27', 'Black Saturday', 'special'], ['2027-04-09', 'Araw ng Kagitingan', 'regular'], ['2027-05-01', 'Labor Day', 'regular'],
+    ['2027-06-12', 'Independence Day', 'regular'], ['2027-08-21', 'Ninoy Aquino Day', 'special'], ['2027-08-30', 'National Heroes Day', 'regular'],
+    ['2027-11-01', "All Saints' Day", 'special'], ['2027-11-02', "All Souls' Day", 'special'], ['2027-11-30', 'Bonifacio Day', 'regular'],
+    ['2027-12-08', 'Feast of the Immaculate Conception', 'special'], ['2027-12-24', 'Christmas Eve', 'special'], ['2027-12-25', 'Christmas Day', 'regular'],
+    ['2027-12-30', 'Rizal Day', 'regular'], ['2027-12-31', 'Last Day of the Year', 'special']] };
+export const __office = office; // the smoke test reads and nudges this
+globalThis.__officeBills = office.bills;
+const offErr = (m, code = 'P0001') => Object.assign(new Error(m), { code });
+const nextDay = (iso, n = 1) => addDaysTo(iso, n);
+const isWork = (iso) => { const wd = new Date(iso + 'T00:00:00Z').getUTCDay(); return wd !== 0 && wd !== 6 && !office.hol.some(([d]) => d === iso); };
+const addWork = (from, n) => { let d = from; for (let k = 0; k < n;) { d = nextDay(d); if (isWork(d)) k++; } return d; };
+const workBetween = (from, to) => { let n = 0; for (let d = nextDay(from); d <= to; d = nextDay(d)) if (isWork(d)) n++; return n; };
+const clockDue = (f) => addWork(f.filed_on, ({ simple: 3, complex: 7, technical: 20 }[f.kind] || f.days) * (f.extended ? 2 : 1) + (f.closed_days || 0));
+const canWrite = () => ['owner', 'admin', 'member'].includes(org.role);
+const isAdminRole = () => ['owner', 'admin'].includes(org.role);
+const reqFor = (id) => { const r = db.requirements.find((x) => x.id === id && !x.deleted_at); if (!r || !canWrite()) throw offErr('Permit not found.', '42501'); return r; };
+const fmtD = (iso) => new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const pesoB = (n) => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+export const holidays = async (from, to) => office.hol.filter(([d]) => d >= from && d <= to).map(([day, name, kind]) => ({ day, name, kind }));
+export const filings = async (reqId) => office.filings.filter((f) => f.requirement_id === reqId).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((f) => ({ ...f }));
+export async function filingSave(v) {
+  if (!CLOCK_ON) throw offErr('The processing clock is not switched on yet.');
+  let f = v.id ? office.filings.find((x) => x.id === v.id) : null;
+  if (v.id && (!f || !canWrite())) throw offErr('Filing not found.', '42501');
+  if (f && f.status !== 'waiting') throw offErr('This filing is closed. If you filed again, start the clock again.');
+  const r = reqFor(f ? f.requirement_id : v.requirement_id);
+  if (!f && office.filings.some((x) => x.requirement_id === r.id && x.status === 'waiting')) throw offErr('The clock is already running for this permit. Update that filing instead.');
+  if (String(v.office || '').trim().length < 2) throw offErr('Which office did you file with?');
+  if (!v.filed_on) throw offErr('When did you hand in your papers?');
+  if (v.filed_on > today()) throw offErr("The day you filed can't be in the future.");
+  if (v.filed_on < addDays(-365)) throw offErr("That's more than a year ago. Start the clock when you file again.");
+  if (!['simple', 'complex', 'technical', 'charter'].includes(v.kind)) throw offErr('Choose the processing time.');
+  if (v.kind === 'charter' && !(Number(v.days) >= 1 && Number(v.days) <= 60)) throw offErr("Enter the working days in the office's Citizen's Charter (1 to 60).");
+  if (v.fees === 'paid' && (!v.fees_paid_on || v.fees_paid_on > today())) throw offErr('Enter the day you paid the fees.');
+  if (v.extended && String(v.extension_note || '').trim().length < 3) throw offErr('Say what the office wrote about needing more time.');
+  const fields = { office: v.office.trim(), reference_no: v.reference_no || null, filed_on: v.filed_on, kind: v.kind, days: v.kind === 'charter' ? Number(v.days) : { simple: 3, complex: 7, technical: 20 }[v.kind],
+    fees: v.fees, fees_paid_on: v.fees === 'paid' ? v.fees_paid_on : null, extended: !!v.extended, extension_note: v.extended ? v.extension_note.trim() : null, closed_days: Number(v.closed_days || 0) };
+  if (f) Object.assign(f, fields);
+  else { f = { id: uid(), org_id: org.id, requirement_id: r.id, request_id: null, status: 'waiting', closed_on: null, followup_at: null, complaint_at: null, complaint_ref: null, created_at: new Date().toISOString(), ...fields }; office.filings.push(f); }
+  f.due_on = clockDue(f);
+  log(v.id ? `Updated the filing with ${f.office}. The office now has until ${fmtD(f.due_on)}.` : `Filed with ${f.office} on ${fmtD(f.filed_on)}. By law it has until ${fmtD(f.due_on)}.`, { entity: 'office_filing', action: v.id ? 'clock_update' : 'clock_start', ...ids(r) });
+  return f.id;
+}
+export async function filingClose(id, status, on) {
+  const f = office.filings.find((x) => x.id === id);
+  if (!f || !(canWrite() || (f.request_id && me.is_platform_admin))) throw offErr('Filing not found.', '42501');
+  if (f.status !== 'waiting') throw offErr('This filing is already closed.');
+  const day = on || today();
+  if (day > today() || day < f.filed_on) throw offErr('Choose a day between the day you filed and today.');
+  Object.assign(f, { status, closed_on: day });
+  const r = db.requirements.find((x) => x.id === f.requirement_id);
+  log(status === 'released' ? `${f.office} released it on ${fmtD(day)}${day > f.due_on ? `, ${workBetween(f.due_on, day)} working day(s) past its deadline.` : ', on time.'}` : `Stopped the clock for the filing with ${f.office}.`, { entity: 'office_filing', action: 'clock_' + status, ...ids(r) });
+}
+export async function filingLetter(id, kind, ref) {
+  const f = office.filings.find((x) => x.id === id);
+  if (!f || !canWrite()) throw offErr('Filing not found.', '42501');
+  const r = db.requirements.find((x) => x.id === f.requirement_id);
+  if (kind === 'followup') { if (!f.followup_at) log(`Drafted a follow-up letter to ${f.office}.`, { entity: 'office_filing', action: 'clock_followup', ...ids(r) }); f.followup_at = new Date().toISOString(); }
+  else { if (!f.complaint_at) log(`Drafted a complaint to ARTA about ${f.office}.`, { entity: 'office_filing', action: 'clock_complaint', ...ids(r) }); f.complaint_at ||= new Date().toISOString(); if (ref) f.complaint_ref = ref; }
+}
+export const bills = async (reqId) => office.bills.filter((b) => b.requirement_id === reqId).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((b) => ({ ...b }));
+export async function billAdd(orgId, reqId, v, file) {
+  if (!BILLS_ON) throw offErr('City bills are not switched on yet.');
+  const r = reqFor(reqId);
+  if (v.mode === 'permitpal' && !isAdminRole()) throw offErr('Only the workspace owner or an admin can have PermitPal pay a bill.', '42501');
+  if (v.mode === 'permitpal' && settings.billpay_open !== 'on') throw offErr("PermitPal isn't paying bills for customers right now. Keep the bill here and pay it yourself.");
+  if (String(v.office || '').trim().length < 2) throw offErr('Which office sent the bill?');
+  if (!(v.amount > 0)) throw offErr('Enter the amount on the bill.');
+  if (v.mode === 'permitpal' && v.amount > Number(settings.billpay_max)) throw offErr(`PermitPal pays bills up to ${pesoB(settings.billpay_max)}. For this one, pay the office directly and keep the receipt here.`);
+  if (v.mode === 'permitpal' && !(file && file.size)) throw offErr('Add a photo of the bill, so we pay exactly what it says.');
+  if (office.bills.some((b) => b.requirement_id === r.id && b.amount_php === v.amount && ['due', 'pending_verification', 'processing'].includes(b.status) && (b.bill_ref || '') === (v.bill_ref || ''))) throw offErr('This bill is already here.');
+  const b = { id: uid(), number: `G-${today().slice(0, 4)}-${String(++office.seq).padStart(5, '0')}`, org_id: org.id, requirement_id: r.id, label: reqLabel(r),
+    office: v.office.trim(), bill_ref: v.bill_ref || null, amount_php: v.amount, pay_by: v.pay_by || null, mode: v.mode, fee_php: v.mode === 'permitpal' ? Number(settings.billpay_fee) : 0,
+    bill_path: file?.size ? `${org.id}/bills/x/${file.name}` : null, bill_name: file?.name || null, status: 'due', pay_method: null, pay_ref: null, proof_path: null, proof_name: null,
+    reported_at: null, received_at: null, pay_deadline: null, paid_at: null, or_no: null, or_date: null, or_path: null, or_name: null, document_id: null, refunded_at: null, refund_note: null,
+    bir_invoice_no: null, note: null, created_at: new Date().toISOString() };
+  office.bills.push(b);
+  log(`Added a bill from ${b.office} for ${pesoB(b.amount_php)}${b.mode === 'permitpal' ? ', for PermitPal to pay.' : '.'}`, { entity: 'gov_bill', action: 'bill_add', ...ids(r) });
+  return b.id;
+}
+export async function billReport(b0, { method, ref, file }) {
+  const b = office.bills.find((x) => x.id === b0.id);
+  if (!['due', 'pending_verification'].includes(b.status)) throw offErr('This bill is already paid or closed.');
+  if (!ref && !(file && file.size)) throw offErr('Add the reference number or a screenshot of the payment.');
+  Object.assign(b, { status: 'pending_verification', pay_method: method, pay_ref: ref || null, proof_path: file?.size ? `${org.id}/bills/${b.id}/${file.name}` : b.proof_path, proof_name: file?.name || b.proof_name, reported_at: new Date().toISOString(), note: null });
+}
+export async function billCancel(id) {
+  const b = office.bills.find((x) => x.id === id);
+  if (!b || !canWrite() || (b.mode === 'permitpal' && !isAdminRole())) throw offErr('Bill not found.', '42501');
+  if (b.status !== 'due') throw offErr('Only a bill nobody has paid yet can be removed.');
+  Object.assign(b, { status: 'cancelled', note: 'Removed.' });
+}
+function fileReceipt(b) {
+  if (!b.or_path || b.document_id) return;
+  const d = { id: uid(), requirement_id: b.requirement_id, cycle_id: null, file_name: `Official receipt ${b.or_no ? b.or_no + ' ' : ''}- ${b.or_name || 'receipt'}`, storage_path: b.or_path, mime_type: 'image/jpeg', size_bytes: 1000, created_at: new Date().toISOString(), deleted_at: null };
+  db.documents.push(d); b.document_id = d.id;
+}
+export async function billPaidSelf(b0, { or_no, or_date, file }) {
+  const b = office.bills.find((x) => x.id === b0.id);
+  if (b.mode !== 'self') throw offErr('PermitPal is paying this one, and adds the receipt itself.');
+  if (b.status !== 'due') throw offErr('This bill is already marked paid.');
+  if (!or_no && !(file && file.size)) throw offErr('Add the official receipt number or a photo of it.');
+  if (!or_date || or_date > today()) throw offErr('Enter the date on the receipt.');
+  Object.assign(b, { status: 'paid', paid_at: new Date().toISOString(), or_no: or_no || null, or_date, or_path: file?.size ? `${org.id}/bills/${b.id}/${file.name}` : null, or_name: file?.name || null });
+  fileReceipt(b);
+  const r = db.requirements.find((x) => x.id === b.requirement_id);
+  log(`Paid ${b.office} ${pesoB(b.amount_php)}${or_no ? ` (official receipt ${or_no})` : ''}.`, { entity: 'gov_bill', action: 'bill_paid', ...ids(r) });
+}
+const staffOnly = () => { if (!me.is_platform_admin) throw offErr('Staff only.', '42501'); };
+export const adminBills = async () => { staffOnly(); return office.bills.map((b) => ({ ...b, orgs: { name: org.name } })).sort((a, b) => b.created_at.localeCompare(a.created_at)); };
+export async function adminBillReceived(id, okPaid, note, inv) {
+  staffOnly();
+  const b = office.bills.find((x) => x.id === id);
+  if (b.status !== 'pending_verification') throw offErr('Nothing to confirm on this bill.');
+  if (!okPaid) { Object.assign(b, { status: 'due', note: note || 'We could not find this payment. Please check the reference number and send it again.' }); return; }
+  Object.assign(b, { status: 'processing', received_at: new Date().toISOString(), pay_deadline: nextBusiness6pm(), note: null, bir_invoice_no: inv || b.bir_invoice_no });
+}
+export async function adminBillPaid(b0, { or_no, or_date, file }) {
+  staffOnly();
+  const b = office.bills.find((x) => x.id === b0.id);
+  if (b.status !== 'processing') throw offErr("Confirm the customer's payment first.");
+  if (!or_no) throw offErr('Enter the official receipt number.');
+  if (!(file && file.size)) throw offErr('Upload the official receipt.');
+  Object.assign(b, { status: 'paid', paid_at: new Date().toISOString(), or_no, or_date, or_path: `${org.id}/bills/${b.id}/${file.name}`, or_name: file.name });
+  fileReceipt(b);
+}
+export async function adminBillRefund(id, note, method, ref) {
+  staffOnly();
+  const b = office.bills.find((x) => x.id === id);
+  if (!['processing', 'pending_verification'].includes(b.status)) throw offErr('Only a bill we have the money for can be refunded.');
+  if (String(note || '').trim().length < 3) throw offErr('Say why, in a sentence the customer will read.');
+  Object.assign(b, { status: 'refunded', refunded_at: new Date().toISOString(), received_at: b.received_at || new Date().toISOString(),
+    refund_note: `${note.trim()}${method ? ` Sent back by ${method.replace('_', ' ')}` : ''}${ref ? `, ref ${ref}` : ''}.` });
+}
+export async function adminFilings() {
+  staffOnly();
+  return office.filings.filter((f) => f.status === 'waiting').sort((a, b) => a.due_on.localeCompare(b.due_on)).map((f) => {
+    const r = db.requirements.find((x) => x.id === f.requirement_id);
+    return { ...f, org_name: org.name, label: r ? reqLabel(r) : '', workdays_late: f.due_on < today() ? workBetween(f.due_on, today()) : 0 };
+  });
+}
+export async function adminStartFiling(requestId, v) {
+  staffOnly();
+  const a = db.requests.find((x) => x.id === requestId);
+  if (!a || ['completed', 'cancelled'].includes(a.status)) throw offErr('This request is closed.');
+  if (!a.requirement_id) throw offErr("This request isn't for one permit, so there's no clock to start.");
+  if (office.filings.some((x) => x.requirement_id === a.requirement_id && x.status === 'waiting')) throw offErr('The clock is already running for this permit.');
+  if (!v.office || !v.filed_on || v.filed_on > today()) throw offErr('Which office, and when?');
+  const f = { id: uid(), org_id: org.id, requirement_id: a.requirement_id, request_id: a.id, office: v.office, reference_no: v.reference_no || null, filed_on: v.filed_on, kind: v.kind,
+    days: v.kind === 'charter' ? Number(v.days) : { simple: 3, complex: 7, technical: 20 }[v.kind], fees: 'not_assessed', fees_paid_on: null, extended: false, extension_note: null, closed_days: 0,
+    status: 'waiting', closed_on: null, followup_at: null, complaint_at: null, complaint_ref: null, created_at: new Date().toISOString() };
+  f.due_on = clockDue(f);
+  office.filings.push(f);
+  return f.id;
+}
+export async function adminCloseFiling(id, status) { return filingClose(id, status, null); }
+export async function adminSetHoliday(day, name, kind, remove) {
+  staffOnly();
+  office.hol = office.hol.filter(([d]) => d !== day);
+  if (!remove) { if (!name) throw offErr('Name the holiday (up to 80 characters).'); office.hol.push([day, name, kind || 'special']); office.hol.sort(); }
+  office.filings.filter((f) => f.status === 'waiting').forEach((f) => { f.due_on = clockDue(f); });
+}
+
+// The demo: an office that ran past its deadline (with the letters on offer), and a few bills.
+if ((CLOCK_ON || BILLS_ON) && (globalThis.PP_DEMO || globalThis.PP_OFFICE)) {
+  const mp = db.requirements.find((r) => r.business_id === 'b1' && r.type_code === 'mayors_permit');
+  const brgy = db.requirements.find((r) => r.business_id === 'b1' && r.type_code === 'barangay_clearance');
+  const fsic = db.requirements.find((r) => r.business_id === 'b1' && r.type_code === 'fsic');
+  let filed = today(); for (let k = 0; k < 7;) { filed = addDaysTo(filed, -1); if (isWork(filed)) k++; }
+  let paid = filed; for (let k = 0; k < 1;) { paid = addDaysTo(paid, 1); if (isWork(paid)) k++; }
+  if (CLOCK_ON && mp) {
+    const f = { id: 'of1', org_id: org.id, requirement_id: mp.id, request_id: null, office: 'Makati Business Permits and Licensing Office', reference_no: 'BPLO-2027-01942', filed_on: filed, kind: 'simple', days: 3,
+      fees: 'paid', fees_paid_on: paid, extended: false, extension_note: null, closed_days: 0, status: 'waiting', closed_on: null, followup_at: null, complaint_at: null, complaint_ref: null, created_at: daysAgoIso(9) };
+    f.due_on = clockDue(f);
+    office.filings.push(f);
+  }
+  if (BILLS_ON && mp) {
+    office.bills.push({ id: 'gb1', number: `G-${today().slice(0, 4)}-00118`, org_id: org.id, requirement_id: mp.id, label: `"${mp.name}" for Corner <Bakery> & Co`, office: 'Makati City Treasurer',
+      bill_ref: 'SOA-2027-0145521', amount_php: 14230.5, pay_by: addDays(9), mode: 'permitpal', fee_php: 99, bill_path: `${org.id}/bills/x/soa.jpg`, bill_name: 'soa.jpg', status: 'processing',
+      pay_method: 'gcash', pay_ref: '1009 552 118', proof_path: null, proof_name: null, reported_at: daysAgoIso(1, 3), received_at: daysAgoIso(0, 2), pay_deadline: nextBusiness6pm(),
+      paid_at: null, or_no: null, or_date: null, or_path: null, or_name: null, document_id: null, refunded_at: null, refund_note: null, bir_invoice_no: null, note: null, created_at: daysAgoIso(1, 4) });
+    if (brgy) office.bills.push({ id: 'gb2', number: `G-${today().slice(0, 4)}-00102`, org_id: org.id, requirement_id: brgy.id, label: `"${brgy.name}" for Corner <Bakery> & Co`, office: 'Barangay Poblacion',
+      bill_ref: null, amount_php: 650, pay_by: null, mode: 'self', fee_php: 0, bill_path: null, bill_name: null, status: 'paid', pay_method: null, pay_ref: null, proof_path: null, proof_name: null,
+      reported_at: null, received_at: null, pay_deadline: null, paid_at: daysAgoIso(12), or_no: 'BRGY-00921', or_date: addDays(-12), or_path: null, or_name: null, document_id: null,
+      refunded_at: null, refund_note: null, bir_invoice_no: null, note: null, created_at: daysAgoIso(13) });
+    if (fsic) office.bills.push({ id: 'gb3', number: `G-${today().slice(0, 4)}-00121`, org_id: org.id, requirement_id: fsic.id, label: `"${fsic.name}" for Corner <Bakery> & Co`, office: 'Bureau of Fire Protection, Makati',
+      bill_ref: 'FSIF-77', amount_php: 1200, pay_by: addDays(5), mode: 'self', fee_php: 0, bill_path: null, bill_name: null, status: 'due', pay_method: null, pay_ref: null, proof_path: null, proof_name: null,
+      reported_at: null, received_at: null, pay_deadline: null, paid_at: null, or_no: null, or_date: null, or_path: null, or_name: null, document_id: null,
+      refunded_at: null, refund_note: null, bir_invoice_no: null, note: null, created_at: daysAgoIso(2) });
+  }
 }

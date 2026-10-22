@@ -350,3 +350,34 @@ test('Late Mayor\'s Permit: the most the Local Government Code allows', () => {
   assert.equal(maxPenalty('', 3).total, 0);                          // nothing typed yet
   assert.equal(maxPenalty(-500, 3).total, 0);
 });
+
+test('Working days: weekends and holidays don\'t count, nor the day you filed', async () => {
+  const { addWorkdays, workdaysBetween, filingDays } = await import('../web/js/workdays.js');
+  assert.equal(addWorkdays('2027-01-07', 3), '2027-01-12');                       // Thursday + 3 = Tuesday
+  const hol = new Set(['2026-12-24', '2026-12-25', '2026-12-30', '2026-12-31', '2027-01-01']);
+  assert.equal(addWorkdays('2026-12-23', 3, hol), '2027-01-04');                  // the same as the database
+  assert.equal(workdaysBetween('2027-01-12', '2027-01-14'), 2);
+  assert.equal(workdaysBetween('2027-01-14', '2027-01-12'), 0);
+  assert.equal(filingDays('simple'), 3);
+  assert.equal(filingDays('complex', null, true, 1), 15);                          // extended once, plus a day closed
+  assert.equal(filingDays('charter', 2), 2);
+});
+
+test('Reading a city bill: the total, its number and the pay-by date', async () => {
+  const { readBill } = await import('../web/js/ocrparse.js');
+  const bill = `CITY TREASURER'S OFFICE
+STATEMENT OF ACCOUNT  SOA No.: 2027-0145521
+Business Tax 2027 ........ 11,820.00
+Mayor's Permit Fee ......... 1,500.00
+Garbage Fee .................. 910.50
+TOTAL AMOUNT DUE   P 14,230.50
+Pay on or before: January 20, 2027`;
+  const r = readBill(bill, '2027-01-08');
+  assert.equal(r.amounts[0], 14230.5);
+  assert.equal(r.ref, '2027-0145521');
+  assert.equal(r.payBy, '2027-01-20');
+  const plain = readBill('Fees: 650.00\nOther 120.00', '2027-01-08');
+  assert.equal(plain.amounts[0], 650);                                              // no total: the biggest figure
+  assert.equal(plain.ref, null);
+  assert.equal(readBill('', '2027-01-08').amounts.length, 0);
+});

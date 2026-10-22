@@ -128,3 +128,33 @@ export function readDocument(text, today) {
   const d = datesFor(text, today);
   return { expires: d.expires, issued: d.issued, references: findReferences(text), plates: findPlates(text), kind: guessKind(text), chars: String(text || '').replace(/\s/g, '').length };
 }
+
+// ---------------------------------------------------------------- a city's bill (tax bill, statement of account, order of payment)
+// The amount to pay, the bill's number and the pay-by date. Totals win over line items; the person checks every one.
+const TOTAL_WORDS = /(grand\s*total|total\s*amount\s*(due|payable)?|amount\s*(due|payable|to\s*pay)|total\s*due|balance\s*due|total\s*tax\s*due|\btotal\b)/i;
+const BILL_REF = /(bill|soa|statement|assessment|order\s*of\s*payment|top|reference|ref|account|transaction|tracking)\s*(no|number|num|#)\.?\s*[:.]?\s*([A-Z0-9][A-Z0-9\-/]{2,29})/i;
+const PAY_BY = /(due\s*date|pay(able)?\s*(on\s*or\s*)?(before|by|until)|on\s*or\s*before|deadline|valid\s*until|last\s*day)/i;
+export function readBill(text, today) {
+  const lines = String(text || '').split(/\r?\n/);
+  const amounts = [];
+  lines.forEach((line, li) => {
+    const re = /(?:₱|php|p)?\s*([0-9OolI]{1,3}(?:[,\s][0-9OolI]{3})+|[0-9OolI]+)[.,]([0-9OolI]{2})(?![0-9])/gi;
+    let m;
+    while ((m = re.exec(line))) {
+      const v = Number(digits(m[1]).replace(/[,\s]/g, '') + '.' + digits(m[2]));
+      if (!(v > 0) || v > 1000000) continue;
+      const near = line.slice(0, m.index) + ' ' + (lines[li - 1] || '');
+      amounts.push({ value: v, total: TOTAL_WORDS.test(line.slice(0, m.index)) || TOTAL_WORDS.test(near), line: li });
+    }
+  });
+  // the last total on the page is usually the one to pay; otherwise the biggest figure
+  const totals = amounts.filter((a) => a.total);
+  const ranked = [...(totals.length ? [totals[totals.length - 1]] : []), ...[...amounts].sort((a, b) => b.value - a.value)]
+    .filter((a, i, arr) => arr.findIndex((x) => x.value === a.value) === i).slice(0, 4);
+  let ref = null;
+  for (const line of lines) { const m = BILL_REF.exec(line); if (m && /\d/.test(m[3]) && !/^(19|20)\d\d$/.test(m[3])) { ref = m[3].replace(/[-/]+$/, ''); break; } }
+  const dates = findDates(text);
+  const payBy = dates.filter((d) => PAY_BY.test(lines[d.line] || '') || PAY_BY.test(lines[d.line - 1] || ''))
+    .map((d) => d.value).filter((v) => !today || v >= today).sort()[0] || null;
+  return { amounts: ranked.map((a) => a.value), ref, payBy, chars: String(text || '').replace(/\s/g, '').length };
+}

@@ -11,6 +11,7 @@ import { checklistCard, watchChecklist } from './checklist.js';
 import { serviceOffer } from './services.js';
 import { scanBox, wireScan } from './scan.js';
 import { papersCard, openPapersCheck, loadState, watchPapers } from './load.js';
+import { officeData, clockCard, billsCard, watchOffice } from './office.js';
 import * as db from 'pp/data';
 
 let detail = null;       // { id, cycles, documents, activity }
@@ -30,15 +31,18 @@ export async function render(el, id) {
     if (loadingId === id) return;
     loadingId = id;
     try {
-      const [d, checks] = await Promise.all([db.requirementDetail(id, { checklist: has('library2') }), has('load') ? db.papersChecks(id).catch(() => []) : [],
-        loadPartners(), loadPlacements(), has('load') ? loadState().catch(() => null) : null]);
-      detail = { id, ...d, checks, checksNav: navs };
+      const [d, checks, office] = await Promise.all([db.requirementDetail(id, { checklist: has('library2') }), has('load') ? db.papersChecks(id).catch(() => []) : [],
+        officeData(id), loadPartners(), loadPlacements(), has('load') ? loadState().catch(() => null) : null]);
+      detail = { id, ...d, checks, office, checksNav: navs };
     } catch (e) { toastError(e); }
     loadingId = null;
     if (!location.hash.includes(id)) return; // navigated away while loading
-  } else if (has('load') && detail.checksNav !== navs) {
-    // A papers check may have been answered since: it's one small read.
-    detail.checks = await db.papersChecks(id).catch(() => detail.checks || []);
+  } else if ((has('load') || has('clock') || has('billpay')) && detail.checksNav !== navs) {
+    // A papers check may have been answered, or a bill paid by PermitPal (its receipt filed here), since: small reads.
+    const [checks, office, d] = await Promise.all([has('load') ? db.papersChecks(id).catch(() => detail.checks || []) : [], officeData(id),
+      has('billpay') ? db.requirementDetail(id, { checklist: has('library2') }).catch(() => null) : null]);
+    detail.checks = checks; detail.office = office;
+    if (d) Object.assign(detail, d);
     detail.checksNav = navs;
     if (!location.hash.includes(id)) return;
   }
@@ -55,6 +59,14 @@ export async function render(el, id) {
 watchPapers(async (reqId) => {
   if (!detail || detail.id !== reqId) return;
   try { detail.checks = await db.papersChecks(reqId); detail.checksNav = navs; } catch { /* keep what we had */ }
+  if (location.hash.includes(reqId)) rerender();
+});
+
+// A filing or a bill changed: refresh those two cards.
+watchOffice(async (reqId) => {
+  if (!detail || detail.id !== reqId) return;
+  // the cards, and the files and activity they add to (a receipt, "drafted a letter")
+  try { const [office, d] = await Promise.all([officeData(reqId), db.requirementDetail(reqId, { checklist: has('library2') })]); detail.office = office; Object.assign(detail, d); } catch { /* keep what we had */ }
   if (location.hash.includes(reqId)) rerender();
 });
 
@@ -130,8 +142,10 @@ function page(r) {
         <button class="btn btn-ghost" data-act="req-start-renewal" data-id="${r.id}">I've started the renewal</button>`)}
     </div>
     ${careNote(r) || ''}
+    ${clockCard(r, detail.office?.filings || [])}
     ${checklistCard(r, detail.ticks || [], { offer: coverOf(r) ? '' : serviceOffer(r, { compact: true }) }) || (coverOf(r) ? '' : serviceOffer(r))}
     ${papersCard(r, detail.checks || [], current ? docsOf(current.id).length : 0)}
+    ${billsCard(r, detail.office?.bills || [])}
     ${partnerSuggestions(r)}
 
     ${when(past.length, html`
