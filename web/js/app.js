@@ -12,7 +12,7 @@ import { network, connectPage, KINDS } from './views/network.js';
 import { contactPage } from './views/contact.js';
 import { partners, costs, shares } from './views/extras.js';
 import './views/import.js';
-import { landing } from './views/landing.js';
+import { landing, pricingPage } from './views/landing.js';
 import { historyPage, trashPage, team, settings } from './views/account.js';
 import { notifications } from './views/notifications.js';
 import { admin } from './views/admin.js';
@@ -81,6 +81,7 @@ async function start() {
     const kindParam = new URLSearchParams(location.hash.split('?')[1] || '').get('type');
     if (kindParam && KINDS[kindParam]) sessionStorageSet('pp-kind', kindParam);
     if (!parts[0] || parts[0] === 'welcome') return landing(app);
+    if (parts[0] === 'pricing') return pricingPage(app);
     if (parts[0] === 'contact') return contactPage(app, { signedIn: false });
     if (parts[0] === 'list-your-firm' && has('revenue')) return partnerApplyPage(app, { signedIn: false });
     if (parts[0] === 'lead' && has('leads')) return leadPage(app, parts[1], { signedIn: false });
@@ -266,6 +267,7 @@ async function renderPage() {
     else if (a === 'services' && has('services')) b === 'orders' && parts[2] ? await order(main, parts[2]) : services(main, params);
     else if (a === 'care' && has('revenue') && IN_PERSON) b === 'start' ? careStart(main, params) : await care(main, params);
     else if (a === 'care') { location.hash = '#/services'; return; }
+    else if (a === 'pricing') { location.hash = '#/settings/billing'; return; } // the website's prices page; signed in, prices live under Settings
     else if (a === 'list-your-firm' && has('revenue')) partnerApplyPage(main, { signedIn: true });
     else if (a === 'lead' && has('leads')) await leadPage(main, b, { signedIn: true });
     else if (a === 'w' && has('plus')) await workerPage(main, b, { signedIn: true });

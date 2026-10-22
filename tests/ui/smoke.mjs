@@ -1218,32 +1218,70 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   inPerson = true;
 }
 
-// The website as customers see it (online only): the free features, Plus shown once its database part is on,
-// nothing that was removed, nothing saying PermitPal checks firms, and "Prices" scrolling in place.
+// The website as customers see it (online only): "Permits on autopilot", everything on one screen, the
+// worries it takes away, the 5-step tour and the free plan as a receipt; prices on their own page.
 {
   inPerson = false;
   const S2 = ['errors', 'assign', 'library2', 'services', 'filings', 'sms', 'mfa', 'revenue'];
+  const over = (p) => p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   for (const [label, init, vp] of [['all', {}, { width: 1280, height: 860 }], ['live', { PP_FEATURES: S2 }, { width: 390, height: 844 }], ['tiny', {}, { width: 320, height: 640 }]]) {
     const p = await browser.newPage({ viewport: vp });
     await p.addInitScript((i) => { Object.assign(globalThis, { PP_LOGGED_OUT: true }, i); }, init);
     const e = [];
     p.on('pageerror', (x) => e.push(x.message));
-    await p.goto('http://localhost:4173/'); await p.waitForSelector('#pricing [data-plan-card] .pp-amount');
+    await p.goto('http://localhost:4173/'); await p.waitForSelector('.lp-home h1');
     const text = await p.textContent('.landing');
-    check(`website ${label}: 12 free features and the set-up offer`, (await p.locator('.lp-features .lp-feature:not(.lp-wide)').count()) === 12
-      && /fixed fee/.test(await p.locator('.lp-features .lp-wide').textContent()));
-    check(`website ${label}: Plus shown only once its database part is on`, (await p.locator('.lp-show').count()) === (label === 'live' ? 0 : 1));
-    check(`website ${label}: nothing removed, and nothing PermitPal doesn't do`, !/Head office|Year-round care|licensed firm|we verify|verified by PermitPal|vetted/i.test(text));
-    check(`website ${label}: no sideways scroll`, (await p.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);
+    check(`website ${label}: the home page leads with "Permits on autopilot"`, /Permits on autopilot/.test(await p.textContent('.lp-home h1')));
+    check(`website ${label}: "One screen." sits on a line of its own`, await p.evaluate(() => {
+      const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
+      return b.textContent === 'One screen.' && b.getClientRects().length === 1 && b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 2;
+    }));
+    check(`website ${label}: 8 worries taken away, and 8 lines on the free-plan receipt at ₱0.00`, (await p.locator('.lp-worry').count()) === 8
+      && (await p.locator('.lp-rc-lines li').count()) === 8 && /Total each month\s*₱0\.00/.test(await p.textContent('.lp-receipt')));
+    check(`website ${label}: no prices on the home page`, (await p.locator('[data-plan-card], .bill-toggle, #pricing').count()) === 0);
+    check(`website ${label}: nothing removed, and nothing PermitPal doesn't do`, !/Head office|Year-round care|licensed firm|we verify|verified by PermitPal|vetted|legal/i.test(text));
+    check(`website ${label}: Plus mentioned only once its database part is on`, /Plus, more staff/.test(text) === (label !== 'live'));
+    check(`website ${label}: the tour starts at step 1, Add`, (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === '1' && /Add permits your way/.test(await p.textContent('.lp-stage')));
+    let worst = await over(p), screens = new Set([await p.getAttribute('.lp-stage .lp-scr', 'aria-label')]);
+    for (const [k, title] of [[2, "Reminded before it's late"], [3, 'Know exactly what to bring'], [4, "Show you're legit"], [5, label === 'live' ? 'Share the load' : 'Your team does the chasing']]) {
+      await p.click('.lp-btn-step'); await p.waitForTimeout(120);
+      const ok = (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === String(k) && (await p.textContent('.lp-stage h3')).includes(title);
+      check(`website ${label}: "Next" moves the tour to step ${k}`, ok, await p.textContent('.lp-stage h3'));
+      check(`website ${label}: step ${k}'s earlier steps show as done`, (await p.locator('.lp-dot.on').count()) === k && (await p.locator('.lp-seg.on').count()) === k - 1);
+      screens.add(await p.getAttribute('.lp-stage .lp-scr', 'aria-label'));
+      worst = Math.max(worst, await over(p));
+    }
+    check(`website ${label}: the phone shows a different screen at each step`, screens.size === 5);
+    await p.click('.lp-btn-step'); await p.waitForTimeout(120);
+    check(`website ${label}: "Start again" goes back to step 1`, (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === '1');
+    await p.click('.lp-dot[data-step="4"]'); await p.waitForTimeout(120);
+    check(`website ${label}: tapping a step jumps to it`, (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === '4');
+    await p.click('.lp-stage .btn-ghost'); await p.waitForTimeout(120);
+    check(`website ${label}: "Back" goes one step back`, (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === '3');
+    check(`website ${label}: no sideways scroll at any tour step`, worst <= 1, `${worst}px`);
     if (label === 'all') {
       const before = await p.evaluate(() => location.hash);
-      await p.click('.lp-nav[data-scroll-to=pricing]'); await p.waitForTimeout(800);
-      check('website: "Prices" scrolls to the prices and keeps the address', (await p.evaluate(() => location.hash)) === before
-        && (await p.evaluate(() => document.getElementById('pricing').getBoundingClientRect().top)) < 200);
-    }
+      await p.click('.lp-nav[data-scroll-to=tour]'); await p.waitForTimeout(800);
+      check('website: "How it works" scrolls to the tour and keeps the address', (await p.evaluate(() => location.hash)) === before
+        && (await p.evaluate(() => document.getElementById('tour').getBoundingClientRect().top)) < 200);
+      await p.click('.lp-nav[href="#/pricing"]'); await p.waitForTimeout(500);
+      check('website: "Prices" opens the prices page at the top', /Simple prices/.test(await p.textContent('main h1')) && (await p.evaluate(() => scrollY)) === 0);
+    } else await p.evaluate(() => { location.hash = '#/pricing'; });
+    await p.waitForSelector('#pricing [data-plan-card] .pp-amount');
+    check(`website ${label}: the prices page lists Free and every team plan on sale`, (await p.locator('#pricing .pp-plan.pp-free').count()) === 1
+      && (await p.locator('#pricing [data-plan-card]').count()) === (label === 'live' ? 3 : 4)); // Small property comes with database file 8
+    check(`website ${label}: Plus shown on the prices page only once its database part is on`, (await p.locator('.lp-show').count()) === (label === 'live' ? 0 : 1));
+    check(`website ${label}: prices page: no sideways scroll`, (await over(p)) <= 1, `${await over(p)}px`);
+    await p.click('.lp-top .brand'); await p.waitForSelector('.lp-home h1');
+    check(`website ${label}: the logo goes back home`, /Permits on autopilot/.test(await p.textContent('main h1')));
     check(`website ${label}: no JavaScript errors`, e.length === 0, e.slice(0, 3).join(' | '));
     await p.close();
   }
+  // Signed in, a prices link from the website lands on Settings > Plan.
+  const p = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await p.goto('http://localhost:4173/#/pricing'); await p.waitForTimeout(800);
+  check('website: signed in, the prices page goes to Settings > Plan', (await p.evaluate(() => location.hash)) === '#/settings/billing');
+  await p.close();
   inPerson = true;
 }
 
@@ -1597,7 +1635,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   const firm = (page) => page.locator('[data-plan-card=firm]').first();
   for (const [label, vp] of [['phone', { width: 360, height: 760 }], ['desktop', { width: 1280, height: 860 }]]) {
     const { page, errs } = await newPage({ PP_LOGGED_OUT: true }, vp);
-    await page.goto('http://localhost:4173/#/welcome'); await page.waitForSelector('#pricing [data-plan-card=property] .pp-amount');
+    await page.goto('http://localhost:4173/#/pricing'); await page.waitForSelector('#pricing [data-plan-card=property] .pp-amount');
     check(`prices ${label}: the website lists Free and the 3 team plans, each with checkmarks`, (await page.locator('#pricing .pp-plan.pp-free').count()) === 1
       && (await page.locator('#pricing [data-plan-card]').count()) === 4 && (await page.locator('#pricing [data-plan-card=firm] .pp-checks li').count()) >= 8);
     check(`prices ${label}: each plan shows a picture of its board and 3 big wins`, (await page.locator('#pricing [data-plan-card] .pp-preview').count()) === 4
