@@ -1199,6 +1199,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('online only: no care teaser and no "Renew several"', (await page.locator('main .care-teaser, main [data-act=svc-bulk]').count()) === 0
     && /Online paperwork, done for you/.test(await page.textContent('main .page-head')));
   check('online only: the demo\'s sample order is the online set-up job', (await page.locator('main .line', { hasText: 'Set up my account for me' }).count()) >= 1);
+  await go('#/services/orders/ord1');
+  check('online only: an account set-up (no office involved) offers no authorization letter', /Set up my account/.test(await page.textContent('main')) && (await page.locator('[data-act=auth-letter]').count()) === 0);
   await go('#/services?service=renew_mayors_permit');
   check('online only: an in-person service can\'t be ordered by link', /not available/.test(await page.textContent('#toast')) && (await page.locator('#modal-root .modal').count()) === 0);
   await go('#/compliance');

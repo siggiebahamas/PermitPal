@@ -315,7 +315,7 @@ export async function order(el, id) {
         <span aria-hidden="true">${i < (a.steps_done || 0) ? '✓' : i + 1}</span>${t}${i < (a.steps_done || 0) ? html`<span class="sr-only"> (done)</span>` : ''}</li>`)}</ol></section>`)}
     <section class="card">
       <div class="card-head"><div><h2>Summary</h2></div>
-        ${when(!closed, html`<button class="btn btn-sm btn-soft" data-act="auth-letter" data-id="${a.id}">${ICON.file} Authorization letter</button>`)}</div>
+        ${when(!closed && ['renew', 'apply'].includes(a.kind), html`<button class="btn btn-sm btn-soft" data-act="auth-letter" data-id="${a.id}">${ICON.file} Authorization letter</button>`)}</div>
       <dl class="kv">
         <dt>Service</dt><dd>${s?.name || a.requirement_name}</dd>
         <dt>Type</dt><dd>${KIND_LABEL[a.kind] || 'Request'}</dd>
@@ -444,7 +444,7 @@ on('auth-letter', (ds) => {
     <p>To whom it may concern:</p>
     <p>I, <b>${me || '______________________________'}</b>, ${b ? html`owner / authorized officer of <b>${b.name}</b>` : html`owner of <b>${who}</b>`}, hereby authorize
       <b>______________________________</b> of PermitPal to ${what}, follow up, pay the official fees for, and receive on my behalf the
-      <b>${a.requirement_name}</b> for <b>${who}</b>.</p>
+      <b>${a.requirement_name}</b> for <b>${who}</b>${/\.$/.test(who) ? '' : '.'}</p>
     <p>This authorization is valid only for the transaction stated above.</p>
     <div class="letter-sig"><div>Signature over printed name<br>${me}</div><div>Authorized representative<br>Signature over printed name</div></div>
   </div>`;
