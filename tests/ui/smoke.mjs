@@ -9,12 +9,13 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const types = { '.gz': 'application/gzip', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+const types = { '.gz': 'application/gzip', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.ics': 'text/calendar', '.xml': 'application/xml', '.txt': 'text/plain' };
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
   if (p === '/') p = '/index.html';
   let file = p.startsWith('/__mock/') ? path.join(root, 'tests/ui', p.slice(8)) : path.join(root, 'web', p);
-  if (!fs.existsSync(file)) { res.writeHead(404); return res.end(); }
+  if (p.endsWith('/')) file = path.join(file, 'index.html'); // like GitHub Pages: a folder serves its index.html
+  if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end(); }
   let body = fs.readFileSync(file);
   if (p === '/index.html') {
     // Point the data layer at the mock, and keep the real Content-Security-Policy so anything it would
@@ -28,6 +29,8 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
   res.end(body);
 });
+// The renewal guides are generated (not committed): build them so the server has them.
+await import('../../scripts/build-city-pages.mjs');
 await new Promise((r) => server.listen(4173, r));
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
@@ -640,8 +643,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('texts: the number lives in its own section, not the profile form', (await page.locator('#profile-form [name=phone]').count()) === 0);
   await page.addInitScript(() => { globalThis.PP_SMS = true; });
   await page.reload(); await page.waitForSelector('#sms');
-  check('texts: on the Free plan, explains they come with team plans', /come with team plans/.test(await page.textContent('#sms')));
-  await page.addInitScript(() => { globalThis.PP_SMS = true; globalThis.PP_PLAN = 'fleet'; });
+  check('texts: on the Free plan, texts run on text credits from load, after verifying the number', /text reminders left|No text credits yet/.test(await page.textContent('#sms')) && (await page.locator('#sms-start [name=phone]').count()) === 1);
+  await page.addInitScript(() => { globalThis.PP_FEATURES = ['errors', 'assign', 'library2', 'services', 'filings', 'sms', 'mfa', 'revenue', 'plus']; });
+  await page.reload(); await page.waitForSelector('#sms');
+  check('texts: on the Free plan without load, explains they come with team plans', /come with team plans/.test(await page.textContent('#sms')));
+  await page.addInitScript(() => { globalThis.PP_SMS = true; globalThis.PP_PLAN = 'fleet'; globalThis.PP_FEATURES = undefined; });
   await page.reload(); await page.waitForSelector('#sms');
   await page.fill('#sms-start [name=phone]', '12345'); await page.click('#sms-start button'); await page.waitForTimeout(200);
   check('texts: a number that is not a PH mobile is refused', /Philippine mobile/.test(await page.textContent('#toast')));
@@ -976,8 +982,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.fill('#money-invoices tbody tr:first-child [name=no]', 'INV-9001'); await page.click('#money-invoices tbody tr:first-child button'); await page.waitForTimeout(500);
   check('money: typing the receipt number takes it off the list', (await page.locator('#money-invoices tbody tr').count()) === missBefore - 1);
   await view('earnings');
-  check('money: Earnings shows the month, the goal and where it came from', /You earned in/.test(await page.textContent('main .money-hero')) && (await page.locator('main .goal-bar').count()) === 1 && (await page.locator('main .money-stat').count()) === 4);
-  check('money: Earnings draws 12 months, stacked, with a legend and the numbers', (await page.locator('svg.trend .col').count()) === 12 && (await page.locator('main .legend > span').count()) === 4 && (await page.locator('main .num-table tbody tr').count()) === 12);
+  check('money: Earnings shows the month, the goal and where it came from', /You earned in/.test(await page.textContent('main .money-hero')) && (await page.locator('main .goal-bar').count()) === 1 && (await page.locator('main .money-stat').count()) === 5);
+  check('money: Earnings draws 12 months, stacked, with a legend and the numbers (load top-ups included)', (await page.locator('svg.trend .col').count()) === 12 && (await page.locator('main .legend > span').count()) === 5 && (await page.locator('main .num-table tbody tr').count()) === 12);
   const tall = await page.evaluate(() => Math.max(...[...document.querySelectorAll('svg.trend .col')].map((g) => g.getBBox().height)));
   check('money: the year has real columns (not empty)', tall > 40, String(tall));
   await page.focus('svg.trend .col:last-of-type'); await page.waitForTimeout(150);
@@ -1271,6 +1277,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`website ${label}: the prices page lists Free and every team plan on sale`, (await p.locator('#pricing .pp-plan.pp-free').count()) === 1
       && (await p.locator('#pricing [data-plan-card]').count()) === (label === 'live' ? 3 : 4)); // Small property comes with database file 8
     check(`website ${label}: Plus shown on the prices page only once its database part is on`, (await p.locator('.lp-show').count()) === (label === 'live' ? 0 : 1));
+    check(`website ${label}: what load buys, with prices, only once its database part is on`, (await p.locator('.lp-load-card').count()) === (label === 'live' ? 0 : 5));
     check(`website ${label}: prices page: no sideways scroll`, (await over(p)) <= 1, `${await over(p)}px`);
     await p.click('.lp-top .brand'); await p.waitForSelector('.lp-home h1');
     check(`website ${label}: the logo goes back home`, /Permits on autopilot/.test(await p.textContent('main h1')));
@@ -1738,6 +1745,212 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check('prices team tools: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
     await page.close();
   }
+}
+
+// PermitPal load: topping up (and staff confirming), text packs, the season pass, a papers check from asking to
+// the staff answer, one template at a time, not enough load, invitations, a teammate's view, phones; and none of it
+// before its database file is in.
+for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', { width: 390, height: 844 }]]) {
+  const page = await browser.newPage({ viewport: vp });
+  await page.addInitScript(() => { globalThis.PP_SMS = true; });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(500); };
+  const mock = (fn) => page.evaluate(fn);
+  const over = () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  const bal = async () => (await page.textContent('.load-amt')).trim();
+  await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+  check(`load ${label}: "Load" is in the menu`, (await page.locator('.sidebar a[data-nav=load]').count()) === 1);
+  await go('#/load'); await page.waitForSelector('.load-hero');
+  check(`load ${label}: a new workspace starts at ₱0, with a Top up button`, (await bal()) === '₱0' && (await page.locator('[data-act=load-topup]').count()) === 1);
+  check(`load ${label}: four things to use it on`, (await page.locator('.load-use').count()) === 4);
+  check(`load ${label}: texts need a verified number first, and say where to add it`, /verified mobile number/.test(await page.locator('.load-use').first().textContent()));
+  // top up ₱500 by GCash
+  await page.click('[data-act=load-topup]'); await page.waitForSelector('#modal-root .modal');
+  await page.check('#modal-root input[name=amount][value="500"]', { force: true });
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+  check(`load ${label}: the top-up shows how to pay, with its number`, /Pay top-up L-\d{4}-\d{5}/.test(await page.textContent('#modal-root h3')) && /GCash/.test(await page.textContent('#modal-root')));
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(200);
+  check(`load ${label}: "I've paid" needs the reference or a screenshot`, /reference number or a screenshot/.test(await page.textContent('#modal-root .modal-error')));
+  await page.fill('#modal-root input[name=ref]', '1009 234 567'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+  check(`load ${label}: after paying, it says it's being checked`, /Checking your ₱500 payment/.test(await page.textContent('main')) && (await bal()) === '₱0');
+  // staff confirm it
+  await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=load]'); await page.waitForSelector('[data-act=adm-topup-ok]');
+  check(`load ${label}: staff see it under Admin > Load`, /₱500/.test(await page.locator('[data-act=adm-topup-ok]').first().locator('xpath=ancestor::div[contains(@class,"line")]').textContent()));
+  await page.click('[data-act=adm-topup-ok]'); await page.fill('#modal-root input[name=no]', 'SI-0101'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+  await go('#/load'); await page.waitForSelector('.load-hero');
+  check(`load ${label}: confirmed: ₱500 is in, and the history says so`, (await bal()) === '₱500' && /Top-up L-\d{4}-\d{5}/.test(await page.textContent('.load-hist')));
+  // texts, once a number is verified
+  await mock(async () => { (await import('/__mock/mock-data.js')).__verifyPhone(); });
+  await go('#/'); await go('#/load'); await page.waitForSelector('.load-hero');
+  check(`load ${label}: with a verified number, two text packs to choose`, (await page.locator('[data-act=load-texts]').count()) === 2);
+  await page.click('[data-act=load-texts][data-pack=texts_50]'); await page.waitForSelector('#modal-root .modal');
+  check(`load ${label}: buying says the price and what's left`, /₱49/.test(await page.textContent('#modal-root')) && /₱451/.test(await page.textContent('#modal-root')));
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+  check(`load ${label}: 50 texts for ₱49`, (await bal()) === '₱451' && /50 text reminders left/.test(await page.textContent('.load-hero')));
+  // the season pass (on sale September to January)
+  const season = await mock(async () => (await (await import('/__mock/mock-data.js')).loadSummary()).season_on_sale);
+  if (season) {
+    await page.click('[data-act=load-season]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+    check(`load ${label}: the season pass is on, with its check waiting`, (await bal()) === '₱302' && /You have the \d{4} pass/.test(await page.textContent('main')) && /one free check waiting/.test(await page.textContent('main')));
+  }
+  // a papers check, from the permit's page
+  const mp = await mock(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b1').id);
+  await go('#/requirement/' + mp); await page.waitForSelector('.papers-card');
+  check(`load ${label}: a permit offers a papers check${season ? ', free with the pass' : ' for ₱149'}`, new RegExp(season ? 'free with your season pass' : '₱149').test(await page.textContent('.papers-card')));
+  await page.click('[data-act=papers-open]'); await page.waitForSelector('#modal-root .modal');
+  check(`load ${label}: the form lists the permit's checklist and the deadline`, (await page.locator('#modal-root .pc-list li').count()) >= 3 && /answers by/.test(await page.textContent('#modal-root')));
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(200);
+  check(`load ${label}: it needs at least one photo when the permit has no files`, /photo/i.test(await page.textContent('#modal-root .modal-error')));
+  await page.setInputFiles('#modal-root input[name=files]', [{ name: 'lease.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('fake') }, { name: 'cedula.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('fake') }]);
+  await page.fill('#modal-root textarea[name=note]', 'We moved in March.');
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(700);
+  check(`load ${label}: sent: the permit says it's being checked, by when`, /We're checking your papers/.test(await page.textContent('.papers-card')) && /\d{1,2}:\d{2}/.test(await page.textContent('.papers-card')));
+  check(`load ${label}: both photos arrived`, (await mock(async () => (await import('/__mock/mock-data.js')).__load.files.length)) === 2);
+  await page.click('[data-act=papers-cancel]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
+  check(`load ${label}: cancelling gives it back`, /Check my papers/.test(await page.textContent('.papers-card')));
+  await page.click('[data-act=papers-open]'); await page.setInputFiles('#modal-root input[name=files]', [{ name: 'lease.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('fake') }]);
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(700);
+  // staff answer it
+  await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=load]'); await page.waitForSelector('[data-act=adm-papers]');
+  await page.click('[data-act=adm-papers]'); await page.waitForSelector('#papers-answer');
+  check(`load ${label}: staff see the photos and the checklist to answer`, (await page.locator('#papers-answer .pc-line').count()) >= 3 && /lease\.jpg/.test(await page.textContent('main')));
+  await page.click('#papers-answer button'); await page.waitForTimeout(200);
+  check(`load ${label}: staff must answer every line`, /Answer every line/.test(await page.textContent('#toast')));
+  const n = await page.locator('#papers-answer .pc-line').count();
+  for (let i = 0; i < n; i++) await page.locator(`#papers-answer input[name=s${i}][value=${i === 1 ? 'fix' : 'ok'}]`).check({ force: true });
+  await page.fill('#papers-answer input[name=n1]', 'Bring the renewed lease.');
+  await page.selectOption('#papers-answer select[name=verdict]', 'almost');
+  await page.fill('#papers-answer textarea[name=summary]', 'One fix: the renewed lease. The rest is in order.');
+  await page.click('#papers-answer button'); await page.waitForTimeout(600);
+  await go('#/requirement/' + mp); await page.waitForSelector('.papers-card');
+  const card = await page.textContent('.papers-card');
+  check(`load ${label}: the customer sees the answer, line by line`, /Almost there/.test(card) && /Needs a fix/.test(card) && /Bring the renewed lease/.test(card) && /One fix: the renewed lease/.test(card));
+  // one template at a time (no Plus here)
+  await go('#/templates'); await page.waitForSelector('[data-act=tpl-unlock]');
+  check(`load ${label}: without Plus, each template can be bought on its own`, /₱39/.test(await page.locator('[data-act=tpl-unlock]').first().textContent()));
+  await page.locator('[data-act=tpl-unlock]').first().click(); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
+  check(`load ${label}: bought: it's yours, and it fills in`, (await page.locator('main .chip', { hasText: 'Yours' }).count()) === 1);
+  await page.locator('[data-act=tpl-fill]').first().click(); await page.waitForTimeout(500);
+  check(`load ${label}: ...the fill-in form opens`, (await page.locator('#modal-root .modal').count()) === 1);
+  await page.keyboard.press('Escape');
+  // not enough load
+  await mock(async () => { (await import('/__mock/mock-data.js')).__load.wallet.paid_php = 10; });
+  await go('#/'); await go('#/load'); await page.waitForSelector('.load-hero');
+  await page.click('[data-act=load-texts][data-pack=texts_200]'); await page.waitForSelector('#modal-root .modal');
+  check(`load ${label}: not enough load offers a top-up for the difference`, /Not enough load/.test(await page.textContent('#modal-root h3')));
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(300);
+  check(`load ${label}: ...with the amount picked`, /Top up your load/.test(await page.textContent('#modal-root h3')) && (await page.locator('#modal-root input[name=amount][value="200"]').isChecked()));
+  await page.keyboard.press('Escape');
+  // invitations
+  check(`load ${label}: an invitation link to share`, /#\/signup\?ref=[A-Z0-9]{8}/.test(await page.textContent('[data-invite-link]')) && await page.locator('[data-act=invite-copy]').isEnabled());
+  check(`load ${label}: no sideways scroll`, (await over()) <= 1, `${await over()}px`);
+  // a teammate sees the balance, not the buttons
+  await mock(async () => { const c = await import('/js/core.js'); c.S.org.role = 'member'; });
+  await go('#/'); await go('#/load'); await page.waitForSelector('.load-hero');
+  check(`load ${label}: a teammate sees the balance but can't spend it`, (await page.locator('[data-act=load-topup], [data-act=load-texts], [data-act=load-season]').count()) === 0
+    && /owner or an admin/.test(await page.textContent('.load-hero')));
+  await mock(async () => { const c = await import('/js/core.js'); c.S.org.role = 'owner'; });
+  check(`load ${label}: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+{
+  // the demo: a workspace that has used its load
+  const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await page.addInitScript(() => { globalThis.PP_DEMO = true; });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto('http://localhost:4173/#/load'); await page.waitForSelector('.load-hero');
+  check('load demo: a balance, texts, a history and invitations', /₱302/.test(await page.textContent('.load-hero')) && (await page.locator('.load-hist .line').count()) >= 4 && /2 businesses have joined/.test(await page.textContent('main')));
+  check('load demo: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+  // before database file 9: nothing about load anywhere
+  const off = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await off.addInitScript(() => { globalThis.PP_FEATURES = ['errors', 'assign', 'library2', 'services', 'filings', 'sms', 'mfa', 'revenue', 'plus']; });
+  const oerrs = [];
+  off.on('pageerror', (e) => oerrs.push(e.message));
+  await off.goto('http://localhost:4173/'); await off.waitForSelector('main h1');
+  check('load off: no Load in the menu', (await off.locator('.sidebar a[data-nav=load]').count()) === 0);
+  await off.evaluate(() => { location.hash = '#/load'; }); await off.waitForTimeout(500);
+  check('load off: #/load goes back to the dashboard', !/Prepaid credit/.test(await off.textContent('main')));
+  const mp = await off.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.type_code === 'mayors_permit').id);
+  await off.evaluate((id) => { location.hash = '#/requirement/' + id; }, mp); await off.waitForTimeout(600);
+  check('load off: permits offer no papers check', (await off.locator('.papers-card').count()) === 0);
+  check('load off: no JavaScript errors', oerrs.length === 0, oerrs.slice(0, 3).join(' | '));
+  await off.close();
+  // invited: the sign-up page says so
+  const inv = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await inv.addInitScript(() => { globalThis.PP_LOGGED_OUT = true; });
+  await inv.goto('http://localhost:4173/#/signup?ref=K7M2Q9XD'); await inv.waitForSelector('.auth-card');
+  check('load invite: the sign-up page says a business invited them', /A business you know invited you/.test(await inv.textContent('.auth-card')));
+  await inv.close();
+}
+
+// Renewal guides (renew/): plain pages search engines can read, with the checklist, the dates, a calendar
+// file and the penalty estimate. Built by scripts/build-city-pages.mjs at the top of this file.
+{
+  const { CITIES } = await import('../../scripts/renew-cities.mjs');
+  const marikina = CITIES.find((c) => c.slug === 'marikina');
+  for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', { width: 360, height: 740 }]]) {
+    const page = await browser.newPage({ viewport: vp });
+    const errs = [];
+    page.on('pageerror', (e) => errs.push(e.message));
+    page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED/.test(m.text())) errs.push(m.text()); });
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort()); // web fonts are cosmetic; tests run offline
+    await page.addInitScript(() => { globalThis.PP_LOGGED_OUT = true; }); // a visitor, for the "Start free" link
+    await page.goto('http://localhost:4173/renew/');
+    check(`guides ${label}: the index lists every city`, (await page.locator('.rn-city').count()) === CITIES.length);
+    check(`guides ${label}: the countdown to January 20 is filled in`, /days from today|Tomorrow|Today|passed/.test(await page.textContent('[data-countdown]')));
+    check(`guides ${label}: the 2026 table links each city to its page`, (await page.locator('.rn-table tbody th a').count()) === (await page.locator('.rn-table tbody tr').count()));
+    check(`guides ${label}: index has no sideways scroll`, await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.click('.rn-city:has-text("Marikina")'); await page.waitForSelector('h1');
+    check(`guides ${label}: a city page has its name, both checklists and the facts with their sources`, /Marikina/.test(await page.textContent('h1'))
+      && (await page.locator('.rn-step').count()) === 2 && (await page.locator('.rn-list li').count()) >= 10
+      && (await page.locator('.rn-facts li small a').count()) === marikina.facts.length && (await page.locator('.rn-links a').count()) === marikina.official.length);
+    check(`guides ${label}: outside links open in a new tab and say so`, await page.evaluate(() => [...document.querySelectorAll('a[target=_blank]')].every((a) => a.rel.includes('noopener') && /^https:/.test(a.href) && /new tab/.test(a.textContent))));
+    check(`guides ${label}: the estimate starts with an example`, (await page.textContent('[data-v=total]')) === '₱1,375');
+    await page.fill('[data-penalty] [name=base]', '10000'); await page.selectOption('[data-penalty] [name=months]', '3'); await page.waitForTimeout(100);
+    check(`guides ${label}: the estimate follows the law's limits (25% + 2% a month)`, (await page.textContent('[data-v=surcharge]')) === '₱2,500' && (await page.textContent('[data-v=interest]')) === '₱750'
+      && (await page.textContent('[data-v=total]')) === '₱3,250' && (await page.textContent('[data-v=months]')) === '3 months');
+    await page.fill('[data-penalty] [name=base]', ''); await page.waitForTimeout(50);
+    check(`guides ${label}: an empty amount shows ₱0, not an error`, (await page.textContent('[data-v=total]')) === '₱0');
+    const cal = await page.request.get(new URL(await page.getAttribute('.rn-due a[download]', 'href'), page.url()).href);
+    const ics = await cal.text();
+    check(`guides ${label}: the calendar file is a real calendar with 4 dates`, /text\/calendar/.test(cal.headers()['content-type']) && ics.startsWith('BEGIN:VCALENDAR\r\n')
+      && (ics.match(/BEGIN:VEVENT/g) || []).length === 4 && /DTSTART;VALUE=DATE:\d{4}0120/.test(ics) && ics.split('\r\n').every((l) => Buffer.byteLength(l) <= 75));
+    check(`guides ${label}: city page has no sideways scroll`, await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.click('.rn-cta .btn'); await page.waitForSelector('.auth-card, main h1');
+    check(`guides ${label}: "Start free" opens sign-up in the app`, /#\/signup/.test(page.url()));
+    check(`guides ${label}: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // Every guide: one h1, a title, a description and a canonical address, and every link inside the site works.
+  const req = (await browser.newContext()).request;
+  const pages = ['renew/', ...CITIES.map((c) => `renew/${c.slug}/`)];
+  const bad = [];
+  const seen = new Set();
+  for (const rel of pages) {
+    const body = await (await req.get('http://localhost:4173/' + rel)).text();
+    if ((body.match(/<h1[\s>]/g) || []).length !== 1 || !/<title>[^<]{20,}<\/title>/.test(body) || !/<meta name="description" content="[^"]{60,}"/.test(body)
+      || !body.includes(`<link rel="canonical" href="https://siggiebahamas.github.io/PermitPal/${rel}">`)) bad.push(rel + ' (head)');
+    for (const [, href] of body.matchAll(/href="([^"]+)"/g)) {
+      const u = new URL(href.replace(/&amp;/g, '&'), 'http://localhost:4173/' + rel);
+      if (u.origin !== 'http://localhost:4173') continue;
+      const path = u.pathname;
+      if (seen.has(path)) continue;
+      seen.add(path);
+      if (!(await req.get(u.origin + path)).ok()) bad.push(`${rel} -> ${href}`);
+    }
+  }
+  check('guides: every page has one h1, a title, a description and its canonical address; every inside link works', bad.length === 0, bad.slice(0, 5).join(' | '));
+  const map = await (await req.get('http://localhost:4173/sitemap.xml')).text();
+  check('guides: the sitemap lists every guide', pages.every((p) => map.includes(`/PermitPal/${p}</loc>`)));
+  const home = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await home.addInitScript(() => { globalThis.PP_LOGGED_OUT = true; });
+  await home.goto('http://localhost:4173/'); await home.waitForSelector('.lp-foot');
+  check('guides: the home page footer links to the guides', (await home.locator('.lp-foot a[href="renew/"]').count()) === 1);
+  await home.close();
 }
 
 await browser.close();

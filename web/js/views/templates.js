@@ -1,31 +1,44 @@
 // Ready-to-use templates (Plus): letters and sworn statements businesses keep needing for permits,
 // filled in from the workspace's own details. Everyone sees the list and the first lines; the full
 // text comes from the database only for Plus workspaces. Printouts carry "Prepared with PermitPal for …".
-import { html, openModal, toast, toastError, when, fmtDate, todayPH, download, esc } from '../util.js';
-import { S, on, has, hasPlus, business, locationsOf } from '../core.js';
+import { html, openModal, toast, toastError, when, fmtDate, todayPH, download, esc, peso } from '../util.js';
+import { S, on, has, hasPlus, isOrgAdmin, rerender, business, locationsOf } from '../core.js';
 import { ICON } from '../components.js';
 import { openUpsell } from './plus.js';
+import { loadState, unlockTemplateFlow } from './load.js';
 import { printSheet } from '../print.js';
 import * as db from 'pp/data';
 
 let listCache = null;
+let unlocked = new Set(); // templates this workspace bought one by one (with load)
+const owned = (code) => hasPlus() || unlocked.has(code);
 const longDate = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-PH', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 export async function templatesPage(el) {
   el.innerHTML = String(html`<div class="page-head"><div><h1>Templates</h1></div></div><div class="loading">Loading…</div>`);
-  try { listCache ||= await db.listTemplates(); } catch (e) { toastError(e); return; }
+  const single = has('load') && !hasPlus();
+  let one = 0;
+  try {
+    listCache ||= await db.listTemplates();
+    if (single) {
+      const [u, st] = await Promise.all([db.templateUnlocks(S.org.id), loadState()]);
+      unlocked = new Set(u.map((x) => x.code));
+      const p = st?.products?.find((x) => x.code === 'template');
+      one = p?.active ? Number(p.price_php) : 0;
+    }
+  } catch (e) { toastError(e); return; }
   const plus = hasPlus();
   const cats = [...new Set(listCache.map((t) => t.category))];
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Templates</h1>
       <p class="muted">Letters and sworn statements offices ask for, filled in with your details. Print, sign, done.</p></div></div>
-    ${when(!plus, html`<div class="banner info"><div><b>Templates come with PermitPal Plus.</b> Preview any of them below.</div>
+    ${when(!plus && has('plus'), html`<div class="banner info"><div><b>Templates come with PermitPal Plus.</b> ${one ? html`Or get just the one you need for ${peso(one)}, yours to keep.` : 'Preview any of them below.'}</div>
       <button class="btn btn-sm btn-primary" data-act="plus-upsell" data-what="Templates">See Plus</button></div>`)}
     ${cats.map((c) => html`<h2 class="section-label">${c}</h2><div class="svc-grid">${listCache.filter((t) => t.category === c).map((t) => html`
       <section class="card svc tpl-card"><div class="svc-top"><h2>${t.title}</h2>${t.notarize ? html`<span class="tag">Needs a notary</span>` : ''}</div>
         <p>${t.summary}</p><p class="muted small"><b>Use it:</b> ${t.use_when}</p>
-        <div class="svc-foot">${plus ? html`<button class="btn btn-primary btn-sm" data-act="tpl-fill" data-code="${t.code}">Fill in</button>`
-          : html`<button class="btn btn-soft btn-sm" data-act="tpl-preview" data-code="${t.code}">Preview</button>`}</div></section>`)}</div>`)}
+        <div class="svc-foot">${owned(t.code) ? html`<button class="btn btn-primary btn-sm" data-act="tpl-fill" data-code="${t.code}">Fill in</button>${when(!plus, html`<span class="chip ok">Yours</span>`)}`
+          : html`<button class="btn btn-soft btn-sm" data-act="tpl-preview" data-code="${t.code}">Preview</button>${when(one && isOrgAdmin(), html`<button class="btn btn-primary btn-sm" data-act="tpl-unlock" data-code="${t.code}">Get it · ${peso(one)}</button>`)}`}</div></section>`)}</div>`)}
     <p class="fineprint">General templates for common permit paperwork, not legal advice. Offices sometimes have their own forms: if they do, use theirs. For anything with legal consequences, have a lawyer look it over.</p>`);
 }
 
@@ -33,8 +46,9 @@ on('tpl-preview', (ds) => {
   const t = (listCache || []).find((x) => x.code === ds.code);
   if (!t) return;
   openModal(t.title, html`<div class="tpl-preview"><pre class="tpl-doc">${t.preview}</pre><div class="tpl-fade" aria-hidden="true"></div></div>
-    <p class="muted small">The rest is filled in with your business's details when you have PermitPal Plus.</p>`, {
-    submitLabel: 'See Plus', onSubmit: () => { setTimeout(() => openUpsell('Templates'), 30); },
+    <p class="muted small">The rest is filled in with your business's details${has('plus') ? ' when you have PermitPal Plus' : ''}${has('load') && isOrgAdmin() ? ', or when you get just this one with your load' : ''}.</p>`, {
+    submitLabel: has('load') && isOrgAdmin() ? 'Get just this one' : 'See Plus',
+    onSubmit: () => { setTimeout(() => (has('load') && isOrgAdmin() ? unlockOne(t) : openUpsell('Templates')), 30); },
   });
 });
 
@@ -63,8 +77,13 @@ function sources(bizId, req) {
 }
 const fill = (body, v) => body.replace(/\{\{([a-z0-9_]+)\}\}/g, (m, k) => (String(v[k] ?? '').trim() || '__________'));
 
+async function unlockOne(t) {
+  if (await unlockTemplateFlow(t)) { unlocked.add(t.code); rerender(); }
+}
+on('tpl-unlock', (ds) => { const t = (listCache || []).find((x) => x.code === ds.code); if (t) unlockOne(t); });
+
 on('tpl-fill', async (ds) => {
-  if (!hasPlus()) return openUpsell('Templates');
+  if (!owned(ds.code)) return has('load') ? unlockOne((listCache || []).find((x) => x.code === ds.code)) : openUpsell('Templates');
   let t;
   try { t = await db.getTemplate(S.org.id, ds.code); } catch (e) { if (e?.hint === 'plus') return openUpsell('Templates'); return toastError(e); }
   const usesPermit = t.fields.some((f) => String(f.source || '').startsWith('permit_'));

@@ -9,13 +9,14 @@ export const STREAMS = {
   care: { name: 'Monthly care plans', color: '#eb6834', note: 'Year-round care bills, paid monthly or yearly' },
   partners: { name: 'Fees from partner firms', color: '#1baf7a', note: 'What firms pay you for quote requests, sales and listings' },
   plans: { name: 'Subscriptions', color: '#eda100', note: 'Team plans, PermitPal Plus and staff licenses' },
+  load: { name: 'Load top-ups', color: '#7c5cd6', note: 'Prepaid load for text reminders, single templates, papers checks and season passes' },
 };
 export const STREAM_KEYS = Object.keys(STREAMS);
 export const KIND_NAMES = {
   service_fee: 'Our fee', gov_fees_in: 'Government fee from customer', gov_fees_out: 'Government fee paid to the office', refund: 'Refund',
   care_fee: 'Monthly care bill', guarantee: 'Late-fee payout (guarantee)', lead: 'Quote request fee', sale: 'Sale fee', placement: 'Checklist ad',
   listing: 'Monthly listing', other: 'Other charge', team_plan: 'Team subscription', credit_topup: 'Prepaid credit from a firm',
-  plus: 'PermitPal Plus', staff_licences: 'Staff licenses', white_label: 'White-label',
+  plus: 'PermitPal Plus', staff_licences: 'Staff licenses', white_label: 'White-label', load_topup: 'Load top-up',
 };
 export const STATE_NAMES = {
   collected: 'Received', to_collect: 'Owed to you', pipeline: 'Waiting for a yes', unbilled: 'Not billed yet',
@@ -95,12 +96,15 @@ export function pipeline(lines, today) {
 
 // Every payment received should have a BIR invoice number. One row per payment (an order, a care bill,
 // a partner statement or a team plan payment), newest first.
+// Payments that get a BIR receipt number (each kind is one row the database can save the number on).
+export const INVOICE_KINDS = ['order', 'care', 'statement', 'plan', 'credit', 'addon', 'load'];
 export function missingInvoices(lines) {
   const pay = new Map();
   for (const l of lines) {
-    const counts = (l.state === 'collected' && num(l.amount) > 0 && ['service_fee', 'care_fee', 'team_plan', 'lead', 'sale', 'placement', 'listing', 'other', 'credit_topup'].includes(l.kind))
+    const counts = (l.state === 'collected' && num(l.amount) > 0 && ['service_fee', 'care_fee', 'team_plan', 'lead', 'sale', 'placement', 'listing', 'other', 'credit_topup',
+      'plus', 'staff_licences', 'white_label', 'load_topup'].includes(l.kind))
       || (l.state === 'held' && l.kind === 'gov_fees_in');
-    if (!counts || !['order', 'care', 'statement', 'plan', 'credit'].includes(l.ref_kind)) continue;
+    if (!counts || !INVOICE_KINDS.includes(l.ref_kind)) continue;
     const key = `${l.ref_kind}:${l.ref_id}`;
     const p = pay.get(key) || { ref_kind: l.ref_kind, ref_id: l.ref_id, day: l.day, who: l.who, label: l.label, amount: 0, invoice_no: null };
     p.amount += num(l.amount);

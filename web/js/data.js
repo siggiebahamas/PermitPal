@@ -696,3 +696,74 @@ export const adminConfirmAddonPayment = async (id, okPaid, note, invoiceNo) => o
   p_invoice: id, p_ok: !!okPaid, p_note: note || null, p_invoice_no: invoiceNo || null }));
 export const adminVoidAddonInvoice = async (id, note) => ok(await sb.rpc('admin_void_addon_invoice', { p_invoice: id, p_note: note }));
 export const adminSetAddon = async (orgId, kind, people, until, note) => ok(await sb.rpc('admin_set_addon', { p_org: orgId, p_kind: kind, p_people: people ?? null, p_until: until, p_note: note || null }));
+
+// ---------------------------------------------------------------- PermitPal load
+// A prepaid balance per workspace: top-ups (by transfer or online), text packs, single templates, papers checks,
+// the renewal season pass and invitations. Every price and rule is checked again by the database.
+export const loadSummary = async (orgId) => ok(await sb.rpc('load_summary', { p_org: orgId }));
+export const loadProducts = async () => ok(await sb.from('load_products').select('*').order('sort'));
+export const loadEntries = async (orgId, limit = 60) => ok(await sb.from('load_entries').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(limit));
+export const loadTopups = async (orgId) => ok(await sb.from('load_topups').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(20));
+export const seasonPasses = async (orgId) => ok(await sb.from('season_passes').select('*').eq('org_id', orgId).order('season', { ascending: false }));
+export async function topupStart(orgId, amount) {
+  const id = ok(await sb.rpc('load_topup_start', { p_org: orgId, p_amount: amount }));
+  return ok(await sb.from('load_topups').select('*').eq('id', id).single());
+}
+export async function topupReport(t, { method, ref, file }) {
+  let proof = null;
+  if (file && file.size) {
+    const problem = checkFile(file);
+    if (problem) throw new Error(problem);
+    proof = { path: `${t.org_id}/load/${t.id}/${rand()}-${safeName(file.name)}`, name: file.name.slice(0, 255) };
+    ok(await sb.storage.from('documents').upload(proof.path, file, { contentType: file.type || 'image/jpeg', upsert: false }));
+  }
+  return ok(await sb.rpc('load_topup_report', { p_topup: t.id, p_method: method, p_ref: ref || null, p_proof_path: proof?.path || null, p_proof_name: proof?.name || null }));
+}
+export const topupCancel = async (id) => ok(await sb.rpc('load_topup_cancel', { p_topup: id }));
+export async function startTopupCheckout(t) {
+  const { data, error } = await sb.functions.invoke('create-checkout', { body: { org_id: t.org_id, plan_id: `load:${t.id}`, months: 1 } });
+  if (error) {
+    let msg = error.message;
+    try { msg = (await error.context.json()).error || msg; } catch { /* keep default */ }
+    throw new Error(msg);
+  }
+  return data.checkout_url;
+}
+export const buyTexts = async (orgId, pack) => ok(await sb.rpc('buy_texts', { p_org: orgId, p_pack: pack }));
+export const buySeasonPass = async (orgId) => ok(await sb.rpc('buy_season_pass', { p_org: orgId }));
+export const templateUnlocks = async (orgId) => ok(await sb.from('template_unlocks').select('code, unlocked_at').eq('org_id', orgId));
+export const unlockTemplate = async (orgId, code) => ok(await sb.rpc('unlock_template', { p_org: orgId, p_code: code }));
+// Papers checks: the photos go in the check's own folder, so they never count as the permit's document.
+export const papersChecks = async (reqId) => ok(await sb.from('papers_checks').select('*').eq('requirement_id', reqId).order('created_at', { ascending: false }).limit(10));
+export const papersCheckFiles = async (checkId) => ok(await sb.from('papers_check_files').select('*').eq('check_id', checkId).order('id'));
+export const requestPapersCheck = async (orgId, reqId, note) => ok(await sb.rpc('request_papers_check', { p_org: orgId, p_requirement: reqId, p_note: note || null }));
+export async function addPapersCheckFile(c, file) {
+  const problem = checkFile(file);
+  if (problem) throw new Error(problem);
+  const path = `${c.org_id}/papers/${c.id}/${rand()}-${safeName(file.name)}`;
+  ok(await sb.storage.from('documents').upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false }));
+  return ok(await sb.rpc('add_papers_check_file', { p_check: c.id, p_path: path, p_name: file.name.slice(0, 255), p_mime: file.type || null }));
+}
+export const cancelPapersCheck = async (id) => ok(await sb.rpc('cancel_papers_check', { p_check: id }));
+export const inviteCode = async (orgId) => ok(await sb.rpc('invite_code', { p_org: orgId }));
+export const claimInvite = async (orgId, code) => ok(await sb.rpc('claim_invite', { p_org: orgId, p_code: code }));
+export const myInvites = async (orgId) => ok(await sb.rpc('my_invites', { p_org: orgId }));
+// Staff: top-ups to confirm, papers checks to answer, prices, gifts and paying load back.
+export const adminTopups = async () => ok(await sb.from('load_topups').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
+export const adminConfirmTopup = async (id, okPaid, note, invoiceNo) => ok(await sb.rpc('admin_confirm_topup', {
+  p_topup: id, p_ok: !!okPaid, p_note: note || null, p_invoice_no: invoiceNo || null }));
+export const adminPapersChecks = async () => ok(await sb.from('papers_checks').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
+export async function adminPapersCheckDetail(c) {
+  const [files, docs, req] = await Promise.all([
+    sb.from('papers_check_files').select('*').eq('check_id', c.id).order('id').then(ok),
+    sb.from('documents').select('id, file_name, storage_path, cycle_id, created_at').eq('requirement_id', c.requirement_id).is('deleted_at', null).order('created_at', { ascending: false }).then(ok),
+    sb.from('requirements').select('id, type_code, name').eq('id', c.requirement_id).maybeSingle().then(ok),
+  ]);
+  return { files, docs, req };
+}
+export const adminAnswerPapersCheck = async (id, verdict, items, summary) => ok(await sb.rpc('admin_answer_papers_check', { p_check: id, p_verdict: verdict, p_items: items, p_summary: summary }));
+export const adminRefundPapersCheck = async (id, note) => ok(await sb.rpc('admin_refund_papers_check', { p_check: id, p_note: note }));
+export const adminSaveLoadProduct = async (code, price, active) => ok(await sb.rpc('admin_save_load_product', { p_code: code, p_price: price, p_active: !!active }));
+export const adminWallets = async () => ok(await sb.from('load_wallets').select('*, orgs(name)').order('updated_at', { ascending: false }).limit(500));
+export const adminLoadGift = async (orgId, amount, texts, note) => ok(await sb.rpc('admin_load_gift', { p_org: orgId, p_amount: amount || 0, p_texts: texts || 0, p_note: note }));
+export const adminLoadCashout = async (orgId, amount, method, ref, note) => ok(await sb.rpc('admin_load_cashout', { p_org: orgId, p_amount: amount, p_method: method, p_ref: ref || null, p_note: note || null }));

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { plateSchedule, suggestDue } from '../web/js/rules.js';
 import { html, esc, raw, normalizePhone, toCsv, addDays, daysBetween } from '../web/js/util.js';
+import { maxPenalty } from '../web/js/penalty.js';
 
 test('LTO plate schedule: last digit = month, 2nd-to-last = week', () => {
   assert.deepEqual(plateSchedule('ABC 1234'), { month: 4, from: 1, to: 7, label: 'April, days 1–7' });
@@ -339,4 +340,13 @@ test('prices: White-label is ₱1,000 a month or ₱10,000 a year (supabase/test
   assert.equal(addonPrice('brand', null, 'monthly'), 1000);
   assert.equal(addonPrice('brand', null, 'yearly'), 10000);
   assert.equal(addonLabel('brand', null, 'monthly'), 'White-label (monthly)');
+});
+
+test('Late Mayor\'s Permit: the most the Local Government Code allows', () => {
+  assert.deepEqual(maxPenalty(10000, 3), { surcharge: 2500, interest: 750, total: 3250, months: 3 }); // 25%, then 2% a month on 12,500
+  assert.equal(maxPenalty(10000, 0).total, 2500);                    // the surcharge applies from day one
+  assert.equal(maxPenalty(10000, 50).months, 36);                    // interest stops after 36 months
+  assert.equal(maxPenalty(10000, 2.2).months, 3);                    // part of a month counts as a month
+  assert.equal(maxPenalty('', 3).total, 0);                          // nothing typed yet
+  assert.equal(maxPenalty(-500, 3).total, 0);
 });

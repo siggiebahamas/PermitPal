@@ -235,7 +235,7 @@ select pg_temp.res('every workspace sees the templates list, without the full te
   (select count(*) from public.list_templates()) = 8 and not exists (select 1 from public.list_templates() where preview like '%{{%'), '');
 do $$ begin perform public.get_template((select org from t_ids), 'affidavit_of_loss');
   perform pg_temp.res('the full template is Plus only', false, 'was allowed');
-exception when others then perform pg_temp.res('the full template is Plus only', sqlerrm like 'Ready-to-use templates come with PermitPal Plus.', sqlerrm); end $$;
+exception when others then perform pg_temp.res('the full template is Plus only', sqlerrm like 'Ready-to-use templates come with PermitPal Plus%', sqlerrm); end $$;
 do $$ begin perform public.trust_page_save((select org from t_ids), (select biz from t_ids), 'Lorna''s Kitchen');
   perform pg_temp.res('the public page is Plus only', false, 'was allowed');
 exception when others then perform pg_temp.res('the public page is Plus only', sqlerrm like 'Your public permit page comes with PermitPal Plus.', sqlerrm); end $$;

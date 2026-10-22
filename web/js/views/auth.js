@@ -13,7 +13,8 @@ export function authPage(el, mode, ctx = {}) {
   const inviteNote = invite ? html`<div class="banner info"><div><b>${invite.invited_by || 'Someone'}</b> invited you to <b>${invite.org_name}</b>.
     ${mode === 'signup' ? 'Create your account' : 'Log in'} with <b>${invite.email}</b> to join.</div></div>`
     : ctx.connect ? html`<div class="banner info"><div><b>A company invited you to connect on PermitPal.</b> ${mode === 'signup' ? 'Create your free account' : 'Log in'} to review what they would see before you accept.
-      ${mode === 'signup' ? html`Already have an account? <a href="#/login">Log in</a>.` : ''}</div></div>` : '';
+      ${mode === 'signup' ? html`Already have an account? <a href="#/login">Log in</a>.` : ''}</div></div>`
+    : mode === 'signup' && sessionStoragePeek('pp-ref') ? html`<div class="banner info"><div><b>A business you know invited you.</b> Create your free account and add 3 permits with their dates: you both get a month of PermitPal Plus, free.</div></div>` : '';
 
   if (mode === 'signup') {
     el.innerHTML = String(shell(html`
@@ -143,4 +144,5 @@ export function onboarding(el, profile, onDone) {
 }
 
 export function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v); } catch { /* private mode */ } }
+export function sessionStoragePeek(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
 export function sessionStorageTake(k) { try { const v = sessionStorage.getItem(k); sessionStorage.removeItem(k); return v; } catch { return null; } }

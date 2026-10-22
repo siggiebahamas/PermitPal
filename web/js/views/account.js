@@ -11,6 +11,7 @@ import { avatar, ICON } from '../components.js';
 import { KINDS, teamAccess, connectionsCard } from './network.js';
 import { mfaSection, requireCard } from './mfa.js';
 import { addonSection, wireAddons, showBrandCard } from './plus.js';
+import { loadSettingsCard, loadState, loadStateNow } from './load.js';
 import { brandPage, brandTabShown } from './brand.js';
 import { billToggle, freeCard, planCard, plansShown, PLANS, compareTable } from './pricing.js';
 import { planTotal } from '../prices.js';
@@ -208,13 +209,15 @@ export async function settings(el, section) {
   let conn = '';
   let pay = {};
   let access = [];
+  let loadCard = '';
   try {
-    [channels, log, conn, pay, access] = await Promise.all([
+    [channels, log, conn, pay, access, loadCard] = await Promise.all([
       db.channelStatus().catch(() => ({})),
       db.myDeliveryLog(S.user.id).catch(() => []),
       section === 'workspace' ? connectionsCard() : '',
       section === 'billing' ? db.appSettings().catch(() => ({})) : {},
       section === 'workspace' && has('services') ? db.staffAccessLog(S.org.id).catch(() => []) : [],
+      section === 'billing' ? loadSettingsCard() : has('load') ? loadState(true).then(() => '').catch(() => '') : '',
     ]);
   } catch { /* shown as empty */ }
   const toggle = (k, label, sub = '', disabled = false) => html`<label class="toggle ${disabled ? 'disabled' : ''}"><div><div>${label}</div>${when(sub, html`<div class="muted small">${sub}</div>`)}</div>
@@ -271,7 +274,7 @@ export async function settings(el, section) {
     </section>`)}
 
     ${when(section === 'billing', html`
-    ${billingSection(pay)}`)}
+    ${billingSection(pay)}${loadCard}`)}
 
     ${when(section === 'workspace', html`
     ${requireCard()}
@@ -482,11 +485,21 @@ on('plan-checkout', async (ds) => {
 
 // ---------------------------------------------------------------- text messages
 // A number gets texts only after the person types back the code we text to it, so reminders never go to
-// a mistyped or someone else's number. Texts cost money, so they come with team plans and are capped.
+// a mistyped or someone else's number. Texts cost money, so they come with team plans (or text credits from
+// load) and are capped.
 const fmtPhone = (p) => (p ? String(p).replace(/^\+63(\d{3})(\d{3})(\d{4})$/, '0$1 $2 $3') : '');
 let smsStep = null; // { phone } while waiting for the code
 let smsChanging = false; // "Change number" pressed: the old number keeps working until the new one is verified
 window.addEventListener('hashchange', () => { smsChanging = false; });
+// Without a team plan, texts are paid with text credits from the workspace's load (or its season pass).
+function textsFrom() {
+  const st = loadStateNow();
+  if (!st) return '';
+  const s = st.summary;
+  return html`<p class="small texts-from">${s.text_source === 'season' ? 'Your season pass is covering texts now.'
+    : s.texts ? html`<b>${s.texts} text reminders left</b> in this workspace. One text uses one.` : html`<b>No text credits yet.</b> Reminders come by email and in the app; texts start once your workspace has text credits.`}
+    ${when(isOrgAdmin(), html` <a href="#/load">${s.texts ? 'Get more' : 'Get text reminders'}</a>`)}</p>`;
+}
 function smsSection(channels) {
   const p = S.profile;
   const plan = effectivePlan();
@@ -494,7 +507,7 @@ function smsSection(channels) {
   const on = !!S.prefs?.sms_enabled;
   let body;
   if (channels.sms === false) body = html`<p class="muted">Text reminders are being set up. Email and in-app reminders work meanwhile.</p>`;
-  else if (!plan?.paid_channels) {
+  else if (!plan?.paid_channels && !has('load')) {
     body = html`<p class="muted">Text reminders come with team plans (Accounting firm, Fleet, Property). On ${plan?.name || 'your'} plan you get email and in-app reminders.</p>
       ${when(isOwner(), html`<a class="btn btn-sm btn-soft" href="#/settings/billing">See plans</a>`)}`;
   } else if (smsStep) {
@@ -518,7 +531,7 @@ function smsSection(channels) {
       <div class="btn-row"><button class="btn btn-primary">Text me a code</button>
         ${when(verified, html`<button type="button" class="btn btn-ghost" data-act="sms-cancel">Cancel: keep ${fmtPhone(p.phone)}</button>`)}</div></form>`;
   }
-  return html`<section class="card" id="sms"><h2>Text messages (SMS)</h2>${body}</section>`;
+  return html`<section class="card" id="sms"><h2>Text messages (SMS)</h2>${body}${channels.sms !== false && !plan?.paid_channels && has('load') ? textsFrom() : ''}</section>`;
 }
 let smsTimer = null;
 function countdown() {

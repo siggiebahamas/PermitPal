@@ -24,6 +24,7 @@ import { filings, forgetFilings } from './views/filings.js';
 import { mfaChallenge, mfaRequired } from './views/mfa.js';
 import { checkPage } from './views/check.js';
 import { templatesPage } from './views/templates.js';
+import { loadPage } from './views/load.js';
 import { workerPage } from './views/worker.js';
 import { applyBrand, sideBrand, poweredBy, connectBrand } from './views/brand.js';
 
@@ -41,11 +42,11 @@ let unsubscribe = null;
 const T = {
   en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
         filings: 'Taxes & contributions', pros: 'Find a professional', services: 'Done for you', care: 'Year-round care', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
-        check: 'Permit check', templates: 'Templates',
+        check: 'Permit check', templates: 'Templates', load: 'Load',
         notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact PermitPal', tools: 'Tools', account: 'Account' },
   tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
         filings: 'Buwis at kontribusyon', pros: 'Maghanap ng Propesyonal', services: 'Ipaasikaso sa amin', care: 'Alaga buong taon', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
-        check: 'Pagsusuri ng permit', templates: 'Mga template',
+        check: 'Pagsusuri ng permit', templates: 'Mga template', load: 'Load',
         notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang PermitPal', tools: 'Mga Tool', account: 'Account' },
 };
 const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k] || k;
@@ -80,6 +81,9 @@ async function start() {
     }
     const kindParam = new URLSearchParams(location.hash.split('?')[1] || '').get('type');
     if (kindParam && KINDS[kindParam]) sessionStorageSet('pp-kind', kindParam);
+    // Invited by another business (#/signup?ref=CODE): remembered through sign-up, claimed once the workspace exists.
+    const refParam = new URLSearchParams(location.hash.split('?')[1] || '').get('ref');
+    if (refParam && /^[A-Za-z0-9]{8}$/.test(refParam)) sessionStorageSet('pp-ref', refParam.toUpperCase());
     if (!parts[0] || parts[0] === 'welcome') return landing(app);
     if (parts[0] === 'pricing') return pricingPage(app);
     if (parts[0] === 'contact') return contactPage(app, { signedIn: false });
@@ -116,6 +120,11 @@ async function start() {
     const kind = sessionStorageTake('pp-kind');
     if (kind && KINDS[kind] && S.org.kind === 'business' && S.org.role === 'owner') {
       try { await db.setOrgProfile(S.org.id, { kind }); Object.assign(S, await db.loadMe(S.user.id)); S.org = S.orgs.find((o) => o.id === S.org.id) || S.orgs[0]; } catch { /* stays a business */ }
+    }
+    // Joined with another business's invitation link: say so (it only counts for a new workspace's owner).
+    const ref = sessionStorageTake('pp-ref');
+    if (ref && has('load') && S.org.role === 'owner') {
+      db.claimInvite(S.org.id, ref).then((yes) => { if (yes) toast('Welcome! Add 3 permits with their dates and you and the business that invited you both get a month of PermitPal Plus.'); }).catch(() => {});
     }
     const connect = parts[0] === 'connect' ? null : sessionStorageTake('pp-connect');
     if (connect) history.replaceState(null, '', '#/connect/' + connect);
@@ -173,8 +182,8 @@ function buildNav() {
   NAV = k?.nav ? [base[0], ['network', k.nav, k.icon], ...base.slice(1)] : base;
   // Below Notifications the menu has two color-coded groups: Tools (pine) and Account (navy).
   TOOLS = [...(has('plus') ? [['check', 'check']] : []), ...(has('services') ? [['services', 'services']] : []), ...(has('revenue') && IN_PERSON ? [['care', 'care']] : []), ['pros', 'pros'], ['costs', 'costs'], ['sharing', 'sharing'],
-    ...(has('plus') ? [['templates', 'templates']] : []), ...(k?.nav ? [] : [['network', 'team_tools']])];
-  ACCOUNT = [['history', 'history'], ['trash', 'trash'], ['team', 'team'], ['settings', 'settings'], ['contact', 'contact']];
+    ...(has('plus') || has('load') ? [['templates', 'templates']] : []), ...(k?.nav ? [] : [['network', 'team_tools']])];
+  ACCOUNT = [['history', 'history'], ['trash', 'trash'], ['team', 'team'], ...(has('load') ? [['load', 'load']] : []), ['settings', 'settings'], ['contact', 'contact']];
   MORE = [['notifications', 'notifications'], ...TOOLS, ...ACCOUNT];
 }
 
@@ -272,7 +281,8 @@ async function renderPage() {
     else if (a === 'lead' && has('leads')) await leadPage(main, b, { signedIn: true });
     else if (a === 'w' && has('plus')) await workerPage(main, b, { signedIn: true });
     else if (a === 'check' && has('plus')) await checkPage(main);
-    else if (a === 'templates' && has('plus')) await templatesPage(main);
+    else if (a === 'templates' && (has('plus') || has('load'))) await templatesPage(main);
+    else if (a === 'load' && has('load')) await loadPage(main);
     else if (['pros', 'partners', 'services', 'help'].includes(a)) await partners(main, params);
     else if (a === 'contact') contactPage(main, { signedIn: true });
     else if (a === 'costs') await costs(main);

@@ -1,5 +1,5 @@
-// Starts a PayMongo checkout (GCash, Maya, cards, GrabPay) for a plan upgrade or for a
-// done-for-you service order the customer has accepted (send { request_id }).
+// Starts a PayMongo checkout (GCash, Maya, cards, GrabPay) for a plan upgrade, an add-on bill or a load
+// top-up (plan "addon:<id>" / "load:<id>"), or for a done-for-you service order the customer has accepted (send { request_id }).
 // Called from the app by a signed-in workspace owner. Needs PAYMONGO_SECRET_KEY and APP_URL.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -37,8 +37,13 @@ Deno.serve(async (req) => {
     const { data, error } = await asUser.rpc("billing_start", { p_org: org_id, p_plan: plan_id, p_months: months ?? 1 });
     if (error) return json({ error: error.message }, 400);
     start = data;
-    lineName = `PermitPal ${data.plan_name} - ${data.months} month${data.months > 1 ? "s" : ""}${data.months_free ? ` (${data.months_free} free)` : ""}`;
-    lineDesc = data.org_name; back = "#/settings/billing";
+    if (data.kind === "load") {
+      // A load top-up (plan "load:<id>"): no months, and back to the Load page.
+      lineName = `PermitPal ${data.plan_name}`; lineDesc = data.org_name; back = "#/load";
+    } else {
+      lineName = `PermitPal ${data.plan_name} - ${data.months} month${data.months > 1 ? "s" : ""}${data.months_free ? ` (${data.months_free} free)` : ""}`;
+      lineDesc = data.org_name; back = "#/settings/billing";
+    }
   }
 
   const amount = Math.round(Number(start.amount_php) * 100); // centavos

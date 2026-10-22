@@ -6,6 +6,7 @@ import { STATUS, byPriority, subjectLabel, dueShort, ICON, counts } from '../com
 import * as db from 'pp/data';
 import { makeZip } from '../zip.js';
 import { trustSection } from './trust.js';
+import { maxPenalty } from '../penalty.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -201,15 +202,13 @@ export async function costs(el) {
     </section>` : empty('No dated renewals yet', 'Add expiry dates to your permits and this page fills in by itself.')}`);
 }
 
-// Late-renewal warning for the Mayor's Permit. The Local Government Code (RA 7160, Sec. 168) caps the
-// surcharge at 25% of the unpaid amount, and interest at 2% a month of the unpaid amount including the
-// surcharge, for at most 36 months. Cities may charge less, never more - so this is an upper limit.
+// Late-renewal warning for the Mayor's Permit: the most the Local Government Code lets a city add (penalty.js).
 export function penaltyNote(r) {
   if (r.type_code !== 'mayors_permit' || !r.expires_on || r.amount_paid == null) return '';
   const today = todayPH();
   const months = r.expires_on < today ? Math.min(36, Math.ceil((Date.parse(today) - Date.parse(r.expires_on)) / (30 * 864e5))) : 0;
   const base = Number(r.amount_paid);
-  const max = (m) => base * 0.25 + base * 1.25 * 0.02 * m;
+  const max = (m) => maxPenalty(base, m).total;
   return html`<div class="banner warn"><div><b>${months ? `Late by about ${plural(months, 'month')}` : 'If you renew late'}:</b>
     the law lets your city add up to ${peso(max(Math.max(months, 1)))}${months ? '' : ' in the first month'} on top of the regular fees
     (a 25% surcharge plus 2% interest a month, figured on the ${peso(base)} you paid last time). This is the most the Local Government Code allows; many cities charge less.</div></div>`;

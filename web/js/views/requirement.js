@@ -1,7 +1,7 @@
 // A single requirement: its current record, files, past records and history — plus the
 // flows used everywhere else (add details, upload, renew, started renewing).
 import { html, fmtDate, fmtDateTime, timeAgo, fileSize, todayPH, openModal, confirmDialog, toast, toastError, formObject, when, peso } from '../util.js';
-import { S, on, go, reload, canEdit, has, reqById, typeOf, vehicle, memberName, empty, subjectHref, coverOf } from '../core.js';
+import { S, on, go, reload, rerender, canEdit, has, reqById, typeOf, vehicle, memberName, empty, subjectHref, coverOf } from '../core.js';
 import { loadPartners, loadPlacements, partnerSuggestions, penaltyNote, trackPlacements } from './extras.js';
 import { careNote } from './care.js';
 import { STATUS, statusChip, dueText, subjectLabel, ICON } from '../components.js';
@@ -10,10 +10,13 @@ import { handledByLine } from './assign.js';
 import { checklistCard, watchChecklist } from './checklist.js';
 import { serviceOffer } from './services.js';
 import { scanBox, wireScan } from './scan.js';
+import { papersCard, openPapersCheck, loadState, watchPapers } from './load.js';
 import * as db from 'pp/data';
 
 let detail = null;       // { id, cycles, documents, activity }
 let loadingId = null;
+let navs = 0;            // page changes, so a papers check answered meanwhile shows when you come back
+window.addEventListener('hashchange', () => { navs++; });
 
 export async function render(el, id) {
   const r = reqById(id);
@@ -27,15 +30,33 @@ export async function render(el, id) {
     if (loadingId === id) return;
     loadingId = id;
     try {
-      const [d] = await Promise.all([db.requirementDetail(id, { checklist: has('library2') }), loadPartners(), loadPlacements()]);
-      detail = { id, ...d };
+      const [d, checks] = await Promise.all([db.requirementDetail(id, { checklist: has('library2') }), has('load') ? db.papersChecks(id).catch(() => []) : [],
+        loadPartners(), loadPlacements(), has('load') ? loadState().catch(() => null) : null]);
+      detail = { id, ...d, checks, checksNav: navs };
     } catch (e) { toastError(e); }
     loadingId = null;
     if (!location.hash.includes(id)) return; // navigated away while loading
+  } else if (has('load') && detail.checksNav !== navs) {
+    // A papers check may have been answered since: it's one small read.
+    detail.checks = await db.papersChecks(id).catch(() => detail.checks || []);
+    detail.checksNav = navs;
+    if (!location.hash.includes(id)) return;
   }
   el.innerHTML = String(page(r));
   trackPlacements(el);
+  // Arriving from "Papers check" on the Load page: open the form once.
+  if (has('load') && /[?&]check=1/.test(location.hash)) {
+    history.replaceState(null, '', location.hash.replace(/[?&]check=1/, ''));
+    const n = detail.documents.filter((d) => d.cycle_id && d.cycle_id === r.cycle_id).length;
+    setTimeout(() => openPapersCheck(r, n), 30);
+  }
 }
+// A papers check was sent, cancelled or got photos: refresh this permit's card.
+watchPapers(async (reqId) => {
+  if (!detail || detail.id !== reqId) return;
+  try { detail.checks = await db.papersChecks(reqId); detail.checksNav = navs; } catch { /* keep what we had */ }
+  if (location.hash.includes(reqId)) rerender();
+});
 
 export function forget() { detail = null; }
 // Keep this page's copy of the checklist ticks current, and refresh if the permit changed underneath.
@@ -110,6 +131,7 @@ function page(r) {
     </div>
     ${careNote(r) || ''}
     ${checklistCard(r, detail.ticks || [], { offer: coverOf(r) ? '' : serviceOffer(r, { compact: true }) }) || (coverOf(r) ? '' : serviceOffer(r))}
+    ${papersCard(r, detail.checks || [], current ? docsOf(current.id).length : 0)}
     ${partnerSuggestions(r)}
 
     ${when(past.length, html`

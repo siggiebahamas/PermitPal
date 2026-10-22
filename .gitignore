@@ -5,3 +5,6 @@ tests/ui/*.png
 web/demo.html
 web/demo/
 *.tmp.mjs
+web/renew/
+web/sitemap.xml
+web/robots.txt

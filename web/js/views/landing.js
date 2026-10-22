@@ -31,7 +31,7 @@ const header = (onHome) => html`<header class="lp-top"><a class="brand" href="#/
   ${onHome ? html`<a class="btn btn-ghost btn-sm lp-nav" href="#tour" data-scroll-to="tour">How it works</a><a class="btn btn-ghost btn-sm lp-nav" href="#for-you" data-scroll-to="for-you">Who it's for</a>`
     : html`<a class="btn btn-ghost btn-sm lp-nav" href="#/">How it works</a>`}
   <a class="btn btn-ghost btn-sm lp-nav" href="#/pricing" ${onHome ? '' : raw('aria-current="page"')}>Prices</a><a class="btn btn-ghost btn-sm" href="#/login">Sign in</a><a class="btn btn-primary btn-sm" href="#/signup">Start free</a></header>`;
-const footer = () => html`<footer class="lp-foot"><span>© PermitPal</span><a href="#/pricing">Prices</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="#/contact">Contact</a>${has('revenue') ? html`<a href="#/list-your-firm">For service providers</a>` : ''}<a href="#/login">Sign in</a></footer>`;
+const footer = () => html`<footer class="lp-foot"><span>© PermitPal</span><a href="#/pricing">Prices</a><a href="renew/">Renewal guides</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="#/contact">Contact</a>${has('revenue') ? html`<a href="#/list-your-firm">For service providers</a>` : ''}<a href="#/login">Sign in</a></footer>`;
 // In-page links scroll; they must not change the address (the app's pages live there).
 const wireScroll = (app) => app.querySelectorAll('[data-scroll-to]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); document.getElementById(a.dataset.scrollTo)?.scrollIntoView({ behavior: 'smooth' }); }));
 
@@ -257,12 +257,25 @@ const plusShowcase = () => (has('plus') ? html`<section class="lp-show card" ari
     <div class="lp-tp-qr" aria-hidden="true">${QR}<span><b>Scan to check</b><small>Print it, stick it by the counter</small></span></div>
   </div>
 </section>` : '');
+// What load buys (prices come from the database once they arrive; these are only shown until then).
+const LOAD_FALLBACK = [{ code: 'texts_50', name: '50 text reminders', price_php: 49, active: true }, { code: 'texts_200', name: '200 text reminders', price_php: 179, active: true },
+  { code: 'template', name: 'One template, yours to keep', price_php: 39, active: true }, { code: 'papers_check', name: 'Papers check', price_php: 149, active: true },
+  { code: 'season_pass', name: 'Renewal season pass', price_php: 149, active: true }];
+const LOAD_WHY = {
+  texts_50: 'A text on the days your permits and tax deadlines need you. Credits never expire.',
+  texts_200: 'The same texts, for bigger teams: works out cheaper per text.',
+  template: 'An authorization letter, SPA or affidavit of loss, filled in with your details. Buy only the one you need.',
+  papers_check: 'Before you queue, we check photos of your papers against the checklist. Answered by 6 pm the next weekday, or free.',
+  season_pass: 'For the January rush: up to 100 texts, one papers check and your renewal plan by email. September to February.',
+};
+const loadCards = (list) => list.filter((p) => p.active).map((p) => html`<div class="card lp-load-card"><b>${p.name}</b><span class="lp-load-price">${peso(p.price_php)}</span><p>${LOAD_WHY[p.code] || ''}</p></div>`);
 const FAQ = [
   ['Is the free plan really free?', 'Yes. Your own businesses, vehicles, team and reminders cost nothing, with no time limit and no card. Team plans and add-ons are for people who need more.'],
   ['What happens after the 30-day trial?', 'You choose to pay monthly or yearly. Nothing is charged by itself: we send a bill, you pay by GCash, Maya, bank or card.'],
   ['How does yearly work?', 'You pay for 10 months and get 12. That is 2 months free, every year.'],
   ['Can I stop anytime?', 'Yes. Your plan runs to the end of what you paid. Your data is never locked or deleted, and you can download it anytime.'],
 ];
+const faq = () => [...FAQ, ...(has('load') ? [['What is PermitPal load?', "Prepaid credit for the small extras: text reminders, one template at a time, a papers check, the renewal season pass. Top up from ₱100. It never expires, and unused paid load can be paid back to you if you ask."]] : [])];
 // The plans and add-ons, with a "start" button for each (sign-up remembers which plan they picked).
 function pricingCards(plans) {
   const price = (id) => Number(plans.find((p) => p.id === id)?.price_php_monthly || 0);
@@ -294,14 +307,18 @@ export async function pricingPage(app) {
         <div data-plans>${pricingCards([])}</div>
         ${addons()}
       </section>
+      ${has('load') ? html`<section class="lp-load" aria-labelledby="load-h"><h2 class="lp-h3" id="load-h">Pay as you go, with PermitPal load</h2>
+        <p class="lp-sub">Top up from ₱100 by GCash, Maya or bank. Use it only on what you need. It never expires.</p>
+        <div class="lp-load-grid" data-load-products>${loadCards(LOAD_FALLBACK)}</div></section>` : ''}
       ${plusShowcase()}
-      <section class="lp-faq" aria-label="Questions about prices">${FAQ.map(([q, a]) => html`<details class="card"><summary><b>${q}</b></summary><p>${a}</p></details>`)}</section>
+      <section class="lp-faq" aria-label="Questions about prices">${faq().map(([q, a]) => html`<details class="card"><summary><b>${q}</b></summary><p>${a}</p></details>`)}</section>
       <section class="lp-final2 lp-final-sm"><div><h2 class="lp-big">Not sure yet?</h2><p class="lp-lead">Start on the free plan. Move up only if you need to.</p></div>
         <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#/">See how it works</a></div></section>
       ${footer()}
     </main>`);
   window.scrollTo(0, 0);
   paintPrices(app);
+  if (has('load')) db.loadProducts().then((list) => { const box = app.querySelector('[data-load-products]'); if (box && list?.length) box.innerHTML = String(loadCards(list)); }).catch(() => {});
   const plans = await plansP;
   const slot = app.querySelector('[data-plans]');
   if (slot && plans.length) { slot.innerHTML = String(pricingCards(plans)); paintPrices(slot); }

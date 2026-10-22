@@ -756,7 +756,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 
@@ -1664,7 +1664,7 @@ const TEMPLATES = [
 export const listTemplates = async () => TEMPLATES.map((t) => ({ code: t.code, title: t.title, category: t.category, summary: t.summary, use_when: t.use_when, notarize: t.notarize, sort: t.sort, version: t.version,
   preview: t.body.replace(/\{\{[a-z0-9_]+\}\}/g, '______').split('\n').slice(0, 7).join('\n') }));
 export async function getTemplate(orgId, code) {
-  if (!hasPlusMock()) throw notPlus('Ready-to-use templates');
+  if (!hasPlusMock() && !loadDb.unlocks.some((u) => u.code === code)) throw notPlus('Ready-to-use templates');
   const t = TEMPLATES.find((x) => x.code === code);
   return { code: t.code, title: t.title, body: t.body, fields: t.fields, notarize: t.notarize, version: t.version, use_when: t.use_when };
 }
@@ -1750,3 +1750,225 @@ export async function uploadBrandLogo(orgId, file) {
 }
 export const removeBrandLogo = async () => {};
 export const brandLogoUrl = (path) => (path ? 'img/logo.png' : null);
+
+// ---------------------------------------------------------------- PermitPal load (the database's rules, in memory)
+const LOAD_ON = globalThis.PP_FEATURES !== 'none' && (!Array.isArray(globalThis.PP_FEATURES) || globalThis.PP_FEATURES.includes('load'));
+const loadDb = { wallet: { paid_php: 0, bonus_php: 0, texts: 0 }, entries: [], topups: [], unlocks: [], checks: [], files: [], passes: [], code: null, invites: [], invitedBy: null, outbox: [],
+  products: [
+    { code: 'texts_50', name: '50 text reminders', price_php: 49, texts: 50, active: true, sort: 10 },
+    { code: 'texts_200', name: '200 text reminders', price_php: 179, texts: 200, active: true, sort: 20 },
+    { code: 'template', name: 'One template, yours to keep', price_php: 39, texts: 0, active: true, sort: 30 },
+    { code: 'papers_check', name: 'Papers check', price_php: 149, texts: 0, active: true, sort: 40 },
+    { code: 'season_pass', name: 'Renewal season pass', price_php: 149, texts: 0, active: true, sort: 50 }] };
+export const __load = loadDb; // the smoke test reads and nudges this
+export function __verifyPhone(phone = '+639171234567') { Object.assign(me, { phone, phone_verified_at: new Date().toISOString() }); myPrefs.sms_enabled = true; }
+let lseq = 0;
+const lnow = () => new Date().toISOString();
+const product = (code) => loadDb.products.find((p) => p.code === code);
+const loadErr = (m, hint) => Object.assign(new Error(m), { code: 'P0001', ...(hint ? { hint } : {}) });
+const pesoS = (n) => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const seasonFor = (iso) => { const m = Number(iso.slice(5, 7)); const y = Number(iso.slice(0, 4)); return m >= 9 ? y + 1 : m === 1 ? y : null; };
+const febEnd = (season) => { const d = new Date(Date.UTC(season, 2, 1)); d.setUTCDate(0); return d.toISOString().slice(0, 10); };
+function loadAdd(kind, paid, bonus, texts, item, label, ref) {
+  loadDb.wallet.paid_php += paid; loadDb.wallet.bonus_php += bonus; loadDb.wallet.texts += texts;
+  loadDb.entries.unshift({ id: ++lseq, org_id: org.id, kind, paid_php: paid, bonus_php: bonus, texts, item, label, ref_id: ref || null, created_at: lnow() });
+}
+function loadSpend(amount, item, label, ref, texts = 0) {
+  const w = loadDb.wallet;
+  if (w.paid_php + w.bonus_php < amount) throw loadErr(`Not enough load: this is ${pesoS(amount)}, and you have ${pesoS(w.paid_php + w.bonus_php)}. Top up first.`, 'load');
+  const bonus = Math.min(w.bonus_php, amount);
+  w.bonus_php -= bonus; w.paid_php -= amount - bonus; w.texts += texts;
+  loadDb.entries.unshift({ id: ++lseq, org_id: org.id, kind: 'spend', paid_php: -(amount - bonus), bonus_php: -bonus, texts, item, label, ref_id: ref || null, created_at: lnow() });
+}
+function loadGiveBack(ref, label) {
+  const e = loadDb.entries.filter((x) => x.ref_id === ref && ['spend', 'refund'].includes(x.kind));
+  const paid = -e.reduce((t, x) => t + x.paid_php, 0); const bonus = -e.reduce((t, x) => t + x.bonus_php, 0);
+  if (paid > 0 || bonus > 0) loadAdd('refund', paid, bonus, 0, null, label, ref);
+}
+const needAdmin = () => { if (!['owner', 'admin'].includes(org.role)) throw Object.assign(new Error('Only the workspace owner or an admin can use the load.'), { code: '42501' }); };
+const planTexts = () => !!plans.find((p) => p.id === org.plan_id)?.paid_channels;
+const activePass = () => loadDb.passes.find((p) => today() >= p.starts_on && today() <= p.ends_on) || null;
+const passTextsUsed = (p) => loadDb.outbox.filter((m) => m.text_source === 'season' && m.created_at.slice(0, 10) >= p.starts_on).length;
+function textSource() {
+  if (planTexts()) return 'plan';
+  const p = activePass();
+  if (p && passTextsUsed(p) < p.texts_cap) return 'season';
+  return loadDb.wallet.texts > 0 ? 'credit' : null;
+}
+const nextBusiness6pm = () => { const d = new Date(today() + 'T00:00:00Z'); do { d.setUTCDate(d.getUTCDate() + 1); } while ([0, 6].includes(d.getUTCDay())); return new Date(`${d.toISOString().slice(0, 10)}T18:00:00+08:00`).toISOString(); };
+
+export async function loadSummary() {
+  const p = loadDb.passes.find((x) => today() <= x.ends_on) || null;
+  const season = seasonFor(today());
+  return { paid: loadDb.wallet.paid_php, bonus: loadDb.wallet.bonus_php, total: loadDb.wallet.paid_php + loadDb.wallet.bonus_php, texts: loadDb.wallet.texts,
+    text_source: textSource(), plan_texts: planTexts(), sms_ready: !!globalThis.PP_SMS, phones: me.phone_verified_at ? 1 : 0, my_phone: !!me.phone_verified_at,
+    texts_month: loadDb.outbox.filter((m) => m.created_at.slice(0, 7) === today().slice(0, 7)).length,
+    pass: p ? { id: p.id, season: p.season, starts_on: p.starts_on, ends_on: p.ends_on, texts_cap: p.texts_cap, check_used: !!p.check_id, texts_used: passTextsUsed(p) } : null,
+    season_on_sale: season && !loadDb.passes.some((x) => x.season === season) && product('season_pass').active ? season : null,
+    season_ends: season ? febEnd(season) : null, has_plus: hasPlusMock(), can_spend: ['owner', 'admin'].includes(org.role),
+    invites: ['owner', 'admin'].includes(org.role) ? { joined: loadDb.invites.length, rewarded: loadDb.invites.filter((i) => i.status === 'rewarded').length,
+      pending: loadDb.invites.filter((i) => i.status === 'pending').length, invited_by: loadDb.invitedBy } : null };
+}
+export const loadProducts = async () => loadDb.products.map((p) => ({ ...p }));
+export const loadEntries = async () => loadDb.entries.map((e) => ({ ...e }));
+export const loadTopups = async () => loadDb.topups.map((t) => ({ ...t }));
+export const seasonPasses = async () => loadDb.passes.map((p) => ({ ...p }));
+export async function topupStart(orgId, amount) {
+  needAdmin();
+  if (!(amount >= 100 && amount <= 5000 && amount % 50 === 0)) throw loadErr('Choose an amount from ₱100 to ₱5,000, in steps of ₱50.');
+  loadDb.topups.filter((t) => t.status === 'due').forEach((t) => { t.status = 'cancelled'; t.note = 'Replaced by a new top-up.'; });
+  const t = { id: uid(), number: `L-${today().slice(0, 4)}-${String(100 + loadDb.topups.length).padStart(5, '0')}`, org_id: org.id, amount_php: amount, status: 'due', valid_until: addDays(7),
+    pay_method: null, pay_ref: null, proof_path: null, proof_name: null, reported_at: null, paid_at: null, bir_invoice_no: null, note: null, created_at: lnow() };
+  loadDb.topups.unshift(t);
+  return { ...t };
+}
+export async function topupReport(t0, { method, ref, file }) {
+  const t = loadDb.topups.find((x) => x.id === t0.id);
+  if (!['due', 'pending_verification'].includes(t.status)) throw loadErr('This top-up is already paid or was replaced.');
+  if (!ref && !(file && file.size)) throw loadErr('Add the reference number or a screenshot of the payment.');
+  Object.assign(t, { status: 'pending_verification', pay_method: method, pay_ref: ref || null, proof_path: file?.size ? `${org.id}/load/${t.id}/x-${file.name}` : null, proof_name: file?.name || null, reported_at: lnow(), note: null });
+}
+export async function topupCancel(id) { const t = loadDb.topups.find((x) => x.id === id); if (t.status !== 'due') throw loadErr("Only a top-up you haven't paid yet can be cancelled."); t.status = 'cancelled'; t.note = 'Cancelled.'; }
+export const startTopupCheckout = async () => { throw new Error('Online card/GCash checkout is not switched on yet. Please use the GCash or bank transfer details shown instead.'); };
+function topupPaid(t, method) {
+  if (t.status === 'paid') return;
+  Object.assign(t, { status: 'paid', paid_at: lnow(), pay_method: method || t.pay_method, note: null });
+  loadAdd('topup', t.amount_php, 0, 0, null, `Top-up ${t.number}${t.pay_method ? ` (${t.pay_method.replace('_', ' ')})` : ''}`, t.id);
+}
+export async function buyTexts(orgId, pack) {
+  needAdmin();
+  const p = product(pack);
+  if (!p || !p.active || !pack.startsWith('texts_')) throw loadErr("That text pack isn't available.");
+  if (!globalThis.PP_SMS) throw loadErr("Text reminders aren't available yet. Nothing was charged.");
+  if (!me.phone_verified_at) throw loadErr('Add and verify a mobile number first (Settings > Notifications), so the texts have somewhere to go.', 'phone');
+  loadSpend(p.price_php, p.code, p.name, null, p.texts);
+  return loadDb.wallet.texts;
+}
+export async function buySeasonPass() {
+  needAdmin();
+  const season = seasonFor(today());
+  if (!season) throw loadErr('The renewal season pass is on sale from September to January.');
+  if (loadDb.passes.some((x) => x.season === season)) throw loadErr(`This workspace already has the ${season} season pass.`);
+  const p = product('season_pass');
+  const pass = { id: uid(), org_id: org.id, season, starts_on: today(), ends_on: febEnd(season), texts_cap: 100, check_id: null, price_php: p.price_php, created_at: lnow() };
+  loadSpend(p.price_php, 'season_pass', `Renewal season pass ${season}`, pass.id);
+  loadDb.passes.unshift(pass);
+  return pass.id;
+}
+export const templateUnlocks = async () => loadDb.unlocks.map((u) => ({ ...u }));
+export async function unlockTemplate(orgId, code) {
+  needAdmin();
+  if (hasPlusMock()) throw loadErr('Your workspace has PermitPal Plus, so every template is already yours.');
+  if (loadDb.unlocks.some((u) => u.code === code)) return;
+  const t = TEMPLATES.find((x) => x.code === code);
+  if (!product('template').active) throw loadErr("Templates can't be bought one by one right now.");
+  loadSpend(product('template').price_php, 'template:' + code, 'Template: ' + t.title, null);
+  loadDb.unlocks.push({ code, unlocked_at: lnow() });
+}
+export const papersChecks = async (reqId) => loadDb.checks.filter((c) => c.requirement_id === reqId).map((c) => ({ ...c, items: c.items.map((i) => ({ ...i })) }));
+export const papersCheckFiles = async (checkId) => loadDb.files.filter((f) => f.check_id === checkId).map((f) => ({ ...f }));
+export async function requestPapersCheck(orgId, reqId, note) {
+  needAdmin();
+  if (note && note.length > 1000) throw loadErr('Please keep the note under 1,000 characters.');
+  const r = db.requirements.find((x) => x.id === reqId);
+  if (loadDb.checks.some((c) => c.requirement_id === reqId && c.status === 'waiting')) throw loadErr('A papers check for this permit is already waiting for an answer.');
+  const pass = loadDb.passes.find((p) => today() >= p.starts_on && today() <= p.ends_on && !p.check_id);
+  const price = pass ? 0 : product('papers_check').price_php;
+  const subj = r.business_id ? db.businesses.find((b) => b.id === r.business_id)?.name : r.vehicle_id ? db.vehicles.find((v) => v.id === r.vehicle_id)?.make_model : db.people.find((p) => p.id === r.person_id)?.full_name;
+  const c = { id: uid(), org_id: org.id, requirement_id: reqId, requirement_name: r.name, subject_label: subj || r.name, city: db.locations.find((l) => l.id === r.location_id)?.city || null,
+    status: 'waiting', note: note || null, paid_with: pass ? 'pass' : 'load', price_php: price, due_by: nextBusiness6pm(), verdict: null, items: [], summary: null, answered_at: null,
+    refunded_at: null, refund_reason: null, requested_by: user.id, created_at: lnow() };
+  if (!pass) loadSpend(price, 'papers_check', `Papers check: ${r.name} (${c.subject_label})`, c.id);
+  else pass.check_id = c.id;
+  loadDb.checks.unshift(c);
+  return c.id;
+}
+export async function addPapersCheckFile(c, file) {
+  if (loadDb.files.filter((f) => f.check_id === c.id).length >= 15) throw loadErr('Up to 15 photos per papers check.');
+  loadDb.files.push({ id: ++lseq, check_id: c.id, org_id: org.id, storage_path: `${org.id}/papers/${c.id}/x-${file.name}`, file_name: file.name, mime_type: file.type, created_at: lnow() });
+}
+function papersRefund(c, status, reason) {
+  Object.assign(c, { status, refunded_at: lnow(), refund_reason: reason, answered_at: null });
+  if (c.paid_with === 'pass') { const p = loadDb.passes.find((x) => x.check_id === c.id); if (p) p.check_id = null; }
+  else loadGiveBack(c.id, `Papers check ${status === 'cancelled' ? 'cancelled' : 'refunded'}: ${c.requirement_name}`);
+}
+export async function cancelPapersCheck(id) { const c = loadDb.checks.find((x) => x.id === id); if (c.status !== 'waiting') throw loadErr("Only a check that hasn't been answered can be cancelled."); papersRefund(c, 'cancelled', 'Cancelled before it was answered.'); }
+export async function inviteCode() { needAdmin(); loadDb.code ||= 'K7M2Q9XD'; return loadDb.code; }
+export async function claimInvite(orgId, code) {
+  if (!/^[A-HJ-NP-Z2-9]{8}$/i.test(code || '')) throw Object.assign(new Error("That invitation code isn't valid."), { code: 'P0002' });
+  if (loadDb.invitedBy) return false;
+  loadDb.invitedBy = { status: 'pending', reward: null, permits: 0 };
+  return true;
+}
+export const myInvites = async () => loadDb.invites.map((i) => ({ ...i }));
+// staff
+export const adminTopups = async () => loadDb.topups.map((t) => ({ ...t, orgs: { name: org.name } }));
+export async function adminConfirmTopup(id, okPaid, note, invoiceNo) {
+  const t = loadDb.topups.find((x) => x.id === id);
+  if (!okPaid) { if (t.status !== 'pending_verification') throw loadErr('Nothing to check on this top-up.'); t.status = 'due'; t.note = note || 'We could not find this payment. Please check the reference number and send it again.'; return; }
+  if (t.status === 'paid') throw loadErr('This top-up is already paid.');
+  if (invoiceNo) t.bir_invoice_no = invoiceNo;
+  topupPaid(t, null);
+}
+export const adminPapersChecks = async () => loadDb.checks.map((c) => ({ ...c, orgs: { name: org.name } }));
+export async function adminPapersCheckDetail(c) {
+  return { files: loadDb.files.filter((f) => f.check_id === c.id).map((f) => ({ ...f })),
+    docs: db.documents.filter((d) => d.requirement_id === c.requirement_id && !d.deleted_at).map((d) => ({ ...d })),
+    req: (() => { const r = db.requirements.find((x) => x.id === c.requirement_id); return r ? { id: r.id, type_code: r.type_code, name: r.name } : null; })() };
+}
+export async function adminAnswerPapersCheck(id, verdict, items, summary) {
+  const c = loadDb.checks.find((x) => x.id === id);
+  if (c.status !== 'waiting') throw loadErr("This papers check isn't waiting for an answer.");
+  if (!['ready', 'almost', 'not_ready'].includes(verdict)) throw loadErr('Choose the overall answer.');
+  if (items.some((i) => !['ok', 'missing', 'fix', 'na'].includes(i.state))) throw loadErr('Every checklist line needs an answer (and notes under 500 characters).');
+  if (!summary || summary.trim().length < 3) throw loadErr('Write a short summary for the customer.');
+  Object.assign(c, { status: 'answered', verdict, items: items.map((i) => ({ k: i.k, t: i.t, state: i.state, note: i.note || null })), summary: summary.trim(), answered_at: lnow() });
+}
+export async function adminRefundPapersCheck(id, note) {
+  if (!note || note.trim().length < 3) throw loadErr('Say why, for the customer.');
+  const c = loadDb.checks.find((x) => x.id === id);
+  if (!['waiting', 'answered'].includes(c.status)) throw loadErr('This papers check was already given back.');
+  papersRefund(c, 'refunded', note.trim());
+}
+export async function adminSaveLoadProduct(code, price, active) {
+  if (!(price >= 0 && price <= 5000)) throw loadErr('Enter a price from ₱0 to ₱5,000.');
+  Object.assign(product(code), { price_php: price, active: !!active });
+}
+export const adminWallets = async () => [{ org_id: org.id, ...loadDb.wallet, updated_at: lnow(), orgs: { name: org.name } }];
+export async function adminLoadGift(orgId, amount, texts, note) {
+  if (!note || note.trim().length < 3) throw loadErr('Say why (the customer sees it).');
+  if (!(amount > 0 || texts > 0)) throw loadErr('Give up to ₱5,000 and/or up to 1,000 texts.');
+  loadAdd('bonus', 0, amount || 0, texts || 0, 'gift', note.trim(), null);
+}
+export async function adminLoadCashout(orgId, amount, method, ref, note) {
+  if (!(amount > 0 && amount <= loadDb.wallet.paid_php)) throw loadErr(`You can give back up to the paid load: ${pesoS(loadDb.wallet.paid_php)}.`);
+  loadDb.wallet.paid_php -= amount;
+  loadDb.entries.unshift({ id: ++lseq, org_id: org.id, kind: 'cashout', paid_php: -amount, bonus_php: 0, texts: 0, item: 'cashout', label: `Paid back to you by ${method.replace('_', ' ')}${ref ? ` (ref ${ref})` : ''}${note ? '. ' + note : ''}`, created_at: lnow() });
+}
+
+// The demo shows a workspace that has used its load: a top-up, a text pack, a checked permit, a business it invited.
+if (LOAD_ON && (globalThis.PP_DEMO || globalThis.PP_LOAD)) {
+  const t = { id: 'lt1', number: `L-${today().slice(0, 4)}-00041`, org_id: org.id, amount_php: 500, status: 'paid', valid_until: addDays(-20), pay_method: 'gcash', pay_ref: '1009 234 567', proof_path: null, proof_name: null,
+    reported_at: daysAgoIso(27), paid_at: daysAgoIso(26), bir_invoice_no: null, note: null, created_at: daysAgoIso(27) };
+  loadDb.topups.push(t);
+  loadDb.entries.push({ id: ++lseq, org_id: org.id, kind: 'topup', paid_php: 500, bonus_php: 0, texts: 0, item: null, label: `Top-up ${t.number} (gcash)`, ref_id: t.id, created_at: daysAgoIso(26) });
+  loadDb.entries.unshift({ id: ++lseq, org_id: org.id, kind: 'spend', paid_php: -49, bonus_php: 0, texts: 50, item: 'texts_50', label: '50 text reminders', ref_id: null, created_at: daysAgoIso(25) });
+  const mp = db.requirements.find((r) => r.business_id === 'b1' && r.type_code === 'mayors_permit');
+  if (mp) {
+    const c = { id: 'pc1', org_id: org.id, requirement_id: mp.id, requirement_name: mp.name, subject_label: 'Corner <Bakery> & Co', city: 'Makati City', status: 'answered', note: 'We moved to a new unit in March.',
+      paid_with: 'load', price_php: 149, due_by: daysAgoIso(8), verdict: 'almost',
+      items: [{ k: 'brgy', t: 'Barangay Business Clearance for this year', state: 'ok', note: null },
+        { k: 'prev', t: "Last year's Mayor's Permit and its official receipt", state: 'ok', note: null },
+        { k: 'lease', t: 'Proof of address', state: 'fix', note: 'The lease in the photo is for your old unit. Bring the new lease (or the landlord\'s certification) for the unit you moved to.' },
+        { k: 'ctc', t: 'Community Tax Certificate (cedula) for the business', state: 'missing', note: 'Get this year\'s cedula from the city treasurer first; it takes 10 minutes.' }],
+      summary: 'Almost there: bring the new lease and this year\'s cedula, and the rest is in order. Since you moved, ask the BPLO to update the address on the permit too.',
+      answered_at: daysAgoIso(9), refunded_at: null, refund_reason: null, requested_by: user.id, created_at: daysAgoIso(10) };
+    loadDb.checks.push(c);
+    loadDb.files.push({ id: ++lseq, check_id: c.id, org_id: org.id, storage_path: `${org.id}/papers/pc1/x-lease.jpg`, file_name: 'lease.jpg', mime_type: 'image/jpeg', created_at: daysAgoIso(10) });
+    loadDb.entries.unshift({ id: ++lseq, org_id: org.id, kind: 'spend', paid_php: -149, bonus_php: 0, texts: 0, item: 'papers_check', label: `Papers check: ${mp.name} (Corner <Bakery> & Co)`, ref_id: c.id, created_at: daysAgoIso(10) });
+  }
+  loadDb.wallet = { paid_php: 302, bonus_php: 0, texts: 37 };
+  loadDb.code = 'K7M2Q9XD';
+  loadDb.invites.push({ joined_on: addDays(-30), status: 'rewarded', permits_with_dates: 3, my_reward: 'plus_month' }, { joined_on: addDays(-6), status: 'pending', permits_with_dates: 1, my_reward: null });
+  loadDb.entries.unshift({ id: ++lseq, org_id: org.id, kind: 'bonus', paid_php: 0, bonus_php: 0, texts: 0, item: 'invite', label: 'Thank you for inviting a business: a month of PermitPal Plus', ref_id: null, created_at: daysAgoIso(22) });
+}
