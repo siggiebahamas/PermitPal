@@ -34,19 +34,19 @@ function addYears(iso, n) {
 }
 
 // Returns { date, note } or null when there is no reliable rule.
-// ctx: { issuedOn, plate, today }
+// ctx: { issuedOn, plate, today, cityRule, cityExtensions } (the city's own rule, like Quezon City's, and the
+// deadline extensions PermitPal announced for that city)
 export function suggestDue(rule, ctx = {}) {
   const today = ctx.today || todayPH();
   const issued = ctx.issuedOn || null;
   switch (rule) {
     case 'jan20': {
-      if (issued) {
-        const y = parseISO(issued).getUTCFullYear() + 1;
-        return { date: isoOf(y, 1, 20), note: 'Most LGUs require renewal by January 20. Check your city or municipality.' };
-      }
-      const y = parseISO(today).getUTCFullYear();
-      const thisYear = isoOf(y, 1, 20);
-      return { date: thisYear >= today ? thisYear : isoOf(y + 1, 1, 20), note: 'Most LGUs require renewal by January 20. Check your city or municipality.' };
+      if (ctx.cityRule?.rule === 'anniversary') return issued ? { date: addYears(issued, 1), note: ctx.cityRule.note } : null;
+      const y = issued ? parseISO(issued).getUTCFullYear() + 1 : parseISO(today).getUTCFullYear();
+      const date = issued || isoOf(y, 1, 20) >= today ? isoOf(y, 1, 20) : isoOf(y + 1, 1, 20);
+      const ext = (ctx.cityExtensions || []).find((d) => d.permit_year === Number(date.slice(0, 4)) && d.due_on > date);
+      if (ext) return { date: ext.due_on, note: `${ext.city_name} extended the ${ext.permit_year} deadline from January 20.` };
+      return { date, note: 'Most LGUs require renewal by January 20. Check your city or municipality.' };
     }
     case 'annual':
       if (!issued) return null;

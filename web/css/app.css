@@ -2096,3 +2096,41 @@ li a.rn-city { text-decoration: none; }
 .hol-row:first-child { border-top: 0; }
 .hol-more { margin-top: 8px; }
 .hol-more summary { cursor: pointer; font-weight: 650; color: var(--link); padding: 6px 0; }
+
+/* the renewal packet on a business permit */
+.packet .card-head { align-items: flex-start; }
+.pk-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 700; padding: 4px 11px; border-radius: 999px; white-space: nowrap;
+  background: var(--s-info-bg); color: var(--s-info); text-decoration: none; }
+.pk-tag svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2.4; }
+.pk-tag.ok { background: var(--s-ok-bg); color: var(--s-ok); }
+.pk-tag.warn { background: var(--s-soon-bg); color: var(--s-soon-on); }
+.pk-tag.sign { background: var(--s-prog-bg); color: var(--s-prog); }
+a.pk-tag:hover { filter: brightness(.96); text-decoration: underline; }
+.pk-progress { height: 8px; border-radius: 999px; background: var(--s-info-bg); overflow: hidden; margin: 4px 0 14px; }
+.pk-progress span { display: block; height: 100%; background: var(--brand); border-radius: 999px; }
+.pk-list { list-style: none; margin: 0 0 14px; padding: 0; }
+.pk-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+.pk-list li:last-child { border-bottom: 0; }
+.pk-list li > div { min-width: 0; }
+.pk-list b { display: block; font-size: 16px; }
+.pk-list small { display: block; color: var(--muted); font-size: 14px; }
+.pk-step .pk-lead { margin: 0 0 12px; color: var(--muted); }
+.pk-back { margin: 0 0 8px; padding-left: 0; }
+.pk-dots { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 14px; flex-wrap: wrap; }
+.pk-dots li { font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--s-info-bg); color: var(--muted); }
+.pk-dots li.done { background: var(--s-ok-bg); color: var(--s-ok); }
+.pk-dots li.now { background: var(--heading); color: #fff; }
+.field .peso-input { display: flex; align-items: center; gap: 8px; margin: 0; }
+.field .peso-input > span { display: inline; margin: 0; font-size: 20px; font-weight: 800; color: var(--heading); }
+.peso-input input { font-size: 20px; font-weight: 700; flex: 1; min-width: 0; }
+.pk-choice { border: 0; padding: 0; margin: 0 0 12px; }
+.pk-choice legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
+.pk-choice .check { margin: 4px 0; }
+.copy-part { margin: 14px 0 4px; font-size: 15px; }
+.copy-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.copy-row > div { min-width: 0; overflow-wrap: anywhere; }
+.copy-row small { display: block; color: var(--muted); font-size: 13px; }
+/* a city moved its deadline */
+.city-banner a { color: inherit; }
+.city-counts { columns: 2 260px; column-gap: 24px; }
+.city-counts .hol-row { break-inside: avoid; }

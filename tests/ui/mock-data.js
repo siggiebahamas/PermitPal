@@ -339,7 +339,7 @@ const now = () => new Date().toISOString();
 function event(a, kind, message, byStaff = false, file = null) {
   db.events.push({ id: ++seq, request_id: a.id, org_id: a.org_id, by_staff: byStaff, kind, message, file_path: file, file_name: file, created_at: now() });
 }
-const settings = { gcash_name: 'PermitPal Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'PermitPal Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '', billpay_fee: '99', billpay_max: '50000', billpay_open: 'on' };
+const settings = { gcash_name: 'PermitPal Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'PermitPal Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '', billpay_fee: '199', billpay_max: '50000', billpay_open: 'on' };
 export const listServices = async () => SERVICES;
 export async function requestService(f) {
   // Same rules as the database: authorization ticked, one open request per permit, no flooding.
@@ -756,7 +756,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 
@@ -2176,7 +2176,7 @@ if ((CLOCK_ON || BILLS_ON) && (globalThis.PP_DEMO || globalThis.PP_OFFICE)) {
   }
   if (BILLS_ON && mp) {
     office.bills.push({ id: 'gb1', number: `G-${today().slice(0, 4)}-00118`, org_id: org.id, requirement_id: mp.id, label: `"${mp.name}" for Corner <Bakery> & Co`, office: 'Makati City Treasurer',
-      bill_ref: 'SOA-2027-0145521', amount_php: 14230.5, pay_by: addDays(9), mode: 'permitpal', fee_php: 99, bill_path: `${org.id}/bills/x/soa.jpg`, bill_name: 'soa.jpg', status: 'processing',
+      bill_ref: 'SOA-2027-0145521', amount_php: 14230.5, pay_by: addDays(9), mode: 'permitpal', fee_php: 199, bill_path: `${org.id}/bills/x/soa.jpg`, bill_name: 'soa.jpg', status: 'processing',
       pay_method: 'gcash', pay_ref: '1009 552 118', proof_path: null, proof_name: null, reported_at: daysAgoIso(1, 3), received_at: daysAgoIso(0, 2), pay_deadline: nextBusiness6pm(),
       paid_at: null, or_no: null, or_date: null, or_path: null, or_name: null, document_id: null, refunded_at: null, refund_note: null, bir_invoice_no: null, note: null, created_at: daysAgoIso(1, 4) });
     if (brgy) office.bills.push({ id: 'gb2', number: `G-${today().slice(0, 4)}-00102`, org_id: org.id, requirement_id: brgy.id, label: `"${brgy.name}" for Corner <Bakery> & Co`, office: 'Barangay Poblacion',
@@ -2188,4 +2188,162 @@ if ((CLOCK_ON || BILLS_ON) && (globalThis.PP_DEMO || globalThis.PP_OFFICE)) {
       reported_at: null, received_at: null, pay_deadline: null, paid_at: null, or_no: null, or_date: null, or_path: null, or_name: null, document_id: null,
       refunded_at: null, refund_note: null, bir_invoice_no: null, note: null, created_at: daysAgoIso(2) });
   }
+}
+
+// ---------------------------------------------------------------- renewal packets and city deadlines
+const PACKET_ON = globalThis.PP_FEATURES !== 'none' && (!Array.isArray(globalThis.PP_FEATURES) || globalThis.PP_FEATURES.includes('packet'));
+const CITY_ON = globalThis.PP_FEATURES !== 'none' && (!Array.isArray(globalThis.PP_FEATURES) || globalThis.PP_FEATURES.includes('citydates'));
+const cityKeyOf = (s) => {
+  const k = String(s || '').split(',')[0].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+    .replace(/^(the )?(city|municipality) of /, '').replace(/ city$/, '').trim();
+  return k === 'qc' || k === 'q c' ? 'quezon' : k;
+};
+const city = {
+  packets: [],
+  rules: [{ city_key: 'quezon', city_name: 'Quezon City', rule: 'anniversary', note: 'Quezon City asks you to renew one year from the issue date of your current permit, not by January 20.',
+    source_url: 'https://quezoncity.gov.ph/qcitizen-guides/how-to-renew-business-permit/' }],
+  deadlines: [], uses: [],
+};
+export const __city = city; // the smoke test reads this
+const PACKET_KEYS = { sales: 'num', employees: 'int', employees_local: 'int', area_sqm: 'num', rent: 'num', changed: ['no', 'yes'], place: ['owned', 'rented'],
+  pay_mode: ['annual', 'semi', 'quarterly'], changes: 500, owner_name: 120, owner_title: 80, owner_address: 300, line: 160, lessor: 160, phone: 30, reg_no: 60 };
+export const packets = async (reqId) => city.packets.filter((p) => p.requirement_id === reqId).sort((a, b) => b.permit_year - a.permit_year).map((p) => ({ ...p, answers: { ...p.answers } }));
+export async function packetSave(reqId, year, answers, ready) {
+  if (!PACKET_ON) throw offErr('Renewal packets are not switched on yet.');
+  const r = reqFor(reqId);
+  if (r.type_code !== 'mayors_permit') throw offErr('Renewal packets are for business permits.');
+  const y = Number(today().slice(0, 4));
+  if (!(year >= y - 1 && year <= y + 2)) throw offErr('Choose the permit year.', '22023');
+  const a = {};
+  for (const [k, v] of Object.entries(answers || {})) {
+    const spec = PACKET_KEYS[k];
+    if (!spec || v == null) continue;
+    if (spec === 'num' || spec === 'int') { if (typeof v !== 'number' || v < 0 || (spec === 'int' && !Number.isInteger(v))) throw offErr(`${k}: enter a number.`, '22023'); a[k] = v; }
+    else if (Array.isArray(spec)) { if (!spec.includes(v)) throw offErr(`${k}: choose one of the options.`, '22023'); a[k] = v; }
+    else { const s = String(v).trim(); if (s.length > spec) throw offErr(`${k}: too long.`, '22023'); if (s) a[k] = s; }
+  }
+  if (ready && a.sales == null) throw offErr("Add last year's sales first.", '22023');
+  let p = city.packets.find((x) => x.requirement_id === r.id && x.permit_year === year);
+  const was = p?.ready_at;
+  if (!p) { p = { id: uid(), org_id: org.id, requirement_id: r.id, permit_year: year, answers: a, ready_at: ready ? new Date().toISOString() : null, created_at: new Date().toISOString() }; city.packets.push(p); }
+  else { p.answers = a; if (ready && !p.ready_at) p.ready_at = new Date().toISOString(); }
+  if (ready && !was) log(`Renewal packet for ${year} is ready`, { entity: 'renewal_packet', action: 'update', ...ids(r) });
+  return p.id;
+}
+export async function cityDates() { return { rules: city.rules.map((x) => ({ ...x })), deadlines: city.deadlines.filter((d) => !d.withdrawn_at).map((d) => ({ ...d })) }; }
+// Business permits in a city, with their current record.
+function cityPermits(key) {
+  return db.requirements.filter((r) => !r.deleted_at && r.type_code === 'mayors_permit' && r.expires && r.business_id && !db.businesses.find((b) => b.id === r.business_id)?.deleted_at).map((r) => {
+    const l = db.locations.find((x) => x.id === r.location_id) || db.locations.find((x) => x.business_id === r.business_id && x.is_main);
+    const c = db.cycles.filter((x) => x.requirement_id === r.id && !x.deleted_at).sort((a, b) => b.seq - a.seq)[0];
+    return { r, c, city: l?.city || '' };
+  }).filter((x) => cityKeyOf(x.city) === key);
+}
+export async function useCityDeadline(id, reqIds) {
+  const d = city.deadlines.find((x) => x.id === id && !x.withdrawn_at);
+  if (!d) throw offErr('That extension is no longer listed.', 'P0002');
+  let n = 0;
+  for (const rid of reqIds) {
+    const r = reqFor(rid);
+    const p = cityPermits(d.city_key).find((x) => x.r.id === r.id);
+    if (!p?.c?.expires_on || p.c.expires_on < `${d.permit_year}-01-01` || p.c.expires_on >= d.due_on) continue;
+    city.uses = city.uses.filter((u) => !(u.deadline_id === d.id && u.requirement_id === r.id));
+    city.uses.push({ deadline_id: d.id, requirement_id: r.id, cycle_id: p.c.id, old_date: p.c.expires_on });
+    log(`Updated the record for ${reqLabel(r)} - expiry ${fmtD(p.c.expires_on)} to ${fmtD(d.due_on)}`, { entity: 'requirement_cycles', action: 'updated', ...ids(r) });
+    p.c.expires_on = d.due_on;
+    log(`${d.city_name} extended the business permit deadline to ${new Date(d.due_on + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`, { entity: 'city_deadline', action: 'update', ...ids(r) });
+    n++;
+  }
+  return n;
+}
+export async function adminCityCounts() {
+  staffOnly();
+  const m = new Map();
+  for (const r of db.requirements.filter((x) => !x.deleted_at && x.type_code === 'mayors_permit' && x.business_id)) {
+    const l = db.locations.find((x) => x.id === r.location_id) || db.locations.find((x) => x.business_id === r.business_id && x.is_main);
+    const k = cityKeyOf(l?.city);
+    if (!k) continue;
+    if (!m.has(k)) m.set(k, { city_key: k, city_name: l.city.trim(), workspaces: 1, permits: 0 });
+    m.get(k).permits++;
+  }
+  return [...m.values()].sort((a, b) => b.permits - a.permits);
+}
+export async function adminCityDeadlines() {
+  staffOnly();
+  return city.deadlines.map((d) => ({ ...d, moved: city.uses.filter((u) => u.deadline_id === d.id).length })).sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+export async function adminCityDeadline(v) {
+  staffOnly();
+  const key = cityKeyOf(v.city); const y = Number(v.year); const t = today();
+  if (!key) throw offErr('Choose the city.', '22023');
+  if (!v.due_on || Number(v.due_on.slice(0, 4)) !== y) throw offErr(`The new date must be in ${y}.`, '22023');
+  if (v.due_on < t) throw offErr('The new date has already passed.', '22023');
+  if (v.due_on <= `${y}-01-20`) throw offErr('An extension comes after January 20.', '22023');
+  if (!/^https:\/\/\S{4,}$/.test(v.source_url || '')) throw offErr("Add the link to the city's notice or a news report (starting with https://).", '22023');
+  const name = v.city === v.city.toLowerCase() ? v.city.replace(/\b\w/g, (c) => c.toUpperCase()) : v.city.trim();
+  const old = city.deadlines.find((d) => d.city_key === key && d.permit_year === y && !d.withdrawn_at);
+  if (old) old.withdrawn_at = new Date().toISOString();
+  const d = { id: uid(), city_key: key, city_name: name, permit_year: y, due_on: v.due_on, was_on: `${y}-01-20`, source_url: v.source_url, note: v.note || null, notified: 0, created_at: new Date().toISOString(), withdrawn_at: null };
+  city.deadlines.push(d);
+  let moved = 0;
+  if (old) for (const u of city.uses.filter((x) => x.deadline_id === old.id)) {
+    const c = db.cycles.find((x) => x.id === u.cycle_id);
+    if (c?.expires_on === old.due_on) { c.expires_on = d.due_on; city.uses.push({ ...u, deadline_id: d.id }); moved++; }
+  }
+  const hit = cityPermits(key).filter((x) => x.c?.expires_on && x.c.expires_on >= `${y}-01-01` && x.c.expires_on < d.due_on);
+  if (hit.length) {
+    db.notifications.unshift({ id: uid(), user_id: user.id, org_id: org.id, kind: 'system', title: `${d.city_name} extended the business permit deadline to ${new Date(d.due_on + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}`,
+      body: hit.length === 1 ? 'Your business permit there is still due earlier in PermitPal. Open it and tap "Use the new date".' : `${hit.length} of your business permits there are still due earlier in PermitPal. Open PermitPal and tap "Use the new date".`,
+      link: hit.length === 1 ? `#/requirement/${hit[0].r.id}?city=1` : '#/?city=1', requirement_id: hit.length === 1 ? hit[0].r.id : null, read_at: null, created_at: new Date().toISOString() });
+  }
+  d.notified = hit.length || moved ? 1 : 0;
+  return { id: d.id, city: d.city_name, workspaces: d.notified, permits: hit.length, moved };
+}
+export async function adminCityDeadlineWithdraw(id) {
+  staffOnly();
+  const d = city.deadlines.find((x) => x.id === id);
+  if (!d) throw offErr('Extension not found.', 'P0002');
+  if (d.withdrawn_at) throw offErr('It was already withdrawn.');
+  d.withdrawn_at = new Date().toISOString();
+  let n = 0;
+  for (const u of city.uses.filter((x) => x.deadline_id === d.id)) {
+    const c = db.cycles.find((x) => x.id === u.cycle_id);
+    if (c?.expires_on === d.due_on) { c.expires_on = u.old_date; n++; }
+  }
+  return n;
+}
+// The demo (and PP_CITY): an extension that applies to one of the sample permits, picked so it works on any day of the year.
+if (CITY_ON && (globalThis.PP_DEMO || globalThis.PP_CITY)) {
+  const target = db.requirements.find((r) => r.type_code === 'mayors_permit' && r.business_id === (globalThis.PP_DEMO ? 'b2' : 'b1') && !r.deleted_at);
+  const c = target && db.cycles.filter((x) => x.requirement_id === target.id).sort((a, b) => b.seq - a.seq)[0];
+  const l = target && db.locations.find((x) => x.id === target.location_id);
+  if (c?.expires_on && l) {
+    const y = c.expires_on.slice(0, 4);
+    const due = [addDaysTo(c.expires_on, 24), `${y}-12-31`].sort()[0];
+    if (due > c.expires_on && due >= today()) {
+      city.deadlines.push({ id: 'cd1', city_key: cityKeyOf(l.city), city_name: l.city, permit_year: Number(y), due_on: due, was_on: `${y}-01-20`,
+        // the demo's is a made-up sample (its link goes to our own city guide), never a real city's announcement
+        source_url: globalThis.PP_DEMO ? '../renew/cebu-city/' : 'https://example.com/notice', note: globalThis.PP_DEMO ? 'A sample, to show how an extension looks' : 'No surcharge or interest until then',
+        notified: 1, created_at: daysAgoIso(1), withdrawn_at: null });
+    }
+  }
+}
+// The demo: the Mandaue permit's packet is ready (last year's answers carried over); the Cebu one still has questions.
+if (PACKET_ON && globalThis.PP_DEMO) {
+  const r = db.requirements.find((x) => x.type_code === 'mayors_permit' && x.location_id === 'l3');
+  const c = r && db.cycles.filter((x) => x.requirement_id === r.id).sort((a, b) => b.seq - a.seq)[0];
+  if (c?.expires_on) {
+    const t = today(); const y0 = Number(c.expires_on.slice(0, 4));
+    const year = c.expires_on < t ? Math.max(y0, Number(t.slice(0, 4))) : y0;
+    const base = { owner_name: 'Ma. Teresa Villanueva', owner_title: 'Owner', line: 'Wholesale of sari-sari store goods', area_sqm: 180, place: 'rented', lessor: 'Ouano Realty', rent: 45000, phone: '0917 555 0142', reg_no: 'DTI 3318842', pay_mode: 'quarterly' };
+    city.packets.push({ id: 'pk0', org_id: org.id, requirement_id: r.id, permit_year: year - 1, answers: { ...base, sales: 6120000, employees: 9, changed: 'no' }, ready_at: daysAgoIso(380), created_at: daysAgoIso(390) });
+    city.packets.push({ id: 'pk1', org_id: org.id, requirement_id: r.id, permit_year: year, answers: { ...base, sales: 7348250.75, employees: 11, employees_local: 8, changed: 'no' }, ready_at: daysAgoIso(2), created_at: daysAgoIso(3) });
+  }
+}
+// PP_QC: a Quezon City café whose permit took January 20, though Quezon City counts a year from the issue date.
+if (CITY_ON && globalThis.PP_QC) {
+  const t = today(); const y = Number(t.slice(0, 4)) - (t.slice(5) < '03-15' ? 1 : 0);
+  db.businesses.push({ id: 'bq', org_id: org.id, name: 'Kanto Café', activity: 'restaurant', structure: 'Sole Proprietorship', tin: '210-555-000-000', deleted_at: null });
+  db.locations.push({ id: 'lq', business_id: 'bq', name: 'Main branch', city: 'QC', address: '18 Maginhawa St, Teachers Village', is_main: true, deleted_at: null });
+  addReq('business', 'bq', 'lq', types[0], { reference_no: 'QC-BP-2291', issued_on: `${y}-03-15`, expires_on: `${y + 1}-01-20` });
 }

@@ -27,6 +27,7 @@ import { templatesPage } from './views/templates.js';
 import { loadPage } from './views/load.js';
 import { workerPage } from './views/worker.js';
 import { applyBrand, sideBrand, poweredBy, connectBrand } from './views/brand.js';
+import { loadCityDates } from './views/citydates.js';
 
 // Never run inside another website's frame (a trick to make people click hidden buttons). GitHub Pages
 // cannot send the header that blocks this, so the page checks for itself; our own frames are fine.
@@ -141,7 +142,7 @@ async function start() {
 }
 
 async function loadData() {
-  S.data = await db.loadOrgData(S.org.id, { revenue: has('revenue'), plus: has('plus') });
+  [S.data] = await Promise.all([db.loadOrgData(S.org.id, { revenue: has('revenue'), plus: has('plus') }), loadCityDates()]);
   // A client of an accounting firm with White-label sees the firm's logo and color (Powered by PermitPal).
   const prev = JSON.stringify(S.brand);
   S.brand = has('brand') && S.org.kind === 'business' ? await db.clientBrand(S.org.id).catch(() => null) : null;

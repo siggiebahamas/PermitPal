@@ -814,3 +814,21 @@ export const adminStartFiling = async (requestId, f) => ok(await sb.rpc('admin_s
   p_filed_on: f.filed_on, p_kind: f.kind, p_days: f.days ? Number(f.days) : null }));
 export const adminCloseFiling = async (id, status) => ok(await sb.rpc('filing_close', { p_id: id, p_status: status, p_on: null }));
 export const adminSetHoliday = async (day, name, kind, remove) => ok(await sb.rpc('admin_set_holiday', { p_day: day, p_name: name || null, p_kind: kind || 'special', p_remove: !!remove }));
+
+// ---------------------------------------------------------------- renewal packets and city deadlines
+// The packet keeps this year's answers for the business permit renewal (next year starts from them). City deadlines:
+// rules like Quezon City's (a year from the issue date) and extensions PermitPal staff announce.
+export const packets = async (reqId) => ok(await sb.from('renewal_packets').select('*').eq('requirement_id', reqId).order('permit_year', { ascending: false }).limit(5));
+export const packetSave = async (reqId, year, answers, ready = false) => ok(await sb.rpc('packet_save', { p_requirement: reqId, p_year: year, p_answers: answers, p_ready: !!ready }));
+export async function cityDates() {
+  const [rules, deadlines] = await Promise.all([
+    sb.from('city_rules').select('*').then(ok),
+    sb.from('city_deadlines').select('id, city_key, city_name, permit_year, due_on, was_on, source_url, note, created_at').order('created_at', { ascending: false }).limit(200).then(ok),
+  ]);
+  return { rules, deadlines };
+}
+export const useCityDeadline = async (id, reqIds) => ok(await sb.rpc('use_city_deadline', { p_deadline: id, p_requirements: reqIds }));
+export const adminCityCounts = async () => ok(await sb.rpc('admin_city_counts'));
+export const adminCityDeadlines = async () => ok(await sb.rpc('admin_city_deadlines'));
+export const adminCityDeadline = async (f) => ok(await sb.rpc('admin_city_deadline', { p_city: f.city, p_year: Number(f.year), p_due: f.due_on, p_source: f.source_url, p_note: f.note || null }));
+export const adminCityDeadlineWithdraw = async (id) => ok(await sb.rpc('admin_city_deadline_withdraw', { p_id: id }));

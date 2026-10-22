@@ -304,7 +304,7 @@ on('clock-letter', async (ds) => {
 // ---------------------------------------------------------------- city bills
 const BILL_STATUS = { due: ['To pay', 'soon'], pending_verification: ['Checking your payment', 'progress'], processing: ["We're paying it", 'progress'],
   paid: ['Paid', 'ok'], refunded: ['Sent back to you', 'needinfo'], cancelled: ['Removed', 'needinfo'] };
-const billFee = () => Number(SET?.billpay_fee ?? 99);
+const billFee = () => Number(SET?.billpay_fee ?? 199);
 const billMax = () => Number(SET?.billpay_max ?? 50000);
 const billOpen = () => (SET?.billpay_open ?? 'on') === 'on';
 const dueWhen = (iso) => new Date(iso).toLocaleString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' });

@@ -1956,16 +1956,16 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.click('#bills [data-act=bill-add]'); await page.waitForSelector('.modal');
   await page.check('.modal input[name=mode][value=permitpal]');
   await page.fill('.modal [name=amount]', '14230.50');
-  check(`bills ${label}: PermitPal paying shows what you send (the bill plus ₱99)`, /You send ₱14,329\.50/.test(await page.textContent('.modal .bill-total')));
+  check(`bills ${label}: PermitPal paying shows what you send (the bill plus ₱199)`, /You send ₱14,429\.50/.test(await page.textContent('.modal .bill-total')));
   await submit(200);
   check(`bills ${label}: ...and needs a photo of the bill`, /photo of the bill/.test(await page.textContent('#modal-root .modal-error')));
   await page.setInputFiles('.modal input[name=file]', { name: 'soa.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('x') });
   await page.click('#modal-root button[type=submit]'); await page.waitForSelector('.modal .quote-hint');
-  check(`bills ${label}: saved: straight to paying PermitPal, with the payment details`, /₱14,329\.50/.test(await page.textContent('.modal .quote-hint')) && (await page.locator('.modal .paywith').count()) >= 1);
+  check(`bills ${label}: saved: straight to paying PermitPal, with the payment details`, /₱14,429\.50/.test(await page.textContent('.modal .quote-hint')) && (await page.locator('.modal .paywith').count()) >= 1);
   await page.fill('.modal [name=ref]', '1009 555 0001'); await submit();
   check(`bills ${label}: paid: we check it`, /Checking your payment/.test(await page.textContent('#bills')));
   await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=office]'); await page.waitForTimeout(700);
-  check(`bills ${label}: staff see it to confirm`, /₱14,329\.50/.test(await page.textContent('main')));
+  check(`bills ${label}: staff see it to confirm`, /₱14,429\.50/.test(await page.textContent('main')));
   await page.click('[data-act=adm-bill-ok]'); await page.waitForSelector('.modal'); await submit(700);
   check(`bills ${label}: confirmed: it's on the list to pay, with the time we promised`, (await page.locator('[data-act=adm-bill-paid]').count()) === 1 && /By /.test(await page.textContent('main .chip.soon, main .chip.overdue')));
   await page.click('[data-act=adm-bill-paid]'); await page.waitForSelector('.modal');
@@ -2038,6 +2038,180 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await off.evaluate(() => { location.hash = '#/admin'; }); await off.waitForTimeout(600);
   check('clock+bills off: ...and staff have no Bills & clock tab', (await off.locator('[data-act=admin-tab][data-tab=office]').count()) === 0);
   check('clock+bills off: no JavaScript errors', oerrs.length === 0, oerrs.slice(0, 3).join(' | '));
+  await off.close();
+}
+
+// Renewal packets (only the questions still open, one at a time; the printed packet, the .zip, the copy kit, changing
+// answers) and city deadlines (the banner and one tap on the permit and the dashboard, Quezon City's rule, staff
+// announcing, replacing and withdrawing an extension, the notice), on a desktop and a phone; switched off; the demo.
+for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', { width: 390, height: 844 }]]) {
+  const page = await browser.newPage({ viewport: vp, acceptDownloads: true });
+  await page.addInitScript(() => { globalThis.PP_CITY = true; globalThis.PP_QC = true; window.print = () => { globalThis.__printed = (globalThis.__printed || 0) + 1; }; });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(600); };
+  const over = () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  const submit = async (wait = 500) => { await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(wait); };
+  const modalErr = () => page.textContent('#modal-root .modal-error');
+  const lastToast = () => page.locator('.toast').last().textContent();
+  const reqNow = (id) => page.evaluate(async (i) => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.id === i), id);
+  await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+  const mp = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.business_id === 'b1' && r.type_code === 'mayors_permit'));
+  const ext = await page.evaluate(async () => (await import('/__mock/mock-data.js')).__city.deadlines[0] || null);
+
+  // ---- city deadline: the permit's banner, "Keep" hides it here; the dashboard gathers it, one tap moves the date
+  if (ext) {
+    await go('#/requirement/' + mp.id); await page.waitForSelector('[data-packet]');
+    check(`city ${label}: the permit says the city extended its deadline, with the source`, /extended the \d{4} business permit deadline/.test(await page.textContent('[data-city-banner]'))
+      && (await page.locator('[data-city-banner] a[target=_blank]').count()) === 1);
+    await go('#/');
+    check(`city ${label}: the dashboard offers the new date too`, (await page.locator('[data-city-banner] [data-act=city-use]').count()) === 1);
+    await page.click('[data-city-banner] [data-act=city-use]'); await page.waitForTimeout(700);
+    const now = (await reqNow(mp.id)).expires_on;
+    check(`city ${label}: one tap moves the permit to the new date, and the banner goes`, now === ext.due_on && (await page.locator('[data-city-banner]').count()) === 0, now);
+  } else check(`city ${label}: (no extension possible on this date; skipped)`, true);
+
+  // ---- Quezon City: a year from the issue date
+  const qc = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.business_id === 'bq'));
+  await go('#/requirement/' + qc.id); await page.waitForSelector('[data-city-banner]');
+  check(`city ${label}: Quezon City's rule is offered on a QC permit that took January 20`, /Quezon City counts a year from the issue date/.test(await page.textContent('[data-city-banner]')));
+  await page.click('[data-city-banner] [data-act=city-keep]'); await page.waitForTimeout(300);
+  await go('#/'); await go('#/requirement/' + qc.id);
+  check(`city ${label}: "Keep" hides it, and it stays hidden`, (await page.locator('[data-city-banner]').count()) === 0);
+  await page.evaluate(() => localStorage.clear()); await go('#/'); await go('#/requirement/' + qc.id); await page.waitForSelector('[data-city-banner]');
+  await page.click('[data-city-banner] [data-act=city-rule-use]'); await page.waitForTimeout(700);
+  const qcNow = await reqNow(qc.id);
+  check(`city ${label}: one tap: due a year from the issue date`, qcNow.expires_on.slice(5) === '03-15' && Number(qcNow.expires_on.slice(0, 4)) === Number(qcNow.issued_on.slice(0, 4)) + 1
+    && (await page.locator('[data-city-banner]').count()) === 0, qcNow.expires_on);
+
+  // ---- the packet: only what's missing, a question at a time
+  await go('#/requirement/' + mp.id); await page.waitForSelector('[data-packet]');
+  check(`packet ${label}: the card says how much is already filled in and what's left`, /already has \d+ of \d+ details/.test(await page.textContent('[data-packet]'))
+    && /4 questions left/.test(await page.textContent('[data-packet]')));
+  await page.click('[data-act=packet-start]'); await page.waitForSelector('.modal [name=sales]');
+  check(`packet ${label}: one question at a time, numbered`, /1 of 4/.test(await page.textContent('#modal-title')));
+  await submit(300);
+  check(`packet ${label}: the sales are needed`, /Please fill in/.test(await modalErr()));
+  await page.fill('.modal [name=sales]', 'a lot'); await submit(300);
+  check(`packet ${label}: ...as an amount in pesos`, /Enter the sales in pesos/.test(await modalErr()));
+  await page.fill('.modal [name=sales]', '₱1,842,600.50'); await submit();
+  await page.waitForSelector('.modal [name=employees]');
+  await page.fill('.modal [name=employees]', '6'); await page.fill('.modal [name=employees_local]', '9'); await submit(300);
+  check(`packet ${label}: people living in the city can't be more than everyone`, /up to 6/.test(await modalErr()));
+  await page.fill('.modal [name=employees_local]', '4'); await submit();
+  await page.waitForSelector('.modal [name=changed]');
+  await submit(300);
+  check(`packet ${label}: "anything changed" needs a yes or no`, /Choose yes or no/.test(await modalErr()));
+  await page.check('.modal [name=changed][value=yes]'); await submit(300);
+  check(`packet ${label}: "yes" asks what changed`, /Say briefly what changed/.test(await modalErr()) && await page.isVisible('.modal [name=changes]'));
+  await page.fill('.modal [name=changes]', 'Bigger space next door'); await submit();
+  await page.waitForSelector('.modal [name=tin]');
+  check(`packet ${label}: the last question asks only for the details PermitPal doesn't have`, (await page.locator('.modal [name=tin]').count()) === 1 && (await page.locator('.modal [name=owner_name]').count()) === 0);
+  await page.click('.modal [data-pk-back]'); await page.waitForSelector('.modal [name=changes]');
+  check(`packet ${label}: Back keeps the answer`, (await page.inputValue('.modal [name=changes]')) === 'Bigger space next door');
+  await submit(); await page.waitForSelector('.modal [name=tin]');
+  await page.fill('.modal [name=tin]', '123-456-789-000'); await page.fill('.modal [name=street]', '12 Jupiter St, Bel-Air');
+  if (await page.locator('.modal [name=phone]').count()) await page.fill('.modal [name=phone]', '0917 123 4567');
+  if (await page.locator('.modal [name=reg_no]').count()) await page.fill('.modal [name=reg_no]', 'CS201912345');
+  await page.fill('.modal [name=area_sqm]', '42');
+  await page.check('.modal [name=place][value=rented]'); await page.fill('.modal [name=lessor]', 'Jupiter <Realty>');
+  await page.click('#modal-root button[type=submit]'); await page.waitForSelector('[data-packet].ready');
+  check(`packet ${label}: built: ready, with the sales and what's in it`, /Ready/.test(await page.textContent('[data-packet]')) && /₱1,842,600\.5/.test(await page.textContent('[data-packet]'))
+    && /Sworn declaration/.test(await page.textContent('[data-packet]')) && (await page.locator('#modal-root .modal').count()) === 0);
+  const tin = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).businesses.find((b) => b.id === 'b1').tin);
+  check(`packet ${label}: the TIN is saved on the business, for every page`, tin === '123-456-789-000', tin);
+  check(`packet ${label}: the permit's activity says it's ready`, /Renewal packet for \d{4} is ready/.test(await page.textContent('main')));
+  await page.click('[data-act=packet-print]'); await page.waitForTimeout(300);
+  const sheet = await page.evaluate(() => document.getElementById('print-sheet')?.textContent || '');
+  check(`packet ${label}: the printout has the checklist, the details, the declaration and the letter`, /Bring or upload/.test(sheet) && /Application details/.test(sheet)
+    && /SWORN DECLARATION OF GROSS SALES/.test(sheet) && /PHP 1,842,600\.50/.test(sheet) && /AUTHORIZATION LETTER/.test(sheet) && /Jupiter <Realty>/.test(sheet)
+    && /Bigger space next door/.test(sheet) && (await page.evaluate(() => globalThis.__printed)) >= 1);
+  check(`packet ${label}: customer text stays text in the printout`, await page.evaluate(() => !document.querySelector('#print-sheet realty')));
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=packet-zip]')]);
+  check(`packet ${label}: the .zip downloads with the packet's name`, /renewal packet \d{4}\.zip$/.test(dl.suggestedFilename()), dl.suggestedFilename());
+  await page.click('[data-act=packet-copy]'); await page.waitForSelector('.modal .copy-row');
+  check(`packet ${label}: the copy kit lists each detail with a Copy button`, (await page.locator('.modal .copy-row').count()) >= 12 && /123-456-789-000/.test(await page.textContent('.modal'))
+    && (await page.locator('.modal [data-copy]').count()) === (await page.locator('.modal .copy-row').count()));
+  check(`packet ${label}: copy kit has no sideways scroll`, (await over()) <= 0);
+  await page.click('.modal [data-modal-close]');
+  await page.click('[data-act=packet-edit]'); await page.waitForSelector('.modal [name=sales]');
+  check(`packet ${label}: changing answers goes through all four, filled in`, /1 of 4/.test(await page.textContent('#modal-title')) && (await page.inputValue('.modal [name=sales]')) === '1,842,600.5');
+  await page.click('.modal [data-modal-close]');
+  check(`packet ${label}: no sideways scroll`, (await over()) <= 0);
+
+  // ---- staff announce an extension; the customer is told; replacing and withdrawing it
+  const [y, due1, due2] = await page.evaluate((exp) => {
+    const t = new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 10);
+    const add = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+    const yy = exp.slice(0, 4); const end = `${yy}-12-31`;
+    return [yy, [add(t, 10), end].sort()[0], [add(t, 20), end].sort()[0]];
+  }, mp.expires_on);
+  const open = await page.evaluate(() => new Date().getMonth()) < 11 && due1 > mp.expires_on && due2 > due1;
+  // start over: the permit back on its first date (the dashboard moved it above), and no extension yet
+  await go('#/'); await page.reload(); await page.waitForSelector('main h1');
+  await page.evaluate(async () => { (await import('/__mock/mock-data.js')).__city.deadlines.forEach((d) => { d.withdrawn_at ||= new Date().toISOString(); }); });
+  Object.assign(mp, await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.business_id === 'b1' && r.type_code === 'mayors_permit')));
+  await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=cities]'); await page.waitForSelector('.adm-city-form');
+  check(`city admin ${label}: the city list counts business permits, QC spellings together`, /Makati City/.test(await page.textContent('main')) && /QC|Quezon/.test(await page.textContent('.city-counts')));
+  await page.fill('.adm-city-form [name=city]', 'Makati City'); await page.click('[data-act=adm-city-add]'); await page.waitForTimeout(300);
+  check(`city admin ${label}: the date and the link are needed`, /new deadline/.test(await lastToast()));
+  if (open && (await page.locator(`.adm-city-form [name=year] option[value="${y}"]`).count())) {
+    await page.selectOption('.adm-city-form [name=year]', y); await page.fill('.adm-city-form [name=due_on]', due1);
+    await page.fill('.adm-city-form [name=source_url]', 'notice.ph'); await page.click('[data-act=adm-city-add]'); await page.waitForTimeout(300);
+    check(`city admin ${label}: the link must be a real https link`, /https/.test(await lastToast()) && (await page.locator('.modal').count()) === 0);
+    await page.fill('.adm-city-form [name=source_url]', 'https://example.com/makati-ordinance');
+    await page.click('[data-act=adm-city-add]'); await page.waitForSelector('.modal');
+    check(`city admin ${label}: it asks before telling anyone, and says how many`, /Up to 1 workspace/.test(await page.textContent('.modal')));
+    await submit(800);
+    check(`city admin ${label}: announced: workspaces told`, /Told 1 workspace/.test(await lastToast()) && /Live/.test(await page.textContent('main')));
+    await go('#/notifications');
+    check(`city ${label}: the notice is in Notifications, with "See the new date"`, (await page.locator('a', { hasText: 'See the new date' }).count()) >= 1);
+    await page.locator('a', { hasText: 'See the new date' }).first().click(); await page.waitForTimeout(700);
+    await page.click('[data-city-banner] [data-act=city-use]'); await page.waitForTimeout(700);
+    check(`city ${label}: the customer takes the new date`, (await reqNow(mp.id)).expires_on === due1);
+    await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=cities]'); await page.waitForSelector('.adm-city-form');
+    await page.fill('.adm-city-form [name=city]', 'Makati City'); await page.selectOption('.adm-city-form [name=year]', y);
+    await page.fill('.adm-city-form [name=due_on]', due2); await page.fill('.adm-city-form [name=source_url]', 'https://example.com/makati-ordinance-2');
+    await page.click('[data-act=adm-city-add]'); await page.waitForSelector('.modal');
+    check(`city admin ${label}: a second date says it replaces the first`, /This replaces/.test(await page.textContent('.modal')));
+    await submit(800);
+    check(`city admin ${label}: replaced: the permit that took the first date moves along`, (await reqNow(mp.id)).expires_on === due2 && /1 moved along/.test(await lastToast()));
+    await page.locator('[data-act=adm-city-withdraw]').first().click(); await page.waitForSelector('.modal');
+    check(`city admin ${label}: withdrawing says what happens to moved permits`, /go back to their old date/.test(await page.textContent('.modal')));
+    await submit(800);
+    check(`city admin ${label}: withdrawn: the permit is back on its first date`, (await reqNow(mp.id)).expires_on === mp.expires_on && /Withdrawn/.test(await page.textContent('main')));
+  } else check(`city admin ${label}: (too close to year end to announce; skipped)`, true);
+  check(`city admin ${label}: no sideways scroll`, (await over()) <= 0);
+  check(`packet+city ${label}: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+}
+{
+  // The demo: a ready packet and a sample extension; and a database before file 11 shows neither.
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.addInitScript(() => { globalThis.PP_DEMO = true; });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+  check('packet demo: the dashboard shows the sample extension, marked as a sample', /A sample/.test(await page.textContent('[data-city-banner]').catch(() => '')) || (await page.locator('[data-city-banner]').count()) === 0);
+  const id = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.location_id === 'l3' && r.type_code === 'mayors_permit').id);
+  await page.evaluate((h) => { location.hash = h; }, '#/requirement/' + id); await page.waitForSelector('[data-packet]');
+  check('packet demo: a ready packet, with last year\'s answers carried over', /Ready/.test(await page.textContent('[data-packet]')) && /₱7,348,250\.75/.test(await page.textContent('[data-packet]')));
+  check('packet demo: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
+  const off = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await off.addInitScript(() => { globalThis.PP_CITY = true; globalThis.PP_FEATURES = ['errors', 'assign', 'library2', 'services', 'filings', 'sms', 'mfa', 'revenue', 'plus', 'load', 'clock', 'billpay']; });
+  const oerrs = [];
+  off.on('pageerror', (e) => oerrs.push(e.message));
+  await off.goto('http://localhost:4173/'); await off.waitForSelector('main h1');
+  const mp = await off.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.type_code === 'mayors_permit').id);
+  check('packet+city off: before database file 11, the dashboard has no city banner', (await off.locator('[data-city-banner]').count()) === 0);
+  await off.evaluate((id) => { location.hash = '#/requirement/' + id; }, mp); await off.waitForTimeout(700);
+  check('packet+city off: ...and the permit has no packet or banner', (await off.locator('[data-packet], [data-city-banner]').count()) === 0);
+  await off.evaluate(() => { location.hash = '#/admin'; }); await off.waitForTimeout(600);
+  check('packet+city off: ...and staff have no City deadlines tab', (await off.locator('[data-act=admin-tab][data-tab=cities]').count()) === 0);
+  check('packet+city off: no JavaScript errors', oerrs.length === 0, oerrs.slice(0, 3).join(' | '));
   await off.close();
 }
 

@@ -381,3 +381,82 @@ Pay on or before: January 20, 2027`;
   assert.equal(plain.ref, null);
   assert.equal(readBill('', '2027-01-08').amounts.length, 0);
 });
+
+test('City spellings match the database: QC, Q.C. and Quezon City are one city', async () => {
+  const { cityKey } = await import('../web/js/citydates.js');
+  assert.equal(cityKey('QC'), 'quezon');
+  assert.equal(cityKey('Q.C.'), 'quezon');
+  assert.equal(cityKey('Quezon City, Metro Manila'), 'quezon');
+  assert.equal(cityKey('City of Manila'), 'manila');
+  assert.equal(cityKey('  MANILA CITY '), 'manila');
+  assert.equal(cityKey('Las Piñas City'), 'las pinas');
+  assert.equal(cityKey('Parañaque'), 'paranaque');
+  assert.equal(cityKey('Lapu-Lapu City'), 'lapu lapu');
+  assert.equal(cityKey('Municipality of Taytay'), 'taytay');
+  assert.equal(cityKey(''), '');
+});
+
+test('A city extension applies to its business permits still due earlier that year', async () => {
+  const { extensionFor, anniversaryDue } = await import('../web/js/citydates.js');
+  const d = { id: 'd1', city_key: 'manila', permit_year: 2027, due_on: '2027-02-13' };
+  const mp = { type_code: 'mayors_permit', expires: true, expires_on: '2027-01-20' };
+  assert.equal(extensionFor(mp, 'Manila City', [d]), d);
+  assert.equal(extensionFor(mp, 'Makati', [d]), null);                                     // another city
+  assert.equal(extensionFor({ ...mp, expires_on: '2027-02-13' }, 'Manila', [d]), null);     // already moved
+  assert.equal(extensionFor({ ...mp, expires_on: '2026-01-20' }, 'Manila', [d]), null);     // another year
+  assert.equal(extensionFor({ ...mp, type_code: 'fsic' }, 'Manila', [d]), null);            // only business permits
+  const qc = { rule: 'anniversary' };
+  assert.equal(anniversaryDue({ ...mp, issued_on: '2026-03-15' }, qc), '2027-03-15');      // QC: a year from the issue date
+  assert.equal(anniversaryDue({ ...mp, issued_on: '2026-01-20' }, qc), null);              // already right
+  assert.equal(anniversaryDue({ ...mp, expires_on: '2027-03-01', issued_on: '2026-03-15' }, qc), null); // a date they typed: leave it
+  assert.equal(anniversaryDue({ ...mp, issued_on: '2024-02-29' }, qc), '2025-02-28');      // leap day
+});
+
+test('Due-date suggestion knows the city: Quezon City\'s rule and announced extensions', () => {
+  const qc = { rule: 'anniversary', note: 'QC note' };
+  assert.deepEqual(suggestDue('jan20', { issuedOn: '2026-03-15', cityRule: qc }), { date: '2027-03-15', note: 'QC note' });
+  assert.equal(suggestDue('jan20', { cityRule: qc }), null);                                // no issue date, no guess
+  const ext = [{ city_name: 'Manila', permit_year: 2027, due_on: '2027-02-13' }];
+  assert.equal(suggestDue('jan20', { issuedOn: '2026-01-15', cityExtensions: ext }).date, '2027-02-13');
+  assert.equal(suggestDue('jan20', { issuedOn: '2025-01-15', cityExtensions: ext }).date, '2026-01-20'); // another year
+});
+
+test('Renewal packet: the year, what carries over, and only the questions still open', async () => {
+  const { packetYear, startAnswers, openSteps, missingDetails, appDetails, filledCount } = await import('../web/js/packet.js');
+  assert.equal(packetYear('2027-01-20', '2026-10-22'), 2027);
+  assert.equal(packetYear('2026-01-20', '2026-10-22'), 2026);      // renewing late
+  assert.equal(packetYear('2024-01-20', '2026-10-22'), 2026);      // long expired: this year's
+  assert.equal(packetYear(null, '2026-10-22'), null);
+  const prev = { sales: 1500000, employees: 6, changed: 'no', owner_name: 'Ana', line: 'Bakery', area_sqm: 40, place: 'owned' };
+  const a = startAnswers(prev, {});
+  assert.equal(a.sales, undefined);                                // sales and headcount are asked fresh
+  assert.equal(a.employees, undefined);
+  assert.equal(a.line, 'Bakery');
+  const known = { tin: '123', address: '5 Rizal St', owner_name: 'Ana', line: 'Bakery', reg_no: 'DTI 1', phone: '0917' };
+  assert.deepEqual(openSteps(known, a), ['sales', 'employees', 'changed']);
+  assert.deepEqual(openSteps({ ...known, tin: '' }, a), ['sales', 'employees', 'changed', 'details']);
+  assert.deepEqual(missingDetails({ ...known, tin: '' }, { ...a, place: 'rented' }), ['tin', 'lessor']);
+  assert.deepEqual(openSteps(known, { ...a, sales: 1, employees: 2, changed: 'no' }), []);
+  assert.equal(openSteps(known, { ...a, sales: 1, employees: 2, changed: 'no' }, true).length, 4); // changing answers: all of them
+  const parts = appDetails({ year: 2027, biz: { name: 'Ana Bakery', structure: 'Sole Proprietorship' }, address: '5 Rizal St, Manila', email: 'a@b.ph', known,
+    a: { ...a, sales: 1842600, employees: 7 }, permit: {} });
+  const rows = parts.flatMap((p) => p.rows);
+  assert.equal(rows.find((r) => r[0] === 'Gross sales or receipts, 2026')[1], 'PHP 1,842,600.00');
+  assert.deepEqual(filledCount(parts), { filled: 13, total: 13 });
+  assert.equal(filledCount(appDetails({ year: 2027, biz: { name: 'X', structure: 'Corporation' }, address: '', email: '', known: { ...known, tin: '' }, a: {}, permit: {} })).filled < 13, true);
+});
+
+test('Reading sales from a tax return photo', async () => {
+  const { readSales } = await import('../web/js/ocrparse.js');
+  const itr = `BIR Form No. 1701
+For the year 2026
+Part IV
+Sales/Revenues/Receipts/Fees      1,842,600.00
+Less: Cost of Sales                 912,300.00
+Gross Income                        930,300.00`;
+  const r = readSales(itr);
+  assert.equal(r.amounts[0], 1842600);
+  assert.equal(r.amounts.includes(2026), false);                   // a year is not money
+  assert.equal(readSales('Total Gross Sales/Receipts 450,000').amounts[0], 450000);
+  assert.equal(readSales('').amounts.length, 0);
+});

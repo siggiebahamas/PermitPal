@@ -158,3 +158,24 @@ export function readBill(text, today) {
     .map((d) => d.value).filter((v) => !today || v >= today).sort()[0] || null;
   return { amounts: ranked.map((a) => a.value), ref, payBy, chars: String(text || '').replace(/\s/g, '').length };
 }
+
+// A tax return or sales summary → the year's gross sales. BIR returns call it "Sales/Revenues/Receipts/Fees",
+// "Total Gross Sales/Receipts" or "Total Sales"; the figure on a sales line comes first, then the biggest ones.
+const SALES_WORDS = /(gross\s*(sales|receipts)|sales\s*\/?\s*(revenues?|receipts)|total\s*(taxable\s*)?(gross\s*)?sales|net\s*sales|total\s*revenues?)/i;
+export function readSales(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  const found = [];
+  lines.forEach((line, li) => {
+    const re = /(?:₱|php|p)?\s*([0-9OolI]{1,3}(?:[,\s][0-9OolI]{3})+|[0-9OolI]{4,})(?:[.,]([0-9OolI]{2}))?(?![0-9])/gi;
+    let m;
+    while ((m = re.exec(line))) {
+      const v = Number(digits(m[1]).replace(/[,\s]/g, '') + (m[2] ? '.' + digits(m[2]) : ''));
+      if (!(v >= 1000) || v > 99999999999 || (!m[2] && /^(19|20)\d\d$/.test(m[1]))) continue;
+      const before = line.slice(0, m.index) + ' ' + (lines[li - 1] || '');
+      found.push({ value: v, sales: SALES_WORDS.test(before) });
+    }
+  });
+  const ranked = [...found.filter((a) => a.sales), ...[...found].sort((a, b) => b.value - a.value)]
+    .map((a) => a.value).filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 4);
+  return { amounts: ranked, chars: String(text || '').replace(/\s/g, '').length };
+}

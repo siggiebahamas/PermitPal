@@ -12,6 +12,8 @@ import { serviceOffer } from './services.js';
 import { scanBox, wireScan } from './scan.js';
 import { papersCard, openPapersCheck, loadState, watchPapers } from './load.js';
 import { officeData, clockCard, billsCard, watchOffice } from './office.js';
+import { packetCard, loadPackets, watchPacket } from './packet.js';
+import { cityBanner, cityOf, cityRule, cityExtensions } from './citydates.js';
 import * as db from 'pp/data';
 
 let detail = null;       // { id, cycles, documents, activity }
@@ -31,9 +33,9 @@ export async function render(el, id) {
     if (loadingId === id) return;
     loadingId = id;
     try {
-      const [d, checks, office] = await Promise.all([db.requirementDetail(id, { checklist: has('library2') }), has('load') ? db.papersChecks(id).catch(() => []) : [],
-        officeData(id), loadPartners(), loadPlacements(), has('load') ? loadState().catch(() => null) : null]);
-      detail = { id, ...d, checks, office, checksNav: navs };
+      const [d, checks, office, packets] = await Promise.all([db.requirementDetail(id, { checklist: has('library2') }), has('load') ? db.papersChecks(id).catch(() => []) : [],
+        officeData(id), loadPackets(r), loadPartners(), loadPlacements(), has('load') ? loadState().catch(() => null) : null]);
+      detail = { id, ...d, checks, office, packets, checksNav: navs };
     } catch (e) { toastError(e); }
     loadingId = null;
     if (!location.hash.includes(id)) return; // navigated away while loading
@@ -67,6 +69,13 @@ watchOffice(async (reqId) => {
   if (!detail || detail.id !== reqId) return;
   // the cards, and the files and activity they add to (a receipt, "drafted a letter")
   try { const [office, d] = await Promise.all([officeData(reqId), db.requirementDetail(reqId, { checklist: has('library2') })]); detail.office = office; Object.assign(detail, d); } catch { /* keep what we had */ }
+  if (location.hash.includes(reqId)) rerender();
+});
+
+// The renewal packet was answered or changed.
+watchPacket((reqId, packets) => {
+  if (!detail || detail.id !== reqId) return;
+  detail.packets = packets;
   if (location.hash.includes(reqId)) rerender();
 });
 
@@ -122,6 +131,7 @@ function page(r) {
         </div>`)}
       </div>`)}
 
+    ${cityBanner(r)}
     ${when(t?.help_text, html`<p class="help-text">${t?.help_text}</p>`)}
     ${['action_required', 'renew_soon'].includes(r.status) ? penaltyNote(r) : ''}
 
@@ -141,6 +151,7 @@ function page(r) {
       ${when(edit && r.expires && r.status !== 'in_progress' && r.status !== 'compliant', html`
         <button class="btn btn-ghost" data-act="req-start-renewal" data-id="${r.id}">I've started the renewal</button>`)}
     </div>
+    ${packetCard(r, detail.packets || [])}
     ${careNote(r) || ''}
     ${clockCard(r, detail.office?.filings || [])}
     ${checklistCard(r, detail.ticks || [], { offer: coverOf(r) ? '' : serviceOffer(r, { compact: true }) }) || (coverOf(r) ? '' : serviceOffer(r))}
@@ -232,9 +243,11 @@ function wireSuggestion(form, r) {
   const expires = form.querySelector('[name=expires_on]');
   const noExp = form.querySelector('[name=no_expiry]');
   const plate = r.subject === 'vehicle' ? vehicle(r.vehicle_id)?.plate_no : null;
+  const city = r.type_code === 'mayors_permit' && has('citydates') ? cityOf(r) : '';
+  const cityCtx = city ? { cityRule: cityRule(city), cityExtensions: cityExtensions(city) } : {};
   const update = () => {
     form.querySelector('.expiry-field').hidden = noExp.checked;
-    const s = !noExp.checked && suggestDue(rule, { issuedOn: issued.value || null, plate });
+    const s = !noExp.checked && suggestDue(rule, { issuedOn: issued.value || null, plate, ...cityCtx });
     if (!s || s.date === expires.value) { box.hidden = true; return; }
     box.hidden = false;
     box.innerHTML = String(html`<span>Suggested expiry: <b>${fmtDate(s.date)}</b>. ${s.note}</span>

@@ -25,6 +25,7 @@ function entityOf(n) {
 // The one thing to do about it, as a button.
 function actionFor(n, e) {
   if (!canEdit()) return n.link ? html`<a class="btn btn-sm nb2" href="${n.link}" data-act="notif-open" data-id="${n.id}">Open</a>` : '';
+  if (/[?&]city=1/.test(n.link || '')) return html`<a class="btn btn-sm nb1" href="${n.link}" data-act="notif-open" data-id="${n.id}">See the new date</a>`;
   if (e.r?.next_action) {
     return html`<button class="btn btn-sm ${e.r.next_action === 'renew' ? 'nb1' : 'nb2'}" data-act="req-next" data-id="${e.r.id}" data-notif="${n.id}">${NEXT_ACTION[e.r.next_action]}</button>`;
   }

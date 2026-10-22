@@ -5,6 +5,7 @@ import { assignable, bulk, bulkBar } from './assign.js';
 import { filingsBrief } from './filings.js';
 import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
 import { accountantCard } from './brand.js';
+import { cityDashBanner } from './citydates.js';
 import * as db from 'pp/data';
 
 // ---------------------------------------------------------------- dashboard
@@ -29,6 +30,7 @@ export function dashboard(el) {
 
   el.innerHTML = String(html`
     ${brief(first, c, open)}
+    ${cityDashBanner()}
     ${statTiles(c)}
     ${careNudge(open)}
     <section class="card next">
