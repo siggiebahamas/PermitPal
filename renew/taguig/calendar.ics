@@ -1,0 +1,51 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Pinoy Permit//Renewal guide//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Business permit renewal 2027 · Taguig
+BEGIN:VEVENT
+UID:20261201-taguig-renewal@permitpal
+DTSTAMP:20261023T131803Z
+DTSTART;VALUE=DATE:20261201
+DTEND;VALUE=DATE:20261202
+SUMMARY:Get your business permit papers ready (Taguig)
+DESCRIPTION:Gather last year's permit and receipt\, gross sales (BIR return
+ s)\, proof of address and your SSS\, PhilHealth and Pag-IBIG proof of paym
+ ent. Checklist: https://siggiebahamas.github.io/PermitPal/renew/taguig/
+TRANSP:TRANSPARENT
+END:VEVENT
+BEGIN:VEVENT
+UID:20270105-taguig-renewal@permitpal
+DTSTAMP:20261023T131803Z
+DTSTART;VALUE=DATE:20270105
+DTEND;VALUE=DATE:20270106
+SUMMARY:Get this year's barangay business clearance (Taguig)
+DESCRIPTION:You need it before the Mayor's Permit. Bring last year's cleara
+ nce and proof of address. Checklist: https://siggiebahamas.github.io/Permi
+ tPal/renew/taguig/
+TRANSP:TRANSPARENT
+END:VEVENT
+BEGIN:VEVENT
+UID:20270113-taguig-renewal@permitpal
+DTSTAMP:20261023T131803Z
+DTSTART;VALUE=DATE:20270113
+DTEND;VALUE=DATE:20270114
+SUMMARY:One week left: business permit renewal (Taguig)
+DESCRIPTION:Most cities want the Mayor's Permit renewed by January 20. Late
+  renewals can pay up to a 25% surcharge plus 2% a month. https://siggiebah
+ amas.github.io/PermitPal/renew/taguig/
+TRANSP:TRANSPARENT
+END:VEVENT
+BEGIN:VEVENT
+UID:20270120-taguig-renewal@permitpal
+DTSTAMP:20261023T131803Z
+DTSTART;VALUE=DATE:20270120
+DTEND;VALUE=DATE:20270121
+SUMMARY:Business permit renewal due (Taguig)
+DESCRIPTION:January 20 is the usual deadline. Some cities extend it\, often
+  only at the last minute\, so don't count on it. https://siggiebahamas.git
+ hub.io/PermitPal/renew/taguig/
+TRANSP:TRANSPARENT
+END:VEVENT
+END:VCALENDAR
