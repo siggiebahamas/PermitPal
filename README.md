@@ -1,5 +1,6 @@
 # PermitPal
 
+> **New Claude Code session?** Read `docs/HANDOFF.md` first.
 One place for every business permit and vehicle registration, with reminders before anything expires, and help renewing when you don't want to do it yourself.
 
 - **Website:** static HTML/JS in `web/`, hosted on GitHub Pages: `https://siggiebahamas.github.io/PermitPal/` (sign-in) and `https://siggiebahamas.github.io/PermitPal/demo/` (the same app on sample data, no sign-in). Both update on every push to `main`.
