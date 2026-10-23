@@ -1236,6 +1236,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await p.goto('http://localhost:4173/'); await p.waitForSelector('.lp-home h1');
     const text = await p.textContent('.landing');
     check(`website ${label}: the home page leads with "Permits on autopilot"`, /Permits on autopilot/.test(await p.textContent('.lp-home h1')));
+    check(`website ${label}: the example phone shows Sadie's Kitchen`, /Good morning, Sadie/.test(await p.textContent('.lp-screen')) && (await p.textContent('.lp-biz')) === "Sadie's Kitchen");
     check(`website ${label}: "One screen." sits on a line of its own`, await p.evaluate(() => {
       const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
       return b.textContent === 'One screen.' && b.getClientRects().length === 1 && b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 2;
@@ -1455,12 +1456,12 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   {
     const { page, errs } = await newPage({}, { width: 390, height: 844 });
     const H = '<img src=x onerror="window.__xss=1">';
-    const live = { state: 'live', title: `Lorna's Kitchen ${H}`, intro: 'Family restaurant', business: "Lorna's Kitchen", city: 'Pasig City', as_of: '2026-10-20', now: new Date().toISOString(), checked_at: new Date().toISOString(),
+    const live = { state: 'live', title: `Sadie's Kitchen ${H}`, intro: 'Family restaurant', business: "Sadie's Kitchen", city: 'Pasig City', as_of: '2026-10-20', now: new Date().toISOString(), checked_at: new Date().toISOString(),
       files: 'everyone', can_download: true, recipient: null, since: '2026-10-01', staff: { people: 12, licences: 14, ok: 13, due: 1, expired: 0 },
       items: [
-        { id: 'a', name: "Mayor's / Business Permit", group: "Lorna's Kitchen", state: 'ok', in_progress: false, expires: true, expires_on: '2027-01-20', issuer: 'City of Pasig', ref: '•••• 0042', on_file: true, files: [{ path: 'o/a/mp.pdf', name: 'mp.pdf' }] },
-        { id: 'b', name: `Fire Safety Inspection Certificate ${H}`, group: "Lorna's Kitchen", state: 'expired', in_progress: false, expires: true, expires_on: '2026-10-10', issuer: null, ref: null, on_file: false, files: null },
-        { id: 'c', name: 'Sanitary Permit', group: "Lorna's Kitchen", state: 'due', in_progress: true, expires: true, expires_on: '2026-11-05', issuer: null, ref: null, on_file: true, files: null },
+        { id: 'a', name: "Mayor's / Business Permit", group: "Sadie's Kitchen", state: 'ok', in_progress: false, expires: true, expires_on: '2027-01-20', issuer: 'City of Pasig', ref: '•••• 0042', on_file: true, files: [{ path: 'o/a/mp.pdf', name: 'mp.pdf' }] },
+        { id: 'b', name: `Fire Safety Inspection Certificate ${H}`, group: "Sadie's Kitchen", state: 'expired', in_progress: false, expires: true, expires_on: '2026-10-10', issuer: null, ref: null, on_file: false, files: null },
+        { id: 'c', name: 'Sanitary Permit', group: "Sadie's Kitchen", state: 'due', in_progress: true, expires: true, expires_on: '2026-11-05', issuer: null, ref: null, on_file: true, files: null },
       ] };
     let asked = null;
     await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
@@ -1484,7 +1485,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('#stop'); await page.waitForTimeout(400);
     check('public page: stopped', /won't get these emails/.test(await page.textContent('main')));
     await page.unroute('**/rest/v1/rpc/get_trust_page');
-    await page.route('**/rest/v1/rpc/get_trust_page', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ state: 'paused', title: 'Lorna' }) }));
+    await page.route('**/rest/v1/rpc/get_trust_page', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ state: 'paused', title: 'Sadie' }) }));
     await page.goto('http://localhost:4173/p.html?c=k7m2q9xd4p'); await page.waitForTimeout(600);
     check('public page: paused shows no statuses', /not available right now/.test(await page.textContent('main')) && (await page.locator('.tp-line').count()) === 0);
     await page.goto('http://localhost:4173/p.html?c=BAD'); await page.waitForTimeout(400);

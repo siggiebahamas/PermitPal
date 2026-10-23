@@ -48,7 +48,7 @@ const hero = () => html`<section class="lp-hero2">
     <div class="lp-blob" aria-hidden="true"></div>
     <div class="lp-phone" role="img" aria-label="PermitPal on a phone: 11 of 12 permits current, with what is due next">
       <div class="lp-screen" aria-hidden="true"><div class="lp-notch"></div>
-        <div><small>Good morning, Lorna</small><b class="lp-biz">Lorna's Kitchen</b></div>
+        <div><small>Good morning, Sadie</small><b class="lp-biz">Sadie's Kitchen</b></div>
         <div class="lp-ring"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="32"/><circle cx="40" cy="40" r="32" class="on"/></svg><div><b>11 of 12</b><small>permits current</small></div></div>
         <div class="lp-caps">WHAT NEEDS YOU</div>
         ${[['Health card · Ana', 'late', '3 days late'], ...(has('filings') ? [['BIR 2551Q', 'soon', 'Due in 5 days']] : []), ["Mayor's Permit", 'soon', 'Due in 12 days'], ['Fire safety (FSIC)', 'ok', 'All good']]
@@ -147,7 +147,7 @@ const SCREENS = [
     <div class="lp-ck">${tick}Renewal recorded</div><div class="lp-ck">${tick}Receipt saved</div>
     <div class="lp-saved"><b>Next renewal set</b>We'll remind you again before it's due.</div></div>`),
   () => html`<div class="lp-scr" role="img" aria-label="A proof page showing three current permits${has('plus') ? ' and a QR code' : ''}">
-    <div class="lp-scr-c"><b class="lp-scr-h">Lorna's Kitchen</b>${pill('ok', 'All permits current')}</div>
+    <div class="lp-scr-c"><b class="lp-scr-h">Sadie's Kitchen</b>${pill('ok', 'All permits current')}</div>
     ${["Mayor's Permit", 'Fire safety (FSIC)', 'Sanitary permit'].map((t) => html`<div class="lp-ck lp-ck-sp"><b>${t}</b><span class="lp-cur">Current</span></div>`)}
     <div class="lp-qrbox">${has('plus') ? html`${QR}<span><b>Scan to check</b>Print it, stick it by the counter</span>` : html`<span><b>Read-only link</b>Send it to anyone. Turn it off anytime.</span>`}</div></div>`,
   () => (has('plus') ? html`<div class="lp-scr" role="img" aria-label="Ana sent her new health card for approval; Ben is cleared; Carlo's driver's license is 3 days late">
@@ -252,7 +252,7 @@ const plusShowcase = () => (has('plus') ? html`<section class="lp-show card" ari
     ${checks(PLUS_CHECKS.slice(0, 6))}
     <div class="btn-row"><a class="btn btn-primary" href="#/signup">Try it free for 14 days</a></div></div>
   <div class="lp-tp" role="img" aria-label="Example public permit page: three permits, two current and one being renewed, with a QR code">
-    <div class="lp-tp-top"><b>Lorna's Kitchen</b><small>Pasig City · from the business's own records, checked automatically by PermitPal today</small></div>
+    <div class="lp-tp-top"><b>Sadie's Kitchen</b><small>Pasig City · from the business's own records, checked automatically by PermitPal today</small></div>
     ${[["Mayor's Permit", 'ok', 'Current'], ['Fire safety (FSIC)', 'ok', 'Current'], ['Sanitary permit', 'soon', 'Being renewed']].map(([n, st, t]) => html`<div class="pv-row" aria-hidden="true"><span class="pv-name">${n}</span><span class="pv-pill pv-${st}">${t}</span></div>`)}
     <div class="lp-tp-qr" aria-hidden="true">${QR}<span><b>Scan to check</b><small>Print it, stick it by the counter</small></span></div>
   </div>
