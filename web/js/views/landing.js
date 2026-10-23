@@ -265,13 +265,13 @@ const LOAD_WHY = {
   texts_50: 'A text on the days your permits and tax deadlines need you. Credits never expire.',
   texts_200: 'The same texts, for bigger teams: works out cheaper per text.',
   template: 'An authorization letter, SPA or affidavit of loss, filled in with your details. Buy only the one you need.',
-  papers_check: 'Before you queue, we check photos of your papers against the checklist. Answered by 6 pm the next weekday, or free.',
+  papers_check: 'Before you queue, we check photos of your papers against the checklist. Usually answered by 6 pm the next weekday.',
   season_pass: 'For the January rush: up to 100 texts, one papers check and your renewal plan by email. September to February.',
 };
 const loadCards = (list) => list.filter((p) => p.active).map((p) => html`<div class="card lp-load-card"><b>${p.name}</b><span class="lp-load-price">${peso(p.price_php)}</span><p>${LOAD_WHY[p.code] || ''}</p></div>`);
 const FAQ = [
   ['Is the free plan really free?', 'Yes. Your own businesses, vehicles, team and reminders cost nothing, with no time limit and no card. Team plans and add-ons are for people who need more.'],
-  ['What happens after the 30-day trial?', 'You choose to pay monthly or yearly. Nothing is charged by itself: we send a bill, you pay by GCash, Maya, bank or card.'],
+  ['What happens after the 30-day trial?', 'You choose to pay monthly or yearly. Nothing is charged by itself: we send a bill, you pay by GCash, Maya or bank transfer.'],
   ['How does yearly work?', 'You pay for 10 months and get 12. That is 2 months free, every year.'],
   ['Can I stop anytime?', 'Yes. Your plan runs to the end of what you paid. Your data is never locked or deleted, and you can download it anytime.'],
 ];

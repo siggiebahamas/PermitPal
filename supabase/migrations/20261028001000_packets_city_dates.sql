@@ -1,4 +1,4 @@
--- PermitPal: renewal packets, city deadlines, and the PHP 199 bill fee.
+-- PermitPal: renewal packets, city deadlines, the PHP 499 bill fee, and no guarantees.
 -- 1) Renewal packet. The business permit renewal asks for the same things every year. PermitPal fills in what
 --    it already knows (the business, the branch, last year's permit, the files on record) and asks only what is
 --    missing or new: last year's sales, how many people work there, and whether anything changed. The answers
@@ -10,7 +10,8 @@
 --    PermitPal staff type the extension once (city, new date, the notice or news report), and every workspace
 --    with a business permit in that city still due before the new date is told. One tap moves the permit's
 --    date. If staff withdraw an extension typed by mistake, the permits moved to it go back to their old date.
--- 3) Paying a city bill through PermitPal now costs PHP 199 (it was PHP 99).
+-- 3) Paying a city bill through PermitPal now costs PHP 499. 4) No guarantees: the on-time guarantee is gone, and a late
+--    papers check is no longer refunded automatically.
 
 -- ================================================================ renewal packets
 create table if not exists public.renewal_packets (
@@ -341,8 +342,76 @@ begin
   return v_n;
 end $$;
 
--- ================================================================ paying a city bill through PermitPal: PHP 199
-update public.app_settings set value = '199' where key = 'billpay_fee' and value = '99';
+-- ================================================================ paying a city bill through PermitPal: PHP 499
+update public.app_settings set value = '499' where key = 'billpay_fee' and value in ('99', '199');
+
+-- ================================================================ no guarantees: PermitPal never pays penalties
+-- PermitPal makes tracking and filing easier; deadlines, surcharges and penalties stay with the business.
+-- 1) The on-time guarantee is gone: no care plan includes it, and claims can't be filed.
+update public.care_tiers set guarantee = false, guarantee_cap_php = 0,
+  includes = array(select x from unnest(includes) x where x !~* 'guarantee');
+create or replace function public.file_guarantee_claim(p_plan uuid, p_requirement uuid, p_penalty numeric, p_note text,
+  p_receipt_path text, p_receipt_name text default null) returns uuid
+language plpgsql security definer set search_path = '' as $$
+begin
+  raise exception 'PermitPal doesn''t pay late penalties or surcharges.' using errcode = 'P0001';
+end $$;
+-- 2) A papers check past its target time isn't refunded any more; staff get a nudge to answer it.
+create or replace function private.load_daily() returns int
+language plpgsql security definer set search_path = '' as $$
+declare v_today date := private.today_ph(); v_n int := 0; c record; s record; v_r1 text; v_r2 text; v_year int := extract(year from private.today_ph())::int;
+begin
+  if not exists (select 1 from private.features where name = 'load') then return 0; end if;
+  -- top-ups nobody paid
+  update public.load_topups set status = 'cancelled', note = 'Not paid in time. Start a new top-up whenever you like.'
+  where status = 'due' and valid_until < v_today;
+
+  -- papers checks past their target time: no refund, a nudge to staff (once) to answer it
+  for c in select * from public.papers_checks where status = 'waiting' and due_by < now() loop
+    perform private.notify_admins('Papers check waiting: ' || c.requirement_name, 'Past its target of ' ||
+      to_char(c.due_by at time zone 'Asia/Manila', 'Dy Mon FMDD, FMHH12:MI am') || '. Answer it in Admin > Load.', 'paperslate:' || c.id, false);
+    v_n := v_n + 1;
+  end loop;
+
+  -- the season plan on December 1 and January 5
+  if to_char(v_today, 'MM-DD') in ('12-01', '01-05') then
+    for s in select id from public.season_passes where v_today between starts_on and ends_on and starts_on < v_today loop
+      perform private.season_plan(s.id, case when extract(month from v_today) = 12 then 'dec' else 'jan' end);
+    end loop;
+  end if;
+
+  -- invitations: once the invited business has 3 permits with dates (a day after joining, email confirmed), both get a month of Plus
+  for c in
+    select x.* from public.invite_signups x join public.orgs o on o.id = x.invited_org and o.deleted_at is null
+    join public.orgs i on i.id = x.inviter_org and i.deleted_at is null
+    where x.status = 'pending' and x.created_at < now() - interval '1 day'
+      and exists (select 1 from auth.users u where u.id = x.invited_user and u.email_confirmed_at is not null)
+      and (select count(*) from public.requirement_status rs where rs.org_id = x.invited_org and rs.expires_on is not null) >= 3
+    for update of x
+  loop
+    v_r2 := private.give_plus_month(c.invited_org, 'Welcome gift for joining by invitation');
+    if (select count(*) from public.invite_signups y where y.inviter_org = c.inviter_org and y.inviter_reward in ('plus_month','bonus_load')
+          and extract(year from y.rewarded_at at time zone 'Asia/Manila') = v_year) >= 6 then
+      v_r1 := 'capped';
+    else
+      v_r1 := private.give_plus_month(c.inviter_org, 'Thank you for inviting a business');
+    end if;
+    update public.invite_signups set status = 'rewarded', inviter_reward = v_r1, invited_reward = v_r2, rewarded_at = now() where id = c.id;
+    perform private.notify_owners(c.invited_org, 'Your welcome gift is here',
+      case v_r2 when 'plus_month' then 'You have a month of PermitPal Plus, free.' else private.peso(private.addon_price('plus', null, 'monthly')) || ' bonus load is in your load.' end,
+      '#/load', 'invitegift:' || c.id, true, true);
+    perform private.notify_owners(c.inviter_org, 'Thank you for inviting a business',
+      case v_r1 when 'plus_month' then 'They''re set up, so you both get a month of PermitPal Plus, free.'
+                when 'bonus_load' then 'They''re set up. You already have Plus, so ' || private.peso(private.addon_price('plus', null, 'monthly')) || ' bonus load is in your load.'
+                else 'They''re set up and got their gift. You''ve reached this year''s 6 thank-you months: thank you for spreading the word!' end,
+      '#/load', 'invitethanks:' || c.id, true, true);
+    v_n := v_n + 1;
+  end loop;
+  -- invitations that never got going
+  update public.invite_signups set status = 'void', reason = 'The invited business didn''t add 3 permits within 90 days.'
+  where status = 'pending' and created_at < now() - interval '90 days';
+  return v_n;
+end $$;
 
 -- ================================================================ who may call what
 do $$ declare f text; begin

@@ -397,7 +397,6 @@ function payBox(a, st) {
   }
   return html`<section class="card pay">
     <div class="card-head"><div><h2>Pay ${peso(a.quote_php)}</h2><p class="card-sub">Pay exactly this amount. Work starts once the payment is confirmed.</p></div></div>
-    ${when(st.online_payments === 'on' && canEdit(), html`<button class="btn btn-primary btn-block" data-act="order-pay-online" data-id="${a.id}">Pay online (GCash, Maya, card)</button><div class="divider">or pay directly</div>`)}
     ${payDetails(st)}
     ${when(canEdit(), html`<form class="pay-form">
       <div class="grid2">
@@ -420,10 +419,6 @@ on('quote-accept', async (ds) => {
 on('order-cancel', async (ds) => {
   if (!(await confirmDialog('Cancel this request?', 'We will stop working on it. Nothing has been charged.', { confirmLabel: 'Cancel request', cancelLabel: 'Keep it' }))) return;
   try { await db.cancelHelpRequest(ds.id); await reload(); toast('Request cancelled.'); } catch (e) { toastError(e); }
-});
-on('order-pay-online', async (ds, btn) => {
-  btn.disabled = true;
-  try { location.href = await db.startOrderCheckout(ds.id); } catch (e) { btn.disabled = false; toastError(e); }
 });
 
 // ---------------------------------------------------------------- authorization letter

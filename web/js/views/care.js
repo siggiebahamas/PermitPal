@@ -1,6 +1,6 @@
 // Year-round care: PermitPal starts every covered renewal early and does it itself. Two ways to pay:
 // per renewal (no monthly fee: each renewal at its usual price, when it happens) or the All-in plan (a
-// fixed amount a month or a year that includes every renewal and the on-time guarantee). Tracking and
+// fixed amount a month or a year that includes every renewal). PermitPal never pays penalties. Tracking and
 // reminders are free either way. The page has one job for someone who hasn't started: show in their own
 // numbers what renewing permits costs them in time, and that reminders only tell you while care does it.
 // Once they have a plan, it shows what we're handling, anything that needs them, and the details
@@ -201,7 +201,6 @@ function introPage() {
       <details><summary>Do I still pay the government fees?</summary><p>Yes, at cost, with official receipts. We always show you the exact amount before we pay it, and nothing is filed until you say yes.</p></details>
       <details><summary>Can I stop anytime?</summary><p>Yes, with one tap. The plan runs to the end of the month you've paid, then stops. Nothing more is billed.</p></details>
       <details><summary>Why not just pay per renewal?</summary><p>You can. Then you have to remember each one, ask us, and approve a new price every time. With Year-round care we start on our own, two months early, so nothing slips. If you only have one or two permits, paying per renewal may suit you better.</p></details>
-      <details><summary>What if you're late?</summary><p>That's what Care Plus is for: if a permit lapses because we missed its deadline, we pay the late penalty, up to ${plus ? peso(plus.guarantee_cap_php) : 'the plan\'s limit'} per permit. <a href="terms.html#guarantee" target="_blank" rel="noopener">How the guarantee works</a></p></details>
     </section>
     ${fineprint()}`;
 }
@@ -297,7 +296,6 @@ function introAuto() {
           <p class="cx-way-price">${ab ? html`<b>${peso(ab.monthly_php)}</b> a month per branch` : ''}${ab && av ? html`<br>` : ''}${av ? html`<b>${peso(av.monthly_php)}</b> a month per vehicle` : ''}</p>
           <p>Every covered renewal included: no fee per renewal. The same work, paid in equal parts instead of all at once in January.</p>
           <ul class="cx-plusses">
-            <li>${SHIELD}<span><b>On-time guarantee.</b> If we miss a deadline, we pay the late penalty${cap ? ` (up to ${peso(cap)} per permit)` : ''}.</span></li>
             ${ab?.walkthroughs ? html`<li>${ICON.check}<span><b>A yearly pre-inspection visit</b> for fire or sanitary, per branch.</span></li>` : ''}
             <li>${ICON.check}<span><b>Pay yearly, get 2 months free:</b> ${[ab ? `${peso(ab.yearly_php)} per branch` : '', av ? `${peso(av.yearly_php)} per vehicle` : ''].filter(Boolean).join(', ')} a year.</span></li>
           </ul>
@@ -313,7 +311,7 @@ function introAuto() {
       ${coveredDetails()}
       <details><summary>Do I still pay the government fees?</summary><p>Yes, at cost, with official receipts. We always show you the exact amount before we pay it, and nothing is filed until you say yes.</p></details>
       <details><summary>Can I stop anytime?</summary><p>Yes, with one tap. Pay per renewal stops the same day. The ${(ab || av)?.name || 'All-in plan'} runs to the end of the month you've paid, then stops.</p></details>
-      <details><summary>What if you're late?</summary><p>We start two months early so that doesn't happen. On the ${(ab || av)?.name || 'All-in plan'}, if a permit still lapses because we missed its deadline, we pay the late penalty${cap ? `, up to ${peso(cap)} per permit` : ''}. <a href="terms.html#guarantee" target="_blank" rel="noopener">How the guarantee works</a></p></details>
+      <details><summary>Who pays penalties?</summary><p>You do: deadlines, surcharges and penalties stay yours. We start two months early so you have time, but we don't pay or refund penalties.</p></details>
     </section>
     <p class="muted small fineprint">Each renewal is quoted at our usual fixed price (shown above) plus government fees at cost, and nothing is filed until you approve it. ${(ab || av)?.name || 'The All-in plan'} includes our fee for the yearly permits listed on each plan; cancel anytime and it runs to the end of what you've paid, with no refund for the rest of that period.
       <a href="terms.html#care" target="_blank" rel="noopener">Year-round care terms</a></p>`;
@@ -482,7 +480,7 @@ function payChoice(can, pick) {
       <small>You pay each renewal's usual price only when we do it${fees ? ` (${fees})` : ''}.</small></span></label>
     ${ab || av ? html`<label class="check care-level"><input type="radio" name="billing" value="monthly" ${on('monthly')} ${can ? '' : 'disabled'}>
       <span><b>${(ab || av).name}, monthly</b> <small class="muted">${both('monthly_php')} a month</small>
-      <small>Every covered renewal included, plus the on-time guarantee${ab?.walkthroughs ? ' and a yearly pre-inspection visit' : ''}. Stop anytime.</small></span></label>
+      <small>Every covered renewal included${ab?.walkthroughs ? ', plus a yearly pre-inspection visit' : ''}. Stop anytime.</small></span></label>
     <label class="check care-level"><input type="radio" name="billing" value="yearly" ${on('yearly')} ${can ? '' : 'disabled'}>
       <span><b>${(ab || av).name}, yearly</b> <small class="muted">${both('yearly_php')} a year</small>
       <small>The same, with 2 months free. No refund if you stop part-way.</small></span></label>` : ''}

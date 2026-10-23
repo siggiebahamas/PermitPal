@@ -339,7 +339,7 @@ const now = () => new Date().toISOString();
 function event(a, kind, message, byStaff = false, file = null) {
   db.events.push({ id: ++seq, request_id: a.id, org_id: a.org_id, by_staff: byStaff, kind, message, file_path: file, file_name: file, created_at: now() });
 }
-const settings = { gcash_name: 'PermitPal Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'PermitPal Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '', billpay_fee: '199', billpay_max: '50000', billpay_open: 'on' };
+const settings = { gcash_name: 'PermitPal Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'PermitPal Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '', billpay_fee: '499', billpay_max: '50000', billpay_open: 'on' };
 export const listServices = async () => SERVICES;
 export async function requestService(f) {
   // Same rules as the database: authorization ticked, one open request per permit, no flooding.
@@ -1052,12 +1052,12 @@ const VEHICLE_SCOPE = ['lto_registration', 'ctpl', 'emission_test', 'mvir'];
 const tiers = [
   { code: 'branch_care', subject: 'branch', name: 'Pay per renewal', monthly_php: 0, yearly_php: 0, guarantee: false, guarantee_cap_php: 0, walkthroughs: 0, active: true, sort: 10, covers: BRANCH_SCOPE,
     includes: ['No monthly fee', "We start every covered renewal about 2 months before it's due, on our own", "You pay each renewal's fixed fee only when we do it", 'Government fees at cost, with official receipts'] },
-  { code: 'branch_plus', subject: 'branch', name: 'All-in plan', monthly_php: 1200, yearly_php: 12000, guarantee: true, guarantee_cap_php: 10000, walkthroughs: 1, active: true, sort: 20, covers: BRANCH_SCOPE,
-    includes: ['Every covered renewal included: no per-renewal fees', 'On-time guarantee: if we miss a deadline, we pay the late penalty (up to ₱10,000 per permit)', 'One fire or sanitary pre-inspection visit a year', "One fixed amount, so January doesn't hit you all at once"] },
+  { code: 'branch_plus', subject: 'branch', name: 'All-in plan', monthly_php: 1200, yearly_php: 12000, guarantee: false, guarantee_cap_php: 0, walkthroughs: 1, active: true, sort: 20, covers: BRANCH_SCOPE,
+    includes: ['Every covered renewal included: no per-renewal fees', 'One fire or sanitary pre-inspection visit a year', "One fixed amount, so January doesn't hit you all at once"] },
   { code: 'vehicle_care', subject: 'vehicle', name: 'Pay per renewal', monthly_php: 0, yearly_php: 0, guarantee: false, guarantee_cap_php: 0, walkthroughs: 0, active: true, sort: 30, covers: VEHICLE_SCOPE,
     includes: ['No monthly fee', 'Registration, CTPL, emission test and inspection started on time', "You pay each renewal's fixed fee only when we do it", 'The new OR/CR saved for you'] },
-  { code: 'vehicle_plus', subject: 'vehicle', name: 'All-in plan', monthly_php: 250, yearly_php: 2500, guarantee: true, guarantee_cap_php: 3000, walkthroughs: 0, active: true, sort: 40, covers: VEHICLE_SCOPE,
-    includes: ['Every covered renewal included: no per-renewal fees', 'On-time guarantee: if we miss the deadline, we pay the late penalty (up to ₱3,000)', 'One fixed amount a month'] },
+  { code: 'vehicle_plus', subject: 'vehicle', name: 'All-in plan', monthly_php: 250, yearly_php: 2500, guarantee: false, guarantee_cap_php: 0, walkthroughs: 0, active: true, sort: 40, covers: VEHICLE_SCOPE,
+    includes: ['Every covered renewal included: no per-renewal fees', 'One fixed amount a month'] },
 ];
 let billSeq = 0;
 const billNo = (p) => `${p}-${today().slice(0, 4)}-${String(++billSeq).padStart(5, '0')}`;
@@ -1127,7 +1127,7 @@ export async function payCareInvoice(inv, { method, ref, file }) {
 }
 export async function fileGuaranteeClaim(orgId, { plan_id, requirement_id, penalty, note, file }) {
   const p = db.care.plans.find((x) => x.id === plan_id);
-  if (!tiers.find((t) => t.code === p.tier)?.guarantee) throw new Error('The on-time guarantee comes with the All-in plan.');
+  if (p || !p) throw new Error("PermitPal doesn't pay late penalties or surcharges.");
   if (!(file && file.size)) throw new Error('Attach the official receipt that shows the penalty.');
   const r = statusRows().find((x) => x.id === requirement_id);
   if (!r?.expires_on || r.expires_on >= today()) throw new Error("This permit hasn't lapsed: there's no past expiry date on file for it.");
@@ -2176,7 +2176,7 @@ if ((CLOCK_ON || BILLS_ON) && (globalThis.PP_DEMO || globalThis.PP_OFFICE)) {
   }
   if (BILLS_ON && mp) {
     office.bills.push({ id: 'gb1', number: `G-${today().slice(0, 4)}-00118`, org_id: org.id, requirement_id: mp.id, label: `"${mp.name}" for Corner <Bakery> & Co`, office: 'Makati City Treasurer',
-      bill_ref: 'SOA-2027-0145521', amount_php: 14230.5, pay_by: addDays(9), mode: 'permitpal', fee_php: 199, bill_path: `${org.id}/bills/x/soa.jpg`, bill_name: 'soa.jpg', status: 'processing',
+      bill_ref: 'SOA-2027-0145521', amount_php: 14230.5, pay_by: addDays(9), mode: 'permitpal', fee_php: 499, bill_path: `${org.id}/bills/x/soa.jpg`, bill_name: 'soa.jpg', status: 'processing',
       pay_method: 'gcash', pay_ref: '1009 552 118', proof_path: null, proof_name: null, reported_at: daysAgoIso(1, 3), received_at: daysAgoIso(0, 2), pay_deadline: nextBusiness6pm(),
       paid_at: null, or_no: null, or_date: null, or_path: null, or_name: null, document_id: null, refunded_at: null, refund_note: null, bir_invoice_no: null, note: null, created_at: daysAgoIso(1, 4) });
     if (brgy) office.bills.push({ id: 'gb2', number: `G-${today().slice(0, 4)}-00102`, org_id: org.id, requirement_id: brgy.id, label: `"${brgy.name}" for Corner <Bakery> & Co`, office: 'Barangay Poblacion',

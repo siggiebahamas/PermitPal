@@ -152,7 +152,7 @@ create trigger gov_bills_touch before update on public.gov_bills for each row ex
 alter table public.app_settings drop constraint if exists app_settings_key_check;
 alter table public.app_settings add constraint app_settings_key_check check (key in ('gcash_name','gcash_number','bank_name','bank_account_name',
   'bank_account_number','payment_note','online_payments','support_phone','support_email','sms_monthly_cap','billpay_fee','billpay_max','billpay_open'));
-insert into public.app_settings (key, value) values ('billpay_fee', '199'), ('billpay_max', '50000'), ('billpay_open', 'on') on conflict (key) do nothing;
+insert into public.app_settings (key, value) values ('billpay_fee', '499'), ('billpay_max', '50000'), ('billpay_open', 'on') on conflict (key) do nothing;
 
 -- ================================================================ who sees what
 alter table public.office_filings enable row level security;
@@ -406,7 +406,7 @@ begin
   end if;
   insert into public.gov_bills (number, org_id, requirement_id, label, office, bill_ref, amount_php, pay_by, mode, fee_php, bill_path, bill_name)
   values (private.next_no('G'), r.org_id, r.id, coalesce(private.requirement_label(r.id), r.name), btrim(p_office), nullif(btrim(p_ref), ''), p_amount, p_pay_by, p_mode,
-    case when p_mode = 'permitpal' then coalesce(nullif(private.app_setting('billpay_fee'), '')::numeric, 199) else 0 end, p_bill_path, left(p_bill_name, 255))
+    case when p_mode = 'permitpal' then coalesce(nullif(private.app_setting('billpay_fee'), '')::numeric, 499) else 0 end, p_bill_path, left(p_bill_name, 255))
   returning id into v_id;
   perform private.req_activity(r.id, 'gov_bill', v_id, 'bill_add', 'Added a bill from ' || btrim(p_office) || ' for ' || private.peso(p_amount)
     || case when p_mode = 'permitpal' then ', for PermitPal to pay.' else '.' end);

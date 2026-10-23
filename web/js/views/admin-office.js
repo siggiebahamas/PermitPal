@@ -55,7 +55,7 @@ export async function officeTab() {
         <span class="chip ${b.status === 'paid' ? 'ok' : 'needinfo'}">${b.status === 'paid' ? 'Paid' : 'Sent back'}</span></div>`)}</details>`)}
     <section class="card"><div class="card-head"><div><h2>Paying bills: settings</h2><p class="card-sub">Customers see these at once. Bills already added keep their fee.</p></div></div>
       <form class="adm-bill-settings"><div class="grid2">
-        <label class="field"><span>Our fee per bill (₱)</span><input name="fee" type="number" min="0" max="5000" step="1" value="${settings.billpay_fee ?? 199}"></label>
+        <label class="field"><span>Our fee per bill (₱)</span><input name="fee" type="number" min="0" max="5000" step="1" value="${settings.billpay_fee ?? 499}"></label>
         <label class="field"><span>Biggest bill we pay (₱)</span><input name="max" type="number" min="100" max="1000000" step="100" value="${settings.billpay_max ?? 50000}"></label></div>
         <label class="check"><input type="checkbox" name="open" ${(settings.billpay_open ?? 'on') === 'on' ? 'checked' : ''}> Take new bills to pay (untick to pause; bills already sent are still paid)</label>
         <button type="button" class="btn btn-sm btn-soft" data-act="adm-bill-settings">Save</button></form>

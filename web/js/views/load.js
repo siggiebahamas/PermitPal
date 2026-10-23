@@ -104,7 +104,7 @@ function papersCardUse(admin) {
   const soon = (S.data.reqs || []).filter((r) => r.expires && ['action_required', 'renew_soon'].includes(r.status)).sort((a, b) => (a.days_left ?? 999) - (b.days_left ?? 999)).slice(0, 3);
   return html`<section class="card load-use">
     <div class="load-use-head"><span class="load-ic">${ICON.check}</span><div><h3>Papers check</h3><p class="muted small">${onSale('papers_check') ? peso(price('papers_check')) + ' a permit' : 'Not available right now'}</p></div></div>
-    <p>Before you queue, our team checks photos of your papers against the permit's checklist and tells you what's missing or needs fixing. Answer by 6 pm the next weekday, or it's free.</p>
+    <p>Before you queue, our team checks photos of your papers against the permit's checklist and tells you what's missing or needs fixing, usually by 6 pm the next weekday.</p>
     ${when(admin && onSale('papers_check'), soon.length ? html`<div class="load-picks">${soon.map((r) => html`<a class="btn btn-sm btn-ghost" href="#/requirement/${r.id}?check=1">${r.name} · ${r.subject_name || ''}</a>`)}</div>`
       : html`<p class="muted small">Open any permit and tap "Check my papers".</p>`)}
   </section>`;
@@ -211,11 +211,8 @@ export function openTopup(suggest = 0) {
 }
 async function openPayTopup(t) {
   const st = await paySettings();
-  const online = st.online_payments === 'on';
   openModal(`Pay top-up ${t.number}`, html`
     <div class="quote-hint"><b>${peso(t.amount_php)}</b> <span class="muted">PermitPal load, good to pay until ${fmtDate(t.valid_until)}</span></div>
-    ${when(online, html`<p><button type="button" class="btn btn-primary" data-act="load-online" data-id="${t.id}">Pay online now (GCash, Maya, card)</button></p>
-      <p class="muted small">The load is added as soon as the payment goes through. Or pay by transfer:</p>`)}
     ${payDetails(st)}
     <div class="grid2">
       <label class="field"><span>Paid with</span><select name="method"><option value="gcash">GCash</option><option value="maya">Maya</option><option value="bank_transfer">Bank transfer</option><option value="other">Other</option></select></label>
@@ -235,11 +232,6 @@ async function openPayTopup(t) {
 }
 on('load-topup', () => openTopup());
 on('load-pay', (ds) => { const t = L?.topups.find((x) => x.id === ds.id); if (t) openPayTopup(t); });
-on('load-online', async (ds, btn) => {
-  const t = L?.topups.find((x) => x.id === ds.id);
-  btn.disabled = true;
-  try { location.href = await db.startTopupCheckout(t); } catch (e) { toastError(e); btn.disabled = false; }
-});
 on('load-topup-cancel', async (ds) => {
   if (!(await confirmDialog('Cancel this top-up?', "Only if you haven't paid it. You can start a new one anytime.", { confirmLabel: 'Cancel it', cancelLabel: 'Keep it' }))) return;
   try { await db.topupCancel(ds.id); await refresh(); toast('Cancelled.'); } catch (e) { toastError(e); }
@@ -298,7 +290,7 @@ export function papersCard(r, checks = [], docsCount = 0) {
   const cta = admin && (p?.active || pass) ? html`<button class="btn btn-primary btn-sm" data-act="papers-open" data-id="${r.id}" data-docs="${docsCount}">${last?.status === 'answered' ? 'Check again' : 'Check my papers'} · ${pass ? 'free with your season pass' : peso(p?.price_php ?? 149)}</button>` : '';
   if (last?.status === 'waiting') {
     return html`<section class="card papers-card" id="papers"><div class="card-head"><h2>Papers check</h2><span class="chip progress">Checking</span></div>
-      <p><b>We're checking your papers.</b> You'll have the answer by <b>${dueWhen(last.due_by)}</b>, or it's free.</p>
+      <p><b>We're checking your papers.</b> We aim to answer by <b>${dueWhen(last.due_by)}</b>.</p>
       ${when(last.note, html`<p class="muted small">Your note: ${last.note}</p>`)}
       ${when(admin, html`<div class="btn-row"><button class="btn btn-sm btn-soft" data-act="papers-add" data-id="${last.id}">${ICON.upload} Add photos</button>
         <button class="btn btn-sm btn-ghost" data-act="papers-cancel" data-id="${last.id}">Cancel and get it back</button></div>`)}</section>`;
@@ -316,7 +308,7 @@ export function papersCard(r, checks = [], docsCount = 0) {
   if (!cta && !admin) return '';
   return html`<section class="card papers-card" id="papers"><div class="card-head"><h2>Not sure you have everything?</h2></div>
     <p>Send us photos of your papers. We check them against this permit's checklist and tell you what's missing or needs fixing, so your trip to the office isn't wasted.
-      Answer by 6 pm the next weekday, or it's free.</p>
+      Usually answered by 6 pm the next weekday.</p>
     ${cta ? html`<div class="btn-row">${cta}</div>` : html`<p class="muted small">Papers checks aren't available right now.</p>`}</section>`;
 }
 

@@ -209,11 +209,8 @@ on('plus-trial', async (ds, btn) => { btn.disabled = true; try { await startTria
 // ---------------------------------------------------------------- paying a bill
 async function openPay(inv) {
   const st = await paySettings();
-  const online = st.online_payments === 'on' && Number(inv.amount_php) >= 20;
   openModal(`Pay bill ${inv.number}`, html`
     <div class="quote-hint"><b>${peso(inv.amount_php)}</b> <span class="muted">${label(inv)}, ${fmtDate(inv.period_start)} to ${fmtDate(inv.period_end)}</span></div>
-    ${when(online, html`<p><button type="button" class="btn btn-primary" data-act="addon-online" data-id="${inv.id}">Pay online now (GCash, Maya, card)</button></p>
-      <p class="muted small">It switches on as soon as the payment goes through. Or pay by transfer:</p>`)}
     ${payDetails(st)}
     <div class="grid2">
       <label class="field"><span>Paid with</span><select name="method"><option value="gcash">GCash</option><option value="maya">Maya</option><option value="bank_transfer">Bank transfer</option><option value="other">Other</option></select></label>
@@ -232,11 +229,6 @@ async function openPay(inv) {
   });
 }
 on('addon-pay', (ds) => { const i = plusOf().invoices.find((x) => x.id === ds.id); if (i) openPay(i); });
-on('addon-online', async (ds, btn) => {
-  const i = plusOf().invoices.find((x) => x.id === ds.id);
-  btn.disabled = true;
-  try { location.href = await db.startAddonCheckout(i); } catch (e) { toastError(e); btn.disabled = false; }
-});
 on('addon-cancel-bill', async (ds) => {
   if (!(await confirmDialog('Cancel this bill?', 'Nothing changes on your plan. You can choose again anytime.', { confirmLabel: 'Cancel the bill', cancelLabel: 'Keep it' }))) return;
   try { await db.addonCancelInvoice(ds.id); await reload(); toast('Cancelled.'); } catch (e) { toastError(e); }

@@ -246,15 +246,6 @@ export async function addOrderMessage(a, message, file) {
   const up = file && file.size ? await uploadRequestFile(a.org_id, a.id, file) : null;
   return ok(await sb.rpc('add_order_message', { p_req: a.id, p_message: message || null, p_file_path: up?.path || null, p_file_name: up?.name || null }));
 }
-export async function startOrderCheckout(reqId) {
-  const { data, error } = await sb.functions.invoke('create-checkout', { body: { request_id: reqId } });
-  if (error) {
-    let msg = error.message;
-    try { msg = (await error.context.json()).error || msg; } catch { /* keep default */ }
-    throw new Error(msg);
-  }
-  return data.checkout_url;
-}
 export async function appSettings() {
   const rows = ok(await sb.from('app_settings').select('key, value'));
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
@@ -337,15 +328,6 @@ export const acceptInvite = async (token) => ok(await sb.rpc('accept_invite', { 
 // ---------------------------------------------------------------- billing
 export const payments = async (orgId) =>
   ok(await sb.from('payments').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(24));
-export async function startCheckout(orgId, planId, months) {
-  const { data, error } = await sb.functions.invoke('create-checkout', { body: { org_id: orgId, plan_id: planId, months } });
-  if (error) {
-    let msg = error.message;
-    try { msg = (await error.context.json()).error || msg; } catch { /* keep default */ }
-    throw new Error(msg);
-  }
-  return data.checkout_url;
-}
 
 // ---------------------------------------------------------------- PermitPal staff console
 export const adminOrgs = async () => ok(await sb.rpc('admin_orgs'));
@@ -606,16 +588,6 @@ export async function addonReportPayment(inv, { method, ref, file }) {
   }
   return ok(await sb.rpc('addon_report_payment', { p_invoice: inv.id, p_method: method, p_ref: ref || null, p_proof_path: proof?.path || null, p_proof_name: proof?.name || null }));
 }
-// Online checkout (GCash, Maya, card) for a bill: the same checkout as team plans, with the bill as the "plan".
-export async function startAddonCheckout(inv) {
-  const { data, error } = await sb.functions.invoke('create-checkout', { body: { org_id: inv.org_id, plan_id: `addon:${inv.id}`, months: inv.months } });
-  if (error) {
-    let msg = error.message;
-    try { msg = (await error.context.json()).error || msg; } catch { /* keep default */ }
-    throw new Error(msg);
-  }
-  return data.checkout_url;
-}
 
 // Staff: contact details, the worker's upload link, photos they sent, licenses by role.
 export const updatePersonContact = async (id, f) => ok(await sb.from('people').update({ email: f.email || null, mobile: f.mobile || null, remind_worker: f.remind_worker !== false }).eq('id', id));
@@ -720,15 +692,6 @@ export async function topupReport(t, { method, ref, file }) {
   return ok(await sb.rpc('load_topup_report', { p_topup: t.id, p_method: method, p_ref: ref || null, p_proof_path: proof?.path || null, p_proof_name: proof?.name || null }));
 }
 export const topupCancel = async (id) => ok(await sb.rpc('load_topup_cancel', { p_topup: id }));
-export async function startTopupCheckout(t) {
-  const { data, error } = await sb.functions.invoke('create-checkout', { body: { org_id: t.org_id, plan_id: `load:${t.id}`, months: 1 } });
-  if (error) {
-    let msg = error.message;
-    try { msg = (await error.context.json()).error || msg; } catch { /* keep default */ }
-    throw new Error(msg);
-  }
-  return data.checkout_url;
-}
 export const buyTexts = async (orgId, pack) => ok(await sb.rpc('buy_texts', { p_org: orgId, p_pack: pack }));
 export const buySeasonPass = async (orgId) => ok(await sb.rpc('buy_season_pass', { p_org: orgId }));
 export const templateUnlocks = async (orgId) => ok(await sb.from('template_unlocks').select('code, unlocked_at').eq('org_id', orgId));

@@ -310,50 +310,14 @@ select pg_temp.res('paying a late bill restarts coverage from today (no paying f
   bool_and(status = 'active' and paid_through = (private.today_ph() + interval '1 month')::date - 1), string_agg(status || ' ' || paid_through, ','))
   from public.care_plans where org_id = (select org from t_ids);
 
--- the on-time guarantee
+-- the on-time guarantee is gone: PermitPal never pays penalties
 update public.care_plans set started_on = private.today_ph() - 120 where org_id = (select org from t_ids);
 update public.requirement_cycles set expires_on = private.today_ph() - 10 where requirement_id = (select brgy from t_ids);
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
-select public.start_care(org, jsonb_build_array(jsonb_build_object('kind','location','id',loc2,'tier','branch_care')), 'per_renewal', true) from t_ids;
-do $$ begin perform public.file_guarantee_claim((select id from public.care_plans where location_id = (select loc2 from t_ids)),
-    (select id from public.requirements where location_id = (select loc2 from t_ids) and type_code = 'mayors_permit'), 500, null, (select org from t_ids) || '/care/claims/r.pdf');
-  perform pg_temp.res('the guarantee is only on the All-in plan', false, 'was allowed');
-exception when others then perform pg_temp.res('the guarantee is only on the All-in plan', sqlerrm like '%comes with the All-in plan%', sqlerrm); end $$;
-do $$ begin perform public.file_guarantee_claim((select plan from t_ids), (select lto from t_ids), 500, null, (select org from t_ids) || '/care/claims/r.pdf');
-  perform pg_temp.res('only permits the plan covers', false, 'was allowed');
-exception when others then perform pg_temp.res('only permits the plan covers', sqlerrm like '%isn''t covered%', sqlerrm); end $$;
-do $$ begin perform public.file_guarantee_claim((select plan from t_ids), (select mp from t_ids), 500, null, (select org from t_ids) || '/care/claims/r.pdf');
-  perform pg_temp.res('a permit that hasn''t lapsed can''t be claimed', false, 'was allowed');
-exception when others then perform pg_temp.res('a permit that hasn''t lapsed can''t be claimed', sqlerrm like '%hasn''t lapsed%', sqlerrm); end $$;
-do $$ begin perform public.file_guarantee_claim((select plan from t_ids), (select brgy from t_ids), 500, null, null);
-  perform pg_temp.res('a claim needs the official receipt', false, 'was allowed');
-exception when others then perform pg_temp.res('a claim needs the official receipt', sqlerrm like '%official receipt%', sqlerrm); end $$;
-reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
-update public.care_plans set paid_through = private.today_ph() - 20 where id = (select plan from t_ids);
-select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
-set local role authenticated;
-do $$ begin perform public.file_guarantee_claim((select plan from t_ids), (select brgy from t_ids), 500, null, (select org from t_ids) || '/care/claims/r.pdf');
-  perform pg_temp.res('not paid up on the expiry date: no guarantee', false, 'was allowed');
-exception when others then perform pg_temp.res('not paid up on the expiry date: no guarantee', sqlerrm like '%wasn''t paid up%', sqlerrm); end $$;
-reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
-update public.care_plans set paid_through = private.today_ph() + 20 where id = (select plan from t_ids);
-select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
-set local role authenticated;
-select pg_temp.res('a valid claim is accepted', public.file_guarantee_claim(plan, brgy, 15000, 'Missed by PermitPal', org || '/care/claims/r.pdf', 'r.pdf') is not null, '') from t_ids;
-do $$ begin perform public.file_guarantee_claim((select plan from t_ids), (select brgy from t_ids), 500, null, (select org from t_ids) || '/care/claims/r2.pdf');
-  perform pg_temp.res('one claim per lapse', false, 'was allowed');
-exception when others then perform pg_temp.res('one claim per lapse', sqlerrm like '%already sent a claim%', sqlerrm); end $$;
-reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
-select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000f4","role":"authenticated"}', true);
-set local role authenticated;
-do $$ begin perform public.admin_decide_claim((select id from public.guarantee_claims where plan_id = (select plan from t_ids)), false, null, 'no');
-  perform pg_temp.res('a decline needs a reason the customer can read', false, 'was allowed');
-exception when others then perform pg_temp.res('a decline needs a reason the customer can read', true, sqlerrm); end $$;
-select public.admin_decide_claim(id, true, 15000, 'Our miss') from public.guarantee_claims where plan_id = (select plan from t_ids);
-select pg_temp.res('the payout is capped at the plan''s limit', approved_php = 10000 and status = 'approved', approved_php::text)
-  from public.guarantee_claims where plan_id = (select plan from t_ids);
-select public.admin_claim_paid(id, 'GCash', 'GC-PAY-1') from public.guarantee_claims where plan_id = (select plan from t_ids);
+do $$ begin perform public.file_guarantee_claim((select plan from t_ids), (select brgy from t_ids), 15000, null, (select org from t_ids) || '/care/claims/r.pdf', 'r.pdf');
+  perform pg_temp.res('no guarantee any more: a lapsed permit on the All-in plan can''t be claimed', false, 'was allowed');
+exception when others then perform pg_temp.res('no guarantee any more: a lapsed permit on the All-in plan can''t be claimed', sqlerrm = 'PermitPal doesn''t pay late penalties or surcharges.', sqlerrm); end $$;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 
 -- cancelling
@@ -507,8 +471,8 @@ create temp table t_money as select * from public.admin_money(private.today_ph()
 select pg_temp.res('one-time jobs: our fee (with rush) is collected, government fees are held separately',
   (select sum(amount) from t_money where stream = 'jobs' and state = 'collected' and kind = 'service_fee' and ref_id = (select ord from t_ids)) = 2300
   and (select sum(amount) from t_money where state = 'held' and ref_id = (select ord from t_ids)) = 2000, '');
-select pg_temp.res('care bills paid are collected; the guarantee payout is a cost',
-  (select sum(amount) from t_money where stream = 'care' and state = 'collected') = 2900 and (select sum(amount) from t_money where state = 'cost') = -10000, '');
+select pg_temp.res('care bills paid are collected; no guarantee payouts',
+  (select sum(amount) from t_money where stream = 'care' and state = 'collected') = 2900 and not exists (select 1 from t_money where state = 'cost'), '');
 select pg_temp.res('firms: the paid statement and the prepaid credit are collected', (select sum(amount) from t_money where stream = 'partners' and state = 'collected') = 1500 + 3000, '');
 select pg_temp.res('team plans are collected', (select sum(amount) from t_money where stream = 'plans') = 4470, '');
 select pg_temp.res('accepted, not paid: the care renewal''s fees are not counted as ours', not exists (select 1 from t_money where state = 'to_collect' and stream = 'jobs' and amount = 0), '');

@@ -267,16 +267,16 @@ reset role;
 select pg_temp.res('staff can give it back: ₱149 returns, the customer is told why', (select status from public.papers_checks where id = (select chk from t_ids)) = 'refunded'
   and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 512
   and exists (select 1 from public.notifications where user_id = 'e9000000-0000-4000-8000-0000000000a1' and title = 'Papers check refunded: Mayor''s / Business Permit' and body like 'We read the wrong permit year.%'), '');
--- not answered in time: the load comes back by itself
+-- past its target time: no refund; staff get a nudge to answer it
 select pg_temp.as_user('e9000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 update t_ids set chk2 = public.request_papers_check(org, fsic, null);
 reset role;
 update public.papers_checks set due_by = now() - interval '1 hour' where id = (select chk2 from t_ids);
 select private.load_daily();
-select pg_temp.res('not answered in time: refunded automatically, and the owner hears so', (select status from public.papers_checks where id = (select chk2 from t_ids)) = 'refunded'
-  and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 512
-  and exists (select 1 from public.notifications where user_id = 'e9000000-0000-4000-8000-0000000000a1' and title like 'Papers check refunded: %' and body like 'We didn''t answer in time%'), '');
+select pg_temp.res('past its target time: still waiting (no refund), staff are nudged to answer', (select status from public.papers_checks where id = (select chk2 from t_ids)) = 'waiting'
+  and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 512 - 149
+  and exists (select 1 from public.notifications where title like 'Papers check waiting: %'), (select paid_php from public.load_wallets where org_id = (select org from t_ids))::text);
 select pg_temp.as_user('e9000000-0000-4000-8000-0000000000f5');
 set local role authenticated;
 select pg_temp.res('staff can''t open the papers of a check that was given back', pg_temp.err(format('select public.staff_open_file(%L)', (select doc from t_ids))) like 'You can only open%', '');

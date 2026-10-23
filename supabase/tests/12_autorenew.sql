@@ -35,9 +35,9 @@ select pg_temp.res('test setup: a branch permit and a van with registration and 
 
 select pg_temp.res('the two ways to pay exist: no monthly fee, and the All-in plan',
   (select monthly_php = 0 and not guarantee from public.care_tiers where code = 'branch_care')
-  and (select monthly_php = 1200 and yearly_php = 12000 and guarantee and guarantee_cap_php = 10000 from public.care_tiers where code = 'branch_plus')
+  and (select monthly_php = 1200 and yearly_php = 12000 and not guarantee and guarantee_cap_php = 0 from public.care_tiers where code = 'branch_plus')
   and (select monthly_php = 0 from public.care_tiers where code = 'vehicle_care')
-  and (select monthly_php = 250 and yearly_php = 2500 and guarantee from public.care_tiers where code = 'vehicle_plus'), '');
+  and (select monthly_php = 250 and yearly_php = 2500 and not guarantee from public.care_tiers where code = 'vehicle_plus'), '');
 
 -- ---------------------------------------------------------------- switching it on
 select set_config('request.jwt.claims', '{"sub":"c1000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
@@ -123,7 +123,7 @@ select set_config('request.jwt.claims', '{"sub":"c1000000-0000-4000-8000-0000000
 set local role authenticated;
 do $$ begin perform public.file_guarantee_claim((select plan from t_ids), (select mp from t_ids), 500, null, (select org from t_ids) || '/care/claims/r.pdf');
   perform pg_temp.res('no guarantee on pay per renewal', false, 'was allowed');
-exception when others then perform pg_temp.res('no guarantee on pay per renewal', sqlerrm like '%comes with the All-in plan%', sqlerrm); end $$;
+exception when others then perform pg_temp.res('no guarantee on pay per renewal', sqlerrm = 'PermitPal doesn''t pay late penalties or surcharges.', sqlerrm); end $$;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 
 -- ---------------------------------------------------------------- the founder's numbers

@@ -824,11 +824,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('care: "Keep it" undoes the cancellation', (await page.locator('main .care-row', { hasText: 'Isuzu Elf' }).locator('[data-act=care-cancel]').count()) === 1);
   await page.fill('main .care-pre [name=amount]', '5000'); await page.click('main .care-pre button'); await page.waitForTimeout(400);
   check('care: government-fee pre-approval saves', /up to ₱5,000/.test(await page.textContent('#toast')));
-  await page.click('main .cx-details summary:has-text("On-time guarantee")'); await page.waitForTimeout(150);
-  await page.click('main [data-act=care-claim]'); await page.waitForTimeout(250);
-  await page.fill('#modal-root [name=penalty]', '2500'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(250);
-  check('care: a guarantee claim needs the official receipt', /Please fill in|official receipt/.test(await page.textContent('#modal-root .modal-error')));
-  await page.click('#modal-root [data-modal-close]');
+  check('care: no on-time guarantee is offered anywhere', !/guarantee/i.test(await page.textContent('main')) && (await page.locator('main [data-act=care-claim]').count()) === 0);
   check('care: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
 }
@@ -1940,11 +1936,23 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await submit();
   check(`clock ${label}: got it: the clock stops and says how late the office was`, /working days? late/.test(await page.textContent('#clock')) && /Waiting on the office/.test(await page.textContent('#clock')));
 
+  // the offer: PermitPal pays it, flat fee, up front
+  check(`bills ${label}: the card offers "Let PermitPal pay it" at ₱499 flat, with why`, /Let PermitPal pay it: ₱499 flat/.test(await page.textContent('#bills'))
+    && (await page.locator('#bills .bill-offer-list li').count()) === 3 && !/guarantee|we pay the surcharge|we cover/i.test(await page.textContent('#bills')));
+  await page.click('#bills .bill-offer [data-act=bill-add]'); await page.waitForSelector('.modal');
+  check(`bills ${label}: the offer opens with PermitPal paying already chosen, and it's shown first`, await page.isChecked('.modal input[name=mode][value=permitpal]')
+    && (await page.locator('.modal .bill-modes label').first().getAttribute('class')).includes('bill-mode-pp'));
+  await page.click('.modal [data-modal-close]');
   // bills: kept on record, paid yourself
-  await page.click('#bills [data-act=bill-add]'); await page.waitForSelector('.modal');
+  await page.click('#bills [data-act=bill-add]:not([data-mode])'); await page.waitForSelector('.modal');
+  check(`bills ${label}: "pay it myself" opens with paying yourself chosen`, await page.isChecked('.modal input[name=mode][value=self]'));
   await page.fill('.modal [name=amount]', '650.5'); await page.fill('.modal [name=bill_ref]', 'BC-118');
   await submit();
   check(`bills ${label}: a bill kept on record: centavos shown, to pay`, /₱650\.50/.test(await page.textContent('#bills')) && /To pay/.test(await page.textContent('#bills')));
+  check(`bills ${label}: a bill you'll pay yourself offers to switch to PermitPal`, (await page.locator('#bills [data-act=bill-switch]').count()) === 1);
+  await page.click('#bills [data-act=bill-switch]'); await page.waitForSelector('.modal');
+  check(`bills ${label}: switching carries the details over, PermitPal chosen`, (await page.inputValue('.modal [name=amount]')) === '650.5' && await page.isChecked('.modal input[name=mode][value=permitpal]'));
+  await page.click('.modal [data-modal-close]');
   await page.click('#bills [data-act=bill-paid]'); await page.waitForSelector('.modal');
   await submit(200);
   check(`bills ${label}: paying it needs the receipt number or a photo`, /official receipt/.test(await page.textContent('#modal-root .modal-error')));
@@ -1956,16 +1964,16 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.click('#bills [data-act=bill-add]'); await page.waitForSelector('.modal');
   await page.check('.modal input[name=mode][value=permitpal]');
   await page.fill('.modal [name=amount]', '14230.50');
-  check(`bills ${label}: PermitPal paying shows what you send (the bill plus ₱199)`, /You send ₱14,429\.50/.test(await page.textContent('.modal .bill-total')));
+  check(`bills ${label}: PermitPal paying shows what you send (the bill plus ₱499)`, /You send ₱14,729\.50/.test(await page.textContent('.modal .bill-total')));
   await submit(200);
   check(`bills ${label}: ...and needs a photo of the bill`, /photo of the bill/.test(await page.textContent('#modal-root .modal-error')));
   await page.setInputFiles('.modal input[name=file]', { name: 'soa.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('x') });
   await page.click('#modal-root button[type=submit]'); await page.waitForSelector('.modal .quote-hint');
-  check(`bills ${label}: saved: straight to paying PermitPal, with the payment details`, /₱14,429\.50/.test(await page.textContent('.modal .quote-hint')) && (await page.locator('.modal .paywith').count()) >= 1);
+  check(`bills ${label}: saved: straight to paying PermitPal, with the payment details`, /₱14,729\.50/.test(await page.textContent('.modal .quote-hint')) && (await page.locator('.modal .paywith').count()) >= 1);
   await page.fill('.modal [name=ref]', '1009 555 0001'); await submit();
   check(`bills ${label}: paid: we check it`, /Checking your payment/.test(await page.textContent('#bills')));
   await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=office]'); await page.waitForTimeout(700);
-  check(`bills ${label}: staff see it to confirm`, /₱14,429\.50/.test(await page.textContent('main')));
+  check(`bills ${label}: staff see it to confirm`, /₱14,729\.50/.test(await page.textContent('main')));
   await page.click('[data-act=adm-bill-ok]'); await page.waitForSelector('.modal'); await submit(700);
   check(`bills ${label}: confirmed: it's on the list to pay, with the time we promised`, (await page.locator('[data-act=adm-bill-paid]').count()) === 1 && /By /.test(await page.textContent('main .chip.soon, main .chip.overdue')));
   await page.click('[data-act=adm-bill-paid]'); await page.waitForSelector('.modal');
@@ -2213,6 +2221,25 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   check('packet+city off: ...and staff have no City deadlines tab', (await off.locator('[data-act=admin-tab][data-tab=cities]').count()) === 0);
   check('packet+city off: no JavaScript errors', oerrs.length === 0, oerrs.slice(0, 3).join(' | '));
   await off.close();
+}
+
+// No guarantees and no card checkout: the terms put penalties on the business, and payment is GCash, Maya or bank only.
+{
+  const req = (await browser.newContext()).request;
+  const terms = await (await req.get('http://localhost:4173/terms.html')).text();
+  const privacy = await (await req.get('http://localhost:4173/privacy.html')).text();
+  check('terms: no on-time guarantee, no surcharge payouts, no "free if late"', !/on-time guarantee|we pay the surcharge|we pay back the late penalty|it's free: what you paid/i.test(terms)
+    && /Penalties stay yours/.test(terms) && /Surcharges stay yours/.test(terms) && /we make no guarantees/.test(terms));
+  check('terms and privacy: no card checkout or PayMongo', !/online checkout|PayMongo/i.test(terms + privacy));
+  const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  await page.addInitScript(() => { globalThis.PP_KIND = 'fleet'; });
+  await page.goto('http://localhost:4173/#/settings/billing'); await page.waitForSelector('main h1'); await page.waitForTimeout(600);
+  check('plans: no "pay online" or card checkout button anywhere', (await page.locator('[data-act=plan-checkout], [data-act=order-pay-online], [data-act=load-online], [data-act=addon-online]').count()) === 0
+    && !/GCash, Maya or card|Pay online/.test(await page.textContent('main')));
+  await page.goto('http://localhost:4173/#/admin'); await page.waitForSelector('main h1');
+  await page.click('[data-act=admin-tab][data-tab=payments]'); await page.waitForTimeout(500);
+  check('admin: no "Show Pay online" switch', (await page.locator('[name=online_payments]').count()) === 0);
+  await page.close();
 }
 
 // Renewal guides (renew/): plain pages search engines can read, with the checklist, the dates, a calendar

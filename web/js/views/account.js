@@ -445,17 +445,12 @@ function billingSection(pay) {
 function payBox(p, pay) {
   const m = Number(p.price_php_monthly);
   const y = planTotal(m, 12);
-  const online = pay.online_payments === 'on' && isOwner();
   return html`<div class="plan-pay">
     <div class="pay-choice">
       <div class="pay-opt"><span class="pay-opt-t">1 month</span><b>${peso(m)}</b><small>less than ${peso(Math.floor((m * 12) / 365) + 1)} a day</small></div>
       <div class="pay-opt best"><span class="pp-ribbon">2 months FREE</span><span class="pay-opt-t">12 months</span><b>${peso(y)}</b><small><s>${peso(m * 12)}</s> · you save ${peso(m * 2)}</small></div>
     </div>
-    ${online ? html`<div class="btn-row">
-        ${has('yearly') ? html`<button class="btn btn-primary" data-act="plan-checkout" data-plan="${p.id}" data-months="12">Pay ${peso(y)} for 12 months</button>` : ''}
-        <button class="btn ${has('yearly') ? 'btn-soft' : 'btn-primary'}" data-act="plan-checkout" data-plan="${p.id}" data-months="1">Pay ${peso(m)} for 1 month</button></div>
-        <p class="muted small">GCash, Maya or card.</p>`
-      : html`${when(pay.gcash_number || pay.bank_account_number, html`<div class="paywiths">
+    ${html`${when(pay.gcash_number || pay.bank_account_number, html`<div class="paywiths">
           ${when(pay.gcash_number, html`<div class="paywith"><b>GCash</b><span>${pay.gcash_number}${pay.gcash_name ? ' · ' + pay.gcash_name : ''}</span></div>`)}
           ${when(pay.bank_account_number, html`<div class="paywith"><b>${pay.bank_name || 'Bank transfer'}</b><span>${pay.bank_account_number}${pay.bank_account_name ? ' · ' + pay.bank_account_name : ''}</span></div>`)}</div>`)}
         <p class="muted small">${pay.payment_note || `Send ${peso(m)} for a month or ${peso(y)} for a year, then press the button. We turn your plan on within 1 business day.`}</p>
@@ -478,9 +473,6 @@ on('plan-request', (ds) => {
       toast("Thanks! We'll confirm and turn your plan on within 1 business day.");
     },
   });
-});
-on('plan-checkout', async (ds) => {
-  try { location.href = await db.startCheckout(S.org.id, ds.plan, Number(ds.months || 1)); } catch (e) { toastError(e); }
 });
 
 // ---------------------------------------------------------------- text messages

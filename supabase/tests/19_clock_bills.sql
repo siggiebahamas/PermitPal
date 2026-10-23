@@ -165,7 +165,7 @@ update public.app_settings set value = 'on' where key = 'billpay_open';
 select pg_temp.as_user('ea000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 update t_ids set b2 = public.bill_add(org, mp, 'Quezon City Treasurer', 'TB-2027-5531', 14230.50, private.today_ph() + 10, 'permitpal', org || '/bills/abcd1234/bill.jpg', 'bill.jpg');
-select pg_temp.res('the owner asks PermitPal to pay: the bill plus the ₱199 fee', fee_php = 199 and amount_php = 14230.50 and status = 'due' and mode = 'permitpal', fee_php::text)
+select pg_temp.res('the owner asks PermitPal to pay: the bill plus the ₱499 fee', fee_php = 499 and amount_php = 14230.50 and status = 'due' and mode = 'permitpal', fee_php::text)
   from public.gov_bills where id = (select b2 from t_ids);
 select pg_temp.res('reporting the payment needs a reference or a screenshot', pg_temp.err(format('select public.bill_report(%L, %L, %L)', (select b2 from t_ids), 'gcash', '')) like 'Add the reference number%', '');
 select public.bill_report(b2, 'gcash', '7788 1122 3344') from t_ids;
@@ -199,8 +199,8 @@ select pg_temp.res('...and the receipt in the bill''s folder', pg_temp.err(forma
 select public.admin_bill_paid(b2, 'OR-7731905', private.today_ph(), org || '/bills/' || b2 || '/or.jpg', 'or.jpg') from t_ids;
 select pg_temp.res('paid: the official receipt is on the permit', b.status = 'paid' and d.requirement_id = (select mp from t_ids) and d.file_name like 'Official receipt OR-7731905%', d.file_name)
   from public.gov_bills b join public.documents d on d.id = b.document_id where b.id = (select b2 from t_ids);
-select pg_temp.res('money: the ₱199 fee is ours; the ₱14,230.50 came in and went to the office',
-  exists (select 1 from public.admin_money(private.today_ph() - 1, private.today_ph()) m where m.ref_id = (select b2 from t_ids) and m.kind = 'billpay_fee' and m.state = 'collected' and m.amount = 199 and m.invoice_no = 'INV-500')
+select pg_temp.res('money: the ₱499 fee is ours; the ₱14,230.50 came in and went to the office',
+  exists (select 1 from public.admin_money(private.today_ph() - 1, private.today_ph()) m where m.ref_id = (select b2 from t_ids) and m.kind = 'billpay_fee' and m.state = 'collected' and m.amount = 499 and m.invoice_no = 'INV-500')
   and exists (select 1 from public.admin_money(private.today_ph() - 1, private.today_ph()) m where m.ref_id = (select b2 from t_ids) and m.kind = 'gov_fees_in' and m.state = 'held' and m.amount = 14230.50)
   and exists (select 1 from public.admin_money(private.today_ph() - 1, private.today_ph()) m where m.ref_id = (select b2 from t_ids) and m.kind = 'gov_fees_out' and m.amount = -14230.50), '');
 select public.admin_set_invoice_no('gbill', b2, 'INV-501') from t_ids;

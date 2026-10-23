@@ -2134,3 +2134,19 @@ a.pk-tag:hover { filter: brightness(.96); text-decoration: underline; }
 .city-banner a { color: inherit; }
 .city-counts { columns: 2 260px; column-gap: 24px; }
 .city-counts .hol-row { break-inside: avoid; }
+
+/* "Let PermitPal pay it" */
+.bill-offer { border: 2px solid var(--brand); border-radius: 14px; padding: 14px 16px; margin: 6px 0 12px; background: var(--accent-soft); }
+.bill-offer.compact { padding: 10px 12px; }
+.bill-offer-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 6px; }
+.bill-offer-top b { font-size: 17px; color: var(--heading); }
+.bill-offer-tag { display: inline-block; font-style: normal; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; background: var(--heading); color: #fff; }
+.bill-offer-list { list-style: none; padding: 0; margin: 4px 0 8px; }
+.bill-offer-list li { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; }
+.bill-offer-list svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; stroke: var(--s-ok); fill: none; stroke-width: 2.6; }
+.bill-offer-math { margin: 0 0 10px; font-weight: 650; color: var(--heading); }
+.bill-offer .btn { margin-bottom: 6px; max-width: 100%; white-space: normal; text-align: center; }
+.bill-nudge { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; font-size: 14px; color: var(--muted); }
+.bill-modes .bill-mode-pp { border: 2px solid var(--brand); border-radius: 12px; padding: 10px 12px; background: var(--accent-soft); }
+.bill-modes .bill-mode-pp.is-off { border-color: var(--border); background: transparent; }
+.bill-modes .bill-mode-pp em { margin-left: 4px; }
