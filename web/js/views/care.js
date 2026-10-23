@@ -314,7 +314,7 @@ function introAuto() {
       <details><summary>Who pays penalties?</summary><p>You do: deadlines, surcharges and penalties stay yours. We start two months early so you have time, but we don't pay or refund penalties.</p></details>
     </section>
     <p class="muted small fineprint">Each renewal is quoted at our usual fixed price (shown above) plus government fees at cost, and nothing is filed until you approve it. ${(ab || av)?.name || 'The All-in plan'} includes our fee for the yearly permits listed on each plan; cancel anytime and it runs to the end of what you've paid, with no refund for the rest of that period.
-      <a href="terms.html#care" target="_blank" rel="noopener">Year-round care terms</a></p>`;
+      <a href="terms.html#services" target="_blank" rel="noopener">Year-round care terms</a></p>`;
 }
 
 function coveredDetails() {
@@ -326,7 +326,7 @@ function coveredDetails() {
 }
 
 const fineprint = () => html`<p class="muted small fineprint">Care covers our service fee for the yearly permits listed on each plan. Government fees, premiums and penalties are paid at cost with official receipts. Cancel anytime: the plan runs to the end of what you've paid, with no refund for the rest of that period.
-  <a href="terms.html#care" target="_blank" rel="noopener">Year-round care terms</a></p>`;
+  <a href="terms.html#services" target="_blank" rel="noopener">Year-round care terms</a></p>`;
 
 // The next renewal care will start on its own, across all plans.
 function nextStart(plans) {
@@ -531,7 +531,7 @@ export function careStart(el, params) {
       <section class="card care-total" aria-live="polite"><div data-care-total></div>
         <label class="check consent"><input type="checkbox" name="consent" ${can ? '' : 'disabled'}>
           <span>I authorize Pinoy Permit to renew the permits of the chosen branches and vehicles for ${S.org.name} while the plan is active, and I'll sign an authorization letter.
-            Government fees are paid at cost with official receipts. <a href="terms.html#care" target="_blank" rel="noopener">Terms</a></span></label>
+            Government fees are paid at cost with official receipts. <a href="terms.html#services" target="_blank" rel="noopener">Terms</a></span></label>
         <p class="form-error" role="alert" hidden></p>
         <button class="btn btn-primary btn-block" ${can ? '' : 'disabled'}>Start</button>
       </section>

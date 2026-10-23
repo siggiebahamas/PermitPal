@@ -2244,6 +2244,10 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   const privacy = await (await req.get('http://localhost:4173/privacy.html')).text();
   check('terms: no on-time guarantee, no surcharge payouts, no "free if late"', !/on-time guarantee|we pay the surcharge|we pay back the late penalty|it's free: what you paid/i.test(terms)
     && /Penalties stay yours/.test(terms) && /Surcharges stay yours/.test(terms) && /we make no guarantees/.test(terms));
+  check('terms: names who runs it (name and city, no street address) and is dated', /run by Sigmund Ty, based in Manila, Philippines/.test(terms) && /Last updated: October 29, 2026/.test(terms)
+    && /run by Sigmund Ty in Manila/.test(privacy) && !/Street|Brgy\.|Barangay [A-Z]\w+ ,/.test(terms.match(/Who runs Pinoy Permit[\s\S]*?<\/p>/)[0]));
+  check('terms: no Year-round care section, load paid back within 5 business days', !/Year-round care/.test(terms) && !/id="care"/.test(terms) && /within 5 business days/.test(terms));
+  check('terms: bill money is held for the bill, and the refund is all we owe', /never kept/.test(terms) && /That refund is all we owe you/.test(terms) && /Money you send us to pay a city bill or a government fee is not a fee/.test(terms));
   check('terms and privacy: no card checkout or PayMongo', !/online checkout|PayMongo/i.test(terms + privacy));
   const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
   await page.addInitScript(() => { globalThis.PP_KIND = 'fleet'; });
