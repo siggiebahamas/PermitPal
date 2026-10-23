@@ -1,4 +1,4 @@
-// The renewal packet on a business permit's page. PermitPal fills in what it already knows (the business, the branch,
+// The renewal packet on a business permit's page. Pinoy Permit fills in what it already knows (the business, the branch,
 // last year's permit and answers, the files on record) and asks only what's missing or new, one question at a time:
 // last year's sales, how many people work there, whether anything changed, and any detail it doesn't have yet.
 // Then the packet is ready: a checklist, the application details in the order of the city's form, a sworn declaration
@@ -63,7 +63,7 @@ export function packetCard(r, packets = []) {
       <div class="card-head"><div><h2>Your ${c.year} renewal packet</h2>
         <p class="muted small">The papers for renewing this business permit, filled in for you.</p></div>
         <span class="pk-tag">${steps.length ? `${plural(steps.length, 'question')} left` : 'Almost ready'}</span></div>
-      <p>PermitPal already has <b>${filled} of ${total}</b> details from your records${c.prev ? " and last year's packet" : ''}.
+      <p>Pinoy Permit already has <b>${filled} of ${total}</b> details from your records${c.prev ? " and last year's packet" : ''}.
         ${steps.length ? `Answer ${steps.length === 1 ? 'one quick question' : `${steps.length} quick questions`} and the packet builds itself` : 'Everything is answered. Build it now'}: the application details,
         a sworn declaration of ${c.year - 1} sales, and copies of your files.</p>
       <div class="pk-progress" role="img" aria-label="${filled} of ${total} details filled in"><span style="width:${pct}%"></span></div>
@@ -158,7 +158,7 @@ function stepBody(step, i) {
   const miss = new Set(all ? ['tin', 'address', 'owner_name', 'line', 'reg_no', 'phone', 'area_sqm', 'place', 'lessor'] : missingDetails(c.known, a));
   const ask = (k) => miss.has(k);
   const regLabel = c.b.structure === 'Corporation' || c.b.structure === 'Partnership' ? 'SEC registration no.' : c.b.structure === 'Cooperative' ? 'CDA registration no.' : 'DTI business name no.';
-  return html`${back}<p class="pk-lead">${all ? 'Everything the city\'s form asks for. Change what\'s different.' : 'A few details PermitPal doesn\'t have yet. You only type them once.'}</p>
+  return html`${back}<p class="pk-lead">${all ? 'Everything the city\'s form asks for. Change what\'s different.' : 'A few details Pinoy Permit doesn\'t have yet. You only type them once.'}</p>
     <div class="grid2">
       ${when(ask('owner_name'), html`<label class="field"><span>Owner's full name${c.b.structure === 'Corporation' ? ' (or president)' : ''}</span><input name="owner_name" maxlength="120" required value="${c.known.owner_name}"></label>`)}
       ${when(all, html`<label class="field"><span>Position</span><input name="owner_title" maxlength="80" value="${a.owner_title || TITLE[c.b.structure] || 'Owner'}"></label>`)}
@@ -343,7 +343,7 @@ function packetPages(c) {
         <li>Authorization letter, only if someone else files for you.</li>
         <li>The list of copies from your files.</li></ol>
       ${when(c.a.changed === 'yes', html`<p class="note"><b>You said something changed:</b> ${c.a.changes || ''}. Ask the office if it needs an amendment before you file.</p>`)}
-      <p class="foot">Prepared with PermitPal on ${today}. A general guide: the city may ask for more or less, and its own forms come first.</p>
+      <p class="foot">Prepared with Pinoy Permit on ${today}. A general guide: the city may ask for more or less, and its own forms come first.</p>
     </section>
     <section class="pk-page">
       <h1>Application details</h1>
@@ -377,9 +377,9 @@ function packetPages(c) {
     </section>
     <section class="pk-page">
       <h1>Copies from your files</h1>
-      ${copies.length ? html`<table><tr><th>Document</th><td><b>On file in PermitPal</b></td></tr>${copies.map((x) => html`<tr><th>${shortName(x)}${x.reference_no ? ` (${x.reference_no})` : ''}</th>
+      ${copies.length ? html`<table><tr><th>Document</th><td><b>On file in Pinoy Permit</b></td></tr>${copies.map((x) => html`<tr><th>${shortName(x)}${x.reference_no ? ` (${x.reference_no})` : ''}</th>
         <td>${x.document_count ? `${plural(x.document_count, 'copy', 'copies')}${x.expires_on ? `, valid until ${fmtDate(x.expires_on)}` : ''}` : 'No copy uploaded yet'}</td></tr>`)}</table>`
-        : html`<p>No permits with copies yet. Upload them in PermitPal and download the packet again.</p>`}
+        : html`<p>No permits with copies yet. Upload them in Pinoy Permit and download the packet again.</p>`}
       <p class="note">The .zip download has these copies next to this packet. Print the ones the city asks for.</p>
     </section>
   </div>`;
@@ -434,7 +434,7 @@ on('packet-copy', (ds) => {
   const parts = partsOf(c);
   openModal('Copy into the city\'s online form', html`
     <p class="muted small">Tap Copy, then paste it into the matching box on the city's site (for example QC E-Services). You submit and pay on the city's site yourself;
-      PermitPal can't sign in or pay there for you.</p>
+      Pinoy Permit can't sign in or pay there for you.</p>
     ${parts.map((p) => html`<h4 class="copy-part">${p.part}</h4><div class="copy-list">
       ${p.rows.filter((row) => String(row[1] ?? '').trim()).map(([k, v]) => html`<div class="copy-row"><div><small>${k}</small><b>${v}</b></div>
         <button type="button" class="btn btn-sm btn-soft" data-copy="${v}" aria-label="Copy ${k}">Copy</button></div>`)}</div>`)}`, {

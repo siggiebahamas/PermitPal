@@ -67,13 +67,13 @@ function page({ up, rel, title, desc, body, here }) {
 <body class="rn-body">
 <a class="skip-link" href="#main">Skip to the guide</a>
 <div class="lp-wrap rn-wrap">
-<header class="lp-top"><a class="brand" href="${up}"><img src="${up}img/logo.png" alt="" width="34" height="34"><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
+<header class="lp-top"><a class="brand" href="${up}"><img src="${up}img/logo.png" alt="" width="34" height="34"><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span></a>
   <div class="spacer"></div>
   <a class="btn btn-ghost btn-sm" href="${up}renew/"${here === 'index' ? ' aria-current="page"' : ''}>Guides</a><a class="btn btn-ghost btn-sm lp-nav" href="${up}#/login">Sign in</a><a class="btn btn-primary btn-sm" href="${up}#/signup">Start free</a></header>
 <main id="main" class="rn" tabindex="-1">
 ${body}
 </main>
-<footer class="lp-foot"><span>© PermitPal</span><a href="${up}renew/">Renewal guides</a><a href="${up}#/pricing">Prices</a><a href="${up}privacy.html">Privacy</a><a href="${up}terms.html">Terms</a><a href="${up}#/contact">Contact</a></footer>
+<footer class="lp-foot"><span>© Pinoy Permit</span><a href="${up}renew/">Renewal guides</a><a href="${up}#/pricing">Prices</a><a href="${up}privacy.html">Privacy</a><a href="${up}terms.html">Terms</a><a href="${up}#/contact">Contact</a></footer>
 </div>
 </body>
 </html>
@@ -120,7 +120,7 @@ const calendarCta = (file, label) => `<a class="btn btn-soft" href="${file}" dow
 
 const ctaSection = (city) => `<section class="card rn-cta" aria-labelledby="cta">
   <div><h2 id="cta">Get reminded before it's due, free</h2>
-  <p>PermitPal keeps your Mayor's Permit, barangay clearance, fire safety certificate and the rest in one place${city ? ` for your ${esc(city.name)} business` : ''}, and emails you before each one expires. Free for one business.</p></div>
+  <p>Pinoy Permit keeps your Mayor's Permit, barangay clearance, fire safety certificate and the rest in one place${city ? ` for your ${esc(city.name)} business` : ''}, and emails you before each one expires. Free for one business.</p></div>
   <a class="btn btn-primary btn-lg" href="${city ? '../../' : '../'}#/signup">Start free</a>
 </section>`;
 
@@ -130,7 +130,7 @@ const finePrint = (up) => `<p class="rn-fine muted small">Last checked ${longDat
 function ics(city) {
   const where = city ? city.name : 'your city';
   const lines = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//PermitPal//Renewal guide//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Pinoy Permit//Renewal guide//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     `X-WR-CALNAME:Business permit renewal ${YEAR}${city ? ' · ' + city.name : ''}`,
   ];
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
@@ -213,7 +213,7 @@ ${ctaSection(city)}
 ${finePrint('../../')}`;
   write(`renew/${city.slug}/index.html`, page({
     up: '../../', rel: `renew/${city.slug}/`,
-    title: `Business permit renewal ${YEAR} in ${city.name}: checklist and deadline · PermitPal`,
+    title: `Business permit renewal ${YEAR} in ${city.name}: checklist and deadline · Pinoy Permit`,
     desc: `How to renew your Mayor's Permit in ${city.name} for ${YEAR}: what to prepare, the deadline, late penalties, and the city's official links.`,
     body,
   }));
@@ -263,7 +263,7 @@ ${ctaSection(null)}
 ${finePrint('../')}`;
   write('renew/index.html', page({
     up: '../', rel: 'renew/', here: 'index',
-    title: `Business permit renewal ${YEAR}: checklists by city · PermitPal`,
+    title: `Business permit renewal ${YEAR}: checklists by city · Pinoy Permit`,
     desc: `Free checklists for renewing your Mayor's Permit in ${YEAR}, city by city: what to prepare, the January 20 deadline, late penalties, and official links.`,
     body,
   }));

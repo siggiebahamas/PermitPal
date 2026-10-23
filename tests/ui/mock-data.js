@@ -239,7 +239,7 @@ export async function uploadDocument({ requirementId, cycleId, file }) {
 }
 // Demo files: a real one-page PDF (or a picture for image files) so View, Download and the inspection pack work.
 function samplePdf(title) {
-  const text = `BT /F1 22 Tf 72 720 Td (${title.replace(/[()\\]/g, '')}) Tj 0 -34 Td /F1 13 Tf (PermitPal demo - sample document, nothing real is stored.) Tj ET`;
+  const text = `BT /F1 22 Tf 72 720 Td (${title.replace(/[()\\]/g, '')}) Tj 0 -34 Td /F1 13 Tf (Pinoy Permit demo - sample document, nothing real is stored.) Tj ET`;
   const objs = ['<</Type/Catalog/Pages 2 0 R>>', '<</Type/Pages/Kids[3 0 R]/Count 1>>',
     '<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>',
     `<</Length ${text.length}>>stream\n${text}\nendstream`, '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>'];
@@ -254,7 +254,7 @@ async function sampleImage(title) {
   const c = document.createElement('canvas'); c.width = 900; c.height = 560;
   const g = c.getContext('2d'); g.fillStyle = '#FFFEF9'; g.fillRect(0, 0, 900, 560); g.strokeStyle = '#1F2A44'; g.lineWidth = 6; g.strokeRect(20, 20, 860, 520);
   g.fillStyle = '#1F2A44'; g.font = 'bold 40px sans-serif'; g.fillText(title.slice(0, 34), 60, 140);
-  g.font = '24px sans-serif'; g.fillStyle = '#4B5568'; g.fillText('PermitPal demo - sample document', 60, 200);
+  g.font = '24px sans-serif'; g.fillStyle = '#4B5568'; g.fillText('Pinoy Permit demo - sample document', 60, 200);
   return new Promise((res) => c.toBlob(res, 'image/png'));
 }
 export async function fileBlob(path) {
@@ -274,7 +274,7 @@ export const markRead = async (ids) => ids.forEach((id) => { const n = db.notifi
 export const markAllRead = async () => db.notifications.forEach((n) => { n.read_at = 'now'; });
 export const deleteNotification = async (id) => { db.notifications = db.notifications.filter((n) => n.id !== id); };
 export const clearNotifications = async () => { db.notifications = []; };
-export const myDeliveryLog = async () => [{ id: 1, channel: 'email', subject: 'PermitPal: 2 items need attention', body_text: '', status: 'sent', created_at: new Date().toISOString() }];
+export const myDeliveryLog = async () => [{ id: 1, channel: 'email', subject: 'Pinoy Permit: 2 items need attention', body_text: '', status: 'sent', created_at: new Date().toISOString() }];
 export const history = async (orgId, { before = null, entities = null, limit = 50 } = {}) => db.audit
   .filter((a) => (!entities || entities.includes(a.entity)) && (!before || a.id < before))
   .sort((a, b) => b.id - a.id).slice(0, limit);
@@ -339,11 +339,11 @@ const now = () => new Date().toISOString();
 function event(a, kind, message, byStaff = false, file = null) {
   db.events.push({ id: ++seq, request_id: a.id, org_id: a.org_id, by_staff: byStaff, kind, message, file_path: file, file_name: file, created_at: now() });
 }
-const settings = { gcash_name: 'PermitPal Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'PermitPal Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '', billpay_fee: '499', billpay_max: '50000', billpay_open: 'on' };
+const settings = { gcash_name: 'Pinoy Permit Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'Pinoy Permit Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '', billpay_fee: '499', billpay_max: '50000', billpay_open: 'on' };
 export const listServices = async () => SERVICES;
 export async function requestService(f) {
   // Same rules as the database: authorization ticked, one open request per permit, no flooding.
-  if (!f.consent) throw new Error('Please tick the box to confirm PermitPal may act for you on this request.');
+  if (!f.consent) throw new Error('Please tick the box to confirm Pinoy Permit may act for you on this request.');
   if (f.requirement_id && db.requests.some((a) => a.requirement_id === f.requirement_id && !['completed', 'cancelled'].includes(a.status))) {
     throw new Error('You already have an open request for this requirement.');
   }
@@ -373,7 +373,7 @@ export const orderEvents = async (id) => db.events.filter((e) => e.request_id ==
 export async function acceptQuote(id, access = false) {
   const a = db.requests.find((x) => x.id === id);
   if (a.status !== 'quoted') throw new Error('There is no quote to accept.');
-  if (SERVICES.find((x) => x.code === a.service_code)?.needs_access && !access) throw new Error('Tick the box to give PermitPal temporary access, so we can set things up for you.');
+  if (SERVICES.find((x) => x.code === a.service_code)?.needs_access && !access) throw new Error('Tick the box to give Pinoy Permit temporary access, so we can set things up for you.');
   if (access) a.staff_access = true;
   Object.assign(a, { accepted_at: now(), payment_status: a.quote_php ? 'awaiting_payment' : 'waived', status: a.quote_php ? 'awaiting_customer' : 'in_progress' });
   event(a, 'accepted', 'Quote accepted');
@@ -512,7 +512,7 @@ export async function adminUpdateOrder(a0, { status, message, file, govActual, p
   const a = db.requests.find((x) => x.id === a0.id);
   if (status) a.status = status;
   if (['completed', 'cancelled'].includes(status)) {
-    // PermitPal's temporary access ends with the job
+    // Pinoy Permit's temporary access ends with the job
     for (const x of (db.staffAccess || []).filter((y) => y.request_id === a.id && !y.ended_at)) { x.ended_at = now(); db.members = db.members.filter((m) => m.user_id !== x.user_id); }
   }
   if (provider) a.provider_name = provider;
@@ -1035,7 +1035,7 @@ if (REV) {
   Object.assign(S_('adv_fire_preinspection'), { name: 'Pre-inspection walk-through (fire or sanitary)', visit: true, price_unit: 'per site visit', type_codes: ['fsic', 'sanitary_permit'],
     summary: 'We visit before the fire or sanitary inspector does and give you a written list of what to fix first, so you pass the first time.' });
   SERVICES.push({ code: 'setup_from_paper', name: 'Set up my account for me', category: 'package', active: true, sort: 200,
-    summary: "Send us photos or scans of your permits, registrations and OR/CRs. We enter everything into PermitPal with the right dates, attach each file, switch on your reminders, and list what's missing or about to expire.",
+    summary: "Send us photos or scans of your permits, registrations and OR/CRs. We enter everything into Pinoy Permit with the right dates, attach each file, switch on your reminders, and list what's missing or about to expire.",
     includes: ['Every permit entered with its dates and file', "What's missing or expiring, listed for you", 'Reminders checked and switched on', 'Temporary access that ends when we finish'],
     price_from: 1500, price_unit: 'up to 20 documents, then ₱50 each', turnaround: '2-5 working days', applies_to: 'any', type_codes: [], rush_fee: 1000, visit: false, needs_access: true,
     steps: ['Photos or scans received', 'Businesses, branches and vehicles added', 'Permits entered with dates and files', "What's missing or expiring, listed for you", 'Reminders checked and on'] });
@@ -1127,7 +1127,7 @@ export async function payCareInvoice(inv, { method, ref, file }) {
 }
 export async function fileGuaranteeClaim(orgId, { plan_id, requirement_id, penalty, note, file }) {
   const p = db.care.plans.find((x) => x.id === plan_id);
-  if (p || !p) throw new Error("PermitPal doesn't pay late penalties or surcharges.");
+  if (p || !p) throw new Error("Pinoy Permit doesn't pay late penalties or surcharges.");
   if (!(file && file.size)) throw new Error('Attach the official receipt that shows the penalty.');
   const r = statusRows().find((x) => x.id === requirement_id);
   if (!r?.expires_on || r.expires_on >= today()) throw new Error("This permit hasn't lapsed: there's no past expiry date on file for it.");
@@ -1137,7 +1137,7 @@ export async function fileGuaranteeClaim(orgId, { plan_id, requirement_id, penal
   return c.id;
 }
 export async function requestServicesBulk(f) {
-  if (!f.consent) throw new Error('Please tick the box to confirm PermitPal may act for you on these permits.');
+  if (!f.consent) throw new Error('Please tick the box to confirm Pinoy Permit may act for you on these permits.');
   if (!f.requirement_ids.length) throw new Error('Choose at least one permit.');
   if (f.requirement_ids.length > 25) throw new Error('Choose up to 25 permits at a time.');
   const batch = uid();
@@ -1166,11 +1166,11 @@ export async function adminOrderStep(id, done) {
 }
 export async function adminJoinWorkspace(id) {
   const a = db.requests.find((x) => x.id === id);
-  if (!a.staff_access) throw new Error("The customer hasn't given PermitPal access for this order.");
+  if (!a.staff_access) throw new Error("The customer hasn't given Pinoy Permit access for this order.");
   if (!['paid', 'waived'].includes(a.payment_status)) throw new Error('Wait until the order is paid, then join.');
   db.staffAccess.push({ user_id: 'u9', request_id: id, requirement_name: a.requirement_name, joined_at: now(), ended_at: null });
   if (!db.members.some((m) => m.user_id === 'u9')) db.members.push({ user_id: 'u9', role: 'member', profile: { first_name: 'Fe', last_name: 'Staff', email: 'fe@permitpal.ph' } });
-  event(a, 'status', 'PermitPal joined your workspace to do the set-up.', true);
+  event(a, 'status', 'Pinoy Permit joined your workspace to do the set-up.', true);
   return org.id;
 }
 
@@ -1316,7 +1316,7 @@ function moneyLines() {
   for (const c of db.credits.filter((x) => x.kind === 'topup')) L.push({ day: dayOf(c.created_at), stream: 'partners', kind: 'credit_topup', state: 'collected', amount: c.amount_php, label: 'Prepaid credit for quote requests',
     who: db.partners.find((p) => p.id === c.partner_id)?.name || 'Firm', ref_kind: 'credit', ref_id: c.id, invoice_no: c.bir_invoice_no || null, rush: 0 });
   for (const pm of db.planPayments) L.push({ day: dayOf(pm.paid_at), stream: 'plans', kind: 'team_plan', state: 'collected', amount: pm.amount_php, label: `${pm.plan_name} plan, ${pm.months} month${pm.months > 1 ? 's' : ''}`, who: pm.org_name, ref_kind: 'plan', ref_id: pm.id, invoice_no: pm.bir_invoice_no || null, rush: 0 });
-  // city bills PermitPal pays: the fee is ours; the bill is the customer's money passing through
+  // city bills Pinoy Permit pays: the fee is ours; the bill is the customer's money passing through
   for (const b of (globalThis.__officeBills || []).filter((x) => x.mode === 'permitpal')) {
     const base = { stream: 'jobs', who: org.name, ref_kind: 'gbill', ref_id: b.id, rush: 0 };
     if (b.received_at) {
@@ -1464,7 +1464,7 @@ if (REV && globalThis.PP_DEMO) {
 }
 
 
-// ---------------------------------------------------------------- PermitPal Plus and staff licenses
+// ---------------------------------------------------------------- Pinoy Permit Plus and staff licenses
 // The same rules as the database, in memory: prices, the free 3 people, bills, the public page, the check.
 const PLUS_ON = globalThis.PP_FEATURES !== 'none';
 const plusDb = { addons: [], invoices: [], roles: [], submissions: [], stopping: {}, pages: [], recipients: [], views: [], findings: [], runs: [], links: [] };
@@ -1474,7 +1474,7 @@ const plusIncludedMock = () => org.kind !== 'business' && ((org.trial_ends_at &&
 const hasPlusMock = () => active(addonMock('plus')) || plusIncludedMock();
 const peopleAllowedMock = () => Math.max(FREE_PEOPLE, active(addonMock('staff')) ? addonMock('staff').people_max : 0);
 function peopleCapMock() { const a = addonMock('staff'); return active(a) && a.next_people_max ? Math.min(peopleAllowedMock(), a.next_people_max) : peopleAllowedMock(); }
-const notPlus = (what) => Object.assign(new Error(`${what} comes with PermitPal Plus.`), { hint: 'plus', code: 'P0001' });
+const notPlus = (what) => Object.assign(new Error(`${what} comes with Pinoy Permit Plus.`), { hint: 'plus', code: 'P0001' });
 let ppa = 100;
 function plusData() {
   if (!PLUS_ON) return { addons: [], invoices: [], roles: [], submissions: [], stopping: {} };
@@ -1684,7 +1684,7 @@ export async function getTemplate(orgId, code) {
   return { code: t.code, title: t.title, body: t.body, fields: t.fields, notarize: t.notarize, version: t.version, use_when: t.use_when };
 }
 
-// staff (PermitPal): bills to confirm, giving time
+// staff (Pinoy Permit): bills to confirm, giving time
 export const adminAddonInvoices = async () => plusDb.invoices.map((i) => ({ ...i, orgs: { name: org.name } }));
 export const adminAddons = async () => plusDb.addons.map((a) => ({ ...a, orgs: { name: org.name } }));
 export async function adminConfirmAddonPayment(id, okPaid, note) {
@@ -1727,7 +1727,7 @@ if (PLUS_ON && (globalThis.PP_DEMO || globalThis.PP_PLUS)) {
 function daysAgoIso(d, h = 0) { return new Date(Date.now() - d * 864e5 - h * 3600e3).toISOString(); }
 
 // ---------------------------------------------------------------- White-label (accounting firms)
-// PP_BRAND shows a client workspace whose accountant has White-label on (logo, color, "Powered by PermitPal").
+// PP_BRAND shows a client workspace whose accountant has White-label on (logo, color, "Powered by Pinoy Permit").
 export const SAMPLE_BRAND = { firm_org: 'f1', name: 'Dela Cruz & Co.', color: '#0F5132', reply_to: 'hello@delacruz.ph', phone: '(02) 8123 4567',
   tagline: 'Tax, books & permits for small businesses', logo_url: 'img/logo.png' };
 const brandEligibleMock = () => org.kind === 'firm' && ((org.trial_ends_at && new Date(org.trial_ends_at) > new Date()) || org.plan_id === 'firm');
@@ -1766,7 +1766,7 @@ export async function uploadBrandLogo(orgId, file) {
 export const removeBrandLogo = async () => {};
 export const brandLogoUrl = (path) => (path ? 'img/logo.png' : null);
 
-// ---------------------------------------------------------------- PermitPal load (the database's rules, in memory)
+// ---------------------------------------------------------------- Pinoy Permit load (the database's rules, in memory)
 const LOAD_ON = globalThis.PP_FEATURES !== 'none' && (!Array.isArray(globalThis.PP_FEATURES) || globalThis.PP_FEATURES.includes('load'));
 const loadDb = { wallet: { paid_php: 0, bonus_php: 0, texts: 0 }, entries: [], topups: [], unlocks: [], checks: [], files: [], passes: [], code: null, invites: [], invitedBy: null, outbox: [],
   products: [
@@ -1873,7 +1873,7 @@ export async function buySeasonPass() {
 export const templateUnlocks = async () => loadDb.unlocks.map((u) => ({ ...u }));
 export async function unlockTemplate(orgId, code) {
   needAdmin();
-  if (hasPlusMock()) throw loadErr('Your workspace has PermitPal Plus, so every template is already yours.');
+  if (hasPlusMock()) throw loadErr('Your workspace has Pinoy Permit Plus, so every template is already yours.');
   if (loadDb.unlocks.some((u) => u.code === code)) return;
   const t = TEMPLATES.find((x) => x.code === code);
   if (!product('template').active) throw loadErr("Templates can't be bought one by one right now.");
@@ -1985,7 +1985,7 @@ if (LOAD_ON && (globalThis.PP_DEMO || globalThis.PP_LOAD)) {
   loadDb.wallet = { paid_php: 302, bonus_php: 0, texts: 37 };
   loadDb.code = 'K7M2Q9XD';
   loadDb.invites.push({ joined_on: addDays(-30), status: 'rewarded', permits_with_dates: 3, my_reward: 'plus_month' }, { joined_on: addDays(-6), status: 'pending', permits_with_dates: 1, my_reward: null });
-  loadDb.entries.unshift({ id: ++lseq, org_id: org.id, kind: 'bonus', paid_php: 0, bonus_php: 0, texts: 0, item: 'invite', label: 'Thank you for inviting a business: a month of PermitPal Plus', ref_id: null, created_at: daysAgoIso(22) });
+  loadDb.entries.unshift({ id: ++lseq, org_id: org.id, kind: 'bonus', paid_php: 0, bonus_php: 0, texts: 0, item: 'invite', label: 'Thank you for inviting a business: a month of Pinoy Permit Plus', ref_id: null, created_at: daysAgoIso(22) });
 }
 
 
@@ -2062,11 +2062,11 @@ export const bills = async (reqId) => office.bills.filter((b) => b.requirement_i
 export async function billAdd(orgId, reqId, v, file) {
   if (!BILLS_ON) throw offErr('City bills are not switched on yet.');
   const r = reqFor(reqId);
-  if (v.mode === 'permitpal' && !isAdminRole()) throw offErr('Only the workspace owner or an admin can have PermitPal pay a bill.', '42501');
-  if (v.mode === 'permitpal' && settings.billpay_open !== 'on') throw offErr("PermitPal isn't paying bills for customers right now. Keep the bill here and pay it yourself.");
+  if (v.mode === 'permitpal' && !isAdminRole()) throw offErr('Only the workspace owner or an admin can have Pinoy Permit pay a bill.', '42501');
+  if (v.mode === 'permitpal' && settings.billpay_open !== 'on') throw offErr("Pinoy Permit isn't paying bills for customers right now. Keep the bill here and pay it yourself.");
   if (String(v.office || '').trim().length < 2) throw offErr('Which office sent the bill?');
   if (!(v.amount > 0)) throw offErr('Enter the amount on the bill.');
-  if (v.mode === 'permitpal' && v.amount > Number(settings.billpay_max)) throw offErr(`PermitPal pays bills up to ${pesoB(settings.billpay_max)}. For this one, pay the office directly and keep the receipt here.`);
+  if (v.mode === 'permitpal' && v.amount > Number(settings.billpay_max)) throw offErr(`Pinoy Permit pays bills up to ${pesoB(settings.billpay_max)}. For this one, pay the office directly and keep the receipt here.`);
   if (v.mode === 'permitpal' && !(file && file.size)) throw offErr('Add a photo of the bill, so we pay exactly what it says.');
   if (office.bills.some((b) => b.requirement_id === r.id && b.amount_php === v.amount && ['due', 'pending_verification', 'processing'].includes(b.status) && (b.bill_ref || '') === (v.bill_ref || ''))) throw offErr('This bill is already here.');
   const b = { id: uid(), number: `G-${today().slice(0, 4)}-${String(++office.seq).padStart(5, '0')}`, org_id: org.id, requirement_id: r.id, label: reqLabel(r),
@@ -2075,7 +2075,7 @@ export async function billAdd(orgId, reqId, v, file) {
     reported_at: null, received_at: null, pay_deadline: null, paid_at: null, or_no: null, or_date: null, or_path: null, or_name: null, document_id: null, refunded_at: null, refund_note: null,
     bir_invoice_no: null, note: null, created_at: new Date().toISOString() };
   office.bills.push(b);
-  log(`Added a bill from ${b.office} for ${pesoB(b.amount_php)}${b.mode === 'permitpal' ? ', for PermitPal to pay.' : '.'}`, { entity: 'gov_bill', action: 'bill_add', ...ids(r) });
+  log(`Added a bill from ${b.office} for ${pesoB(b.amount_php)}${b.mode === 'permitpal' ? ', for Pinoy Permit to pay.' : '.'}`, { entity: 'gov_bill', action: 'bill_add', ...ids(r) });
   return b.id;
 }
 export async function billReport(b0, { method, ref, file }) {
@@ -2097,7 +2097,7 @@ function fileReceipt(b) {
 }
 export async function billPaidSelf(b0, { or_no, or_date, file }) {
   const b = office.bills.find((x) => x.id === b0.id);
-  if (b.mode !== 'self') throw offErr('PermitPal is paying this one, and adds the receipt itself.');
+  if (b.mode !== 'self') throw offErr('Pinoy Permit is paying this one, and adds the receipt itself.');
   if (b.status !== 'due') throw offErr('This bill is already marked paid.');
   if (!or_no && !(file && file.size)) throw offErr('Add the official receipt number or a photo of it.');
   if (!or_date || or_date > today()) throw offErr('Enter the date on the receipt.');
@@ -2293,7 +2293,7 @@ export async function adminCityDeadline(v) {
   const hit = cityPermits(key).filter((x) => x.c?.expires_on && x.c.expires_on >= `${y}-01-01` && x.c.expires_on < d.due_on);
   if (hit.length) {
     db.notifications.unshift({ id: uid(), user_id: user.id, org_id: org.id, kind: 'system', title: `${d.city_name} extended the business permit deadline to ${new Date(d.due_on + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}`,
-      body: hit.length === 1 ? 'Your business permit there is still due earlier in PermitPal. Open it and tap "Use the new date".' : `${hit.length} of your business permits there are still due earlier in PermitPal. Open PermitPal and tap "Use the new date".`,
+      body: hit.length === 1 ? 'Your business permit there is still due earlier in Pinoy Permit. Open it and tap "Use the new date".' : `${hit.length} of your business permits there are still due earlier in Pinoy Permit. Open Pinoy Permit and tap "Use the new date".`,
       link: hit.length === 1 ? `#/requirement/${hit[0].r.id}?city=1` : '#/?city=1', requirement_id: hit.length === 1 ? hit[0].r.id : null, read_at: null, created_at: new Date().toISOString() });
   }
   d.notified = hit.length || moved ? 1 : 0;

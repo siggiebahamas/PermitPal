@@ -54,7 +54,7 @@ begin
   begin insert into public.compliance_shares (org_id, scope, label, show_refs, expires_at) values (o1, 'org', 'For the bank', true, now() + interval '30 days') returning token into stok; perform pg_temp.res('create a share link', stok is not null, ''); exception when others then perform pg_temp.res('create a share link', false, sqlerrm); end;
   begin insert into public.org_invites (org_id, email, role) values (o1, 'teammate@example.org', 'member'); get diagnostics n = row_count; perform pg_temp.res('invite a teammate', n = 1, ''); exception when others then perform pg_temp.res('invite a teammate', false, sqlerrm); end;
   begin perform public.request_plan(o1, 'fleet', 'sweep test'); perform pg_temp.res('choose a plan ("I have paid")', true, ''); exception when others then perform pg_temp.res('choose a plan ("I have paid")', false, sqlerrm); end;
-  begin perform public.contact_support('question', 'Sweep test message', null, null, o1); perform pg_temp.res('Contact PermitPal (signed in)', true, ''); exception when others then perform pg_temp.res('Contact PermitPal (signed in)', false, sqlerrm); end;
+  begin perform public.contact_support('question', 'Sweep test message', null, null, o1); perform pg_temp.res('Contact Pinoy Permit (signed in)', true, ''); exception when others then perform pg_temp.res('Contact Pinoy Permit (signed in)', false, sqlerrm); end;
   begin select count(*) into n from public.list_professionals(); perform pg_temp.res('Find a professional loads', true, n || ' listed'); exception when others then perform pg_temp.res('Find a professional loads', false, sqlerrm); end;
   begin perform public.request_org_deletion(o1); perform public.cancel_org_deletion(o1); perform pg_temp.res('delete workspace, then undo', true, ''); exception when others then perform pg_temp.res('delete workspace, then undo', false, sqlerrm); end;
   begin update public.orgs set name = 'Sweep Test Company' where id = o1; get diagnostics n = row_count; perform pg_temp.res('rename workspace', n = 1, ''); exception when others then perform pg_temp.res('rename workspace', false, sqlerrm); end;
@@ -66,7 +66,7 @@ begin
   begin j := public.get_shared_compliance(stok); perform pg_temp.res('share link opens for a visitor', j->>'org_name' is not null and jsonb_array_length(j->'items') > 0, coalesce(j->>'error', j->>'org_name')); exception when others then perform pg_temp.res('share link opens for a visitor', false, sqlerrm); end;
   begin j := public.get_shared_compliance('nope-this-is-not-a-real-token'); perform pg_temp.res('bad share link shows a message', j ? 'error', j::text); exception when others then perform pg_temp.res('bad share link shows a message', false, sqlerrm); end;
   begin select count(*) into n from public.businesses; perform pg_temp.res('visitor cannot read businesses', n = 0, n::text); exception when others then perform pg_temp.res('visitor cannot read businesses', true, 'blocked: ' || sqlerrm); end;
-  begin perform public.contact_support('privacy', 'Please delete my data', 'Visitor', 'visitor@example.org', null); perform pg_temp.res('Contact PermitPal (no account)', true, ''); exception when others then perform pg_temp.res('Contact PermitPal (no account)', false, sqlerrm); end;
+  begin perform public.contact_support('privacy', 'Please delete my data', 'Visitor', 'visitor@example.org', null); perform pg_temp.res('Contact Pinoy Permit (no account)', true, ''); exception when others then perform pg_temp.res('Contact Pinoy Permit (no account)', false, sqlerrm); end;
 
 end $$;
 reset role;

@@ -25,9 +25,9 @@ update private.settings set value = '{}' where key = 'channel_status';
 delete from public.message_outbox;
 
 select pg_temp.res('both feature switches are on', exists (select 1 from private.features where name = 'packet') and exists (select 1 from private.features where name = 'citydates'), '');
-select pg_temp.res('paying a city bill through PermitPal costs ₱499', private.app_setting('billpay_fee') = '499', private.app_setting('billpay_fee'));
+select pg_temp.res('paying a city bill through Pinoy Permit costs ₱499', private.app_setting('billpay_fee') = '499', private.app_setting('billpay_fee'));
 select pg_temp.res('no care plan includes a guarantee any more', not exists (select 1 from public.care_tiers where guarantee or guarantee_cap_php > 0 or array_to_string(includes, ' ') ~* 'guarantee'), '');
-select pg_temp.res('guarantee claims are refused', pg_temp.err('select public.file_guarantee_claim(gen_random_uuid(), gen_random_uuid(), 1000, null, ''x'')') = 'PermitPal doesn''t pay late penalties or surcharges.', '');
+select pg_temp.res('guarantee claims are refused', pg_temp.err('select public.file_guarantee_claim(gen_random_uuid(), gen_random_uuid(), 1000, null, ''x'')') = 'Pinoy Permit doesn''t pay late penalties or surcharges.', '');
 select pg_temp.res('a late papers check is not refunded by the daily job', position('papers_refund' in pg_get_functiondef('private.load_daily()'::regprocedure)) = 0, '');
 
 -- ---------------------------------------------------------------- set-up: two branches in Manila, one in QC; another business in Manila

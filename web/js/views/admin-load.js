@@ -170,4 +170,4 @@ on('adm-load-cashout', async () => {
     onSubmit: async (fd) => { await db.adminLoadCashout(fd.get('org'), Number(fd.get('amount')), fd.get('method'), String(fd.get('ref') || '').trim(), String(fd.get('note') || '').trim()); toast('Recorded.'); rerender(); },
   });
 });
-export const loadTabEmpty = () => empty('Not available yet', 'PermitPal load switches on with database file 9.');
+export const loadTabEmpty = () => empty('Not available yet', 'Pinoy Permit load switches on with database file 9.');

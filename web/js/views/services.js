@@ -1,4 +1,4 @@
-// Done for you: PermitPal renews (or applies for) a permit on the customer's behalf. The catalog,
+// Done for you: Pinoy Permit renews (or applies for) a permit on the customer's behalf. The catalog,
 // asking for a quote, and following an order from quote to payment to the finished permit, which
 // staff save straight to the customer's account. Guard rails, because this is money and the law:
 // an exact quote before anything starts, written authorization, government fees at cost with
@@ -43,7 +43,7 @@ const PROMISES = [
   ['Saved for you', 'When it\'s done, the new permit is saved to your account and your reminders reset.'],
   ['Money back if we can\'t deliver', 'If we can\'t get it done, you get the service fee back in full. If government fees come in lower than quoted, we refund the difference.'],
 ];
-const FINE_PRINT = 'PermitPal acts as your authorized representative, only with your written authorization, and follows each office\'s standard process. We never pay anyone to speed things up: that is against the law (RA 11032). Processing times are set by the government office.';
+const FINE_PRINT = 'Pinoy Permit acts as your authorized representative, only with your written authorization, and follows each office\'s standard process. We never pay anyone to speed things up: that is against the law (RA 11032). Processing times are set by the government office.';
 let settingsCache = null;
 const settings = async () => (settingsCache ||= await db.appSettings().catch(() => ({})));
 export const paySettings = settings;
@@ -63,9 +63,9 @@ export const renewable = () => S.data.reqs.filter((r) => r.subject !== 'person' 
 export function payDetails(st) {
   const gcash = st.gcash_number ? html`<div class="paywith"><b>GCash</b><span>${st.gcash_number}${st.gcash_name ? ' · ' + st.gcash_name : ''}</span></div>` : '';
   const bank = st.bank_account_number ? html`<div class="paywith"><b>${st.bank_name || 'Bank transfer'}</b><span>${st.bank_account_number}${st.bank_account_name ? ' · ' + st.bank_account_name : ''}</span></div>` : '';
-  return html`${gcash || bank ? html`<div class="paywiths">${gcash}${bank}</div>` : html`<p class="muted">PermitPal will send you the payment details. Then enter the reference below.</p>`}
+  return html`${gcash || bank ? html`<div class="paywiths">${gcash}${bank}</div>` : html`<p class="muted">Pinoy Permit will send you the payment details. Then enter the reference below.</p>`}
     ${when(st.payment_note, html`<p class="muted small">${st.payment_note}</p>`)}
-    <p class="muted small">Only pay to the accounts shown here. PermitPal staff will never ask you to pay a personal account by text or chat.</p>`;
+    <p class="muted small">Only pay to the accounts shown here. Pinoy Permit staff will never ask you to pay a personal account by text or chat.</p>`;
 }
 
 // ---------------------------------------------------------------- catalog + my requests
@@ -173,7 +173,7 @@ export function openRequest(code, { requirementId } = {}) {
   const optional = s.applies_to === 'any' && s.category !== 'renewal';
   if (t.kind === 'requirement' && !t.list.length) {
     const handled = requirementId && reqById(requirementId)?.open_request_id;
-    return toast(handled ? 'PermitPal is already handling this permit. Open its request to follow it.'
+    return toast(handled ? 'Pinoy Permit is already handling this permit. Open its request to follow it.'
       : s.type_codes.length ? 'You have no permit of this kind yet, or it already has an open request. Add the permit first.' : 'Add a business or vehicle first.', 'error');
   }
   if (t.kind === 'subject' && !t.list.length && !optional) return toast(`Add a ${s.applies_to} first, then ask for this service.`, 'error');
@@ -191,15 +191,15 @@ export function openRequest(code, { requirementId } = {}) {
       <fieldset class="field kind-pick"><legend>What do you need?</legend>
         <label class="check"><input type="radio" name="kind" value="renew" ${firstTime(start) ? '' : 'checked'}><span>Renew it <small class="muted">(we have it already)</small></span></label>
         <label class="check"><input type="radio" name="kind" value="apply" ${firstTime(start) ? 'checked' : ''}><span>Get it for the first time <small class="muted">(we don't have it yet)</small></span></label></fieldset>`
-    : html`<label class="field"><span>For</span><select name="target">${optional ? html`<option value="">A new business (not in PermitPal yet)</option>` : ''}
+    : html`<label class="field"><span>For</span><select name="target">${optional ? html`<option value="">A new business (not in Pinoy Permit yet)</option>` : ''}
         ${t.list.map(([v, l]) => html`<option value="${v}">${l}</option>`)}</select></label>`;
   openModal(s.name, html`
     <div class="quote-hint"><b>${price(s)}</b> <span class="muted">${s.price_unit}</span>${s.turnaround ? html`<span class="muted"> · usually ${s.turnaround}</span>` : ''}</div>
     <p class="muted small">You'll get an exact quote within 1 business day. Nothing starts and nothing is charged until you accept it.</p>
     ${pick}
     ${when(s.category === 'renewal', html`<label class="field"><span>Do you have the documents?</span><select name="docs_status">
-      <option value="have">Yes, they're uploaded in PermitPal</option><option value="need">No, I still need them</option><option value="not_sure" selected>Not sure what's needed</option></select></label>`)}
-    ${when(s.needs_access && has('revenue'), html`<p class="banner info small"><span>To do this, PermitPal joins your workspace as a team member until the job is done. You'll be asked to OK that with the quote, and you can remove it anytime under Team.</span></p>`)}
+      <option value="have">Yes, they're uploaded in Pinoy Permit</option><option value="need">No, I still need them</option><option value="not_sure" selected>Not sure what's needed</option></select></label>`)}
+    ${when(s.needs_access && has('revenue'), html`<p class="banner info small"><span>To do this, Pinoy Permit joins your workspace as a team member until the job is done. You'll be asked to OK that with the quote, and you can remove it anytime under Team.</span></p>`)}
     ${when(!(s.visit && has('revenue')), html`<label class="check"><input type="checkbox" name="rush"><span>It's urgent <small class="muted">(${rushText(s)})</small></span></label>`)}
     <div class="grid2">
       <label class="field"><span>Best way to reach you</span><select name="contact_method">
@@ -209,7 +209,7 @@ export function openRequest(code, { requirementId } = {}) {
     <label class="field"><span>Anything we should know? <small>(optional)</small></span>
       <textarea name="notes" rows="3" maxlength="2000" placeholder="e.g. Please finish before Jan 20. The barangay clearance is already done."></textarea></label>
     <label class="check consent"><input type="checkbox" name="consent" required>
-      <span>I authorize PermitPal to process this for ${S.org.name} and will sign an authorization letter. Government fees are paid at cost with official receipts.
+      <span>I authorize Pinoy Permit to process this for ${S.org.name} and will sign an authorization letter. Government fees are paid at cost with official receipts.
         <a href="terms.html#services" target="_blank" rel="noopener">Done-for-you terms</a></span></label>`, {
     submitLabel: 'Ask for a quote',
     onOpen: (form) => {
@@ -243,7 +243,7 @@ export function openRequest(code, { requirementId } = {}) {
       let contact = (f.contact_value || '').trim();
       if (f.contact_method === 'email') { if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) throw new Error('Please enter a valid email address so we can send your quote.'); }
       else { contact = normalizePhone(contact); if (!contact) throw new Error('Please enter a valid mobile number, e.g. 0917 123 4567.'); }
-      if (!f.consent) throw new Error('Please tick the box to authorize PermitPal for this request.');
+      if (!f.consent) throw new Error('Please tick the box to authorize Pinoy Permit for this request.');
       const notes = t.visit ? [`Preferred dates: ${f.visit_dates}`, `Site address: ${f.site_address}`, f.notes].filter(Boolean).join('\n') : f.notes;
       const row = { org_id: S.org.id, service_code: s.code, notes, rush: !!f.rush, contact_method: f.contact_method, contact_value: contact,
         docs_status: f.docs_status, consent: true, kind: t.visit ? 'other' : t.kind === 'requirement' ? (f.kind === 'apply' ? 'apply' : 'renew') : 'other' };
@@ -303,12 +303,12 @@ export async function order(el, id) {
         ? 'We\'re checking the government fees and will send you the exact price here within 1 business day: our usual fee plus the government fees. Nothing is filed until you approve it.'
         : 'We\'re checking the exact government fees and will send them here within 1 business day. Our service fee is covered by your plan.'}</div></div>`
       : html`<div class="banner info"><div><b>We're preparing your exact quote.</b> You'll get it within 1 business day, by ${a.contact_method === 'email' ? 'email' : a.contact_method} and here. Nothing is charged until you accept it.</div></div>`)}
-    ${when(access && !closed, html`<div class="banner info"><div><b>PermitPal has access to ${S.org.name}</b> to do this set-up. It ends automatically when this order is done. <a href="#/team">Remove it now</a></div></div>`)}
+    ${when(access && !closed, html`<div class="banner info"><div><b>Pinoy Permit has access to ${S.org.name}</b> to do this set-up. It ends automatically when this order is done. <a href="#/team">Remove it now</a></div></div>`)}
     ${when(a.status === 'quoted', quoteBox(a))}
     ${when(['awaiting_payment', 'pending_verification'].includes(a.payment_status) && !closed, payBox(a, st))}
     ${when(['paid', 'waived'].includes(a.payment_status) && !closed, html`<div class="banner progress"><div><b>We're working on it.</b> Sign and upload the authorization letter below if you haven't yet. We'll post every update here.</div></div>`)}
     ${when(a.status === 'completed', html`<div class="banner ok-banner"><div><b>Done.</b> ${r ? html`The new record is saved to <a href="#/requirement/${r.id}">${r.name}</a>.` : 'Your documents are attached below.'}</div></div>`)}
-    ${when(a.admin_note && !closed && a.status !== 'quoted', html`<div class="banner warn"><div><b>From PermitPal:</b> ${a.admin_note}</div></div>`)}
+    ${when(a.admin_note && !closed && a.status !== 'quoted', html`<div class="banner warn"><div><b>From Pinoy Permit:</b> ${a.admin_note}</div></div>`)}
 
     ${when(jobSteps.length, html`<section class="card"><div class="card-head"><div><h2>Steps</h2><p class="card-sub">${a.steps_done || 0} of ${jobSteps.length} done</p></div></div>
       <ol class="job-steps">${jobSteps.map((t, i) => html`<li class="${i < (a.steps_done || 0) ? 'done' : i === (a.steps_done || 0) && !closed && ['paid', 'waived'].includes(a.payment_status) ? 'now' : ''}">
@@ -333,12 +333,12 @@ export async function order(el, id) {
     <section class="card">
       <div class="card-head"><h2>Timeline</h2><span class="muted small">${plural(ev.length, 'update')}</span></div>
       <ol class="timeline">${ev.map((e) => html`<li class="${e.by_staff ? 'staff' : ''}">
-        <div class="tl-dot"></div><div class="tl-body"><div class="tl-head"><b>${e.by_staff ? 'PermitPal' : 'You'}</b><span class="muted small">${fmtDateTime(e.created_at)}</span></div>
+        <div class="tl-dot"></div><div class="tl-body"><div class="tl-head"><b>${e.by_staff ? 'Pinoy Permit' : 'You'}</b><span class="muted small">${fmtDateTime(e.created_at)}</span></div>
         ${when(e.message, html`<div class="pre">${e.message}</div>`)}
         ${when(e.file_path, html`<button class="linklike doc-file" data-act="doc-view" data-path="${e.file_path}" data-name="${e.file_name || 'file'}" data-type="">${ICON.file}${e.file_name || 'Attached file'}</button>`)}
         </div></li>`)}</ol>
       ${when(!closed && canEdit(), html`<form class="msg-form" data-id="${a.id}">
-        <label class="field"><span>Message PermitPal</span><textarea name="message" rows="2" maxlength="2000" placeholder="Ask a question, or send the signed authorization letter"></textarea></label>
+        <label class="field"><span>Message Pinoy Permit</span><textarea name="message" rows="2" maxlength="2000" placeholder="Ask a question, or send the signed authorization letter"></textarea></label>
         <div class="btn-row"><label class="file-pick"><span class="sr-only">Attach a file</span><input type="file" name="file" accept=".pdf,image/*"></label><button class="btn btn-soft btn-sm">Send</button></div></form>`)}
     </section>
 
@@ -384,7 +384,7 @@ function quoteBox(a) {
     <div class="qline total"><span>Total</span><b>${peso(a.quote_php)}</b></div>
     ${when(a.quote_note, html`<p class="quote-note pre">${a.quote_note}</p>`)}
     ${when(access && canEdit(), html`<label class="check consent"><input type="checkbox" data-access-ok>
-      <span>PermitPal may join ${S.org.name} as a team member to set it up. Access ends automatically when the job is done, and I can remove it anytime under Team.</span></label>`)}
+      <span>Pinoy Permit may join ${S.org.name} as a team member to set it up. Access ends automatically when the job is done, and I can remove it anytime under Team.</span></label>`)}
     ${when(canEdit(), html`<div class="btn-row qbtns"><button class="btn btn-primary" data-act="quote-accept" data-id="${a.id}">Accept quote</button>
       <button class="btn btn-ghost" data-act="order-cancel" data-id="${a.id}">No thanks</button></div>`)}
     <div class="sheet-foot">If the government fees end up lower, we refund the difference. If they are higher, we ask you before paying. If we can't deliver, the service fee is refunded in full.</div>
@@ -412,7 +412,7 @@ on('quote-accept', async (ds) => {
   const a = S.data.requests.find((x) => x.id === ds.id);
   if (!a) return;
   const box = document.querySelector('[data-access-ok]');
-  if (box && !box.checked) { box.closest('label').classList.add('need'); box.focus(); return toast('Tick the box to let PermitPal join for the set-up first.', 'error'); }
+  if (box && !box.checked) { box.closest('label').classList.add('need'); box.focus(); return toast('Tick the box to let Pinoy Permit join for the set-up first.', 'error'); }
   if (!(await confirmDialog('Accept this quote?', `Total ${peso(a.quote_php)}. Next you'll pay, then we start.`, { confirmLabel: 'Accept quote', danger: false }))) return;
   try { await db.acceptQuote(ds.id, !!box?.checked); await reload(); toast(Number(a.quote_php) ? 'Quote accepted. Pay below to get started.' : 'Accepted. We\'re starting now.'); } catch (e) { toastError(e); }
 });
@@ -438,7 +438,7 @@ on('auth-letter', (ds) => {
     <h2 class="letter-title">AUTHORIZATION LETTER</h2>
     <p>To whom it may concern:</p>
     <p>I, <b>${me || '______________________________'}</b>, ${b ? html`owner / authorized officer of <b>${b.name}</b>` : html`owner of <b>${who}</b>`}, hereby authorize
-      <b>______________________________</b> of PermitPal to ${what}, follow up, pay the official fees for, and receive on my behalf the
+      <b>______________________________</b> of Pinoy Permit to ${what}, follow up, pay the official fees for, and receive on my behalf the
       <b>${a.requirement_name}</b> for <b>${who}</b>${/\.$/.test(who) ? '' : '.'}</p>
     <p>This authorization is valid only for the transaction stated above.</p>
     <div class="letter-sig"><div>Signature over printed name<br>${me}</div><div>Authorized representative<br>Signature over printed name</div></div>
@@ -466,14 +466,14 @@ on('auth-letter', (ds) => {
 export function serviceOffer(r, { compact = false } = {}) {
   if (!has('services')) return '';
   if (r.open_request_id && canEdit()) {
-    return html`<div class="offer-inline"><div class="offer-body">${ICON.briefcase}<div><b>PermitPal is handling this</b>
+    return html`<div class="offer-inline"><div class="offer-body">${ICON.briefcase}<div><b>Pinoy Permit is handling this</b>
       <span class="muted">Follow the progress in your request.</span></div></div><a class="btn btn-soft btn-sm" href="#/services/orders/${r.open_request_id}">Open request</a></div>`;
   }
   const s = serviceFor(r);
   if (!s || !canEdit() || (r.status === 'compliant' && !r.expires)) return '';
   const apply = !r.cycle_id;
   return html`<div class="offer-inline ${compact ? 'compact' : ''}"><div class="offer-body">${ICON.briefcase}<div>
-    <b>${compact ? 'No time for all this?' : ''} Have PermitPal ${apply ? 'get it for you' : 'renew it for you'}</b>
+    <b>${compact ? 'No time for all this?' : ''} Have Pinoy Permit ${apply ? 'get it for you' : 'renew it for you'}</b>
     <span class="muted">${price(s)} ${s.price_unit} plus government fees at cost${s.turnaround ? ' · usually ' + s.turnaround : ''}. Exact quote first; nothing is charged until you accept.</span></div></div>
     <button class="btn btn-primary btn-sm" data-act="svc-for-req" data-id="${r.id}">Get a quote</button></div>`;
 }
@@ -504,7 +504,7 @@ export function openBulk(preselect = null) {
     </div>
     <label class="field"><span>Anything we should know? <small>(optional)</small></span><textarea name="notes" rows="2" maxlength="2000"></textarea></label>
     <label class="check consent"><input type="checkbox" name="consent" required>
-      <span>I authorize PermitPal to process these for ${S.org.name} and will sign an authorization letter. Government fees are paid at cost with official receipts.
+      <span>I authorize Pinoy Permit to process these for ${S.org.name} and will sign an authorization letter. Government fees are paid at cost with official receipts.
         <a href="terms.html#services" target="_blank" rel="noopener">Done-for-you terms</a></span></label>`, {
     wide: true, submitLabel: 'Ask for quotes',
     onOpen: (form) => {
@@ -530,7 +530,7 @@ export function openBulk(preselect = null) {
       let contact = (f.contact_value || '').trim();
       if (f.contact_method === 'email') { if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) throw new Error('Please enter a valid email address so we can send your quotes.'); }
       else { contact = normalizePhone(contact); if (!contact) throw new Error('Please enter a valid mobile number, e.g. 0917 123 4567.'); }
-      if (!f.consent) throw new Error('Please tick the box to authorize PermitPal for these permits.');
+      if (!f.consent) throw new Error('Please tick the box to authorize Pinoy Permit for these permits.');
       await db.requestServicesBulk({ org_id: S.org.id, requirement_ids: ids, rush: !!f.rush, contact_method: f.contact_method, contact_value: contact, notes: f.notes, consent: true });
       await reload();
       go('#/services');

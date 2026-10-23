@@ -85,7 +85,7 @@ export async function filings(el) {
       <div class="row-main"><div class="row-title"><span class="agency">${t.agency}</span> ${['BIR', 'SEC'].includes(t.agency) ? `${t.form}: ` : ''}${t.name}</div>
         <div class="row-sub">For ${it.period_label} · ${it.business_name} · due ${fmtDate(it.due_on)}</div>
         ${when(it.filed_on, html`<div class="row-sub filed-line">${ICON.check} Filed ${fmtDate(it.filed_on)}${it.filed_on > it.due_on ? ` (${daysBetween(it.due_on, it.filed_on)} days late)` : ''}${it.reference ? ' · ref ' + it.reference : ''}${it.amount != null ? ' · ' + peso(it.amount) : ''}${it.filed_by ? ' · by ' + (it.filed_by === S.user?.id ? 'you' : memberName(it.filed_by)) : ''}</div>`)}
-        ${when(early, html`<div class="row-sub muted">This was due before you started tracking in PermitPal. Mark it filed if it's done.</div>`)}
+        ${when(early, html`<div class="row-sub muted">This was due before you started tracking in Pinoy Permit. Mark it filed if it's done.</div>`)}
       </div>
       <div class="row-side"><span class="chip ${st.cls}">${st.label}</span>
         ${when(edit && !it.filed_on, html`<button class="btn btn-sm ${st.key === 'later' ? 'btn-soft' : 'btn-primary'}" data-act="filing-mark" data-key="${it.business_id}|${it.code}|${it.period_start}">Mark filed</button>`)}

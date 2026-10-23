@@ -46,7 +46,7 @@ select pg_temp.res('...by transfer either', pg_temp.err(format('select public.re
 select pg_temp.res('Plus can''t be bought on top of Small property', pg_temp.err(format('select public.addon_preview(%L, %L, null, %L)', org, 'plus', 'monthly')) = 'Plus is already included in your team plan.', '') from t_ids;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 
--- firms confirm they're registered and licensed; PermitPal doesn't check
+-- firms confirm they're registered and licensed; Pinoy Permit doesn't check
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 set local role anon;
 select pg_temp.res('a firm must confirm it is registered and licensed',

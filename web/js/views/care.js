@@ -1,6 +1,6 @@
-// Year-round care: PermitPal starts every covered renewal early and does it itself. Two ways to pay:
+// Year-round care: Pinoy Permit starts every covered renewal early and does it itself. Two ways to pay:
 // per renewal (no monthly fee: each renewal at its usual price, when it happens) or the All-in plan (a
-// fixed amount a month or a year that includes every renewal). PermitPal never pays penalties. Tracking and
+// fixed amount a month or a year that includes every renewal). Pinoy Permit never pays penalties. Tracking and
 // reminders are free either way. The page has one job for someone who hasn't started: show in their own
 // numbers what renewing permits costs them in time, and that reminders only tell you while care does it.
 // Once they have a plan, it shows what we're handling, anything that needs them, and the details
@@ -81,7 +81,7 @@ const outOfScope = (p) => {
 // ---------------------------------------------------------------- the page
 export async function care(el, params) {
   if (!has('revenue')) { el.innerHTML = String(empty('Not available yet', 'Year-round care is coming soon.', html`<a class="btn btn-primary" href="#/services">See Done for you</a>`)); return; }
-  // Bills and plans change on PermitPal's side (a payment confirmed, a renewal started): show them as they are now.
+  // Bills and plans change on Pinoy Permit's side (a payment confirmed, a renewal started): show them as they are now.
   if (!el.querySelector('.care-row, .cx-hero')) el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   try { S.data.care = await db.loadCare(S.org.id); } catch { /* show what we have */ }
   if (!location.hash.startsWith('#/care')) return;
@@ -107,7 +107,7 @@ function yourYear() {
   return { renewals: reqs.length, hours, days: Math.max(1, Math.round(hours / 8)), branches, vehicles, monthly, b, v, perYear, allinYear };
 }
 
-const startBtn = (label = 'Let PermitPal handle it') => isOwner()
+const startBtn = (label = 'Let Pinoy Permit handle it') => isOwner()
   ? html`<a class="btn btn-primary btn-lg" href="#/care/start">${label}</a>`
   : html`<p class="muted small">Only ${ownerName()} (the owner) can start this. Share this page with them.</p>`;
 
@@ -510,7 +510,7 @@ export function careStart(el, params) {
   const levels = [...new Set([...tiers.branch, ...tiers.vehicle].map((t) => (t.guarantee ? 'plus' : 'care')))];
   el.innerHTML = String(html`
     <a class="back" href="#/care">← Year-round care</a>
-    <div class="page-head"><div><h1>Let PermitPal handle your renewals</h1><p class="muted">Pick what we should look after. You'll see the total before you pay anything, and you can stop anytime.</p></div></div>
+    <div class="page-head"><div><h1>Let Pinoy Permit handle your renewals</h1><p class="muted">Pick what we should look after. You'll see the total before you pay anything, and you can stop anytime.</p></div></div>
     ${when(!can, html`<div class="banner warn"><div>Only ${ownerName()} (the owner) can start a paid plan. You can look, and share this page with them.</div></div>`)}
     <form class="care-form" novalidate>
       <section class="card"><h2>1. What should we handle?</h2>
@@ -530,7 +530,7 @@ export function careStart(el, params) {
       </section>`}
       <section class="card care-total" aria-live="polite"><div data-care-total></div>
         <label class="check consent"><input type="checkbox" name="consent" ${can ? '' : 'disabled'}>
-          <span>I authorize PermitPal to renew the permits of the chosen branches and vehicles for ${S.org.name} while the plan is active, and I'll sign an authorization letter.
+          <span>I authorize Pinoy Permit to renew the permits of the chosen branches and vehicles for ${S.org.name} while the plan is active, and I'll sign an authorization letter.
             Government fees are paid at cost with official receipts. <a href="terms.html#care" target="_blank" rel="noopener">Terms</a></span></label>
         <p class="form-error" role="alert" hidden></p>
         <button class="btn btn-primary btn-block" ${can ? '' : 'disabled'}>Start</button>
@@ -582,7 +582,7 @@ export function careStart(el, params) {
     const t = total();
     const fail = (m) => { err.textContent = m; err.hidden = false; };
     if (!t.items.length) return fail('Choose at least one branch or vehicle.');
-    if (!form.consent.checked) return fail('Please tick the box to authorize PermitPal.');
+    if (!form.consent.checked) return fail('Please tick the box to authorize Pinoy Permit.');
     btn.disabled = true; btn.textContent = 'Starting…';
     try {
       const inv = await db.startCare(S.org.id, t.items.map((x) => ({ kind: x.kind, id: x.id, tier: x.tier.code })), t.billing);

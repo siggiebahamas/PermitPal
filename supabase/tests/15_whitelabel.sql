@@ -119,8 +119,8 @@ set local role authenticated;
 update t_ids set link = public.link_invite(firm, 'client', 'carlo@bakery.ph', 'Carlo');
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 update t_ids set tok = (select token from public.org_links where id = (select link from t_ids));
-select pg_temp.res('the invitation goes out under the firm''s name, replies to the firm', o.subject = 'Dela Cruz & Co. invites you to connect on PermitPal'
-  and o.from_name = 'Dela Cruz & Co.' and o.reply_to = 'hello@delacruz.ph' and o.body_html like '%#0F5132%' and o.body_html like '%Powered by%PermitPal%'
+select pg_temp.res('the invitation goes out under the firm''s name, replies to the firm', o.subject = 'Dela Cruz & Co. invites you to connect on Pinoy Permit'
+  and o.from_name = 'Dela Cruz & Co.' and o.reply_to = 'hello@delacruz.ph' and o.body_html like '%#0F5132%' and o.body_html like '%Powered by%Pinoy Permit%'
   and o.body_html like '%Dela Cruz &amp; Co.%' and o.body_html like '%Tax &amp; permits &lt;i&gt;x&lt;/i&gt;%' and o.body_html not like '%<i>x</i>%', o.subject)
   from public.message_outbox o where o.to_address = 'carlo@bakery.ph' and o.dedupe_key like 'linkinv:%';
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
@@ -132,9 +132,9 @@ reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); en
 select pg_temp.as_user('e1000000-0000-4000-8000-0000000000b2');
 set local role authenticated;
 select pg_temp.res('the invitation page shows the brand', (public.link_preview(tok) -> 'brand' ->> 'color') = '#0F5132', '') from t_ids;
-select pg_temp.res('before connecting, the client''s app looks like PermitPal', public.client_brand(client) is null, '') from t_ids;
+select pg_temp.res('before connecting, the client''s app looks like Pinoy Permit', public.client_brand(client) is null, '') from t_ids;
 select public.link_accept(tok, client, false) from t_ids;
-select pg_temp.res('once connected, the client''s app shows the firm (Powered by PermitPal)', public.client_brand(client) ->> 'name' = 'Dela Cruz & Co.'
+select pg_temp.res('once connected, the client''s app shows the firm (Powered by Pinoy Permit)', public.client_brand(client) ->> 'name' = 'Dela Cruz & Co.'
   and public.client_brand(client) ->> 'phone' = '(02) 8123 4567', '') from t_ids;
 select pg_temp.res('the client can''t read another workspace''s brand', public.client_brand(other) is null, '') from t_ids;
 select pg_temp.res('the client can''t read the firm''s settings table', not exists (select 1 from public.org_brands), '');
@@ -148,17 +148,17 @@ delete from public.message_outbox;
 select private.queue_due_reminders();
 select pg_temp.res('the client''s permit reminder comes under the firm''s name, replies to the firm',
   o.subject like 'Dela Cruz & Co.: %' and o.from_name = 'Dela Cruz & Co.' and o.reply_to = 'hello@delacruz.ph' and o.body_html like '%#0F5132%'
-  and o.body_html like '%Questions? Email%hello@delacruz.ph%(02) 8123 4567%' and o.body_html like '%Sent for Dela Cruz &amp; Co. · Powered by%PermitPal%'
-  and o.body_text like '%Sent for Dela Cruz & Co. by PermitPal.%', o.subject)
+  and o.body_html like '%Questions? Email%hello@delacruz.ph%(02) 8123 4567%' and o.body_html like '%Sent for Dela Cruz &amp; Co. · Powered by%Pinoy Permit%'
+  and o.body_text like '%Sent for Dela Cruz & Co. by Pinoy Permit.%', o.subject)
   from public.message_outbox o where o.to_address = 'carlo@bakery.ph' and o.dedupe_key like 'remmail:%';
-select pg_temp.res('everyone else gets PermitPal''s usual email', o.subject like 'PermitPal: %' and o.from_name is null and o.reply_to is null
-  and o.body_html like '%<span style="color:#0C2A57">Permit</span>%', o.subject)
+select pg_temp.res('everyone else gets Pinoy Permit''s usual email', o.subject like 'Pinoy Permit: %' and o.from_name is null and o.reply_to is null
+  and o.body_html like '%<span style="color:#0C2A57">Pinoy</span> <span style="color:#2F6FED">Permit</span>%', o.subject)
   from public.message_outbox o where o.to_address = 'olive@other.ph' and o.dedupe_key like 'remmail:%';
 select private.notify('e1000000-0000-4000-8000-0000000000b2', client, 'filing', 'BIR 2551Q due in 3 days', 'File and pay by the 25th.', '#/filings', null, 'tfil:1', true) from t_ids;
 select private.notify('e1000000-0000-4000-8000-0000000000b2', client, 'billing', 'Your plan ends soon', 'Renew anytime.', '#/settings/billing', null, 'tbill:1', true) from t_ids;
 select pg_temp.res('tax-deadline emails carry the firm''s look', (select subject = 'Dela Cruz & Co.: BIR 2551Q due in 3 days' and from_name = 'Dela Cruz & Co.'
   from public.message_outbox where dedupe_key = 'tfil:1:email'), '');
-select pg_temp.res('PermitPal''s own account emails don''t', (select subject = 'PermitPal: Your plan ends soon' and from_name is null
+select pg_temp.res('Pinoy Permit''s own account emails don''t', (select subject = 'Pinoy Permit: Your plan ends soon' and from_name is null
   from public.message_outbox where dedupe_key = 'tbill:1:email'), '');
 
 -- Monday summary (pretend today is a Monday)
@@ -168,8 +168,8 @@ delete from public.message_outbox;
 select private.queue_due_reminders();
 select pg_temp.res('the Monday summary comes under the firm''s name', o.subject = 'Dela Cruz & Co. weekly summary: Carlo Bakery' and o.from_name = 'Dela Cruz & Co.'
   and o.body_html like '%Powered by%', o.subject) from public.message_outbox o where o.to_address = 'carlo@bakery.ph' and o.dedupe_key like 'digest:%';
-select pg_temp.res('...and the outsider''s is PermitPal''s', exists (select 1 from public.message_outbox where to_address = 'olive@other.ph' and dedupe_key like 'digest:%'
-  and subject = 'PermitPal weekly summary: Olive Hardware' and from_name is null), '');
+select pg_temp.res('...and the outsider''s is Pinoy Permit''s', exists (select 1 from public.message_outbox where to_address = 'olive@other.ph' and dedupe_key like 'digest:%'
+  and subject = 'Pinoy Permit weekly summary: Olive Hardware' and from_name is null), '');
 
 -- Reminders the firm sends
 delete from public.message_outbox;
@@ -183,7 +183,7 @@ select pg_temp.res('the connected client gets one email, under the firm''s name'
 select pg_temp.res('...and the in-app note says who asked', exists (select 1 from public.notifications where user_id = 'e1000000-0000-4000-8000-0000000000b2'
   and title = 'Dela Cruz & Co. asks you to update your permits'), '');
 select pg_temp.res('the managed client''s contact gets it under the firm''s name', o.subject = 'Dela Cruz & Co.: permits that need your attention' and o.from_name = 'Dela Cruz & Co.'
-  and o.reply_to = 'hello@delacruz.ph' and o.body_html like '%Dela Cruz &amp; Co. sent you this from PermitPal.%', o.subject)
+  and o.reply_to = 'hello@delacruz.ph' and o.body_html like '%Dela Cruz &amp; Co. sent you this from Pinoy Permit.%', o.subject)
   from public.message_outbox o where o.to_address = 'mila@sarisari.ph';
 
 -- ---------------------------------------------------------------- the monthly client report (pretend today is the 1st)
@@ -221,11 +221,11 @@ delete from public.addon_invoices where kind = 'brand';
 update public.orgs set trial_ends_at = now() - interval '1 day' where id = (select firm from t_ids);
 select private.plus_daily();
 select pg_temp.res('no bill once the firm plan itself has ended', not exists (select 1 from public.addon_invoices where kind = 'brand'), '');
-select pg_temp.res('...and clients see PermitPal''s own look again', private.client_brand_json((select client from t_ids)) is null, '');
+select pg_temp.res('...and clients see Pinoy Permit''s own look again', private.client_brand_json((select client from t_ids)) is null, '');
 update public.orgs set trial_ends_at = now() + interval '5 days' where id = (select firm from t_ids);
 select pg_temp.res('back on when the firm plan is', private.client_brand_json((select client from t_ids)) ->> 'name' = 'Dela Cruz & Co.', '');
 update public.addons set paid_through = private.today_ph() - 1 where kind = 'brand';
-select pg_temp.res('when White-label lapses, clients see PermitPal''s look; the settings stay', private.client_brand_json((select client from t_ids)) is null
+select pg_temp.res('when White-label lapses, clients see Pinoy Permit''s look; the settings stay', private.client_brand_json((select client from t_ids)) is null
   and exists (select 1 from public.org_brands where org_id = (select firm from t_ids)), '');
 delete from public.notifications where kind = 'billing';
 select private.plus_daily();
@@ -238,8 +238,8 @@ set local role authenticated;
 select public.link_end(link) from t_ids;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select pg_temp.res('when the firm disconnects, the client is told their account stays theirs', exists (select 1 from public.notifications
-  where user_id = 'e1000000-0000-4000-8000-0000000000b2' and title = 'You are no longer connected to Dela Cruz & Co.' and body like 'Your PermitPal account and everything in it stay yours, free.%'), '');
-select pg_temp.res('...and their app goes back to PermitPal''s look', private.client_brand_json((select client from t_ids)) is null, '');
+  where user_id = 'e1000000-0000-4000-8000-0000000000b2' and title = 'You are no longer connected to Dela Cruz & Co.' and body like 'Your Pinoy Permit account and everything in it stay yours, free.%'), '');
+select pg_temp.res('...and their app goes back to Pinoy Permit''s look', private.client_brand_json((select client from t_ids)) is null, '');
 
 -- ---------------------------------------------------------------- staff and money
 select pg_temp.as_user('e1000000-0000-4000-8000-0000000000f5');

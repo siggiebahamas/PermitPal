@@ -98,7 +98,7 @@ export function friendlyError(err) {
   const msg = err?.message || String(err || 'Something went wrong.');
   if (/row-level security|permission denied/i.test(msg)) return "You don't have permission to do that. (Viewers can look but not change things.)";
   if (err?.code === '23505' || /duplicate key/i.test(msg)) return 'That already exists here.';
-  if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) return "Can't reach PermitPal right now. Check your internet connection and try again.";
+  if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) return "Can't reach Pinoy Permit right now. Check your internet connection and try again.";
   if (/JWT|refresh token/i.test(msg)) return 'Your session expired. Please log in again.';
   // Database rule violations: say what to fix in plain words instead of showing the raw error.
   if (err?.code === '23514' || /violates check constraint/i.test(msg)) {
@@ -120,7 +120,7 @@ export function toast(message, kind = 'ok') {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.className = 'toast'), kind === 'error' ? 6000 : 3000);
 }
-// Shown to the customer; unexpected errors (bugs, not typing mistakes) are also reported to PermitPal staff.
+// Shown to the customer; unexpected errors (bugs, not typing mistakes) are also reported to Pinoy Permit staff.
 export const toastError = (err) => { maybeReportShownError(err); toast(friendlyError(err), 'error'); };
 
 // ---------------------------------------------------------------- modals

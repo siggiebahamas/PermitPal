@@ -4,7 +4,7 @@
 // The caller must present the shared x-cron-secret; the database checks it.
 //
 // Channels switch on when their secrets are set (Supabase dashboard > Edge Functions > Secrets):
-//   Email     RESEND_API_KEY, EMAIL_FROM (e.g. "PermitPal <reminders@yourdomain.ph>")
+//   Email     RESEND_API_KEY, EMAIL_FROM (e.g. "Pinoy Permit <reminders@yourdomain.ph>")
 //   SMS       SEMAPHORE_API_KEY, SEMAPHORE_SENDER (optional approved sender name)
 //   WhatsApp  WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_TEMPLATE_LANG (optional, default "en")
 // A message for a channel that is not set up is marked "skipped" (the in-app notification
@@ -32,13 +32,13 @@ const configured = {
   whatsapp: !!env("WHATSAPP_TOKEN") && !!env("WHATSAPP_PHONE_ID"),
 };
 
-// "Firm name via PermitPal <reminders@...>": the firm's name, PermitPal's own sending address.
+// "Firm name via Pinoy Permit <reminders@...>": the firm's name, Pinoy Permit's own sending address.
 function fromHeader(name?: string | null) {
   const base = env("EMAIL_FROM");
   const clean = (name ?? "").replace(/["<>\\\r\n]/g, "").trim().slice(0, 60);
   if (!clean) return base;
   const addr = base.match(/<([^>]+)>/)?.[1] ?? base.trim();
-  return `"${clean} via PermitPal" <${addr}>`;
+  return `"${clean} via Pinoy Permit" <${addr}>`;
 }
 const replyTo = (r?: string | null) => (r && /^[^@\s<>",]+@[^@\s<>",]+\.[a-z]{2,}$/i.test(r) ? [r] : undefined);
 
@@ -50,7 +50,7 @@ async function sendEmail(m: Msg): Promise<Result> {
       from: fromHeader(m.from_name),
       to: [m.to_address],
       reply_to: replyTo(m.reply_to),
-      subject: m.subject ?? "PermitPal",
+      subject: m.subject ?? "Pinoy Permit",
       text: m.body_text,
       html: m.body_html ?? undefined,
     }),

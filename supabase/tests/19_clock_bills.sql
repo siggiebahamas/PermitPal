@@ -1,5 +1,5 @@
 -- The processing clock (working days, holidays, extensions, late notices, letters, staff filings) and city bills
--- (kept on record, or paid by PermitPal: confirming, paying, receipts on the permit, refunds, reminders, money views,
+-- (kept on record, or paid by Pinoy Permit: confirming, paying, receipts on the permit, refunds, reminders, money views,
 -- who can see and open what). Rolled back at the end.
 begin;
 create temp table t_res (n serial primary key, step text, ok boolean, info text);
@@ -141,7 +141,7 @@ update t_ids set b1 = public.bill_add(org, brgy, 'Barangay Teachers Village', 'B
 select pg_temp.res('a teammate keeps a bill on record: no fee, waiting to be paid', number ~ '^G-\d{4}-\d{5}$' and fee_php = 0 and status = 'due' and label like '"Barangay%', number)
   from public.gov_bills where id = (select b1 from t_ids);
 select pg_temp.res('the same bill can''t be added twice', pg_temp.err(format('select public.bill_add(%L, %L, %L, %L, 650, null, %L)', (select org from t_ids), (select brgy from t_ids), 'Barangay Teachers Village', 'BC-118', 'self')) = 'This bill is already here.', '');
-select pg_temp.res('only an owner or admin can have PermitPal pay one', pg_temp.err(format('select public.bill_add(%L, %L, %L, null, 5000, null, %L, %L, %L)', (select org from t_ids), (select mp from t_ids), 'QC Treasurer', 'permitpal', (select org from t_ids) || '/bills/x/bill.jpg', 'bill.jpg')) like 'Only the workspace owner or an admin%', '');
+select pg_temp.res('only an owner or admin can have Pinoy Permit pay one', pg_temp.err(format('select public.bill_add(%L, %L, %L, null, 5000, null, %L, %L, %L)', (select org from t_ids), (select mp from t_ids), 'QC Treasurer', 'permitpal', (select org from t_ids) || '/bills/x/bill.jpg', 'bill.jpg')) like 'Only the workspace owner or an admin%', '');
 select pg_temp.res('paying it yourself needs the receipt number or a photo', pg_temp.err(format('select public.bill_paid_self(%L, %L, %L)', (select b1 from t_ids), '', private.today_ph())) like 'Add the official receipt%', '');
 select public.bill_paid_self(b1, 'BRGY-00921', private.today_ph(), org || '/bills/abc/or.jpg', 'or.jpg') from t_ids;
 select pg_temp.res('paid yourself: the receipt goes on the permit', b.status = 'paid' and d.requirement_id = (select brgy from t_ids) and d.file_name like 'Official receipt BRGY-00921 -%' and d.storage_path = b.or_path, d.file_name)
@@ -149,23 +149,23 @@ select pg_temp.res('paid yourself: the receipt goes on the permit', b.status = '
 select pg_temp.res('a paid bill can''t be removed', pg_temp.err(format('select public.bill_cancel(%L)', (select b1 from t_ids))) like 'Only a bill nobody has paid%', '');
 reset role;
 
--- ---------------------------------------------------------------- city bills: PermitPal pays
+-- ---------------------------------------------------------------- city bills: Pinoy Permit pays
 select pg_temp.as_user('ea000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
-select pg_temp.res('PermitPal paying needs a photo of the bill', pg_temp.err(format('select public.bill_add(%L, %L, %L, null, 5000, null, %L)', (select org from t_ids), (select mp from t_ids), 'QC Treasurer', 'permitpal')) like 'Add a photo of the bill%', '');
+select pg_temp.res('Pinoy Permit paying needs a photo of the bill', pg_temp.err(format('select public.bill_add(%L, %L, %L, null, 5000, null, %L)', (select org from t_ids), (select mp from t_ids), 'QC Treasurer', 'permitpal')) like 'Add a photo of the bill%', '');
 select pg_temp.res('...in this workspace''s bills folder', pg_temp.err(format('select public.bill_add(%L, %L, %L, null, 5000, null, %L, %L, %L)', (select org from t_ids), (select mp from t_ids), 'QC Treasurer', 'permitpal', (select other from t_ids) || '/bills/x/bill.jpg', 'bill.jpg')) = 'Invalid file location.', '');
-select pg_temp.res('...up to ₱50,000', pg_temp.err(format('select public.bill_add(%L, %L, %L, null, 60000, null, %L, %L, %L)', (select org from t_ids), (select mp from t_ids), 'QC Treasurer', 'permitpal', (select org from t_ids) || '/bills/x/bill.jpg', 'bill.jpg')) like 'PermitPal pays bills up to ₱50,000%', '');
+select pg_temp.res('...up to ₱50,000', pg_temp.err(format('select public.bill_add(%L, %L, %L, null, 60000, null, %L, %L, %L)', (select org from t_ids), (select mp from t_ids), 'QC Treasurer', 'permitpal', (select org from t_ids) || '/bills/x/bill.jpg', 'bill.jpg')) like 'Pinoy Permit pays bills up to ₱50,000%', '');
 reset role;
 update public.app_settings set value = 'off' where key = 'billpay_open';
 select pg_temp.as_user('ea000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
-select pg_temp.res('when staff pause it, nobody can ask PermitPal to pay', pg_temp.err(format('select public.bill_add(%L, %L, %L, null, 5000, null, %L, %L, %L)', (select org from t_ids), (select mp from t_ids), 'QC Treasurer', 'permitpal', (select org from t_ids) || '/bills/x/bill.jpg', 'bill.jpg')) like 'PermitPal isn''t paying bills%', '');
+select pg_temp.res('when staff pause it, nobody can ask Pinoy Permit to pay', pg_temp.err(format('select public.bill_add(%L, %L, %L, null, 5000, null, %L, %L, %L)', (select org from t_ids), (select mp from t_ids), 'QC Treasurer', 'permitpal', (select org from t_ids) || '/bills/x/bill.jpg', 'bill.jpg')) like 'Pinoy Permit isn''t paying bills%', '');
 reset role;
 update public.app_settings set value = 'on' where key = 'billpay_open';
 select pg_temp.as_user('ea000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 update t_ids set b2 = public.bill_add(org, mp, 'Quezon City Treasurer', 'TB-2027-5531', 14230.50, private.today_ph() + 10, 'permitpal', org || '/bills/abcd1234/bill.jpg', 'bill.jpg');
-select pg_temp.res('the owner asks PermitPal to pay: the bill plus the ₱499 fee', fee_php = 499 and amount_php = 14230.50 and status = 'due' and mode = 'permitpal', fee_php::text)
+select pg_temp.res('the owner asks Pinoy Permit to pay: the bill plus the ₱499 fee', fee_php = 499 and amount_php = 14230.50 and status = 'due' and mode = 'permitpal', fee_php::text)
   from public.gov_bills where id = (select b2 from t_ids);
 select pg_temp.res('reporting the payment needs a reference or a screenshot', pg_temp.err(format('select public.bill_report(%L, %L, %L)', (select b2 from t_ids), 'gcash', '')) like 'Add the reference number%', '');
 select public.bill_report(b2, 'gcash', '7788 1122 3344') from t_ids;
@@ -208,7 +208,7 @@ select pg_temp.res('the BIR invoice number can be changed later', bir_invoice_no
 reset role;
 select pg_temp.res('the owner is told it''s paid', exists (select 1 from public.notifications where user_id = 'ea000000-0000-4000-8000-0000000000a1' and title = 'Paid: Quezon City Treasurer ₱14,230.50'), '');
 
--- a bill PermitPal can't pay goes back in full
+-- a bill Pinoy Permit can't pay goes back in full
 select pg_temp.as_user('ea000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 update t_ids set b3 = public.bill_add(org, fsic, 'BFP Quezon City', 'FSIF-88', 1200, null, 'permitpal', org || '/bills/ef01/bill.jpg', 'bill.jpg');
@@ -238,7 +238,7 @@ update public.gov_bills set created_at = now() - interval '15 days' where id = (
 select private.clock_daily();
 select pg_temp.res('3 days before a bill''s pay-by date, the owner is reminded', exists (select 1 from public.notifications where user_id = 'ea000000-0000-4000-8000-0000000000a1'
   and title = 'Pay BFP Quezon City by ' || private.fmt_date(private.today_ph() + 3)), '');
-select pg_temp.res('a bill PermitPal was asked to pay but nobody sent money for is closed after 14 days', (select status from public.gov_bills where id = (select b3 from t_ids)) = 'cancelled', '');
+select pg_temp.res('a bill Pinoy Permit was asked to pay but nobody sent money for is closed after 14 days', (select status from public.gov_bills where id = (select b3 from t_ids)) = 'cancelled', '');
 select pg_temp.as_user('ea000000-0000-4000-8000-0000000000b2');
 set local role authenticated;
 select public.bill_cancel(b4) from t_ids;

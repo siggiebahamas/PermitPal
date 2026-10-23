@@ -1,6 +1,6 @@
 // A business's public permit page (p.html?c=<code>), opened from a link, the QR poster, a badge or an
 // update email. Shows each permit's status from the business's own records, checked automatically by
-// PermitPal; never claims a government check. Visitors can ask for updates; recipients can stop them.
+// Pinoy Permit; never claims a government check. Visitors can ask for updates; recipients can stop them.
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import { html, fmtDate, timeAgo } from './util.js';
 
@@ -14,14 +14,14 @@ const home = new URL('./', location.href).href;
 const STATE = { ok: ['Current', 'ok'], due: ['Renewal due soon', 'soon'], expired: ['Expired', 'overdue'], pending: ['Details being added', 'needinfo'] };
 const label = (i) => (i.in_progress ? (i.state === 'expired' ? ['Expired · renewal in progress', 'overdue'] : ['Being renewed', 'progress']) : STATE[i.state] || STATE.pending);
 const checkedWhen = (ts) => (Date.now() - Date.parse(ts) < 7 * 864e5 ? timeAgo(ts).toLowerCase() : `on ${fmtDate(String(ts).slice(0, 10))}`);
-const brand = html`<span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span>`;
+const brand = html`<span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span>`;
 
 function shell(inner) {
   app.innerHTML = String(html`<div class="share-wrap">
-    <header class="share-top"><a href="${home}" class="tp-brand" aria-label="PermitPal home">${brand}</a>
+    <header class="share-top"><a href="${home}" class="tp-brand" aria-label="Pinoy Permit home">${brand}</a>
       <button class="btn btn-ghost btn-sm no-print" id="print">Print</button></header>
     ${inner}
-    <footer class="tp-foot no-print"><p>PermitPal reminds businesses before their permits expire and keeps their papers in one place.
+    <footer class="tp-foot no-print"><p>Pinoy Permit reminds businesses before their permits expire and keeps their papers in one place.
       <a href="${home}#/welcome">Make a page like this for your business</a></p></footer></div>`);
   document.getElementById('print')?.addEventListener('click', () => window.print());
 }
@@ -49,7 +49,7 @@ async function main() {
       ${data.city ? html`<p class="muted">${data.city}</p>` : ''}
       ${data.intro ? html`<p>${data.intro}</p>` : ''}
       <p class="tp-state"><span class="chip lg ${head[0]}">${head[1]}</span></p>
-      <p class="muted small">From ${data.title}'s own records, checked automatically by PermitPal ${checkedWhen(data.checked_at)} · status as of ${fmtDate(data.as_of)}</p>
+      <p class="muted small">From ${data.title}'s own records, checked automatically by Pinoy Permit ${checkedWhen(data.checked_at)} · status as of ${fmtDate(data.as_of)}</p>
       ${data.recipient ? html`<p class="small">Hi ${data.recipient}: you get an email when they renew a permit. <a href="?c=${code}&r=${rcpt}&stop=1">Stop these emails</a></p>` : ''}
     </section>
     <section class="card">
@@ -71,7 +71,7 @@ async function main() {
         <label class="field"><span>Why <small>(optional)</small></span><input name="note" maxlength="300" placeholder="e.g. For your supplier accreditation"></label>
         <p class="form-error" role="alert" hidden></p>
         <button class="btn btn-primary">Ask for updates</button></form></section>`}
-    <p class="fineprint">This page shows ${data.title}'s own records${data.business && data.business !== data.title ? ` for ${data.business}` : ''}; the business chooses which permits to list. PermitPal checks them automatically every morning (for example, that each one has a copy and an expiry date) and shows them as they are. PermitPal does not issue permits or verify them with the government: ask the business for the originals if you need them.</p>`);
+    <p class="fineprint">This page shows ${data.title}'s own records${data.business && data.business !== data.title ? ` for ${data.business}` : ''}; the business chooses which permits to list. Pinoy Permit checks them automatically every morning (for example, that each one has a copy and an expiry date) and shows them as they are. Pinoy Permit does not issue permits or verify them with the government: ask the business for the originals if you need them.</p>`);
 
   app.querySelectorAll('.tp-files [data-path]').forEach((b) => b.addEventListener('click', async () => {
     b.disabled = true;

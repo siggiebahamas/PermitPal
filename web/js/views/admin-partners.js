@@ -1,4 +1,4 @@
-// Admin > Professionals and Admin > Partner billing: firms that pay PermitPal. Who applied, how each firm
+// Admin > Professionals and Admin > Partner billing: firms that pay Pinoy Permit. Who applied, how each firm
 // pays (per quote request from prepaid credit, or a flat monthly listing), their checklist lines with
 // honest counts, their credit, how often customers hire them, the leads they reported, what each firm
 // owes, the statements sent, and the quote requests behind them.
@@ -7,7 +7,7 @@ import { S, on, actions, rerender, empty, has } from '../core.js';
 import { PARTNER_CATEGORIES } from './extras.js';
 import * as db from 'pp/data';
 
-// Per-sale fees went with prepaid credit: a sale happens outside PermitPal and can't be proven.
+// Per-sale fees went with prepaid credit: a sale happens outside Pinoy Permit and can't be proven.
 const feeModels = () => (has('leads')
   ? { per_lead: 'Per quote request (prepaid credit)', monthly: 'Flat monthly listing', none: 'No fee' }
   : { per_lead: 'Per quote request', per_sale_flat: 'Per sale (flat ₱)', per_sale_percent: 'Per sale (% of the sale)', monthly: 'Flat monthly listing', none: 'No fee' });
@@ -138,7 +138,7 @@ function editPro(p = {}) {
       <label class="field" data-fee="monthly" ${fm === 'monthly' ? '' : 'hidden'}><span>₱ a month</span><input name="monthly_fee_php" type="number" min="0" step="1" value="${p.monthly_fee_php ?? ''}"></label>
     </div>
     <p class="muted small" data-ins-note ${p.category === 'insurance' ? '' : 'hidden'}>Insurers: without your Insurance Commission license on file (Money → Today → Settings), only "Flat monthly listing" or "No fee" is allowed.</p>
-    <label class="check"><input type="checkbox" name="verified" ${p.verified ? 'checked' : ''}> <span>The firm confirmed it is registered and licensed <small class="muted">(in its application, or to you in writing). You don't check papers, and customers are told PermitPal doesn't.</small></span></label>
+    <label class="check"><input type="checkbox" name="verified" ${p.verified ? 'checked' : ''}> <span>The firm confirmed it is registered and licensed <small class="muted">(in its application, or to you in writing). You don't check papers, and customers are told Pinoy Permit doesn't.</small></span></label>
     <label class="check"><input type="checkbox" name="published" ${p.published ? 'checked' : ''}> <span>Show to customers</span></label>
     <details class="pro-more"><summary><b>More</b> <span class="muted small">license shown to customers, description, website, a separate email for statements, notes</span></summary>
       <div class="grid2">
@@ -421,7 +421,7 @@ on('stmt-print', (ds) => {
   const p = cache.partners.find((x) => x.id === s?.partner_id);
   const lines = cache.charges.filter((c) => c.statement_id === s.id).sort((a, b) => a.occurred_on.localeCompare(b.occurred_on));
   const sheet = html`<div class="letter"><h2 class="letter-title">STATEMENT OF ACCOUNT</h2>
-    <p><b>PermitPal</b><br>Statement ${s.number} · ${fmtDate(s.sent_at.slice(0, 10))}</p>
+    <p><b>Pinoy Permit</b><br>Statement ${s.number} · ${fmtDate(s.sent_at.slice(0, 10))}</p>
     <p>To: <b>${p?.name}</b>${p?.contact_name ? html`<br>Attention: ${p.contact_name}` : ''}</p>
     <table class="table"><thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead><tbody>
       ${lines.map((c) => html`<tr><td>${fmtDate(c.occurred_on)}</td><td>${c.description}</td><td>${peso(c.amount_php)}</td></tr>`)}

@@ -135,7 +135,7 @@ export const KINDS = {
       f.structure = st.value;
       if (st.note) notes.push(st.note);
       const k = key(f.name);
-      if (k && ctx.businesses.some((b) => key(b.name) === k)) problems.push('Already in PermitPal');
+      if (k && ctx.businesses.some((b) => key(b.name) === k)) problems.push('Already in Pinoy Permit');
       else if (k && seen.has(k)) problems.push('This business appears twice in the file');
       if (k) seen.add(k);
       return { f, problems, notes, show: [f.name, f.structure, f.city || '—'] };
@@ -144,7 +144,7 @@ export const KINDS = {
   },
 
   branches: {
-    label: 'Branches of a business', one: 'branch', many: 'branches', unit: 'One branch per row. The business must already be in PermitPal.',
+    label: 'Branches of a business', one: 'branch', many: 'branches', unit: 'One branch per row. The business must already be in Pinoy Permit.',
     cols: [
       ['business', 'Business name', 'Corner Bakery Corp.', ['businessname', 'business', 'company', 'companyname']],
       ['name', 'Branch name', 'SM North branch', ['branchname', 'branch', 'name', 'store', 'outlet', 'site']],
@@ -158,11 +158,11 @@ export const KINDS = {
       const bname = get('business');
       const b = ctx.businesses.find((x) => key(x.name) === key(bname));
       if (!bname) problems.push('Business name is missing');
-      else if (!b) problems.push(`No business called "${bname}" in PermitPal.${didYouMean(bname, ctx.businesses, (x) => x.name)} Import or add the business first.`);
+      else if (!b) problems.push(`No business called "${bname}" in Pinoy Permit.${didYouMean(bname, ctx.businesses, (x) => x.name)} Import or add the business first.`);
       if (!f.name) problems.push('Branch name is missing');
       f.business_id = b?.id;
       const k = b ? b.id + '|' + key(f.name) : null;
-      if (b && f.name && ctx.locations.some((l) => l.business_id === b.id && key(l.name) === key(f.name))) problems.push('This branch is already in PermitPal');
+      if (b && f.name && ctx.locations.some((l) => l.business_id === b.id && key(l.name) === key(f.name))) problems.push('This branch is already in Pinoy Permit');
       else if (k && f.name && seen.has(k)) problems.push('This branch appears twice in the file');
       if (k) seen.add(k);
       return { f, problems, notes, show: [b?.name || bname || '—', f.name || '—', f.city || '—'] };
@@ -194,7 +194,7 @@ export const KINDS = {
       if (!f.vehicle_type) problems.push(`Type "${t}" isn't one of: ${VEHICLE_TYPES.join(', ')}`);
       for (const k of ['registration_expires', 'ctpl_expires']) { const d = date(get(k)); if (d.error) problems.push(d.error); else f[k] = d.value; }
       const p = plate(f.plate_no);
-      if (p && ctx.vehicles.some((v) => plate(v.plate_no) === p)) problems.push('Already in PermitPal');
+      if (p && ctx.vehicles.some((v) => plate(v.plate_no) === p)) problems.push('Already in Pinoy Permit');
       else if (p && seen.has(p)) problems.push('Same plate appears twice in the file');
       if (p) seen.add(p);
       return { f, problems, notes, show: [f.make_model || '—', f.plate_no || '—', f.registration_expires, f.ctpl_expires] };
@@ -240,7 +240,7 @@ export const KINDS = {
         if (d.value && d.value < ctx.today) notes.push(`${t.name} already expired (${d.value}).`);
       }
       const k = key(f.full_name);
-      if (k && ctx.people.some((x) => key(x.full_name) === k)) problems.push('Already in PermitPal. To add license dates for existing staff, import "Permit records" instead');
+      if (k && ctx.people.some((x) => key(x.full_name) === k)) problems.push('Already in Pinoy Permit. To add license dates for existing staff, import "Permit records" instead');
       else if (k && seen.has(k)) problems.push('This person appears twice in the file');
       if (k) seen.add(k);
       return { f, problems, notes, show: [f.full_name || '—', f.role_title || '—', f.licences.map((l) => l.name).join(', ') || 'No licenses'] };
@@ -250,7 +250,7 @@ export const KINDS = {
 
   permits: {
     label: 'Permit records (numbers and dates)', one: 'permit record', many: 'permit records',
-    unit: 'One permit per row: who it belongs to, which permit, and its number and dates. Businesses, vehicles and staff must already be in PermitPal.',
+    unit: 'One permit per row: who it belongs to, which permit, and its number and dates. Businesses, vehicles and staff must already be in Pinoy Permit.',
     cols: [
       ['subject', 'For (business, plate or staff name)', 'Corner Bakery Corp.', ['forbusinessplateorstaffname', 'for', 'business', 'businessname', 'vehicle', 'plate', 'platenumber', 'staff', 'name', 'owner', 'holder', 'company']],
       ['branch', 'Branch', 'Main branch', ['branch', 'branchname', 'location', 'store', 'outlet']],
@@ -307,15 +307,15 @@ export const KINDS = {
         if (f.issued_on && f.issued_on > ctx.today) problems.push('Issued in the future: check the date');
         if (t?.expires && !f.expires_on && !f.reference_no && !f.issued_on) problems.push('Nothing to record: add a reference number or dates');
         if (f.expires_on && f.expires_on < ctx.today) notes.push(`Already expired (${f.expires_on}): it will show as overdue.`);
-        // what is already in PermitPal for it
+        // what is already in Pinoy Permit for it
         const existing = ctx.reqs.find((r) => r.subject === s.subject && (r.business_id || r.vehicle_id || r.person_id) === s.id
           && (t ? r.type_code === t.code : key(r.name) === key(f.name)) && (s.subject !== 'business' || !f.location_id || (r.location_id || null) === f.location_id));
         if (existing) {
           f.requirement_id = existing.id;
           if (existing.cycle_id) {
             const sameDates = (existing.expires_on || null) === (f.expires_on || null) && (!f.reference_no || existing.reference_no === f.reference_no);
-            if (sameDates) { f.action = 'skip'; notes.push('Already up to date in PermitPal.'); }
-            else if (f.expires_on && existing.expires_on && f.expires_on < existing.expires_on) problems.push(`Older than what PermitPal has (expires ${existing.expires_on})`);
+            if (sameDates) { f.action = 'skip'; notes.push('Already up to date in Pinoy Permit.'); }
+            else if (f.expires_on && existing.expires_on && f.expires_on < existing.expires_on) problems.push(`Older than what Pinoy Permit has (expires ${existing.expires_on})`);
             else if (f.expires_on && existing.expires_on && f.expires_on === existing.expires_on) {
               f.action = 'update'; f.cycle_id = existing.cycle_id;
               f.keep = { issuer: existing.issuer, issued_on: f.issued_on || existing.issued_on, expires_on: existing.expires_on, amount_paid: existing.amount_paid };

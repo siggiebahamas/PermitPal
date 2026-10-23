@@ -1,4 +1,4 @@
-// Opens a customer's file for PermitPal staff. Staff can't read customer files from storage
+// Opens a customer's file for Pinoy Permit staff. Staff can't read customer files from storage
 // directly: the database checks there's an open request for it and logs the open (customers
 // see the log in Settings), then this returns a link that works for 2 minutes.
 import { createClient } from "npm:@supabase/supabase-js@2";

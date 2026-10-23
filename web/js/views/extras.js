@@ -12,7 +12,7 @@ const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct
 
 // ================================================================ professionals (independent firms)
 // Firms that file and renew in person (liaison, accounting, fire safety...). Customers deal with
-// them directly; PermitPal only checks their license, lists them, and sends them quote requests.
+// them directly; Pinoy Permit only checks their license, lists them, and sends them quote requests.
 export const PARTNER_CATEGORIES = {
   liaison: 'Permit & registration filing', bookkeeping: 'Accounting, bookkeeping & BIR', fire_safety: 'Fire safety & extinguishers',
   pest_control: 'Pest control', health_clinic: 'Health cards & medical exams', emission_testing: 'Emission testing',
@@ -54,9 +54,9 @@ on('placement-quote', async (ds) => {
   partnerIntro(ds.id, ds.req || null, ds.pl);
 });
 on('placement-why', () => openModal('Why am I seeing this?', html`
-  <p>PermitPal shows one firm on a checklist step when it matches the step and your city. The firm pays PermitPal to be listed there.</p>
+  <p>Pinoy Permit shows one firm on a checklist step when it matches the step and your city. The firm pays Pinoy Permit to be listed there.</p>
   <ul class="small"><li>It never changes the firm's price, and you don't have to use them.</li>
-    <li>Firms tell us they are registered and licensed. PermitPal doesn't check their papers: ask to see them before you hire.</li>
+    <li>Firms tell us they are registered and licensed. Pinoy Permit doesn't check their papers: ask to see them before you hire.</li>
     <li>We only share your details if you press "Request a quote".</li></ul>
   <p class="muted small">Rather not see these? Turn them off in <a href="#/settings">Settings</a>.</p>`));
 let proCat = 'all';
@@ -74,7 +74,7 @@ export async function partners(el, params = new URLSearchParams()) {
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Find a professional</h1><p class="muted">Firms that file and renew permits in person, so you don't have to queue. You deal with them directly.</p></div></div>
     <section class="card promises pro-promises">
-      <div class="promise">${ICON.check}<div><b>Independent firms</b><span>Each firm told us it is registered and holds the licenses its work needs. PermitPal doesn't check their papers, so ask to see them before you hire.</span></div></div>
+      <div class="promise">${ICON.check}<div><b>Independent firms</b><span>Each firm told us it is registered and holds the licenses its work needs. Pinoy Permit doesn't check their papers, so ask to see them before you hire.</span></div></div>
       <div class="promise">${ICON.check}<div><b>Straight to them</b><span>Your request goes directly to the firm. They reply within 1 business day.</span></div></div>
       <div class="promise">${ICON.check}<div><b>No obligation</b><span>Compare quotes, ask questions, and only hire who you trust.</span></div></div>
     </section>
@@ -89,7 +89,7 @@ export async function partners(el, params = new URLSearchParams()) {
         ${has('leads') && canEdit() && ['requested', 'introduced'].includes(r.status)
           ? html`<span class="hired-ask"><span class="muted small">Did you hire them?</span><button class="btn btn-sm btn-soft" data-act="ref-hired" data-id="${r.id}" data-hired="1">Yes</button><button class="btn btn-sm btn-ghost" data-act="ref-hired" data-id="${r.id}" data-hired="">No</button></span>`
           : html`<span class="chip ${r.status === 'converted' ? 'ok' : r.status === 'not_converted' ? 'needinfo' : 'progress'}">${{ requested: 'Sent', introduced: 'They replied', converted: 'Hired', not_converted: has('leads') ? "Didn't hire" : 'Closed' }[r.status] || 'Sent'}</span>`}</div>`; })}</section>`)}
-    <p class="fineprint">Listed firms pay PermitPal for the quote requests we send them (or a flat monthly fee). It never changes their price, and you're free to choose anyone.${has('revenue') ? '' : ' PermitPal does not file anything with the government itself.'}</p>
+    <p class="fineprint">Listed firms pay Pinoy Permit for the quote requests we send them (or a flat monthly fee). It never changes their price, and you're free to choose anyone.${has('revenue') ? '' : ' Pinoy Permit does not file anything with the government itself.'}</p>
     ${when(has('revenue'), html`<p class="fineprint">Run a liaison, accounting or fire-safety firm? <a href="#/list-your-firm">Apply to be listed</a>.</p>`)}`);
 }
 document.addEventListener('change', (e) => {
@@ -134,7 +134,7 @@ export function partnerIntro(partnerId, requirementId = null, placementId = null
   });
 }
 on('partner-intro', async (ds) => { await loadPartners(); partnerIntro(ds.id, ds.req || null); });
-// "Did you hire them?" One tap. It tells PermitPal which firms do good work.
+// "Did you hire them?" One tap. It tells Pinoy Permit which firms do good work.
 on('ref-hired', async (ds) => {
   try { await db.answerReferral(ds.id, !!ds.hired); toast(ds.hired ? 'Thanks. Glad it worked out.' : 'Thanks for telling us.'); partners(document.getElementById('main')); } catch (e) { toastError(e); }
 });
@@ -334,7 +334,7 @@ on('inspection-pack', async (ds, btn) => {
     }
     const summary = String(html`<!doctype html><html><head><meta charset="utf-8"><title>Compliance summary</title>
       <style>body{font-family:system-ui,sans-serif;max-width:860px;margin:32px auto;padding:0 16px;color:#111}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;padding:8px;text-align:left;font-size:14px}</style></head><body>
-      <h1>${title}</h1><p>Compliance summary as of ${fmtDate(todayPH())} · prepared with PermitPal</p>
+      <h1>${title}</h1><p>Compliance summary as of ${fmtDate(todayPH())} · prepared with Pinoy Permit</p>
       <table><tr><th>Permit</th><th>For</th><th>Status</th><th>Reference no.</th><th>Expires</th><th>File</th></tr>
       ${[...reqs].sort(byPriority).map((r) => html`<tr><td>${r.name}</td><td>${subjectLabel(r)}</td><td>${STATUS[r.status].label}</td><td>${r.reference_no || '—'}</td>
         <td>${r.expires ? (r.expires_on ? fmtDate(r.expires_on) : '—') : 'Does not expire'}</td><td>${r.document_count ? 'Included' : 'Missing'}</td></tr>`)}</table></body></html>`);
@@ -354,10 +354,10 @@ on('calendar-export', () => {
   const day = (iso) => iso.replace(/-/g, '');
   const next = (iso) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10).replace(/-/g, ''); };
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//PermitPal//Deadlines//EN', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${esc(S.org.name)} permits`];
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Pinoy Permit//Deadlines//EN', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${esc(S.org.name)} permits`];
   for (const r of items) {
     lines.push('BEGIN:VEVENT', `UID:${r.cycle_id || r.id}@permitpal`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${day(r.expires_on)}`, `DTEND;VALUE=DATE:${next(r.expires_on)}`,
-      `SUMMARY:${esc(`Expires: ${r.name} (${subjectLabel(r)})`)}`, `DESCRIPTION:${esc(`${r.reference_no ? 'Ref ' + r.reference_no + '. ' : ''}Open PermitPal to renew.`)}`,
+      `SUMMARY:${esc(`Expires: ${r.name} (${subjectLabel(r)})`)}`, `DESCRIPTION:${esc(`${r.reference_no ? 'Ref ' + r.reference_no + '. ' : ''}Open Pinoy Permit to renew.`)}`,
       'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(r.name + ' expires in 30 days')}`, 'TRIGGER:-P30D', 'END:VALARM',
       'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(r.name + ' expires in 7 days')}`, 'TRIGGER:-P7D', 'END:VALARM', 'END:VEVENT');
   }

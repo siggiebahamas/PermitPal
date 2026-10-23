@@ -106,7 +106,7 @@ on('care-set', (ds) => {
   openModal(`Change ${p.label}`, html`<label class="field"><span>New status</span><select name="status">
       ${p.status !== 'active' ? html`<option value="active">Active (only if paid up)</option>` : ''}${p.status !== 'paused' ? html`<option value="paused">Paused</option>` : ''}<option value="cancelled">End the plan now</option></select></label>
     <label class="field"><span>Reason <small>(the customer sees it)</small></span><input name="note" required minlength="5" maxlength="500"></label>
-    <p class="muted small">Refunds for a plan you end are sent outside PermitPal (GCash or bank).</p>`, {
+    <p class="muted small">Refunds for a plan you end are sent outside Pinoy Permit (GCash or bank).</p>`, {
     submitLabel: 'Save',
     onSubmit: async (fd) => { await db.adminSetCarePlan(p.id, fd.get('status'), String(fd.get('note')).trim()); toast('Saved. The customer was told.'); rerender(); },
   });

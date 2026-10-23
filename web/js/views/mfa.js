@@ -17,7 +17,7 @@ export async function mfaChallenge(app, done) {
   try { factors = (await db.mfa.factors()).totp || []; } catch (e) { toastError(e); }
   app.innerHTML = String(html`<main class="auth"><div class="auth-card">
     <h1 class="auth-title">Two-step login</h1>
-    <p class="tagline">Open your authenticator app and type the 6-digit code it shows for PermitPal.</p>
+    <p class="tagline">Open your authenticator app and type the 6-digit code it shows for Pinoy Permit.</p>
     <form id="mfa-form" novalidate>
       ${when(factors.length > 1, html`<label class="field"><span>Which device?</span><select name="factor">${factors.map((f) => html`<option value="${f.id}">${f.friendly_name || 'Authenticator'}</option>`)}</select></label>`)}
       <label class="field"><span>6-digit code</span><input name="code" class="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required placeholder="123456" autofocus></label>
@@ -25,7 +25,7 @@ export async function mfaChallenge(app, done) {
       <button class="btn btn-primary btn-block">Continue</button>
     </form>
     <details class="lost"><summary>Lost your phone, or no code?</summary>
-      <p>${factors.length > 1 ? 'Choose your other device above and use its code. ' : ''}If you can't get a code, contact PermitPal support. After we confirm it's really you, we turn two-step login off so you can sign in with your password and set it up again (usually within 1 business day).</p>
+      <p>${factors.length > 1 ? 'Choose your other device above and use its code. ' : ''}If you can't get a code, contact Pinoy Permit support. After we confirm it's really you, we turn two-step login off so you can sign in with your password and set it up again (usually within 1 business day).</p>
       <button type="button" class="btn btn-soft btn-block" data-act="mfa-lost">Sign out and contact support</button></details>
     <button type="button" class="btn btn-ghost btn-block" data-act="sign-out">Sign out</button>
   </div></main>`);
@@ -84,7 +84,7 @@ export async function startSetup({ onDone, second = false } = {}) {
         <div class="qr"><img src="${enrolled.totp.qr_code}" alt="QR code for your authenticator app" width="200" height="200"></div>
         <small class="muted">Can't scan it? Choose "enter a setup key" in the app and type: <code class="secret">${grouped(enrolled.totp.secret)}</code>
           <button type="button" class="linklike" data-copy="${enrolled.totp.secret}">Copy</button></small></li>
-      <li><b>Type the 6-digit code</b> the app now shows for PermitPal:
+      <li><b>Type the 6-digit code</b> the app now shows for Pinoy Permit:
         <input name="code" class="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required placeholder="123456" aria-label="6-digit code from the app"></li>
     </ol>
     <p class="muted small">Keep the key private: anyone with it can make your codes.</p>`, {

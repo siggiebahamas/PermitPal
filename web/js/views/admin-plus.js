@@ -1,4 +1,4 @@
-// Admin > Plus & staff: PermitPal Plus, staff license and White-label bills. Payments by GCash/bank to confirm (the
+// Admin > Plus & staff: Pinoy Permit Plus, staff license and White-label bills. Payments by GCash/bank to confirm (the
 // only thing that needs a person, and only while online checkout is off), open bills, every workspace's
 // plan, and giving time (a launch partner, a goodwill month).
 import { html, fmtDate, toast, toastError, when, peso, plural, todayPH, openModal, confirmDialog } from '../util.js';
@@ -35,7 +35,7 @@ export async function plusTab() {
         <button class="btn btn-sm btn-primary" data-act="addon-give">Give time</button></div>
       ${on_.length ? html`<div class="table-wrap" tabindex="0" role="region" aria-label="Plans on now"><table class="table"><thead><tr><th>Workspace</th><th>Plan</th><th>Until</th><th>How</th></tr></thead><tbody>
         ${on_.map((a) => html`<tr><td>${a.orgs?.name || ''}</td><td>${a.kind === 'plus' ? 'Plus' : a.kind === 'brand' ? 'White-label' : `Staff, up to ${a.people_max}`}${a.next_people_max ? ` (then ${a.next_people_max})` : ''}</td>
-          <td>${fmtDate(a.paid_through)}</td><td>${a.trial ? 'Free trial' : a.comped ? 'Given by PermitPal' : a.billing === 'yearly' ? 'Paid yearly' : 'Paid monthly'}</td></tr>`)}</tbody></table></div>` : html`<p class="muted">None yet.</p>`}
+          <td>${fmtDate(a.paid_through)}</td><td>${a.trial ? 'Free trial' : a.comped ? 'Given by Pinoy Permit' : a.billing === 'yearly' ? 'Paid yearly' : 'Paid monthly'}</td></tr>`)}</tbody></table></div>` : html`<p class="muted">None yet.</p>`}
     </section>
     ${paid.length ? html`<details class="card"><summary><b>Paid bills</b> <span class="muted small">latest ${paid.length}</span></summary>
       ${paid.map((i) => html`<div class="line"><div class="line-main"><b>${i.orgs?.name || ''}: ${peso(i.amount_php)}</b><small>${label(i)} · bill ${i.number} · ${fmtDate(String(i.paid_at || '').slice(0, 10))}${i.bir_invoice_no ? ` · BIR ${i.bir_invoice_no}` : ''}</small></div></div>`)}</details>` : ''}`;
@@ -56,14 +56,14 @@ on('addon-notfound', (ds) => {
 });
 on('addon-void', async (ds) => {
   if (!(await confirmDialog('Cancel this bill?', 'The customer can make a new one anytime.', { confirmLabel: 'Cancel bill' }))) return;
-  try { await db.adminVoidAddonInvoice(ds.id, 'Cancelled by PermitPal.'); rerender(); } catch (e) { toastError(e); }
+  try { await db.adminVoidAddonInvoice(ds.id, 'Cancelled by Pinoy Permit.'); rerender(); } catch (e) { toastError(e); }
 });
 on('addon-give', async () => {
   try { orgsCache ||= await db.adminOrgs(); } catch (e) { return toastError(e); }
   const until = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
   openModal('Give time (no bill)', html`
     <label class="field"><span>Workspace</span><select name="org">${orgsCache.map((o) => html`<option value="${o.id}">${o.name}</option>`)}</select></label>
-    <div class="grid2"><label class="field"><span>Plan</span><select name="kind"><option value="plus">PermitPal Plus</option><option value="staff">Staff licenses</option>${has('brand') ? html`<option value="brand">White-label (accounting firms)</option>` : ''}</select></label>
+    <div class="grid2"><label class="field"><span>Plan</span><select name="kind"><option value="plus">Pinoy Permit Plus</option><option value="staff">Staff licenses</option>${has('brand') ? html`<option value="brand">White-label (accounting firms)</option>` : ''}</select></label>
       <label class="field"><span>People <small>(staff licenses)</small></span><input type="number" name="people" min="4" max="5000" value="10"></label></div>
     <label class="field"><span>Until</span><input type="date" name="until" value="${until}" required></label>
     <label class="field"><span>Note to the customer <small>(optional)</small></span><input name="note" maxlength="200" placeholder="e.g. Thanks for being an early customer"></label>`, {

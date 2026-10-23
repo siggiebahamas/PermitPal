@@ -27,12 +27,12 @@ const PIC = {
 const pill = (st, t) => html`<span class="pv-pill pv-${st}">${t}</span>`;
 const tick = html`<span class="lp-done">${ICON.check}</span>`;
 
-const header = (onHome) => html`<header class="lp-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
+const header = (onHome) => html`<header class="lp-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span></a>
   <div class="spacer"></div>
   ${onHome ? html`<a class="btn btn-ghost btn-sm lp-nav" href="#tour" data-scroll-to="tour">How it works</a><a class="btn btn-ghost btn-sm lp-nav" href="#for-you" data-scroll-to="for-you">Who it's for</a>`
     : html`<a class="btn btn-ghost btn-sm lp-nav" href="#/">How it works</a>`}
   <a class="btn btn-ghost btn-sm lp-nav" href="#/pricing" ${onHome ? '' : raw('aria-current="page"')}>Prices</a><a class="btn btn-ghost btn-sm" href="#/login">Sign in</a><a class="btn btn-primary btn-sm" href="#/signup">Start free</a></header>`;
-const footer = () => html`<footer class="lp-foot"><span>© PermitPal</span><a href="#/pricing">Prices</a><a href="renew/">Renewal guides</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="#/contact">Contact</a>${has('revenue') ? html`<a href="#/list-your-firm">For service providers</a>` : ''}<a href="#/login">Sign in</a></footer>`;
+const footer = () => html`<footer class="lp-foot"><span>© Pinoy Permit</span><a href="#/pricing">Prices</a><a href="renew/">Renewal guides</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="#/contact">Contact</a>${has('revenue') ? html`<a href="#/list-your-firm">For service providers</a>` : ''}<a href="#/login">Sign in</a></footer>`;
 // In-page links scroll; they must not change the address (the app's pages live there).
 const wireScroll = (app) => app.querySelectorAll('[data-scroll-to]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); document.getElementById(a.dataset.scrollTo)?.scrollIntoView({ behavior: 'smooth' }); }));
 
@@ -41,13 +41,13 @@ const hero = () => html`<section class="lp-hero2">
   <div class="lp-hero2-copy">
     <p class="lp-tag">Permits on autopilot</p>
     <h1>Track and manage every permit. <span class="lp-blue">Easily.</span></h1>
-    <p class="lp-lead">Add your permits once. PermitPal keeps track of every expiry date${has('filings') ? ' and tax deadline' : ''}${has('library2') ? ', reminds you before each one is due, and shows you how to renew' : ' and reminds you before each one is due'}.</p>
+    <p class="lp-lead">Add your permits once. Pinoy Permit keeps track of every expiry date${has('filings') ? ' and tax deadline' : ''}${has('library2') ? ', reminds you before each one is due, and shows you how to renew' : ' and reminds you before each one is due'}.</p>
     <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#tour" data-scroll-to="tour">See how it works</a></div>
     <ul class="lp-ticks"><li>${ICON.check}Free plan, no card</li><li>${ICON.check}Works on any phone</li></ul>
   </div>
   <div class="lp-hero2-art">
     <div class="lp-blob" aria-hidden="true"></div>
-    <div class="lp-phone" role="img" aria-label="PermitPal on a phone: 11 of 12 permits current, with what is due next">
+    <div class="lp-phone" role="img" aria-label="Pinoy Permit on a phone: 11 of 12 permits current, with what is due next">
       <div class="lp-screen" aria-hidden="true"><div class="lp-notch"></div>
         <div><small>Good morning, Sadie</small><b class="lp-biz">Sadie's Kitchen</b></div>
         <div class="lp-ring"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="32"/><circle cx="40" cy="40" r="32" class="on"/></svg><div><b>11 of 12</b><small>permits current</small></div></div>
@@ -98,7 +98,7 @@ const worries = () => {
   ];
   return html`<section id="worry" class="lp-band" aria-labelledby="worry-h"><div class="lp-wrap">
     <h2 class="lp-big lp-narrow" id="worry-h">Things you'll never worry about again.</h2>
-    <p class="lp-lead">The headaches PermitPal takes off your plate.</p>
+    <p class="lp-lead">The headaches Pinoy Permit takes off your plate.</p>
     <div class="lp-worries">${list.map(([ic, t, b, d]) => html`<div class="lp-worry"><span class="lp-sq lp-sq-lg ${t}">${ic}</span><h3>${b}</h3><p>${d}</p></div>`)}</div>
   </div></section>`;
 };
@@ -133,9 +133,9 @@ const SCREENS = [
     <div class="lp-saved"><b>Mayor's Permit saved</b>Expires Dec 31. We'll remind you.</div></div>`,
   () => html`<div class="lp-scr" role="img" aria-label="Reminders 30 days, 7 days and 1 day before the Mayor's Permit is due">
     <div class="lp-clock"><b>7:00</b>Monday</div>
-    <div class="lp-msg"><b>PermitPal</b>Mayor's Permit is due in <b>30 days</b>.${has('library2') ? " Here's the checklist." : ''}</div>
-    <div class="lp-msg"><b>PermitPal</b>Still to do: Mayor's Permit, due in <b>7 days</b>.</div>
-    <div class="lp-msg"><b>PermitPal</b>Mayor's Permit is due <b>tomorrow</b>.</div>
+    <div class="lp-msg"><b>Pinoy Permit</b>Mayor's Permit is due in <b>30 days</b>.${has('library2') ? " Here's the checklist." : ''}</div>
+    <div class="lp-msg"><b>Pinoy Permit</b>Still to do: Mayor's Permit, due in <b>7 days</b>.</div>
+    <div class="lp-msg"><b>Pinoy Permit</b>Mayor's Permit is due <b>tomorrow</b>.</div>
     <div class="lp-msg lp-msg-sum"><b>Your Monday summary</b>2 things this week. The rest is current.</div></div>`,
   () => (has('library2') ? html`<div class="lp-scr" role="img" aria-label="A renewal checklist for the Mayor's Permit with three of five steps done">
     <b class="lp-scr-h">Renew Mayor's Permit</b>
@@ -207,7 +207,7 @@ const receipt = () => {
       <p class="lp-lead">Everything on the receipt, every month, for nothing. Add more only when you need it.</p>
     </div>
     <div class="lp-receipt">
-      <div class="lp-rc-top"><img src="img/logo.png" alt=""><b class="lp-rc-name wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></b><span class="lp-rc-plan">Free plan</span><span class="lp-rc-every">Every month</span></div>
+      <div class="lp-rc-top"><img src="img/logo.png" alt=""><b class="lp-rc-name wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></b><span class="lp-rc-plan">Free plan</span><span class="lp-rc-every">Every month</span></div>
       <hr class="lp-rc-dash">
       <ul class="lp-rc-lines">${lines.map(([ic, t, n]) => html`<li><span class="lp-sq lp-sq-round ${t}">${ic}</span><span class="lp-rc-n">${tick}${n}</span><span class="lp-rc-inc">Included</span></li>`)}</ul>
       <hr class="lp-rc-dash">
@@ -245,15 +245,15 @@ export function landing(app) {
 }
 
 // ---------------------------------------------------------------- the prices page
-// PermitPal Plus, shown: the public permit page with its QR code (example data).
+// Pinoy Permit Plus, shown: the public permit page with its QR code (example data).
 const plusShowcase = () => (has('plus') ? html`<section class="lp-show card" aria-labelledby="plus-h">
-  <div class="lp-show-copy"><span class="lp-kicker">PermitPal Plus · ${peso(PLUS_MONTHLY)} a month</span>
+  <div class="lp-show-copy"><span class="lp-kicker">Pinoy Permit Plus · ${peso(PLUS_MONTHLY)} a month</span>
     <h2 id="plus-h">Look legit. Stay a step ahead.</h2>
-    <p class="muted">One link and a QR poster show customers, malls and inspectors that your permits are current. Every morning PermitPal goes through your records and tells you what to fix.</p>
+    <p class="muted">One link and a QR poster show customers, malls and inspectors that your permits are current. Every morning Pinoy Permit goes through your records and tells you what to fix.</p>
     ${checks(PLUS_CHECKS.slice(0, 6))}
     <div class="btn-row"><a class="btn btn-primary" href="#/signup">Try it free for 14 days</a></div></div>
   <div class="lp-tp" role="img" aria-label="Example public permit page: three permits, two current and one being renewed, with a QR code">
-    <div class="lp-tp-top"><b>Sadie's Kitchen</b><small>Pasig City · from the business's own records, checked automatically by PermitPal today</small></div>
+    <div class="lp-tp-top"><b>Sadie's Kitchen</b><small>Pasig City · from the business's own records, checked automatically by Pinoy Permit today</small></div>
     ${[["Mayor's Permit", 'ok', 'Current'], ['Fire safety (FSIC)', 'ok', 'Current'], ['Sanitary permit', 'soon', 'Being renewed']].map(([n, st, t]) => html`<div class="pv-row" aria-hidden="true"><span class="pv-name">${n}</span><span class="pv-pill pv-${st}">${t}</span></div>`)}
     <div class="lp-tp-qr" aria-hidden="true">${QR}<span><b>Scan to check</b><small>Print it, stick it by the counter</small></span></div>
   </div>
@@ -276,7 +276,7 @@ const FAQ = [
   ['How does yearly work?', 'You pay for 10 months and get 12. That is 2 months free, every year.'],
   ['Can I stop anytime?', 'Yes. Your plan runs to the end of what you paid. Your data is never locked or deleted, and you can download it anytime.'],
 ];
-const faq = () => [...FAQ, ...(has('load') ? [['What is PermitPal load?', "Prepaid credit for the small extras: text reminders, one template at a time, a papers check, the renewal season pass. Top up from ₱100. It never expires, and unused paid load can be paid back to you if you ask."]] : [])];
+const faq = () => [...FAQ, ...(has('load') ? [['What is Pinoy Permit load?', "Prepaid credit for the small extras: text reminders, one template at a time, a papers check, the renewal season pass. Top up from ₱100. It never expires, and unused paid load can be paid back to you if you ask."]] : [])];
 // The plans and add-ons, with a "start" button for each (sign-up remembers which plan they picked).
 function pricingCards(plans) {
   const price = (id) => Number(plans.find((p) => p.id === id)?.price_php_monthly || 0);
@@ -286,7 +286,7 @@ function pricingCards(plans) {
 }
 const addons = () => (has('plus') ? html`<h2 class="lp-h3">Add-ons for any workspace</h2>
   <div class="pp-grid">
-    ${addonCard({ id: 'lp-plus', icon: ICON.share, name: 'PermitPal Plus', who: 'Show customers you are legit, and let PermitPal check your permits for you', monthly: PLUS_MONTHLY, list: PLUS_CHECKS,
+    ${addonCard({ id: 'lp-plus', icon: ICON.share, name: 'Pinoy Permit Plus', who: 'Show customers you are legit, and let Pinoy Permit check your permits for you', monthly: PLUS_MONTHLY, list: PLUS_CHECKS,
       cta: html`<a class="btn btn-soft btn-block" href="#/signup">Try free for 14 days</a>` })}
     ${addonCard({ id: 'lp-staff', icon: ICON.person, name: 'Staff licenses', who: 'Every license your team needs, tracked for you. They renew, you approve.',
       body: html`${staffTracks()}${checks(STAFF_CHECKS)}${staffLadder()}${staffExamples()}`, cta: html`<a class="btn btn-soft btn-block" href="#/signup">Start free with 3 people</a>` })}
@@ -308,7 +308,7 @@ export async function pricingPage(app) {
         <div data-plans>${pricingCards([])}</div>
         ${addons()}
       </section>
-      ${has('load') ? html`<section class="lp-load" aria-labelledby="load-h"><h2 class="lp-h3" id="load-h">Pay as you go, with PermitPal load</h2>
+      ${has('load') ? html`<section class="lp-load" aria-labelledby="load-h"><h2 class="lp-h3" id="load-h">Pay as you go, with Pinoy Permit load</h2>
         <p class="lp-sub">Top up from ₱100 by GCash, Maya or bank. Use it only on what you need. It never expires.</p>
         <div class="lp-load-grid" data-load-products>${loadCards(LOAD_FALLBACK)}</div></section>` : ''}
       ${plusShowcase()}

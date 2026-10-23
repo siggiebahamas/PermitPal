@@ -1,4 +1,4 @@
-// The automatic permit check (Plus). PermitPal runs it every morning and whenever this page opens:
+// The automatic permit check (Plus). Pinoy Permit runs it every morning and whenever this page opens:
 //   Fix these        facts from your own records (expired, no copy, no expiry date, a role's license missing)
 //   Please confirm   things that look off but might be right, asked as questions ("It's right" closes them)
 //   Coming up        renewals in the next 60 days
@@ -26,7 +26,7 @@ export async function checkPage(el) {
   const pct = run.items ? Math.round((run.in_order / run.items) * 100) : 100;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Permit check</h1>
-      <p class="muted">PermitPal goes through your records every morning: what's expired, what's missing, and dates that don't look right.</p></div>
+      <p class="muted">Pinoy Permit goes through your records every morning: what's expired, what's missing, and dates that don't look right.</p></div>
       <div class="btn-row"><button class="btn btn-ghost" data-act="check-run">Check again</button></div></div>
     <section class="card check-score">
       <div class="check-ring" style="--p:${pct}" role="img" aria-label="${run.in_order} of ${run.items} in order"><b>${run.in_order}</b><span>of ${run.items}</span></div>
@@ -44,16 +44,16 @@ export async function checkPage(el) {
       ${section('Coming up', 'Due in the next 60 days. Starting early avoids the rush.', by('soon'), 'soon')}
       ${when(!open.length, html`<section class="card"><p class="center"><b>All clear.</b> We'll keep checking every morning.</p></section>`)}
       <section class="card read-card" id="read-card"><div class="card-head"><div><h2>Read your photos</h2>
-        <p class="card-sub">PermitPal can read the dates on the photos you've uploaded, here on this device, and ask you if one doesn't match what's saved. PDFs aren't read.</p></div></div>
+        <p class="card-sub">Pinoy Permit can read the dates on the photos you've uploaded, here on this device, and ask you if one doesn't match what's saved. PDFs aren't read.</p></div></div>
         <div class="read-out"><button class="btn btn-soft" data-act="check-read">Look for photos to read</button></div></section>
       ${when(answered.length, html`<details class="card"><summary><b>You answered</b> <span class="muted small">${plural(answered.length, 'question')}</span></summary>
         ${answered.map((f) => html`<div class="line"><div class="line-main"><b>${f.title}</b><small>${f.note ? `“${f.note}”` : 'Marked as right'}</small></div>
           ${when(canEdit(), html`<button class="btn btn-sm btn-ghost" data-act="finding-reopen" data-id="${f.id}">Undo</button>`)}</div>`)}</details>`)}`
     : html`<section class="card plus-teaser"><h2>See each one, and how to fix it</h2>
-        <p>PermitPal Plus lists every item it found with a one-tap fix, checks again every morning, reads the dates on your photos, and emails a report on the 1st.</p>
+        <p>Pinoy Permit Plus lists every item it found with a one-tap fix, checks again every morning, reads the dates on your photos, and emails a report on the 1st.</p>
         <ul class="plus-perks">${PLUS_PERKS.map(([t, d]) => html`<li><b>${t}.</b> ${d}</li>`)}</ul>
         <button class="btn btn-primary" data-act="plus-upsell" data-what="The full permit check">See Plus</button></section>`}
-    <p class="fineprint">PermitPal checks your own records automatically. It doesn't issue permits or verify them with the government: anything it isn't sure about is asked, not stated.</p>`);
+    <p class="fineprint">Pinoy Permit checks your own records automatically. It doesn't issue permits or verify them with the government: anything it isn't sure about is asked, not stated.</p>`);
 }
 
 function section(title, sub, items, sev) {

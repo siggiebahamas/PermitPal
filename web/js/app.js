@@ -32,7 +32,7 @@ import { loadCityDates } from './views/citydates.js';
 // Never run inside another website's frame (a trick to make people click hidden buttons). GitHub Pages
 // cannot send the header that blocks this, so the page checks for itself; our own frames are fine.
 try { if (window.top !== window.self && window.top.location.origin !== location.origin) throw new Error(); }
-catch { document.documentElement.innerHTML = ''; throw new Error('PermitPal cannot be shown inside another website.'); }
+catch { document.documentElement.innerHTML = ''; throw new Error('Pinoy Permit cannot be shown inside another website.'); }
 
 const app = document.getElementById('app');
 let recovery = false;
@@ -44,11 +44,11 @@ const T = {
   en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
         filings: 'Taxes & contributions', pros: 'Find a professional', services: 'Done for you', care: 'Year-round care', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
         check: 'Permit check', templates: 'Templates', load: 'Load',
-        notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact PermitPal', tools: 'Tools', account: 'Account' },
+        notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact Pinoy Permit', tools: 'Tools', account: 'Account' },
   tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
         filings: 'Buwis at kontribusyon', pros: 'Maghanap ng Propesyonal', services: 'Ipaasikaso sa amin', care: 'Alaga buong taon', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
         check: 'Pagsusuri ng permit', templates: 'Mga template', load: 'Load',
-        notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang PermitPal', tools: 'Mga Tool', account: 'Account' },
+        notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang Pinoy Permit', tools: 'Mga Tool', account: 'Account' },
 };
 const t = (k) => (T[S.profile?.lang] || T.en)[k] || T.en[k] || k;
 
@@ -125,7 +125,7 @@ async function start() {
     // Joined with another business's invitation link: say so (it only counts for a new workspace's owner).
     const ref = sessionStorageTake('pp-ref');
     if (ref && has('load') && S.org.role === 'owner') {
-      db.claimInvite(S.org.id, ref).then((yes) => { if (yes) toast('Welcome! Add 3 permits with their dates and you and the business that invited you both get a month of PermitPal Plus.'); }).catch(() => {});
+      db.claimInvite(S.org.id, ref).then((yes) => { if (yes) toast('Welcome! Add 3 permits with their dates and you and the business that invited you both get a month of Pinoy Permit Plus.'); }).catch(() => {});
     }
     const connect = parts[0] === 'connect' ? null : sessionStorageTake('pp-connect');
     if (connect) history.replaceState(null, '', '#/connect/' + connect);
@@ -135,7 +135,7 @@ async function start() {
     renderShell();
   } catch (e) {
     reportError(e); // a lost connection is ignored by the reporter; anything else is a bug worth knowing about
-    app.innerHTML = String(html`<main class="auth"><div class="auth-card"><h1 class="auth-title">Couldn't load PermitPal</h1><p class="tagline">${friendlyError(e)}</p>
+    app.innerHTML = String(html`<main class="auth"><div class="auth-card"><h1 class="auth-title">Couldn't load Pinoy Permit</h1><p class="tagline">${friendlyError(e)}</p>
       <button class="btn btn-primary btn-block" data-act="reload">Try again</button>
       <button class="btn btn-ghost btn-block" data-act="sign-out">Sign out</button></div></main>`);
   }
@@ -143,7 +143,7 @@ async function start() {
 
 async function loadData() {
   [S.data] = await Promise.all([db.loadOrgData(S.org.id, { revenue: has('revenue'), plus: has('plus') }), loadCityDates()]);
-  // A client of an accounting firm with White-label sees the firm's logo and color (Powered by PermitPal).
+  // A client of an accounting firm with White-label sees the firm's logo and color (Powered by Pinoy Permit).
   const prev = JSON.stringify(S.brand);
   S.brand = has('brand') && S.org.kind === 'business' ? await db.clientBrand(S.org.id).catch(() => null) : null;
   applyBrand(S.brand);
@@ -230,7 +230,7 @@ function renderShell() {
   renderPage();
 }
 
-const ppBrand = () => html`<a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>`;
+const ppBrand = () => html`<a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span></a>`;
 // The firm's look switched on or off while the app was open (it comes and goes with the add-on).
 function paintBrand() {
   const set = (slot, v) => { const el = document.querySelector(`[data-brand-slot="${slot}"]`); if (el) el.innerHTML = String(v); };
@@ -297,7 +297,7 @@ async function renderPage() {
     else dashboard(main);
   } catch (e) {
     console.error(e);
-    reportError(e); // PermitPal staff see this in Admin > Errors
+    reportError(e); // Pinoy Permit staff see this in Admin > Errors
     main.innerHTML = String(html`<div class="empty"><div class="empty-title">Something went wrong on this page</div>
       <p>${friendlyError(e)}</p><p class="muted small">We've been told about it automatically. Try again, or go back to the dashboard.</p>
       <div class="btn-row"><button class="btn btn-primary" data-act="reload">Try again</button><a class="btn btn-ghost" href="#/">Dashboard</a></div></div>`);
@@ -367,6 +367,6 @@ db.auth.onChange((event) => {
 });
 window.addEventListener('pp-password-updated', () => { recovery = false; });
 
-// Errors in people's browsers are reported to PermitPal staff (scrubbed of personal details).
+// Errors in people's browsers are reported to Pinoy Permit staff (scrubbed of personal details).
 initErrorReporting((r) => (S.features?.errors ? db.logClientError(r) : Promise.resolve()), () => ({ orgId: S.org?.id }));
 start();

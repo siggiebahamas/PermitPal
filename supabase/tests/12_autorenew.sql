@@ -123,7 +123,7 @@ select set_config('request.jwt.claims', '{"sub":"c1000000-0000-4000-8000-0000000
 set local role authenticated;
 do $$ begin perform public.file_guarantee_claim((select plan from t_ids), (select mp from t_ids), 500, null, (select org from t_ids) || '/care/claims/r.pdf');
   perform pg_temp.res('no guarantee on pay per renewal', false, 'was allowed');
-exception when others then perform pg_temp.res('no guarantee on pay per renewal', sqlerrm = 'PermitPal doesn''t pay late penalties or surcharges.', sqlerrm); end $$;
+exception when others then perform pg_temp.res('no guarantee on pay per renewal', sqlerrm = 'Pinoy Permit doesn''t pay late penalties or surcharges.', sqlerrm); end $$;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 
 -- ---------------------------------------------------------------- the founder's numbers

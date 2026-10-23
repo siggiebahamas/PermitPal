@@ -32,16 +32,16 @@ Deno.serve(async (req) => {
   if (request_id) {
     const { data, error } = await asUser.rpc("order_payment_start", { p_req: request_id });
     if (error) return json({ error: error.message }, 400);
-    start = data; lineName = `PermitPal: ${data.name}`; lineDesc = data.description; back = `#/services/orders/${request_id}`;
+    start = data; lineName = `Pinoy Permit: ${data.name}`; lineDesc = data.description; back = `#/services/orders/${request_id}`;
   } else {
     const { data, error } = await asUser.rpc("billing_start", { p_org: org_id, p_plan: plan_id, p_months: months ?? 1 });
     if (error) return json({ error: error.message }, 400);
     start = data;
     if (data.kind === "load") {
       // A load top-up (plan "load:<id>"): no months, and back to the Load page.
-      lineName = `PermitPal ${data.plan_name}`; lineDesc = data.org_name; back = "#/load";
+      lineName = `Pinoy Permit ${data.plan_name}`; lineDesc = data.org_name; back = "#/load";
     } else {
-      lineName = `PermitPal ${data.plan_name} - ${data.months} month${data.months > 1 ? "s" : ""}${data.months_free ? ` (${data.months_free} free)` : ""}`;
+      lineName = `Pinoy Permit ${data.plan_name} - ${data.months} month${data.months > 1 ? "s" : ""}${data.months_free ? ` (${data.months_free} free)` : ""}`;
       lineDesc = data.org_name; back = "#/settings/billing";
     }
   }

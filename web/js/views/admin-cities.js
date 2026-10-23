@@ -26,7 +26,7 @@ export async function citiesTab() {
         <div class="grid2">
           <label class="field"><span>City or municipality</span><input name="city" list="adm-city-list" maxlength="80" required autocomplete="off" placeholder="e.g. Manila">
             <datalist id="adm-city-list">${counts.map((c) => html`<option value="${c.city_name}">${c.city_name}: ${plural(c.workspaces, 'workspace')}, ${plural(c.permits, 'business permit')}</option>`)}</datalist>
-            <small data-city-hint class="muted">${counts.length ? `${plural(counts.length, 'city', 'cities')} with business permits in PermitPal.` : 'No business permits yet.'}</small></label>
+            <small data-city-hint class="muted">${counts.length ? `${plural(counts.length, 'city', 'cities')} with business permits in Pinoy Permit.` : 'No business permits yet.'}</small></label>
           <label class="field"><span>For the permit year</span><select name="year">${years.map((v) => html`<option value="${v}">${v}</option>`)}</select></label>
           <label class="field"><span>New deadline</span><input type="date" name="due_on" required min="${todayPH()}"></label>
           <label class="field"><span>Link to the notice or news report</span><input type="url" name="source_url" maxlength="500" required placeholder="https://"></label>

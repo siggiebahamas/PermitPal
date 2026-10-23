@@ -1,4 +1,4 @@
-/* PermitPal — phone first. "Calendar Horizon" look on the warm cream canvas of Buzz and Nifti:
+/* Pinoy Permit — phone first. "Calendar Horizon" look on the warm cream canvas of Buzz and Nifti:
    crisp white cards, dark-blue actions, bold sans headlines, one color per status. */
 :root {
   --bg: #F8F6F2; --bg-grad: none; --card: #fff; --border: #E9E4DB; --text: #1F2A44; --muted: #4B5568; --heading: #0B1B3A;
@@ -1328,7 +1328,7 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .lane.empty p { margin: 0; }
 .todo-n { white-space: nowrap; flex: none; }
 
-/* ---------- PermitPal Plus and staff licenses ---------- */
+/* ---------- Pinoy Permit Plus and staff licenses ---------- */
 .plus-perks { margin: 8px 0 14px; padding-left: 20px; }
 .plus-perks li { margin: 6px 0; }
 .staff-calc { margin-top: 6px; }
@@ -1446,7 +1446,7 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .pp-text small { font-size: 11.5px; color: #4B5568; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qr-mini svg, .qr-mini svg * { stroke: none; }
 
-/* White-label: an accounting firm's look for its clients (always with "Powered by PermitPal") */
+/* White-label: an accounting firm's look for its clients (always with "Powered by Pinoy Permit") */
 .banner.ok { background: var(--green-bg); color: #1D5A3C; }
 .co-brand { min-width: 0; }
 .co-brand img { width: auto; max-width: 120px; max-height: 34px; object-fit: contain; }
@@ -1687,7 +1687,7 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .ladder-head { margin: 14px 0 0; font-size: 13.5px; font-weight: 700; color: var(--muted); text-align: center; }
 .ladder-head + .ladder { margin-top: 6px; }
 
-/* Prices page: the PermitPal Plus showcase */
+/* Prices page: the Pinoy Permit Plus showcase */
 .lp-show { display: grid; gap: 22px; margin-top: 30px; align-items: center; border-top: 5px solid var(--accent); }
 @media (min-width: 900px) { .lp-show { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); } }
 .lp-show h2 { margin: 6px 0 8px; font-size: 24px; color: var(--heading); }
@@ -1927,7 +1927,7 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 }
 @media (max-width: 400px) { .lp-wrap { padding: 0 16px; } .lp-hero2 h1 { letter-spacing: -1.4px; } }
 
-/* ---------------------------------------------------------------- PermitPal load */
+/* ---------------------------------------------------------------- Pinoy Permit load */
 .load-hero { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; }
 .load-bal { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .load-amt { font-family: var(--font-head); font-weight: 800; font-size: 40px; line-height: 1.05; color: var(--heading); letter-spacing: -1px; }
@@ -2135,7 +2135,7 @@ a.pk-tag:hover { filter: brightness(.96); text-decoration: underline; }
 .city-counts { columns: 2 260px; column-gap: 24px; }
 .city-counts .hol-row { break-inside: avoid; }
 
-/* "Let PermitPal pay it" */
+/* "Let Pinoy Permit pay it" */
 .bill-offer { border: 2px solid var(--brand); border-radius: 14px; padding: 14px 16px; margin: 6px 0 12px; background: var(--accent-soft); }
 .bill-offer.compact { padding: 10px 12px; }
 .bill-offer-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 6px; }

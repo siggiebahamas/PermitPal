@@ -134,7 +134,7 @@ const CTX = {
 };
 
 test('import: businesses are matched, guessed carefully, and duplicates skipped', () => {
-  const res = checkImport('businesses', [['My PermitPal list'], ['Business Name', 'Industry', 'Structure', 'City'],
+  const res = checkImport('businesses', [['My Pinoy Permit list'], ['Business Name', 'Industry', 'Structure', 'City'],
     ['Lola Nena Bakeshop', 'Bakery', '', 'Quezon City'], ['Mabuhay Trading Inc.', 'Wholesale', '', ''], ['corner bakery corp.', '', 'Corp', ''],
     ['Lola Nena Bakeshop', '', '', ''], ['', 'Retail', '', ''], ['Odd Co', 'Space mining', 'Single', '']], CTX);
   assert.equal(res.headerRow, 2); // found under a title row
@@ -143,7 +143,7 @@ test('import: businesses are matched, guessed carefully, and duplicates skipped'
   assert.ok(a.notes.some((n) => /blank: set to Sole Proprietorship/.test(n)));
   assert.equal(b.f.structure, 'Corporation'); // from "Inc." in the name, with a note saying so
   assert.equal(b.f.activity, 'retail');
-  assert.ok(c.problems.includes('Already in PermitPal')); // different capitals, same business
+  assert.ok(c.problems.includes('Already in Pinoy Permit')); // different capitals, same business
   assert.ok(d.problems.includes('This business appears twice in the file'));
   assert.ok(e.problems.includes('Business name is missing'));
   assert.equal(f.f.activity, 'other'); assert.ok(f.notes.some((n) => /Space mining/.test(n)));
@@ -153,14 +153,14 @@ test('import: branches need an existing business, and typos get a suggestion', (
   const res = checkImport('branches', [['Business name', 'Branch name', 'City'], ['Kape Uno', 'Alabang', 'Muntinlupa'], ['Kape Un0', 'BGC', 'Taguig'], ['Kape Uno', 'ortigas', '']], CTX);
   assert.equal(res.rows[0].problems.length, 0);
   assert.match(res.rows[1].problems[0], /Did you mean "Kape Uno"/);
-  assert.ok(res.rows[2].problems.includes('This branch is already in PermitPal'));
+  assert.ok(res.rows[2].problems.includes('This branch is already in Pinoy Permit'));
 });
 
 test('import: vehicles keep the old rules (plates, types, dates)', () => {
   const res = checkImport('vehicles', [['Make and model', 'Plate number', 'Type', 'Registration expires'], ['L300', 'abc-1234', 'mpv', '03/04/2027'], ['Elf', 'NGV5588', 'Truck', ''], ['Beat', 'XYZ 9', 'Spaceship', '31/02/2027']], CTX);
   assert.equal(res.ambiguous, true);
   assert.deepEqual([res.rows[0].f.vehicle_type, res.rows[0].f.registration_expires], ['Van', '2027-03-04']);
-  assert.ok(res.rows[1].problems.includes('Already in PermitPal')); // same plate without the space
+  assert.ok(res.rows[1].problems.includes('Already in Pinoy Permit')); // same plate without the space
   assert.equal(res.rows[2].problems.length, 2); // bad type and impossible date
   const dayFirst = checkImport('vehicles', [['Make and model', 'Registration expires'], ['L300', '03/04/2027']], CTX, { dayFirst: true });
   assert.equal(dayFirst.rows[0].f.registration_expires, '2027-04-03');
@@ -173,7 +173,7 @@ test('import: staff with licenses; existing staff are pointed to permit records'
   assert.deepEqual(a.f.licences.map((l) => l.type_code), ['drivers_license', 'nbi_clearance']);
   assert.equal(a.f.business_id, 'b2');
   assert.ok(a.notes.some((n) => /already expired/.test(n)));
-  assert.match(b.problems[0], /Already in PermitPal/);
+  assert.match(b.problems[0], /Already in Pinoy Permit/);
   assert.match(c.notes[0], /not found, so not linked/);
 });
 
@@ -190,11 +190,11 @@ test('import: permit records find the right thing and never overwrite newer data
     ['Juan dela Cruz', '', 'NBI', 'N-1', '', '2027-06-30'],                              // a staff license, added
     ['Corner Bakery Corp.', '', 'Pest control certificate', '', '', '2027-03-01'],      // not in the library: own permit
     ['Nobody Inc', '', 'Business permit', 'X', '', '2027-01-20'],
-    ['Corner Bakery Corp.', '', "Mayor's / Business Permit", 'BP-1', '', '2027-01-20'],  // same as PermitPal: skip
+    ['Corner Bakery Corp.', '', "Mayor's / Business Permit", 'BP-1', '', '2027-01-20'],  // same as Pinoy Permit: skip
     ['Corner Bakery Corp.', '', 'BIR', 'COR-1', '2020-01-01', '2030-01-01']], CTX);
   const r = res.rows;
   assert.equal(r[0].f.action, 'renewal'); assert.equal(r[0].problems.length, 0);
-  assert.match(r[1].problems[0], /Older than what PermitPal has/);
+  assert.match(r[1].problems[0], /Older than what Pinoy Permit has/);
   assert.equal(r[2].f.action, 'record');
   assert.ok(r[3].problems.includes('Expires before it was issued: check the two dates') && r[3].problems.includes('Issued in the future: check the date'));
   assert.match(r[4].problems[0], /No branch "Makati"/);
@@ -334,7 +334,7 @@ test('prices: yearly is 10 months; Plus is ₱199 or ₱1,990', () => {
   assert.equal(addonPrice('plus', null, 'monthly'), 199);
   assert.equal(addonPrice('plus', null, 'yearly'), 1990);
   assert.equal(addonLabel('staff', 25, 'monthly'), 'Staff licenses, up to 25 people (monthly)');
-  assert.equal(addonLabel('plus', null, 'yearly'), 'PermitPal Plus (yearly)');
+  assert.equal(addonLabel('plus', null, 'yearly'), 'Pinoy Permit Plus (yearly)');
 });
 test('prices: White-label is ₱1,000 a month or ₱10,000 a year (supabase/tests/15_whitelabel.sql checks the same)', () => {
   assert.equal(addonPrice('brand', null, 'monthly'), 1000);

@@ -5,16 +5,16 @@ import * as db from 'pp/data';
 
 const shell = (inner) => html`<main class="auth"><div class="auth-card">
   <img class="auth-logo" src="img/logo.png" alt="">
-  <div class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></div>
+  <div class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></div>
   ${inner}</div></main>`;
 
 export function authPage(el, mode, ctx = {}) {
   const invite = ctx.invite;
   const inviteNote = invite ? html`<div class="banner info"><div><b>${invite.invited_by || 'Someone'}</b> invited you to <b>${invite.org_name}</b>.
     ${mode === 'signup' ? 'Create your account' : 'Log in'} with <b>${invite.email}</b> to join.</div></div>`
-    : ctx.connect ? html`<div class="banner info"><div><b>A company invited you to connect on PermitPal.</b> ${mode === 'signup' ? 'Create your free account' : 'Log in'} to review what they would see before you accept.
+    : ctx.connect ? html`<div class="banner info"><div><b>A company invited you to connect on Pinoy Permit.</b> ${mode === 'signup' ? 'Create your free account' : 'Log in'} to review what they would see before you accept.
       ${mode === 'signup' ? html`Already have an account? <a href="#/login">Log in</a>.` : ''}</div></div>`
-    : mode === 'signup' && sessionStoragePeek('pp-ref') ? html`<div class="banner info"><div><b>A business you know invited you.</b> Create your free account and add 3 permits with their dates: you both get a month of PermitPal Plus, free.</div></div>` : '';
+    : mode === 'signup' && sessionStoragePeek('pp-ref') ? html`<div class="banner info"><div><b>A business you know invited you.</b> Create your free account and add 3 permits with their dates: you both get a month of Pinoy Permit Plus, free.</div></div>` : '';
 
   if (mode === 'signup') {
     el.innerHTML = String(shell(html`
@@ -26,7 +26,7 @@ export function authPage(el, mode, ctx = {}) {
         <label class="field"><span>Last name</span><input name="last_name" maxlength="80" autocomplete="family-name"></label></div>
         <label class="field"><span>Email</span><input type="email" name="email" required autocomplete="email" value="${invite?.email || ''}"></label>
         <label class="field"><span>Password <small>(at least 8 characters)</small></span><input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
-        <label class="check"><input type="checkbox" name="consent" required> <span>I agree to the <a href="terms.html" target="_blank">Terms</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>, and consent to PermitPal storing my business and vehicle documents.</span></label>
+        <label class="check"><input type="checkbox" name="consent" required> <span>I agree to the <a href="terms.html" target="_blank">Terms</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>, and consent to Pinoy Permit storing my business and vehicle documents.</span></label>
         <div class="form-error" hidden></div>
         <button class="btn btn-primary btn-block">Create account</button>
       </form>
@@ -62,7 +62,7 @@ export function authPage(el, mode, ctx = {}) {
         <button class="btn btn-primary btn-block">Log in</button>
       </form>
       ${google()}
-      <p class="switch-auth">New to PermitPal? <a href="#/signup">Create an account</a></p>
+      <p class="switch-auth">New to Pinoy Permit? <a href="#/signup">Create an account</a></p>
       <p class="switch-auth"><a href="demo/">Look around the demo first</a> · sample data, no sign-up</p>`));
   }
 
@@ -112,7 +112,7 @@ export async function invitePage(el, token, loggedIn) {
   if (!inv || inv.status !== 'pending') {
     el.innerHTML = String(shell(html`<h1 class="auth-title">Invitation ${inv ? inv.status : 'not found'}</h1>
       <p class="tagline">${inv?.status === 'accepted' ? 'This invitation was already used.' : 'Ask the person who invited you for a new link.'}</p>
-      <a class="btn btn-primary btn-block" href="#/">Go to PermitPal</a>`));
+      <a class="btn btn-primary btn-block" href="#/">Go to Pinoy Permit</a>`));
     return null;
   }
   sessionStorageSet('pp-invite', token);

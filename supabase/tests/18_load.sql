@@ -1,4 +1,4 @@
--- PermitPal load: top-ups (by transfer and online), text packs and how texts use them, templates one at a time,
+-- Pinoy Permit load: top-ups (by transfer and online), text packs and how texts use them, templates one at a time,
 -- papers checks (asking, photos, staff answering, cancelling, refunds, late answers), the renewal season pass,
 -- inviting a business, staff gifts and pay-backs, money views and who can see what. Rolled back at the end.
 begin;
@@ -170,7 +170,7 @@ update public.app_settings set value = '1' where key = 'sms_monthly_cap';
 update public.load_wallets set texts = 3 where org_id = (select org from t_ids);
 insert into public.message_outbox (org_id, user_id, channel, to_address, body_text, dedupe_key)
   select org, 'e9000000-0000-4000-8000-0000000000a1', 'sms', '+639171230001', 'test', 'test-paid' from t_ids;
-select pg_temp.res('the monthly cap (for texts PermitPal pays) doesn''t stop paid-for texts', text_source = 'credit' and status = 'queued', coalesce(last_error, status))
+select pg_temp.res('the monthly cap (for texts Pinoy Permit pays) doesn''t stop paid-for texts', text_source = 'credit' and status = 'queued', coalesce(last_error, status))
   from public.message_outbox where dedupe_key = 'test-paid';
 insert into public.message_outbox (org_id, user_id, channel, to_address, body_text, dedupe_key)
   select team, 'e9000000-0000-4000-8000-0000000000c3', 'sms', '+639171230003', 'test', 'test-plan2' from t_ids;
@@ -191,7 +191,7 @@ update public.load_wallets set texts = 0 where org_id = (select org from t_ids);
 -- ---------------------------------------------------------------- one template, yours to keep
 select pg_temp.as_user('e9000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
-select pg_temp.res('without Plus, a template''s full text is locked', pg_temp.err(format('select public.get_template(%L, %L)', (select org from t_ids), 'authorization_letter')) like 'Ready-to-use templates come with PermitPal Plus, or one at a time%', '');
+select pg_temp.res('without Plus, a template''s full text is locked', pg_temp.err(format('select public.get_template(%L, %L)', (select org from t_ids), 'authorization_letter')) like 'Ready-to-use templates come with Pinoy Permit Plus, or one at a time%', '');
 select public.unlock_template(org, 'authorization_letter') from t_ids;
 select pg_temp.res('bought for ₱39: it opens', (public.get_template(org, 'authorization_letter') ->> 'title') = 'Authorization letter'
   and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 512, '') from t_ids;
@@ -203,7 +203,7 @@ select pg_temp.res('other templates stay locked', pg_temp.err(format('select pub
 reset role;
 select pg_temp.as_user('e9000000-0000-4000-8000-0000000000c3');
 set local role authenticated;
-select pg_temp.res('a workspace with Plus doesn''t pay for templates', pg_temp.err(format('select public.unlock_template(%L, %L)', (select team from t_ids), 'authorization_letter')) like 'Your workspace has PermitPal Plus%', '');
+select pg_temp.res('a workspace with Plus doesn''t pay for templates', pg_temp.err(format('select public.unlock_template(%L, %L)', (select team from t_ids), 'authorization_letter')) like 'Your workspace has Pinoy Permit Plus%', '');
 select pg_temp.res('...and can''t spend someone else''s load', pg_temp.err(format('select public.unlock_template(%L, %L)', (select org from t_ids), 'authorization_letter')) like 'Only the workspace owner%', '');
 reset role;
 
@@ -342,7 +342,7 @@ select pg_temp.res('a wrong code says so', pg_temp.err(format('select public.cla
 select pg_temp.res('the right code is accepted once', public.claim_invite(neworg, lower(code)) and not public.claim_invite(neworg, code), '') from t_ids;
 select pg_temp.res('the new business sees it''s waiting for 3 permits', (public.load_summary(neworg) -> 'invites' -> 'invited_by' ->> 'status') = 'pending', '') from t_ids;
 reset role;
-select pg_temp.res('the inviter hears a business joined', exists (select 1 from public.notifications where user_id = 'e9000000-0000-4000-8000-0000000000a1' and title = 'A business you invited joined PermitPal'), '');
+select pg_temp.res('the inviter hears a business joined', exists (select 1 from public.notifications where user_id = 'e9000000-0000-4000-8000-0000000000a1' and title = 'A business you invited joined Pinoy Permit'), '');
 select pg_temp.as_user('e9000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 select pg_temp.res('the inviter sees it (no name), waiting', (select count(*) = 1 and bool_and(status = 'pending' and permits_with_dates = 0) from public.my_invites((select org from t_ids))), '');

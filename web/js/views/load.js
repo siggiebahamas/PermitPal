@@ -1,4 +1,4 @@
-// PermitPal load: prepaid credit for the small extras that each do one job: text reminders, one template
+// Pinoy Permit load: prepaid credit for the small extras that each do one job: text reminders, one template
 // at a time, a papers check before you queue, and the renewal season pass. Topping it up (GCash, Maya, bank
 // or online), inviting other businesses, and the history of every peso. The database checks every price and
 // rule again; nothing here decides what anything costs.
@@ -47,7 +47,7 @@ export async function loadPage(el) {
     <div class="page-head"><div><h1>Load</h1>
       <p class="muted">Prepaid credit for small extras: text reminders, a single template, a papers check, the renewal season pass. It never expires.</p></div></div>
     ${s.invites?.invited_by?.status === 'pending' ? html`<div class="banner info"><div><b>You joined by invitation.</b>
-      Add 3 permits with their dates (${s.invites.invited_by.permits} of 3 so far) and you both get a month of PermitPal Plus, free.</div>
+      Add 3 permits with their dates (${s.invites.invited_by.permits} of 3 so far) and you both get a month of Pinoy Permit Plus, free.</div>
       <a class="btn btn-sm btn-primary" href="#/compliance">Add dates</a></div>` : ''}
     ${open.map((t) => html`<div class="banner ${t.status === 'due' ? 'info' : 'progress'}"><div>${t.status === 'due'
       ? html`<b>Top-up ${t.number}: ${peso(t.amount_php)} to pay.</b> ${t.note ? html`${t.note} ` : ''}Good until ${fmtDate(t.valid_until)}.`
@@ -78,7 +78,7 @@ export async function loadPage(el) {
       : html`<p class="muted">Nothing yet. Top up to start: from ${peso(100)}.</p>`}</section>
     ${when(L.topups.length, html`<details class="card bills-all"><summary><b>Top-ups</b> <span class="muted small">${plural(L.topups.length, 'top-up')}</span></summary>
       ${L.topups.map(topupRow)}</details>`)}
-    <p class="fineprint">Load is prepaid credit for PermitPal's own services in this workspace. It never expires and can't be sent to anyone. Paid load that's still unused can be paid back to you: ask us from <a href="#/contact">Contact PermitPal</a>. Bonus load (from invitations or gifts) is used first and can't be paid out. Prices include everything. <a href="terms.html#load" target="_blank" rel="noopener">Terms for load</a>.</p>`);
+    <p class="fineprint">Load is prepaid credit for Pinoy Permit's own services in this workspace. It never expires and can't be sent to anyone. Paid load that's still unused can be paid back to you: ask us from <a href="#/contact">Contact Pinoy Permit</a>. Bonus load (from invitations or gifts) is used first and can't be paid out. Prices include everything. <a href="terms.html#load" target="_blank" rel="noopener">Terms for load</a>.</p>`);
   wireLoad(el);
 }
 
@@ -139,7 +139,7 @@ function inviteSection(s) {
   const n = s.invites;
   return html`<h2 class="section-label" id="invite">Invite a business</h2>
   <section class="card invite-card">
-    <p><b>Know another business owner who juggles permits?</b> Send them your link. When they've added 3 permits with their dates, you both get a month of PermitPal Plus, free${s.has_plus ? ' (you already have Plus, so yours comes as ₱199 bonus load)' : ''}.</p>
+    <p><b>Know another business owner who juggles permits?</b> Send them your link. When they've added 3 permits with their dates, you both get a month of Pinoy Permit Plus, free${s.has_plus ? ' (you already have Plus, so yours comes as ₱199 bonus load)' : ''}.</p>
     <div class="invite-row"><div class="invite-link" data-invite-link><span class="muted small">Getting your link…</span></div>
       <button class="btn btn-soft" data-act="invite-copy" disabled>Copy link</button>
       ${when(typeof navigator !== 'undefined' && navigator.share, html`<button class="btn btn-ghost" data-act="invite-share" disabled>Share</button>`)}</div>
@@ -172,7 +172,7 @@ on('invite-copy', async () => {
 on('invite-share', async () => {
   const url = document.querySelector('[data-invite-link]')?.dataset.url;
   if (!url) return;
-  try { await navigator.share({ title: 'PermitPal', text: 'I use PermitPal to keep our permits and tax deadlines on track. Join with my link and we both get a month of Plus free:', url }); } catch { /* closed */ }
+  try { await navigator.share({ title: 'Pinoy Permit', text: 'I use Pinoy Permit to keep our permits and tax deadlines on track. Join with my link and we both get a month of Plus free:', url }); } catch { /* closed */ }
 });
 
 function entryRow(e) {
@@ -212,7 +212,7 @@ export function openTopup(suggest = 0) {
 async function openPayTopup(t) {
   const st = await paySettings();
   openModal(`Pay top-up ${t.number}`, html`
-    <div class="quote-hint"><b>${peso(t.amount_php)}</b> <span class="muted">PermitPal load, good to pay until ${fmtDate(t.valid_until)}</span></div>
+    <div class="quote-hint"><b>${peso(t.amount_php)}</b> <span class="muted">Pinoy Permit load, good to pay until ${fmtDate(t.valid_until)}</span></div>
     ${payDetails(st)}
     <div class="grid2">
       <label class="field"><span>Paid with</span><select name="method"><option value="gcash">GCash</option><option value="maya">Maya</option><option value="bank_transfer">Bank transfer</option><option value="other">Other</option></select></label>
@@ -330,7 +330,7 @@ export async function openPapersCheck(r, docsCount = 0) {
     <label class="field"><span>Anything we should know? <small>(optional)</small></span><textarea name="note" maxlength="1000" rows="2" placeholder="e.g. We moved to a new unit in March."></textarea></label>
     <div class="calc-lines"><div class="calc-total"><span>${pass ? 'Your season pass covers this one' : 'From your load'}</span><b>${pass ? 'Free' : peso(cost)}</b></div></div>
     ${when(!pass && cost > have, html`<p class="small"><b>You have ${peso(have)}.</b> Top up first, then come back.</p>`)}
-    <p class="muted small">Only PermitPal staff see these photos, and each time they open one it's listed under Settings. Photos sent here never count as the permit's own document.</p>`, {
+    <p class="muted small">Only Pinoy Permit staff see these photos, and each time they open one it's listed under Settings. Photos sent here never count as the permit's own document.</p>`, {
     submitLabel: !pass && cost > have ? 'Top up' : pass ? 'Send for checking' : `Send for checking · ${peso(cost)}`,
     onSubmit: async (fd) => {
       if (!pass && cost > have) { setTimeout(() => openTopup(Math.max(100, Math.ceil((cost - have) / 50) * 50)), 30); return; }
@@ -385,7 +385,7 @@ export async function loadSettingsCard() {
   if (!has('load')) return '';
   let s;
   try { s = (await loadState(true)).summary; } catch { return ''; }
-  return html`<section class="card load-mini"><div class="card-head"><h2>PermitPal load</h2><a class="btn btn-sm btn-soft" href="#/load">Open</a></div>
+  return html`<section class="card load-mini"><div class="card-head"><h2>Pinoy Permit load</h2><a class="btn btn-sm btn-soft" href="#/load">Open</a></div>
     <p><b class="load-amt-sm">${peso(s.total)}</b> <span class="muted">· ${s.plan_texts ? 'texts included in your plan' : plural(s.texts, 'text reminder') + ' left'}${s.pass ? ` · season pass until ${fmtDate(s.pass.ends_on)}` : ''}</span></p>
     <p class="muted small">Prepaid credit for text reminders, single templates, papers checks and the renewal season pass. It never expires.</p></section>`;
 }

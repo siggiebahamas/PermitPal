@@ -1,4 +1,4 @@
-// "Contact PermitPal": questions, problems, plan and payment questions, and privacy requests
+// "Contact Pinoy Permit": questions, problems, plan and payment questions, and privacy requests
 // (the Data Protection Officer reads these). Works signed in, or signed out for people without an
 // account (e.g. staff whose license details an employer added). The message is emailed to the team.
 import { html, when } from '../util.js';
@@ -7,7 +7,7 @@ import { friendlyError } from '../util.js';
 import * as db from 'pp/data';
 
 const TOPICS = [
-  ['question', 'A question about PermitPal'],
+  ['question', 'A question about Pinoy Permit'],
   ['problem', 'Something is not working'],
   ['billing', 'Plans & payment'],
   ['privacy', 'Privacy / my data (Data Protection Officer)'],
@@ -29,17 +29,17 @@ export function contactPage(el, { signedIn = !!S.user } = {}) {
     <div class="contact-done" hidden>
       <h2>Message sent</h2>
       <p>Thanks. We reply by email within 1 business day${signedIn ? html`, to <b>${S.user?.email || 'your account email'}</b>` : ''}.</p>
-      ${signedIn ? html`<a class="btn btn-ghost" href="#/">Back to dashboard</a>` : html`<a class="btn btn-ghost" href="#/">Back to PermitPal</a>`}
+      ${signedIn ? html`<a class="btn btn-ghost" href="#/">Back to dashboard</a>` : html`<a class="btn btn-ghost" href="#/">Back to Pinoy Permit</a>`}
     </div>`;
   el.innerHTML = String(signedIn
-    ? html`<div class="page-head"><div><h1>Contact PermitPal</h1><p class="muted">Questions, problems, plans and payment, or a request about your personal data.</p></div></div>
+    ? html`<div class="page-head"><div><h1>Contact Pinoy Permit</h1><p class="muted">Questions, problems, plans and payment, or a request about your personal data.</p></div></div>
         <section class="card contact-card">${body}</section>`
     : html`<main class="auth"><div class="auth-card contact-public">
-        <a href="#/"><img class="auth-logo" src="img/logo.png" alt="PermitPal"></a>
-        <h1>Contact PermitPal</h1>
+        <a href="#/"><img class="auth-logo" src="img/logo.png" alt="Pinoy Permit"></a>
+        <h1>Contact Pinoy Permit</h1>
         <p class="tagline">Questions, problems, or a request about your personal data. Our Data Protection Officer reads privacy messages.</p>
         ${body}
-        <p class="switch-auth"><a href="#/">Back to PermitPal</a></p></div></main>`);
+        <p class="switch-auth"><a href="#/">Back to Pinoy Permit</a></p></div></main>`);
 
   const form = el.querySelector('#contact-form');
   form.addEventListener('submit', async (e) => {

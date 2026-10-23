@@ -1,7 +1,7 @@
 // White-label for accounting firms (₱1,000 a month on top of the firm plan): the firm's name, logo and
 // color on its clients' emails and in their app, replies to the firm, and a report to each client on
-// the 1st. Clients keep their own free accounts and always see "Powered by PermitPal"; when the add-on
-// or the firm plan lapses, or the firm disconnects, everything goes back to PermitPal's look by itself
+// the 1st. Clients keep their own free accounts and always see "Powered by Pinoy Permit"; when the add-on
+// or the firm plan lapses, or the firm disconnects, everything goes back to Pinoy Permit's look by itself
 // (the database works the look out each time, so nothing here has to switch it off).
 import { html, when, toast, toastError, fmtDate, plural, todayPH, daysBetween, peso } from '../util.js';
 import { ICON } from '../components.js';
@@ -40,7 +40,7 @@ export function applyBrand(b) {
 }
 
 // ---------------------------------------------------------------- what a firm's client sees
-const wordmark = html`<span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span>`;
+const wordmark = html`<span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span>`;
 export const sideBrand = (b, extra = '') => html`<a class="brand co-brand ${extra}" href="#/">${b.logo_url ? html`<img src="${b.logo_url}" alt="">` : ''}<span class="cb-name">${b.name}</span></a>`;
 export const poweredBy = () => html`<div class="powered-by">Powered by ${wordmark}</div>`;
 const tel = (p) => String(p || '').replace(/[^0-9+]/g, '');
@@ -52,7 +52,7 @@ export function accountantCard() {
       <div><div class="muted small">Your accountant</div><b>${b.name}</b>${b.tagline ? html`<div class="muted small">${b.tagline}</div>` : ''}</div></div>
     ${b.reply_to || b.phone ? html`<div class="btn-row">${b.reply_to ? html`<a class="btn btn-sm btn-soft" href="mailto:${b.reply_to}">Email ${b.reply_to}</a>` : ''}
       ${b.phone ? html`<a class="btn btn-sm btn-ghost" href="tel:${tel(b.phone)}">Call ${b.phone}</a>` : ''}</div>` : ''}
-    <p class="muted small">${b.name} sees your permits' status here. Your PermitPal account stays yours, free, whoever you work with.</p></section>`;
+    <p class="muted small">${b.name} sees your permits' status here. Your Pinoy Permit account stays yours, free, whoever you work with.</p></section>`;
 }
 
 // The sign-up page opened from a firm's invitation: the firm's logo and name (no account needed to see them).
@@ -63,7 +63,7 @@ export async function connectBrand(token) {
   applyBrand(b);
   banner.insertAdjacentHTML('beforebegin', String(html`<div class="auth-firm">${b.logo_url ? html`<img src="${b.logo_url}" alt="">` : ''}<b>${b.name}</b></div>`));
   const lead = banner.querySelector('b');
-  if (lead) lead.textContent = `${b.name} invited you to connect on PermitPal.`;
+  if (lead) lead.textContent = `${b.name} invited you to connect on Pinoy Permit.`;
 }
 
 // ---------------------------------------------------------------- Settings > Plan: the White-label card
@@ -95,7 +95,7 @@ export function brandCard() {
   }
   return addonCard({ id: 'white-label', icon: ICON.briefcase, name: 'White-label', who: 'For accounting firms: your brand on everything your clients see',
     monthly: BRAND_MONTHLY, list: BRAND_CHECKS, status, cta: actions, current: live && eligible,
-    note: 'Your clients keep their own free PermitPal accounts and see "Powered by PermitPal".' });
+    note: 'Your clients keep their own free Pinoy Permit accounts and see "Powered by Pinoy Permit".' });
 }
 on('brand-trial', async (ds, btn) => {
   btn.disabled = true;
@@ -160,9 +160,9 @@ export async function brandPage(el, subnav) {
           <ul class="plain-list small">
             <li>Permit reminders, tax and contribution deadlines, the Monday summary and your nudges, to every client you're connected to or manage.</li>
             <li>Your invitations to connect, and the sign-up page they open.</li>
-            <li>Your clients' PermitPal app: your logo, color and contact details.</li>
+            <li>Your clients' Pinoy Permit app: your logo, color and contact details.</li>
           </ul>
-          <p class="muted small">Your clients keep their own PermitPal accounts, free, and always see "Powered by PermitPal". If White-label ends or you disconnect a client, their emails and app go back to PermitPal's look by themselves, and we tell them their account stays theirs.</p>
+          <p class="muted small">Your clients keep their own Pinoy Permit accounts, free, and always see "Powered by Pinoy Permit". If White-label ends or you disconnect a client, their emails and app go back to Pinoy Permit's look by themselves, and we tell them their account stays theirs.</p>
         </section>
       </div>
     </div>`);
@@ -184,12 +184,12 @@ export async function brandPage(el, subnav) {
     const tag = form.tagline.value.trim();
     const img = removeLogo ? null : blobUrl || logoUrl;
     el.querySelector('[data-mail-prev]').innerHTML = String(html`
-      <div class="mp-from"><b>${name} via PermitPal</b>${reply ? html` <span class="muted">· replies to ${reply}</span>` : ''}</div>
+      <div class="mp-from"><b>${name} via Pinoy Permit</b>${reply ? html` <span class="muted">· replies to ${reply}</span>` : ''}</div>
       <div class="mp-head">${img ? html`<img src="${img}" alt="">` : ''}<b style="color:${c}">${name}</b>${tag ? html`<small>${tag}</small>` : ''}</div>
       <div class="mp-card" style="border-top-color:${c}"><b>Mayor's Permit expires in 7 days</b><p class="small">Sample Client Store · due ${fmtDate(todayPH())}</p>
-        <span class="mp-btn" style="background:${c}">Open PermitPal</span></div>
+        <span class="mp-btn" style="background:${c}">Open Pinoy Permit</span></div>
       <p class="mp-foot">${reply || phone ? `Questions? ${reply ? `Email ${reply}` : ''}${reply && phone ? ' or call ' : phone ? 'Call ' : ''}${phone}.` : ''}
-        <br>Sent for ${name} · Powered by PermitPal</p>`);
+        <br>Sent for ${name} · Powered by Pinoy Permit</p>`);
     el.querySelector('[data-side-prev]').innerHTML = String(html`<div class="sp-top">${img ? html`<img src="${img}" alt="">` : ''}<b>${name}</b></div>${poweredBy()}
       <div class="sp-nav"><span style="background:${brandVars(c)['--accent-soft']};color:${brandVars(c)['--accent-ink']}">Dashboard</span><span>Businesses</span><span>Compliance</span></div>`);
   };

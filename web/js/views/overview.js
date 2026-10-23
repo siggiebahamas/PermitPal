@@ -77,7 +77,7 @@ function brief(first, c, open) {
   const hint = !r ? '' : r.status === 'action_required' ? 'It is past its expiry date. Late renewals usually pay a surcharge, so renew it as soon as you can.'
     : r.status === 'renew_soon' ? 'Renew before the due date to avoid penalties and long queues.'
     : r.status === 'in_progress' ? 'A renewal is under way. Record the new permit once you have it.'
-    : 'Add the missing details or document so PermitPal can remind you on time.';
+    : 'Add the missing details or document so Pinoy Permit can remind you on time.';
   return html`
     <section class="brief card">
       <div class="brief-hello">
@@ -102,7 +102,7 @@ function brief(first, c, open) {
           </div>
           ${when_(has('revenue') && coverOf(r) && !r.open_request_id, html`<p class="focus-alt">${ICON.check} Covered by Year-round care: we'll start this renewal for you.</p>`)}
           ${when_(has('services') && canEdit() && !r.open_request_id && !coverOf(r) && ['action_required', 'renew_soon'].includes(r.status) && serviceFor(r),
-            html`<p class="focus-alt">No time? <button class="linklike" data-act="svc-for-req" data-id="${r.id}">Have PermitPal ${r.cycle_id ? 'renew' : 'get'} it for you</button></p>`)}` : html`<div class="brief-date">Do this first</div><div class="all-good">${ICON.check} Nothing to do. You're all caught up.</div>`}
+            html`<p class="focus-alt">No time? <button class="linklike" data-act="svc-for-req" data-id="${r.id}">Have Pinoy Permit ${r.cycle_id ? 'renew' : 'get'} it for you</button></p>`)}` : html`<div class="brief-date">Do this first</div><div class="all-good">${ICON.check} Nothing to do. You're all caught up.</div>`}
       </div>
     </section>`;
 }
@@ -155,7 +155,7 @@ export function compliance(el, params) {
   const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Compliance</h1><p class="muted">Every permit and registration across your businesses and vehicles.</p></div>
-      <div class="btn-row">${when_(has('revenue') && IN_PERSON && canEdit(), html`<button class="btn btn-soft btn-sm" data-act="svc-bulk">${ICON.briefcase} Have PermitPal renew several</button>`)}
+      <div class="btn-row">${when_(has('revenue') && IN_PERSON && canEdit(), html`<button class="btn btn-soft btn-sm" data-act="svc-bulk">${ICON.briefcase} Have Pinoy Permit renew several</button>`)}
         ${when_(canEdit(), html`<button class="btn btn-ghost btn-sm" data-act="imp-open" data-kind="permits">${ICON.upload} Import permit records</button>`)}
         <button class="btn btn-ghost btn-sm" data-act="calendar-export">${ICON.calendar} Add to calendar</button>
         <button class="btn btn-ghost btn-sm" data-act="share-open" data-scope="org">${ICON.share} Share proof</button>
@@ -222,7 +222,7 @@ on('export-csv', async () => {
       rows.push([r.subject_name, r.location_name || '', r.location_city || '', r.plate_no || '', r.name, STATUS[r.status].label,
         r.reference_no || '', r.issued_on || '', r.expires ? (r.expires_on || '') : 'Does not expire', r.document_count, hist]);
     }
-    download(`permitpal-${S.org.name.replace(/\W+/g, '-').toLowerCase()}-${todayPH()}.csv`, toCsv(rows));
+    download(`pinoypermit-${S.org.name.replace(/\W+/g, '-').toLowerCase()}-${todayPH()}.csv`, toCsv(rows));
   } catch (e) { toastError(e); }
 });
 

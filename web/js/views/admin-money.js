@@ -1,4 +1,4 @@
-// Admin > Money: every peso PermitPal earns, in plain words, four tabs.
+// Admin > Money: every peso Pinoy Permit earns, in plain words, four tabs.
 //   Home          four big numbers (earned this month, owed to you, comes in every month, not your money),
 //                 a to-do list written as sentences, and BIR receipt numbers to add
 //   Earnings      one month: where the money came from, the last 12 months as a chart, who paid most
@@ -74,7 +74,7 @@ function homeView() {
     [n(s.statements_overdue), `${plural(n(s.statements_overdue), 'partner firm')} ${n(s.statements_overdue) === 1 ? 'is' : 'are'} late paying their bill`, 'Follow up', { tab: 'billing' }],
     [n(s.disputes_open), `Decide on ${plural(n(s.disputes_open), 'lead')} a firm reported (they wait for your answer)`, 'Decide', { tab: 'billing' }],
     [n(s.firms_paused), `${plural(n(s.firms_paused), 'firm')} ${n(s.firms_paused) === 1 ? 'is' : 'are'} paused for no credit: add credit when they pay`, 'Open', { tab: 'partners' }],
-    [n(s.applications_new), `${plural(n(s.applications_new), 'firm')} ${n(s.applications_new) === 1 ? 'wants' : 'want'} to be listed on PermitPal`, 'Review', { tab: 'partners' }],
+    [n(s.applications_new), `${plural(n(s.applications_new), 'firm')} ${n(s.applications_new) === 1 ? 'wants' : 'want'} to be listed on Pinoy Permit`, 'Review', { tab: 'partners' }],
     [n(s.covered_missing_dates), `${plural(n(s.covered_missing_dates), 'permit')} on a care plan ${n(s.covered_missing_dates) === 1 ? 'has' : 'have'} no expiry date yet`, 'Fix', { tab: 'care' }],
     [n(s.gov_unrecorded), `Write down the government fee you paid for ${plural(n(s.gov_unrecorded), 'finished job')}`, 'Record', { tab: 'orders' }],
     [n(s.missing_invoice), `Add BIR receipt numbers to ${plural(n(s.missing_invoice), 'payment')}`, 'Add numbers', { receipts: true }],
@@ -280,7 +280,7 @@ function paymentsView() {
     </tbody></table></div>${when(list.length > 400, html`<div class="sheet-foot">Showing 400 of ${list.length}. Search or pick a month, or download everything.</div>`)}
     ${when(!list.length, html`<p class="muted pad">Nothing matches.</p>`)}</section>`;
 }
-on('ledger-csv', () => download(`permitpal-payments-${data.today}.csv`, toCsv(ledgerCsv(filterLedger(data.lines, st.ledger)))));
+on('ledger-csv', () => download(`pinoypermit-payments-${data.today}.csv`, toCsv(ledgerCsv(filterLedger(data.lines, st.ledger)))));
 document.addEventListener('change', (e) => {
   if (e.target.matches?.('[data-money-month]')) { st.month = e.target.value; rerender(); }
   if (e.target.matches?.('select[data-ledger]')) { st.ledger[e.target.dataset.ledger] = e.target.value; rerender(); }

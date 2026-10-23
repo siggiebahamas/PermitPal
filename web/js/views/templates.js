@@ -1,6 +1,6 @@
 // Ready-to-use templates (Plus): letters and sworn statements businesses keep needing for permits,
 // filled in from the workspace's own details. Everyone sees the list and the first lines; the full
-// text comes from the database only for Plus workspaces. Printouts carry "Prepared with PermitPal for …".
+// text comes from the database only for Plus workspaces. Printouts carry "Prepared with Pinoy Permit for …".
 import { html, openModal, toast, toastError, when, fmtDate, todayPH, download, esc, peso } from '../util.js';
 import { S, on, has, hasPlus, isOrgAdmin, rerender, business, locationsOf } from '../core.js';
 import { ICON } from '../components.js';
@@ -32,7 +32,7 @@ export async function templatesPage(el) {
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Templates</h1>
       <p class="muted">Letters and sworn statements offices ask for, filled in with your details. Print, sign, done.</p></div></div>
-    ${when(!plus && has('plus'), html`<div class="banner info"><div><b>Templates come with PermitPal Plus.</b> ${one ? html`Or get just the one you need for ${peso(one)}, yours to keep.` : 'Preview any of them below.'}</div>
+    ${when(!plus && has('plus'), html`<div class="banner info"><div><b>Templates come with Pinoy Permit Plus.</b> ${one ? html`Or get just the one you need for ${peso(one)}, yours to keep.` : 'Preview any of them below.'}</div>
       <button class="btn btn-sm btn-primary" data-act="plus-upsell" data-what="Templates">See Plus</button></div>`)}
     ${cats.map((c) => html`<h2 class="section-label">${c}</h2><div class="svc-grid">${listCache.filter((t) => t.category === c).map((t) => html`
       <section class="card svc tpl-card"><div class="svc-top"><h2>${t.title}</h2>${t.notarize ? html`<span class="tag">Needs a notary</span>` : ''}</div>
@@ -46,7 +46,7 @@ on('tpl-preview', (ds) => {
   const t = (listCache || []).find((x) => x.code === ds.code);
   if (!t) return;
   openModal(t.title, html`<div class="tpl-preview"><pre class="tpl-doc">${t.preview}</pre><div class="tpl-fade" aria-hidden="true"></div></div>
-    <p class="muted small">The rest is filled in with your business's details${has('plus') ? ' when you have PermitPal Plus' : ''}${has('load') && isOrgAdmin() ? ', or when you get just this one with your load' : ''}.</p>`, {
+    <p class="muted small">The rest is filled in with your business's details${has('plus') ? ' when you have Pinoy Permit Plus' : ''}${has('load') && isOrgAdmin() ? ', or when you get just this one with your load' : ''}.</p>`, {
     submitLabel: has('load') && isOrgAdmin() ? 'Get just this one' : 'See Plus',
     onSubmit: () => { setTimeout(() => (has('load') && isOrgAdmin() ? unlockOne(t) : openUpsell('Templates')), 30); },
   });
@@ -140,7 +140,7 @@ on('tpl-fill', async (ds) => {
         reset();
       });
       form.req?.addEventListener('change', reset);
-      const footer = () => `Prepared with PermitPal for ${bizName()} · ${fmtDate(todayPH())}`;
+      const footer = () => `Prepared with Pinoy Permit for ${bizName()} · ${fmtDate(todayPH())}`;
       form.querySelector('[data-tpl-print]').addEventListener('click', () => printSheet(String(html`<article class="tpl-print"><pre>${text()}</pre><footer>${footer()}</footer></article>`)));
       form.querySelector('[data-tpl-copy]').addEventListener('click', async () => { try { await navigator.clipboard.writeText(text()); toast('Copied.'); } catch { toast("Couldn't copy here. Use Word or Print instead.", 'error'); } });
       form.querySelector('[data-tpl-doc]').addEventListener('click', () => {

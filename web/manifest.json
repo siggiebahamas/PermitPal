@@ -1,6 +1,6 @@
 {
-  "name": "PermitPal",
-  "short_name": "PermitPal",
+  "name": "Pinoy Permit",
+  "short_name": "Pinoy Permit",
   "description": "Every permit and registration in one place, with reminders before anything expires.",
   "start_url": "./",
   "scope": "./",

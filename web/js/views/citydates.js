@@ -1,4 +1,4 @@
-// City deadlines on the customer's side: when a city extends its business permit deadline (PermitPal staff announce it,
+// City deadlines on the customer's side: when a city extends its business permit deadline (Pinoy Permit staff announce it,
 // with the source), every business permit there still showing an earlier date gets a banner with one tap to take the new
 // date; the dashboard gathers them. Quezon City's own rule (a year from the issue date) is offered the same way.
 // "Keep" only hides the banner on this device.

@@ -13,7 +13,7 @@ import * as db from 'pp/data';
 export const KINDS = {
   business: { title: 'A business', nav: null, blurb: 'Track your own permits and vehicles.' },
   head_office: {
-    hidden: true, // no longer offered: PermitPal serves small businesses, not large chains
+    hidden: true, // no longer offered: Pinoy Permit serves small businesses, not large chains
     title: 'Head office or franchisor', nav: 'Branches', plan: 'head_office', relation: 'franchisee', one: 'branch', many: 'branches',
     icon: ICON.building, page: 'Branches', sub: 'Every branch and franchisee, one screen. Spot the store that is about to lapse before the city does.',
     pitch: 'See every branch and franchisee on one screen, remind the ones falling behind, and export it all for audits.',
@@ -28,7 +28,7 @@ export const KINDS = {
   property: {
     title: 'Mall or property manager', nav: 'Tenants', plan: 'property', relation: 'tenant', one: 'tenant', many: 'tenants',
     icon: ICON.grid, page: 'Tenants', sub: "Every tenant's permits, always current. No more chasing photocopies every January.",
-    pitch: "Tenants keep their own permits current in PermitPal; you see who is compliant and download their shared copies.",
+    pitch: "Tenants keep their own permits current in Pinoy Permit; you see who is compliant and download their shared copies.",
     cols: ['mayors_permit', 'barangay_clearance', 'fsic', 'sanitary_permit'],
   },
   fleet: {
@@ -40,7 +40,7 @@ export const KINDS = {
 };
 const TEAM_PLANS = ['head_office', 'firm', 'property', 'property_s', 'fleet'];
 export const kindOf = () => S.org?.kind || 'business';
-// Is the paid side switched on for this workspace (trial, plan, or PermitPal staff)?
+// Is the paid side switched on for this workspace (trial, plan, or Pinoy Permit staff)?
 export function teamAccess(org = S.org) {
   if (!org || org.kind === 'business') return { on: false, why: 'business' };
   if (S.profile?.is_platform_admin) return { on: true, why: 'staff' };
@@ -164,9 +164,9 @@ function orgBoard(el, k, acc) {
         })}</tbody></table></div>
       ${when(!shown.length, html`<p class="muted">Nothing matches this filter.</p>`)}
     </section>` : html`<section class="card nb-empty">${k.icon}<div><h2>Add your first ${k.one}</h2>
-      <p>${kind === 'head_office' ? 'Your own branches show up here automatically. Invite franchisees by email: they keep their own permits up to date in PermitPal for free, and you see their status here.'
-        : kind === 'firm' ? 'Invite clients to connect their PermitPal, or create a workspace and manage their permits for them.'
-        : 'Invite tenants by email. They keep their permits current in PermitPal for free and can share copies with you.'}</p>
+      <p>${kind === 'head_office' ? 'Your own branches show up here automatically. Invite franchisees by email: they keep their own permits up to date in Pinoy Permit for free, and you see their status here.'
+        : kind === 'firm' ? 'Invite clients to connect their Pinoy Permit, or create a workspace and manage their permits for them.'
+        : 'Invite tenants by email. They keep their permits current in Pinoy Permit for free and can share copies with you.'}</p>
       ${when(isOrgAdmin(), html`<button class="btn btn-primary" data-act="nb-add">+ Add ${k.one}</button>`)}</div></section>`}
 
     ${when(pending.length, html`<section class="card"><div class="card-head"><div><h2>Waiting to connect</h2><p class="card-sub">They got an email with a link. You can copy it and send it yourself too.</p></div></div>
@@ -268,10 +268,10 @@ on('nb-add', () => {
   const labelPh = kind === 'property' ? 'Unit, e.g. G/F Unit 12' : kind === 'head_office' ? 'Store code or branch, e.g. QC-014' : 'Optional note, e.g. retainer client';
   openModal(`Add a ${k.one}`, html`
     ${when(kind === 'firm', html`<div class="seg" role="tablist">
-      <label><input type="radio" name="mode" value="invite" checked> They use PermitPal themselves</label>
+      <label><input type="radio" name="mode" value="invite" checked> They use Pinoy Permit themselves</label>
       <label><input type="radio" name="mode" value="manage"> I'll manage it for them</label></div>`)}
     <div class="nb-invite">
-      <p class="muted small">We'll email them a link. They connect their own PermitPal (free for them) and choose what you see. Until then they show as "Waiting to connect".</p>
+      <p class="muted small">We'll email them a link. They connect their own Pinoy Permit (free for them) and choose what you see. Until then they show as "Waiting to connect".</p>
       <label class="field"><span>Their email</span><input type="email" name="email" maxlength="160" placeholder="owner@theirbusiness.ph"></label>
       <label class="field"><span>${kind === 'property' ? 'Unit' : kind === 'head_office' ? 'Store code or branch' : 'Note'} <small>(optional, only you see this)</small></span><input name="label" maxlength="120" placeholder="${labelPh}"></label>
     </div>
@@ -441,7 +441,7 @@ export async function connectPage(el, token) {
         <div class="yes"><b>${ICON.check} What they will see</b><p>The names, status and expiry dates of the permits in the workspace you choose${req.length ? `, including ${req.join(', ')}` : ''}.</p></div>
         <div class="no"><b>✕ What they never see</b><p>Your costs, notes, team, other workspaces, and your files, unless you tick the box below.</p></div>
       </div>
-      <p class="muted small">You can stop sharing anytime from Settings → Workspace. PermitPal stays free for your business.</p>
+      <p class="muted small">You can stop sharing anytime from Settings → Workspace. Pinoy Permit stays free for your business.</p>
     </section>
     ${mine.length ? html`<section class="card"><form id="connect-form">
       <label class="field"><span>Which workspace?</span><select name="org">${mine.map((o) => html`<option value="${o.id}" ${o.id === S.org.id ? 'selected' : ''}>${o.name}</option>`)}</select></label>

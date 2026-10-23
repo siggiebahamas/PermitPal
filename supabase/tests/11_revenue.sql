@@ -1,4 +1,4 @@
--- The three ways PermitPal earns and the money ledger: rush fees, renewing several permits at once,
+-- The three ways Pinoy Permit earns and the money ledger: rush fees, renewing several permits at once,
 -- "set up my account" with temporary staff access, package steps, Year-round care (bills, pauses,
 -- renewals it starts by itself, the on-time guarantee), fees from firms (per lead, per sale, listings,
 -- checklist lines, statements, applications) and the staff ledger. Rolled back at the end.
@@ -154,10 +154,10 @@ reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); en
 select pg_temp.res('staff are a plain member (not admin)', role = 'member', role) from public.org_members
   where org_id = (select org from t_ids) and user_id = 'c0000000-0000-4000-8000-0000000000f4';
 select pg_temp.res('the owner is told, with how to remove access', count(*) >= 1, count(*)::text)
-  from public.notifications where user_id = 'c0000000-0000-4000-8000-0000000000a1' and title like 'PermitPal joined%';
+  from public.notifications where user_id = 'c0000000-0000-4000-8000-0000000000a1' and title like 'Pinoy Permit joined%';
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000b2","role":"authenticated"}', true);
 set local role authenticated;
-select pg_temp.res('the team can see who from PermitPal has access and why', count(*) = 1 and min(requirement_name) = 'Set up my account for me', count(*)::text)
+select pg_temp.res('the team can see who from Pinoy Permit has access and why', count(*) = 1 and min(requirement_name) = 'Set up my account for me', count(*)::text)
   from public.my_staff_access((select org from t_ids));
 select pg_temp.res('the customer sees the step progress', steps_done = 2, steps_done::text) from public.assistance_requests where id = (select setup from t_ids);
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
@@ -310,14 +310,14 @@ select pg_temp.res('paying a late bill restarts coverage from today (no paying f
   bool_and(status = 'active' and paid_through = (private.today_ph() + interval '1 month')::date - 1), string_agg(status || ' ' || paid_through, ','))
   from public.care_plans where org_id = (select org from t_ids);
 
--- the on-time guarantee is gone: PermitPal never pays penalties
+-- the on-time guarantee is gone: Pinoy Permit never pays penalties
 update public.care_plans set started_on = private.today_ph() - 120 where org_id = (select org from t_ids);
 update public.requirement_cycles set expires_on = private.today_ph() - 10 where requirement_id = (select brgy from t_ids);
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
 do $$ begin perform public.file_guarantee_claim((select plan from t_ids), (select brgy from t_ids), 15000, null, (select org from t_ids) || '/care/claims/r.pdf', 'r.pdf');
   perform pg_temp.res('no guarantee any more: a lapsed permit on the All-in plan can''t be claimed', false, 'was allowed');
-exception when others then perform pg_temp.res('no guarantee any more: a lapsed permit on the All-in plan can''t be claimed', sqlerrm = 'PermitPal doesn''t pay late penalties or surcharges.', sqlerrm); end $$;
+exception when others then perform pg_temp.res('no guarantee any more: a lapsed permit on the All-in plan can''t be claimed', sqlerrm = 'Pinoy Permit doesn''t pay late penalties or surcharges.', sqlerrm); end $$;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 
 -- cancelling

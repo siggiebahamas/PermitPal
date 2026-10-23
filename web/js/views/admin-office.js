@@ -1,4 +1,4 @@
-// Admin > Bills & clock: city bills customers asked PermitPal to pay (confirm their payment, pay the office by the
+// Admin > Bills & clock: city bills customers asked Pinoy Permit to pay (confirm their payment, pay the office by the
 // promised time, add the official receipt, or send everything back), offices running past their legal deadline,
 // the national holiday calendar the clock counts with, and the bill-paying settings.
 // Every rule is enforced by the database; this page only asks it.

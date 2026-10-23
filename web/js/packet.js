@@ -17,7 +17,7 @@ export function startAnswers(prev = {}, cur = {}) {
   return { ...a, ...cur };
 }
 
-// The details the city's form asks for that PermitPal can't fill in yet. known: { tin, address, owner_name, line, phone, reg_no }
+// The details the city's form asks for that Pinoy Permit can't fill in yet. known: { tin, address, owner_name, line, phone, reg_no }
 // from the records (or this year's answers); a: the answers.
 export function missingDetails(known, a) {
   const miss = [];

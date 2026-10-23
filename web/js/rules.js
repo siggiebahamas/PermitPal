@@ -35,7 +35,7 @@ function addYears(iso, n) {
 
 // Returns { date, note } or null when there is no reliable rule.
 // ctx: { issuedOn, plate, today, cityRule, cityExtensions } (the city's own rule, like Quezon City's, and the
-// deadline extensions PermitPal announced for that city)
+// deadline extensions Pinoy Permit announced for that city)
 export function suggestDue(rule, ctx = {}) {
   const today = ctx.today || todayPH();
   const issued = ctx.issuedOn || null;

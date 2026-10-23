@@ -1,7 +1,7 @@
 // Your public permit page (Plus), managed from Share proof: one page per business (or the whole
 // workspace) that shows each permit's status, live. Shared by link, a QR poster for the wall, a badge
 // for email signatures and websites, and by email to people who get each renewal. The page says what
-// PermitPal does (shows your own records, checked automatically) and never claims a government check.
+// Pinoy Permit does (shows your own records, checked automatically) and never claims a government check.
 import { html, raw, openModal, confirmDialog, toast, toastError, when, plural, fmtDate, timeAgo, todayPH, download, esc } from '../util.js';
 import { S, on, has, hasPlus, canEdit, business, vehicle } from '../core.js';
 import { ICON, STATUS, byPriority, subjectLabel } from '../components.js';
@@ -60,7 +60,7 @@ function createCard() {
   if (!canEdit()) return html`<section class="card"><h2>Your public permit page</h2><p class="muted">Not set up yet. Ask your workspace owner to make one.</p></section>`;
   const bizs = S.data.businesses;
   return html`<section class="card trust-create"><div class="card-head"><div><h2>Make your public permit page</h2>
-      <p class="card-sub">It shows each permit's status and expiry date from your records, updates by itself, and says it's checked automatically by PermitPal. You choose what's on it.</p></div></div>
+      <p class="card-sub">It shows each permit's status and expiry date from your records, updates by itself, and says it's checked automatically by Pinoy Permit. You choose what's on it.</p></div></div>
     <form data-trust-create>
       ${bizs.length > 1 ? html`<label class="field"><span>Which business?</span><select name="business_id">${bizs.map((b) => html`<option value="${b.id}">${b.name}</option>`)}<option value="">All of ${S.org.name}</option></select></label>`
         : html`<input type="hidden" name="business_id" value="${bizs[0]?.id || ''}">`}
@@ -109,13 +109,13 @@ function shareTab(page) {
       <div><h3>QR poster for your wall</h3><p class="muted small">Customers and inspectors scan it and see your permits, live. Print it on A4 and put it by the door or the counter.</p>
         <div class="btn-row"><button class="btn btn-sm btn-primary" data-act="trust-poster">${ICON.file} Print the poster</button>
           <button class="btn btn-sm btn-ghost" data-act="trust-qr-png">${ICON.download} QR image</button></div></div></div>
-    <div class="share-way"><img class="badge-preview" src="img/badge-email.png" width="220" height="44" alt="Badge: Our permits, live on PermitPal">
+    <div class="share-way"><img class="badge-preview" src="img/badge-email.png" width="220" height="44" alt="Badge: Our permits, live on Pinoy Permit">
       <div><h3>Email signature</h3><p class="muted small">A small badge under your name. Clients click it to see your permits.</p>
         <div class="btn-row"><button class="btn btn-sm btn-primary" data-act="trust-sign">Copy for Gmail or Outlook</button></div></div></div>
     <div class="share-way">${badgePreview(page)}
       <div><h3>Website badge</h3><p class="muted small">Shows your permit status live on your website or online store. Paste the code where you want it.</p>
         <div class="btn-row"><button class="btn btn-sm btn-primary" data-act="trust-web">Copy the website code</button></div></div></div>
-    <p class="fineprint">The page shows your own records, checked automatically by PermitPal every morning. It never says the government checked anything. Turn it off or change its address anytime under Settings.</p></div>`;
+    <p class="fineprint">The page shows your own records, checked automatically by Pinoy Permit every morning. It never says the government checked anything. Turn it off or change its address anytime under Settings.</p></div>`;
 }
 // What the website badge shows right now (the real one on their site reads the page live).
 function badgePreview(page) {
@@ -127,7 +127,7 @@ function badgePreview(page) {
   const pending = items.length - expired - due - ok;
   const [cls, title] = expired ? ['expired', `${expired} permit${expired === 1 ? '' : 's'} expired`] : due ? ['due', `${due} renewal${due === 1 ? '' : 's'} due`]
     : ok && !pending ? ['ok', `All ${ok} permits current`] : [ok ? 'ok' : '', `${ok} permit${ok === 1 ? '' : 's'} current`];
-  return html`<span class="pp-badge ${cls}" role="img" aria-label="Website badge preview: ${title}"><span class="pp-mark" aria-hidden="true"></span><span class="pp-text"><b>${title}</b><small>PermitPal · checked daily</small></span></span>`;
+  return html`<span class="pp-badge ${cls}" role="img" aria-label="Website badge preview: ${title}"><span class="pp-mark" aria-hidden="true"></span><span class="pp-text"><b>${title}</b><small>Pinoy Permit · checked daily</small></span></span>`;
 }
 on('trust-copy', async (ds) => {
   const page = state.pages.find((p) => p.id === state.pageId);
@@ -137,13 +137,13 @@ on('trust-poster', () => {
   const page = state.pages.find((p) => p.id === state.pageId);
   const url = pageUrl(page.code, 'qr');
   printSheet(String(html`<div class="poster">
-    <div class="poster-brand"><span class="w1">Permit</span><span class="w2">Pal</span></div>
+    <div class="poster-brand"><span class="w1">Pinoy</span> <span class="w2">Permit</span></div>
     <h1>${page.title}</h1>
     <p class="poster-lead">Our permits, live</p>
     <img src="${qrPng(url, 900)}" alt="QR code">
     <p class="poster-cta">Scan to see each permit's status and expiry date</p>
     <p class="poster-url">${url.replace(/^https?:\/\//, '').replace(/&s=qr$/, '')}</p>
-    <p class="poster-fine">Kept up to date from our records and checked automatically by PermitPal every morning. PermitPal doesn't issue permits.</p>
+    <p class="poster-fine">Kept up to date from our records and checked automatically by Pinoy Permit every morning. Pinoy Permit doesn't issue permits.</p>
   </div>`), { cls: 'poster-sheet' });
 });
 on('trust-qr-png', () => {
@@ -157,7 +157,7 @@ on('trust-sign', async () => {
   const page = state.pages.find((p) => p.id === state.pageId);
   const url = pageUrl(page.code, 'sign');
   const img = `${base()}img/badge-email.png`;
-  const htmlSig = `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(img)}" width="220" height="44" alt="Our permits, live on PermitPal" style="border:0;display:block"></a>`;
+  const htmlSig = `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(img)}" width="220" height="44" alt="Our permits, live on Pinoy Permit" style="border:0;display:block"></a>`;
   try {
     if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([htmlSig], { type: 'text/html' }), 'text/plain': new Blob([url], { type: 'text/plain' }) })]);
     else await navigator.clipboard.writeText(htmlSig);
@@ -168,7 +168,7 @@ on('trust-sign', async () => {
 });
 on('trust-web', async () => {
   const page = state.pages.find((p) => p.id === state.pageId);
-  const code = `<iframe src="${base()}badge.html#${page.code}" title="Our permits on PermitPal" width="260" height="64" style="border:0;overflow:hidden" loading="lazy"></iframe>`;
+  const code = `<iframe src="${base()}badge.html#${page.code}" title="Our permits on Pinoy Permit" width="260" height="64" style="border:0;overflow:hidden" loading="lazy"></iframe>`;
   try { await navigator.clipboard.writeText(code); toast('Copied. Paste it into your website (as HTML or an "Embed" block).'); }
   catch { openModal('Website badge', html`<textarea class="copy-box" rows="4" readonly>${code}</textarea>`); }
 });
@@ -335,7 +335,7 @@ document.addEventListener('submit', async (e) => {
       ${items.map((r) => html`<tr><td>${r.name}</td><td>${subjectLabel(r)}</td><td>${r.reference_no || '—'}</td><td>${r.expires ? (r.expires_on ? fmtDate(r.expires_on) : '—') : 'Does not expire'}</td>
         <td>${docs.some((d) => d.requirement_id === r.id) ? 'Included' : '—'}</td></tr>`)}</table>
       <p style="margin-top:24px"><img src="${qrPng(url, 360)}" width="160" height="160" alt="QR code to the live permit page" style="float:left;margin:0 16px 8px 0">
-      <b>See these live.</b><br>Scan the code or open <a href="${url}">${url}</a>.<br><small>The page shows the business's own records, checked automatically by PermitPal. PermitPal doesn't issue permits or verify them with the government.</small></p></body></html>`);
+      <b>See these live.</b><br>Scan the code or open <a href="${url}">${url}</a>.<br><small>The page shows the business's own records, checked automatically by Pinoy Permit. Pinoy Permit doesn't issue permits or verify them with the government.</small></p></body></html>`);
     const files = [{ name: '00 Cover letter.html', data: new TextEncoder().encode(letter) }, { name: '01 Permit summary.html', data: new TextEncoder().encode(summary) }];
     const used = new Set();
     for (const d of docs) {

@@ -8,7 +8,7 @@ import * as db from 'pp/data';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function workerPage(el, token, { signedIn = false } = {}) {
-  const wrap = (inner) => (signedIn ? inner : html`<main class="landing worker-page"><header class="lp-top"><span class="brand"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></span>
+  const wrap = (inner) => (signedIn ? inner : html`<main class="landing worker-page"><header class="lp-top"><span class="brand"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span></span>
     <div class="spacer"></div></header>${inner}</main>`);
   el.innerHTML = String(wrap(html`<div class="loading">Loading…</div>`));
   let w = null;

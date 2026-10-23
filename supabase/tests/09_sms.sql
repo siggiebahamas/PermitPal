@@ -29,7 +29,7 @@ do $$ begin perform public.start_phone_verification('09171234567');
   perform pg_temp.res('a second code within a minute is refused', false, 'was allowed');
 exception when others then perform pg_temp.res('a second code within a minute is refused', sqlerrm like '%wait a minute%', sqlerrm); end $$;
 reset role;
-select pg_temp.res('the code goes out even before the number is verified', status = 'queued' and body_text ~ 'PermitPal code: \d{6}', status)
+select pg_temp.res('the code goes out even before the number is verified', status = 'queued' and body_text ~ 'Pinoy Permit code: \d{6}', status)
   from public.message_outbox where dedupe_key like 'verify:d0000000-0000-4000-8000-0000000000a1:%';
 select pg_temp.res('only a hash of the code is stored', code_hash !~ '^\d{6}$' and length(code_hash) = 64, '') from private.phone_codes where user_id = 'd0000000-0000-4000-8000-0000000000a1';
 -- the test can't read the texted code, so it sets a known one

@@ -1,4 +1,4 @@
-// Prices for PermitPal Plus, staff licenses and White-label. The database works out every bill the same way
+// Prices for Pinoy Permit Plus, staff licenses and White-label. The database works out every bill the same way
 // (private.staff_monthly / private.addon_price); these only show the price before asking it.
 export const FREE_PEOPLE = 3;
 export const PLUS_MONTHLY = 199;
@@ -23,4 +23,4 @@ export function staffBands(people) {
 export const staffMonthly = (people) => staffBands(people).reduce((t, b) => t + b.amount, 0);
 export const addonPrice = (kind, people, billing) => (kind === 'plus' ? PLUS_MONTHLY : kind === 'brand' ? BRAND_MONTHLY : staffMonthly(people)) * (billing === 'yearly' ? YEAR_MONTHS : 1);
 export const addonLabel = (kind, people, billing) =>
-  `${kind === 'plus' ? 'PermitPal Plus' : kind === 'brand' ? 'White-label' : `Staff licenses, up to ${people} people`} (${billing === 'yearly' ? 'yearly' : 'monthly'})`;
+  `${kind === 'plus' ? 'Pinoy Permit Plus' : kind === 'brand' ? 'White-label' : `Staff licenses, up to ${people} people`} (${billing === 'yearly' ? 'yearly' : 'monthly'})`;

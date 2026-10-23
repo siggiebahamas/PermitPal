@@ -31,7 +31,7 @@ async function main() {
   }
   const counts = Object.keys(STATUS).map((s) => [s, data.items.filter((i) => i.status === s).length]).filter(([, n]) => n);
   app.innerHTML = String(html`<div class="share-wrap">
-    <header class="share-top"><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span>
+    <header class="share-top"><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span>
       <button class="btn btn-ghost btn-sm no-print" id="print">Print or save as PDF</button></header>
     <section class="card">
       <div class="card-head"><h1>${data.org_name}</h1></div>
@@ -43,7 +43,7 @@ async function main() {
           <span class="chip ${STATUS[i.status]?.[1] || 'needinfo'}">${STATUS[i.status]?.[0] || 'Needs info'}</span></div>`)}`)}
       ${data.items.length ? '' : html`<p class="share-msg">Nothing to show yet.</p>`}
     </section>
-    <p class="fineprint">Generated ${fmtDateTime(data.generated_at)} from the business's own PermitPal records. PermitPal does not issue or certify these documents; ask the business for the original permits if you need them. This link stops working on ${fmtDate(String(data.expires_at).slice(0, 10))}.</p>
+    <p class="fineprint">Generated ${fmtDateTime(data.generated_at)} from the business's own Pinoy Permit records. Pinoy Permit does not issue or certify these documents; ask the business for the original permits if you need them. This link stops working on ${fmtDate(String(data.expires_at).slice(0, 10))}.</p>
   </div>`);
   document.getElementById('print').onclick = () => window.print();
 }

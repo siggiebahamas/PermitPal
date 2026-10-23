@@ -1,4 +1,4 @@
-// PermitPal Plus and staff licenses: the cards under Settings > Plan, bills and paying them, the free
+// Pinoy Permit Plus and staff licenses: the cards under Settings > Plan, bills and paying them, the free
 // trial, and the "this comes with Plus" pop-up used wherever a Plus feature is opened without it.
 // Every price shown comes from the same rule the database uses; before anything is charged the
 // database works the bill out itself (addon_preview), and that's what the confirmation shows.
@@ -18,7 +18,7 @@ const activePeople = () => (S.data?.people || []).length;
 export const PLUS_PERKS = [
   ['Public permit page', 'One link and a QR poster for your wall: customers, clients and inspectors see each permit\'s status, live. Badges for your email and website.'],
   ['Renewals sent for you', 'Your clients, mall or landlord get an email, with the copy, each time you renew a permit.'],
-  ['Automatic permit check', 'Every morning PermitPal looks for expired permits, missing copies and dates that look wrong, and emails you a report on the 1st.'],
+  ['Automatic permit check', 'Every morning Pinoy Permit looks for expired permits, missing copies and dates that look wrong, and emails you a report on the 1st.'],
   ['Ready-to-use templates', 'Authorization letter, SPA, affidavit of loss and more, filled in with your details.'],
 ];
 
@@ -26,7 +26,7 @@ export const PLUS_PERKS = [
 export function openUpsell(what = 'Plus') {
   const plus = addonOf('plus');
   const canTrial = isOrgAdmin() && !plus?.trial_used_on && !plus?.started_on && !hasPlus();
-  openModal(`${what} comes with PermitPal Plus`, html`
+  openModal(`${what} comes with Pinoy Permit Plus`, html`
     <p class="pp-upsell-price"><b>${peso(PLUS_MONTHLY)}</b> a month: less than ₱7 a day. <span class="muted">Or ${peso(PLUS_MONTHLY * YEAR_MONTHS)} a year: 2 months free.</span></p>
     ${checks(PLUS_CHECKS)}
     ${isOrgAdmin() ? '' : html`<p class="muted small">Ask your workspace owner to turn it on under Settings > Plan.</p>`}`, {
@@ -106,7 +106,7 @@ export function addonSection(pay) {
     ${billToggle('How often to pay for add-ons')}
     ${open.length ? html`<section class="card bills-due"><div class="card-head"><h2>To pay</h2></div>${open.map(billRow)}</section>` : ''}
     <div class="pp-grid">
-      ${addonCard({ id: 'plus-card', icon: ICON.share, name: 'PermitPal Plus', who: 'Show customers you are legit, and let PermitPal check your permits for you',
+      ${addonCard({ id: 'plus-card', icon: ICON.share, name: 'Pinoy Permit Plus', who: 'Show customers you are legit, and let Pinoy Permit check your permits for you',
         monthly: included ? 0 : PLUS_MONTHLY, list: PLUS_CHECKS, status: plusStatus, cta: plusActions, current: plusOn || included,
         note: included ? '' : plus?.trial_used_on || plusOn ? '' : 'Try it free for 14 days. Nothing is charged after.' })}
       ${has('brand') && S.org.kind === 'firm' ? brandCard() : ''}
@@ -182,7 +182,7 @@ async function choose(kind, people, billing) {
   try { q = await db.addonPreview(S.org.id, kind, people ?? null, billing); } catch (e) { return toastError(e); }
   const name = addonLabel(kind, people, billing);
   const when_ = q.mode === 'next_period' ? html`<p>This starts with your next period, on <b>${fmtDate(q.period_start)}</b>. Nothing to pay now; your current plan carries on until then.</p>`
-    : q.mode === 'after_trial' ? html`<p>Your free days are kept: this starts on <b>${fmtDate(q.period_start)}</b>, when ${addonOf(kind)?.comped ? 'the time PermitPal gave you' : 'your trial'} ends, and runs to ${fmtDate(q.period_end)}.</p>`
+    : q.mode === 'after_trial' ? html`<p>Your free days are kept: this starts on <b>${fmtDate(q.period_start)}</b>, when ${addonOf(kind)?.comped ? 'the time Pinoy Permit gave you' : 'your trial'} ends, and runs to ${fmtDate(q.period_end)}.</p>`
     : q.mode === 'renewal' ? html`<p>Your next period: <b>${fmtDate(q.period_start)}</b> to ${fmtDate(q.period_end)}.</p>`
     : q.mode === 'change' ? html`<p>Starts today and runs to <b>${fmtDate(q.period_end)}</b>. What's unused of your current period comes off the price.</p>`
     : html`<p>Starts the day you pay and runs for ${q.months === 12 ? 'a year' : 'a month'}.</p>`;
@@ -238,7 +238,7 @@ on('addon-stop', async (ds) => {
   const msg = ds.kind === 'plus'
     ? `Plus stays on until ${fmtDate(a.paid_through)}. Then your public page shows "paused" and the monthly check stops. Nothing is deleted, and you can turn it on again anytime.`
     : ds.kind === 'brand'
-    ? `White-label stays on until ${fmtDate(a.paid_through)}. Then your clients' emails and app show PermitPal's own look again. Your brand settings are kept.`
+    ? `White-label stays on until ${fmtDate(a.paid_through)}. Then your clients' emails and app show Pinoy Permit's own look again. Your brand settings are kept.`
     : `Your licenses stay on until ${fmtDate(a.paid_through)}. Then reminders pause for everyone above the free ${FREE_PEOPLE}. Nothing is deleted.`;
   if (!(await confirmDialog('Stop at the end of the period?', msg, { confirmLabel: 'Stop it then', cancelLabel: 'Keep it' }))) return;
   try { const d = await db.addonStop(S.org.id, ds.kind); await reload(); toast(`It ends on ${fmtDate(d)}.`); } catch (e) { toastError(e); }

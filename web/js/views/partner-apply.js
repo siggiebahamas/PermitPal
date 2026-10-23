@@ -17,10 +17,10 @@ const HOW_CREDIT = [
 ];
 
 export function partnerApplyPage(el, { signedIn = false } = {}) {
-  const wrap = (inner) => (signedIn ? inner : html`<main class="landing apply-page"><header class="lp-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></span></a>
+  const wrap = (inner) => (signedIn ? inner : html`<main class="landing apply-page"><header class="lp-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span></a>
     <div class="spacer"></div><a class="btn btn-ghost btn-sm" href="#/login">Sign in</a></header>${inner}</main>`);
   el.innerHTML = String(wrap(html`
-    <div class="page-head"><div><h1>List your firm on PermitPal</h1>
+    <div class="page-head"><div><h1>List your firm on Pinoy Permit</h1>
       <p class="muted">For liaison firms, accountants, fire-safety, pest-control and water-testing providers, clinics and notaries. Get quote requests from businesses whose permits are due.</p></div></div>
     <section class="card promises">${(has('leads') ? HOW_CREDIT : HOW).map(([t, d]) => html`<div class="promise"><div><b>${t}</b><span>${d}</span></div></div>`)}</section>
     <section class="card"><h2>Apply</h2>
@@ -39,7 +39,7 @@ export function partnerApplyPage(el, { signedIn = false } = {}) {
         </div>
         <label class="field"><span>What you handle</span><input name="services" maxlength="600" placeholder="e.g. Mayor's Permit renewals, FSIC filing, extinguisher refills"></label>
         <label class="field"><span>Anything else? <small>(optional)</small></span><textarea name="message" rows="3" maxlength="1500"></textarea></label>
-        ${has('property_s') ? html`<label class="check attest"><input type="checkbox" name="attested" required> <span>My business is registered (DTI, SEC or CDA) and holds every license and permit its work needs, and I'll keep them current. I understand PermitPal doesn't check this and customers rely on it.</span></label>` : ''}
+        ${has('property_s') ? html`<label class="check attest"><input type="checkbox" name="attested" required> <span>My business is registered (DTI, SEC or CDA) and holds every license and permit its work needs, and I'll keep them current. I understand Pinoy Permit doesn't check this and customers rely on it.</span></label>` : ''}
         <label class="hp" aria-hidden="true">Leave this empty <input name="trap" tabindex="-1" autocomplete="off"></label>
         <p class="form-error" role="alert" hidden></p>
         <button class="btn btn-primary">Send application</button>
@@ -65,7 +65,7 @@ export function partnerApplyPage(el, { signedIn = false } = {}) {
     try {
       await db.applyAsPartner({ ...f, phone: f.phone ? normalizePhone(f.phone) : '', attested: form.attested ? form.attested.checked : undefined });
       form.closest('section').innerHTML = String(html`<h2>Thanks, we got it</h2><p>We'll reply to <b>${f.email}</b> within 3 business days.</p>
-        <p class="muted small">Questions in the meantime? <a href="#/contact">Contact PermitPal</a>.</p>`);
+        <p class="muted small">Questions in the meantime? <a href="#/contact">Contact Pinoy Permit</a>.</p>`);
       toast('Application sent.');
     } catch (ex) { btn.disabled = false; btn.textContent = 'Send application'; fail(ex.message || 'Something went wrong. Please try again.'); }
   });

@@ -267,7 +267,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check('History filter changes the list', histAll > 0 && histTeam === 0 && histEmpty === 1 && histBiz >= 1 && histBiz <= histAll
       && (await page.locator('.hist-line').count()) === histAll, `all ${histAll} team ${histTeam} biz ${histBiz}`);
 
-    // Contact PermitPal: an empty message is refused with a message, a filled one is sent.
+    // Contact Pinoy Permit: an empty message is refused with a message, a filled one is sent.
     await go('#/contact');
     await page.fill('#contact-form textarea[name=message]', 'Hello, testing the contact form.');
     await page.click('#contact-form button');
@@ -387,7 +387,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await go('#/requirement/' + mpId);
   check('checklist: open on an overdue permit, with where to file', await page.locator('details.checklist[open]').count() === 1 && /BPLO/.test(await page.textContent('.checklist .ck-facts')));
   check('checklist: "do these first" offers to add the missing barangay clearance', (await page.locator('.ck-dep.missing', { hasText: 'Barangay Business Clearance' }).locator('[data-act=req-add]').count()) === 1);
-  check('checklist: a step tracked elsewhere shows its live status', /In PermitPal: Compliant until/.test(await page.textContent('.ck-list')));
+  check('checklist: a step tracked elsewhere shows its live status', /In Pinoy Permit: Compliant until/.test(await page.textContent('.ck-list')));
   check('checklist: starts at 0 ready', (await page.textContent('.ck-count')).includes('0 of 6'));
   check('checklist: the "already filed?" hint waits for a tick', await page.locator('[data-ck-hint]').isHidden());
   await page.check('[data-ck=prev]'); await page.waitForTimeout(250);
@@ -411,7 +411,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   // Done for you: menu, catalog, asking for a quote.
   check('done for you: in the menu', (await page.locator('.sidebar a[data-nav=services]').count()) === 1);
   await go('#/requirement/' + mpId);
-  check('done for you: offered on the permit page with the starting price', /Have PermitPal renew it for you/.test(await page.textContent('.checklist .offer-inline')) && /₱6,000/.test(await page.textContent('.checklist .offer-inline')));
+  check('done for you: offered on the permit page with the starting price', /Have Pinoy Permit renew it for you/.test(await page.textContent('.checklist .offer-inline')) && /₱6,000/.test(await page.textContent('.checklist .offer-inline')));
   await page.click('.checklist .offer-inline [data-act=svc-for-req]');
   check('done for you: the quote form picks this permit and "renew"', (await page.inputValue('.modal select[name=target]')) === mpId && await page.isChecked('.modal input[name=kind][value=renew]'));
   await page.click('.modal button[type=submit]'); await page.waitForTimeout(200);
@@ -425,7 +425,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('done for you: the authorization letter names the business and permit', /Corner <Bakery> & Co/.test(await page.textContent('.letter')) && /Mayor's \/ Business Permit/.test(await page.textContent('.letter')));
   await page.click('.modal [data-modal-close]'); await page.waitForTimeout(150);
   await go('#/requirement/' + mpId);
-  check('done for you: the permit now says PermitPal is handling it', /PermitPal is handling this/.test(await page.textContent('main .banner.progress')) && (await page.locator('.checklist .offer-inline', { hasText: 'Open request' }).count()) === 1);
+  check('done for you: the permit now says Pinoy Permit is handling it', /Pinoy Permit is handling this/.test(await page.textContent('main .banner.progress')) && (await page.locator('.checklist .offer-inline', { hasText: 'Open request' }).count()) === 1);
   await page.click('.checklist .offer-inline a'); await page.waitForTimeout(300);
   check('done for you: "Open request" goes back to the same request', (await page.evaluate(() => location.hash)) === orderHash);
 
@@ -750,7 +750,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.close();
 }
 
-// ---------------------------------------------------------------- the three ways PermitPal earns
+// ---------------------------------------------------------------- the three ways Pinoy Permit earns
 // 1) Year-round care: from a branch card to an active plan, as the customer and as staff.
 {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
@@ -866,7 +866,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   // set up my account for me
   await go('#/services');
   await page.locator('main .svc', { hasText: 'Set up my account for me' }).locator('[data-act=svc-request]').click(); await page.waitForTimeout(250);
-  check('jobs: the set-up request says PermitPal joins the workspace until done', /joins your workspace as a team member until the job is done/.test(await page.textContent('#modal-root')));
+  check('jobs: the set-up request says Pinoy Permit joins the workspace until done', /joins your workspace as a team member until the job is done/.test(await page.textContent('#modal-root')));
   await page.check('#modal-root [name=consent]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
   const setupHash = await page.evaluate(() => location.hash);
   await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
@@ -875,7 +875,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.fill('.admin-quote [name=fee]', '2000'); await page.click('.admin-quote button'); await page.waitForTimeout(400);
   await go(setupHash);
   await page.click('[data-act=quote-accept]'); await page.waitForTimeout(200);
-  check('jobs: accepting a set-up quote needs the access tick first', /Tick the box to let PermitPal join/.test(await page.textContent('#toast')) && (await page.locator('#modal-root .modal').count()) === 0);
+  check('jobs: accepting a set-up quote needs the access tick first', /Tick the box to let Pinoy Permit join/.test(await page.textContent('#toast')) && (await page.locator('#modal-root .modal').count()) === 0);
   await page.check('[data-access-ok]'); await page.click('[data-act=quote-accept]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
   await page.fill('.pay-form [name=ref]', 'GC-9'); await page.click('.pay-form button[type=submit]'); await page.waitForTimeout(400);
   await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
@@ -884,14 +884,14 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.click('[data-act=admin-join]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
   await page.check('.admin-steps [name=done][value="2"]'); await page.click('.admin-steps button'); await page.waitForTimeout(400);
   await go('#/team');
-  check('jobs: the team page shows PermitPal with why and until when', (await page.locator('main .staff-tag').count()) === 1 && /Ends automatically when that job is done/.test(await page.textContent('main')));
+  check('jobs: the team page shows Pinoy Permit with why and until when', (await page.locator('main .staff-tag').count()) === 1 && /Ends automatically when that job is done/.test(await page.textContent('main')));
   await go(setupHash);
-  check('jobs: the order shows the access and the steps done', /PermitPal has access to/.test(await page.textContent('main')) && /2 of 5 done/.test(await page.textContent('main .job-steps').then(() => page.textContent('main'))) && (await page.locator('main .job-steps li.done').count()) === 2);
+  check('jobs: the order shows the access and the steps done', /Pinoy Permit has access to/.test(await page.textContent('main')) && /2 of 5 done/.test(await page.textContent('main .job-steps').then(() => page.textContent('main'))) && (await page.locator('main .job-steps li.done').count()) === 2);
   await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
   await page.locator('main .line', { hasText: 'Set up my account for me' }).click(); await page.waitForTimeout(300);
   await page.selectOption('.admin-update [name=status]', 'completed'); await page.click('.admin-update button'); await page.waitForTimeout(400);
   await go('#/team');
-  check('jobs: finishing the job ends PermitPal\'s access', (await page.locator('main .staff-tag').count()) === 0);
+  check('jobs: finishing the job ends Pinoy Permit\'s access', (await page.locator('main .staff-tag').count()) === 0);
   check('jobs: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
 }
@@ -912,7 +912,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('partners: it is quiet (small grey text, no colors or images)', await line.evaluate((e) => parseFloat(getComputedStyle(e).fontSize) <= 14 && !e.querySelector('img')));
   check('partners: our own walk-through is offered on the inspection step', /Book a pre-inspection walk-through/.test(await page.textContent('.ck-list li:has-text("Have someone at the site") .ck-offer')));
   await line.locator('[data-act=placement-why]').click(); await page.waitForTimeout(200);
-  check('partners: "Why this?" says the firm pays and it doesn\'t change their price', /pays PermitPal/.test(await page.textContent('#modal-root')) && /never changes the firm's price/.test(await page.textContent('#modal-root')));
+  check('partners: "Why this?" says the firm pays and it doesn\'t change their price', /pays Pinoy Permit/.test(await page.textContent('#modal-root')) && /never changes the firm's price/.test(await page.textContent('#modal-root')));
   await page.click('#modal-root [data-modal-close]');
   await line.locator('[data-act=placement-quote]').click(); await page.waitForTimeout(300);
   check('partners: "Request a quote" asks first and says what is shared', /Request a quote from Metro Fire Safety/.test(await page.textContent('#modal-root')) && /nothing else/.test(await page.textContent('#modal-root')));
@@ -947,8 +947,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.fill('#apply-form [name=website]', 'makatifire.ph'); await page.click('#apply-form button'); await page.waitForTimeout(200);
   check('apply: a website without https:// is caught', /https:\/\//.test(await page.textContent('#apply-form .form-error')));
   await page.fill('#apply-form [name=website]', ''); await page.click('#apply-form button'); await page.waitForTimeout(200);
-  check('apply: the firm must confirm it is registered and licensed (PermitPal doesn\'t check)', /confirm your business is registered and licensed/.test(await page.textContent('#apply-form .form-error'))
-    && /PermitPal doesn't check this/.test(await page.textContent('#apply-form .attest')));
+  check('apply: the firm must confirm it is registered and licensed (Pinoy Permit doesn\'t check)', /confirm your business is registered and licensed/.test(await page.textContent('#apply-form .form-error'))
+    && /Pinoy Permit doesn't check this/.test(await page.textContent('#apply-form .attest')));
   await page.check('#apply-form [name=attested]'); await page.click('#apply-form button'); await page.waitForTimeout(400);
   check('apply: sent, with a clear next step', /Thanks, we got it/.test(await page.textContent('main')) && /3 business days/.test(await page.textContent('main')));
   check('apply: no sideways scroll on a phone', (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1);
@@ -970,7 +970,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await go('#/admin');
   check('money: Home shows the four big numbers in plain words', (await page.locator('main .mh-card').count()) === 4 && /You earned this month/.test(await page.textContent('main'))
     && /Owed to you/.test(await page.textContent('main .mh-cards')) && /Comes in every month/.test(await page.textContent('main')) && /Not your money/.test(await page.textContent('main')));
-  check('money: Home lists what needs doing as sentences, with counts', (await page.locator('main .todo').count()) >= 3 && /want(s)? to be listed on PermitPal/.test(await page.textContent('main')));
+  check('money: Home lists what needs doing as sentences, with counts', (await page.locator('main .todo').count()) >= 3 && /want(s)? to be listed on Pinoy Permit/.test(await page.textContent('main')));
   check('money: Home shows only the first 5 receipt numbers to add, with "Show all"', (await page.locator('#money-invoices tbody tr').count()) <= 5);
   if (await page.locator('[data-act=money-all-receipts]').count()) { await page.click('[data-act=money-all-receipts]'); await page.waitForTimeout(400); }
   const missBefore = await page.locator('#money-invoices tbody tr').count();
@@ -1114,7 +1114,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.goto('http://localhost:4173/');
   await page.waitForSelector('main h1');
   await go('#/pros');
-  check('leads: no firm website in the directory (requests go through PermitPal)', (await page.locator('main .partner a[href^="http"]').count()) === 0);
+  check('leads: no firm website in the directory (requests go through Pinoy Permit)', (await page.locator('main .partner a[href^="http"]').count()) === 0);
   check('leads: a firm out of credit isn\'t listed', !(await page.textContent('main')).includes('Sample Permit Desk') && (await page.textContent('main')).includes('Sample Liaison Services'));
   await page.click('[data-act=partner-intro][data-id=p1]');
   await page.selectOption('.modal [name=contact_method]', 'email');
@@ -1159,7 +1159,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await out.goto('http://localhost:4173/'); await out.waitForSelector('.landing h1');
   const token = await out.evaluate(async () => (await import('/__mock/mock-data.js')).demoLeadToken());
   await out.evaluate((t) => { location.hash = '#/lead/' + t; }, token); await out.waitForTimeout(600);
-  check('firm page: opens from the email link without an account', /Quote request from Isla Water Station/.test(await out.textContent('h1')) && /₱500 from your PermitPal credit/.test(await out.textContent('.lead-page')));
+  check('firm page: opens from the email link without an account', /Quote request from Isla Water Station/.test(await out.textContent('h1')) && /₱500 from your Pinoy Permit credit/.test(await out.textContent('.lead-page')));
   await out.click('#lead-report button'); await out.waitForTimeout(200);
   check('firm page: a report needs a reason', /Choose a reason/.test(await out.textContent('#lead-report .form-error')));
   await out.check('#lead-report [name=reason][value=unreachable]');
@@ -1200,12 +1200,12 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await go('#/services?service=renew_mayors_permit');
   check('online only: an in-person service can\'t be ordered by link', /not available/.test(await page.textContent('#toast')) && (await page.locator('#modal-root .modal').count()) === 0);
   await go('#/compliance');
-  check('online only: no "Have PermitPal renew several" on Compliance', (await page.locator('main [data-act=svc-bulk]').count()) === 0);
+  check('online only: no "Have Pinoy Permit renew several" on Compliance', (await page.locator('main [data-act=svc-bulk]').count()) === 0);
   await go('#/businesses/b2');
   check('online only: branch cards don\'t offer Year-round care', (await page.locator('main .care-line').count()) === 0);
   const mp = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b2').id));
   await go('#/requirement/' + mp);
-  check('online only: a Mayor\'s Permit page offers no renewal by PermitPal', (await page.locator('main [data-act=svc-for-req], main .care-note, main .ck-offer').count()) === 0);
+  check('online only: a Mayor\'s Permit page offers no renewal by Pinoy Permit', (await page.locator('main [data-act=svc-for-req], main .care-note, main .ck-offer').count()) === 0);
   await go('#/admin');
   check('online only: staff have no Care tab', (await page.locator('[data-act=admin-tab][data-tab=care]').count()) === 0);
   await page.click('[data-act=money-view][data-v=earnings]'); await page.waitForTimeout(350);
@@ -1245,8 +1245,10 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`website ${label}: the receipt uses the site's own type (no typewriter font) and the two-color name`, await p.evaluate(() => {
       const f = (q) => getComputedStyle(document.querySelector(q)).fontFamily;
       return ['.lp-rc-plan', '.lp-rc-every', '.lp-rc-inc', '.lp-rc-amt'].every((q) => !/Mono|monospace/.test(f(q)))
-        && document.querySelector('.lp-rc-name .w1').textContent === 'Permit' && getComputedStyle(document.querySelector('.lp-rc-name .w1')).color !== getComputedStyle(document.querySelector('.lp-rc-name .w2')).color;
+        && document.querySelector('.lp-rc-name .w1').textContent === 'Pinoy' && getComputedStyle(document.querySelector('.lp-rc-name .w1')).color !== getComputedStyle(document.querySelector('.lp-rc-name .w2')).color;
     }));
+    check(`website ${label}: the name is Pinoy Permit everywhere on the page and in the tab`, !/PermitPal|Permit ?Pal\b/.test(text) && !/PermitPal/.test(await p.title())
+      && /Pinoy Permit/.test(await p.title()) && (await p.textContent('.lp-top .brand')).trim() === 'Pinoy Permit');
     check(`website ${label}: the example phone shows Sadie's Kitchen`, /Good morning, Sadie/.test(await p.textContent('.lp-screen')) && (await p.textContent('.lp-biz')) === "Sadie's Kitchen");
     check(`website ${label}: "One screen." sits on a line of its own`, await p.evaluate(() => {
       const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
@@ -1255,7 +1257,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`website ${label}: 8 worries taken away, and 8 lines on the free-plan receipt at ₱0.00`, (await p.locator('.lp-worry').count()) === 8
       && (await p.locator('.lp-rc-lines li').count()) === 8 && /Total each month\s*₱0\.00/.test(await p.textContent('.lp-receipt')));
     check(`website ${label}: no prices on the home page`, (await p.locator('[data-plan-card], .bill-toggle, #pricing').count()) === 0);
-    check(`website ${label}: nothing removed, and nothing PermitPal doesn't do`, !/Head office|Year-round care|licensed firm|we verify|verified by PermitPal|vetted|legal/i.test(text));
+    check(`website ${label}: nothing removed, and nothing Pinoy Permit doesn't do`, !/Head office|Year-round care|licensed firm|we verify|verified by Pinoy Permit|vetted|legal/i.test(text));
     check(`website ${label}: Plus mentioned only once its database part is on`, /Plus, more staff/.test(text) === (label !== 'live'));
     check(`website ${label}: the tour starts at step 1, Add`, (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === '1' && /Add permits your way/.test(await p.textContent('.lp-stage')));
     let worst = await over(p), screens = new Set([await p.getAttribute('.lp-stage .lp-scr', 'aria-label')]);
@@ -1302,7 +1304,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   inPerson = true;
 }
 
-// PermitPal Plus and staff licenses: plans and bills, the free 3 people, the permit check, templates,
+// Pinoy Permit Plus and staff licenses: plans and bills, the free 3 people, the permit check, templates,
 // the public permit page (and the page itself), the worker's upload link, and staff confirming payments.
 {
   const newPage = async (g, vp = { width: 1280, height: 860 }) => {
@@ -1357,7 +1359,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await go('#/templates');
     check('plus: everyone sees the templates', (await page.locator('main .tpl-card').count()) >= 2 && (await page.locator('[data-act=tpl-preview]').count()) >= 2);
     await page.click('[data-act=tpl-preview]'); await page.waitForTimeout(200);
-    check('plus: free: a preview of the first lines only', /comes with PermitPal Plus|filled in with your business/.test(await page.textContent('#modal-root')) && !/\{\{/.test(await page.textContent('#modal-root')));
+    check('plus: free: a preview of the first lines only', /comes with Pinoy Permit Plus|filled in with your business/.test(await page.textContent('#modal-root')) && !/\{\{/.test(await page.textContent('#modal-root')));
     await page.click('#modal-root [data-modal-close]');
     await go('#/check'); await page.waitForSelector('.check-score');
     check('plus: free: the check says how many it found, and offers Plus for the list', /to fix/.test(await mainText(page)) && (await page.locator('.plus-teaser').count()) === 1 && (await page.locator('.finding').count()) === 0);
@@ -1484,7 +1486,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const t = await page.textContent('main');
     check('public page: the headline is honest (1 permit expired)', /1 permit expired/.test(t));
     check('public page: each permit shows its state and date', /Valid until Jan 20, 2027/.test(t) && /Expired/.test(t) && /Being renewed/.test(t) && /•••• 0042/.test(t));
-    check('public page: says what PermitPal does, and doesn\'t', /checked automatically by PermitPal/.test(t) && /does not issue permits or verify them with the government/.test(t));
+    check('public page: says what Pinoy Permit does, and doesn\'t', /checked automatically by Pinoy Permit/.test(t) && /does not issue permits or verify them with the government/.test(t));
     check('public page: names are shown as text, never run', !(await page.evaluate(() => window.__xss)) && (await page.locator('main img[src=x]').count()) === 0);
     check('public page: copies can be downloaded when allowed', (await page.locator('.tp-files [data-path]').count()) === 1);
     check('public page: staff licenses as counts only', /14 for 12 people: 13 current, 1 due soon/.test(t));
@@ -1522,7 +1524,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
 }
 
 // White-label: an accounting firm puts its name, logo and color on what its clients see, with
-// "Powered by PermitPal" always there.
+// "Powered by Pinoy Permit" always there.
 {
   const newPage = async (g, vp = { width: 1280, height: 860 }) => {
     const page = await browser.newPage({ viewport: vp });
@@ -1546,7 +1548,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.evaluate(async () => { await (await import('/__mock/mock-data.js')).setOrgProfile('o1', { kind: 'firm' }); await (await import('/js/core.js')).reload(); });
     await go('#/settings/billing'); await page.waitForSelector('#white-label');
     const card = await page.textContent('#white-label');
-    check(`brand ${label}: a firm sees White-label on the Plan page, ₱1,000 a month, 14 days free`, /₱1,000/.test(card) && /Powered by PermitPal/.test(card) && (await page.locator('#white-label [data-act=brand-trial]').count()) === 1, card.replace(/\s+/g, ' ').slice(0, 120));
+    check(`brand ${label}: a firm sees White-label on the Plan page, ₱1,000 a month, 14 days free`, /₱1,000/.test(card) && /Powered by Pinoy Permit/.test(card) && (await page.locator('#white-label [data-act=brand-trial]').count()) === 1, card.replace(/\s+/g, ' ').slice(0, 120));
     check(`brand ${label}: Settings has a "Your brand" tab`, (await page.locator('.subnav a[href="#/settings/brand"]').count()) === 1);
     await go('#/settings/brand'); await page.waitForSelector('#brand-form');
     check(`brand ${label}: before it's on, the page says clients see it once White-label is on`, /once White-label is on/.test(await mainText(page)));
@@ -1561,8 +1563,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.fill('#brand-form [name=phone]', '(02) 8123 4567');
     await page.fill('#brand-form [name=tagline]', 'Tax, books & permits'); await page.waitForTimeout(80);
     const prev = await page.textContent('.mail-prev');
-    check(`brand ${label}: the email preview shows the firm as sender, replies to the firm, Powered by PermitPal`,
-      /Dela Cruz <b>& Co\.<\/b> via PermitPal/.test(prev) && /replies to hello@delacruz\.ph/.test(prev) && /Powered by PermitPal/.test(prev) && /Questions\? Email hello@delacruz\.ph or call \(02\) 8123 4567/.test(prev), prev.replace(/\s+/g, ' ').slice(0, 160));
+    check(`brand ${label}: the email preview shows the firm as sender, replies to the firm, Powered by Pinoy Permit`,
+      /Dela Cruz <b>& Co\.<\/b> via Pinoy Permit/.test(prev) && /replies to hello@delacruz\.ph/.test(prev) && /Powered by Pinoy Permit/.test(prev) && /Questions\? Email hello@delacruz\.ph or call \(02\) 8123 4567/.test(prev), prev.replace(/\s+/g, ' ').slice(0, 160));
     check(`brand ${label}: names show as typed, never as code`, (await page.locator('.mail-prev b b, .side-prev b b').count()) === 0);
     check(`brand ${label}: the preview button takes the color`, /rgb\(15, 81, 50\)/.test(await page.locator('.mail-prev .mp-btn').evaluate((e) => getComputedStyle(e).backgroundColor)));
     await page.setInputFiles('#brand-form [name=logo]', { name: 'big.png', mimeType: 'image/png', buffer: Buffer.alloc(600 * 1024, 1) }); await page.waitForTimeout(150);
@@ -1585,7 +1587,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const m = await page.textContent('#modal-root');
     check(`brand ${label}: paying keeps the free days and costs ₱1,000`, /White-label \(monthly\)/.test(m) && /when your trial ends/.test(m) && /Get the bill: ₱1,000/.test(m), m.replace(/\s+/g, ' ').slice(0, 160));
     await page.click('#modal-root [data-modal-close]');
-    check(`brand ${label}: the firm's own app keeps PermitPal's look`, (await page.locator('.sidebar .co-brand').count()) === 0);
+    check(`brand ${label}: the firm's own app keeps Pinoy Permit's look`, (await page.locator('.sidebar .co-brand').count()) === 0);
     check(`brand ${label}: firm set-up: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -1594,14 +1596,14 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   for (const [label, vp] of [['phone', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 860 }]]) {
     const { page, errs, go } = await newPage({ PP_TEAM: true, PP_BRAND: true }, vp);
     await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
-    check(`brand ${label}: the client's menu shows the firm, Powered by PermitPal`, /Dela Cruz & Co\./.test(await page.textContent('.sidebar .co-brand')) && /Powered by PermitPal/.test(await page.textContent('.sidebar .powered-by')));
+    check(`brand ${label}: the client's menu shows the firm, Powered by Pinoy Permit`, /Dela Cruz & Co\./.test(await page.textContent('.sidebar .co-brand')) && /Powered by Pinoy Permit/.test(await page.textContent('.sidebar .powered-by')));
     if (label === 'phone') check('brand phone: the top bar shows the firm', await page.locator('.topbar .co-brand').isVisible());
     const vars = await page.evaluate(() => ['--brand', '--link', '--accent-soft'].map((v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()));
     check(`brand ${label}: the app takes the firm's color (links a shade darker)`, vars[0] === '#0F5132' && /^#[0-9A-F]{6}$/.test(vars[1]) && /^#[0-9A-F]{6}$/.test(vars[2]), vars.join(' '));
     const fc = await page.textContent('.firm-card');
     check(`brand ${label}: the dashboard shows "Your accountant" with email and phone`, /Your accountant/.test(fc) && (await page.getAttribute('.firm-card a[href^="mailto:"]', 'href')) === 'mailto:hello@delacruz.ph'
       && (await page.getAttribute('.firm-card a[href^="tel:"]', 'href')) === 'tel:0281234567');
-    check(`brand ${label}: ...and that the account stays theirs`, /Your PermitPal account stays yours, free/.test(fc));
+    check(`brand ${label}: ...and that the account stays theirs`, /Your Pinoy Permit account stays yours, free/.test(fc));
     check(`brand ${label}: no sideways scroll`, (await sideways(page)) <= 1, `${await sideways(page)}px`);
     await go('#/settings');
     check(`brand ${label}: a client has no "Your brand" tab`, (await page.locator('.subnav a[href="#/settings/brand"]').count()) === 0);
@@ -1616,7 +1618,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const { page, errs } = await newPage({ PP_BRAND: true, PP_LOGGED_OUT: true }, { width: 390, height: 844 });
     await page.goto('http://localhost:4173/#/connect/tokfirm'); await page.waitForSelector('.auth-firm');
     check('brand: the sign-up page from the invitation shows the firm', /Dela Cruz & Co\./.test(await page.textContent('.auth-firm')) && (await page.locator('.auth-firm img').count()) === 1
-      && /Dela Cruz & Co\. invited you to connect on PermitPal/.test(await page.textContent('.auth-card .banner')));
+      && /Dela Cruz & Co\. invited you to connect on Pinoy Permit/.test(await page.textContent('.auth-card .banner')));
     check('brand: sign-up page: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -1625,7 +1627,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   {
     const { page, errs, go } = await newPage({ PP_TEAM: true, PP_BRAND: true, PP_FEATURES: ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus'] });
     await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
-    check('brand off: clients see PermitPal\'s own look', (await page.locator('.co-brand, .firm-card').count()) === 0);
+    check('brand off: clients see Pinoy Permit\'s own look', (await page.locator('.co-brand, .firm-card').count()) === 0);
     await page.evaluate(async () => { await (await import('/__mock/mock-data.js')).setOrgProfile('o1', { kind: 'firm' }); await (await import('/js/core.js')).reload(); });
     await go('#/settings/billing'); await page.waitForSelector('#addons');
     check('brand off: firms see no White-label card or tab', (await page.locator('#white-label, .subnav a[href="#/settings/brand"]').count()) === 0);
@@ -1700,7 +1702,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.locator('main .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
     check('prices app: switching to yearly changes the button too', /₱1,990 a year \(2 months free\)/.test(await plusBtn.textContent()) && (await plusBtn.getAttribute('data-billing')) === 'yearly');
     await plusBtn.click(); await page.waitForSelector('#modal-root .modal');
-    check('prices app: the yearly bill is ₱1,990', /PermitPal Plus \(yearly\)/.test(await page.textContent('#modal-root')) && /Get the bill: ₱1,990/.test(await page.textContent('#modal-root')));
+    check('prices app: the yearly bill is ₱1,990', /Pinoy Permit Plus \(yearly\)/.test(await page.textContent('#modal-root')) && /Get the bill: ₱1,990/.test(await page.textContent('#modal-root')));
     await page.click('#modal-root [data-modal-close]');
     await page.fill('[data-staff-calc] [name=people]', '50'); await page.waitForTimeout(100);
     const calc = await page.textContent('[data-staff-calc] .calc-out');
@@ -1757,7 +1759,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   }
 }
 
-// PermitPal load: topping up (and staff confirming), text packs, the season pass, a papers check from asking to
+// Pinoy Permit load: topping up (and staff confirming), text packs, the season pass, a papers check from asking to
 // the staff answer, one template at a time, not enough load, invitations, a teammate's view, phones; and none of it
 // before its database file is in.
 for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', { width: 390, height: 844 }]]) {
@@ -1898,7 +1900,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
 }
 
 // The processing clock (starting it, a deadline passing, the follow-up letter and the ARTA complaint, closing it) and
-// city bills (paying one yourself; PermitPal paying one, from the customer's payment to staff confirming, paying and
+// city bills (paying one yourself; Pinoy Permit paying one, from the customer's payment to staff confirming, paying and
 // filing the receipt), a teammate's view, phones.
 for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', { width: 390, height: 844 }]]) {
   const page = await browser.newPage({ viewport: vp, acceptDownloads: true });
@@ -1948,11 +1950,11 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await submit();
   check(`clock ${label}: got it: the clock stops and says how late the office was`, /working days? late/.test(await page.textContent('#clock')) && /Waiting on the office/.test(await page.textContent('#clock')));
 
-  // the offer: PermitPal pays it, flat fee, up front
-  check(`bills ${label}: the card offers "Let PermitPal pay it" at ₱499 flat, with why`, /Let PermitPal pay it: ₱499 flat/.test(await page.textContent('#bills'))
+  // the offer: Pinoy Permit pays it, flat fee, up front
+  check(`bills ${label}: the card offers "Let Pinoy Permit pay it" at ₱499 flat, with why`, /Let Pinoy Permit pay it: ₱499 flat/.test(await page.textContent('#bills'))
     && (await page.locator('#bills .bill-offer-list li').count()) === 3 && !/guarantee|we pay the surcharge|we cover/i.test(await page.textContent('#bills')));
   await page.click('#bills .bill-offer [data-act=bill-add]'); await page.waitForSelector('.modal');
-  check(`bills ${label}: the offer opens with PermitPal paying already chosen, and it's shown first`, await page.isChecked('.modal input[name=mode][value=permitpal]')
+  check(`bills ${label}: the offer opens with Pinoy Permit paying already chosen, and it's shown first`, await page.isChecked('.modal input[name=mode][value=permitpal]')
     && (await page.locator('.modal .bill-modes label').first().getAttribute('class')).includes('bill-mode-pp'));
   await page.click('.modal [data-modal-close]');
   // bills: kept on record, paid yourself
@@ -1961,9 +1963,9 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.fill('.modal [name=amount]', '650.5'); await page.fill('.modal [name=bill_ref]', 'BC-118');
   await submit();
   check(`bills ${label}: a bill kept on record: centavos shown, to pay`, /₱650\.50/.test(await page.textContent('#bills')) && /To pay/.test(await page.textContent('#bills')));
-  check(`bills ${label}: a bill you'll pay yourself offers to switch to PermitPal`, (await page.locator('#bills [data-act=bill-switch]').count()) === 1);
+  check(`bills ${label}: a bill you'll pay yourself offers to switch to Pinoy Permit`, (await page.locator('#bills [data-act=bill-switch]').count()) === 1);
   await page.click('#bills [data-act=bill-switch]'); await page.waitForSelector('.modal');
-  check(`bills ${label}: switching carries the details over, PermitPal chosen`, (await page.inputValue('.modal [name=amount]')) === '650.5' && await page.isChecked('.modal input[name=mode][value=permitpal]'));
+  check(`bills ${label}: switching carries the details over, Pinoy Permit chosen`, (await page.inputValue('.modal [name=amount]')) === '650.5' && await page.isChecked('.modal input[name=mode][value=permitpal]'));
   await page.click('.modal [data-modal-close]');
   await page.click('#bills [data-act=bill-paid]'); await page.waitForSelector('.modal');
   await submit(200);
@@ -1972,16 +1974,16 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.setInputFiles('.modal input[type=file]', { name: 'or.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('x') });
   await submit();
   check(`bills ${label}: paid: the receipt is with the permit's files`, /official receipt OR-55120/.test(await page.textContent('#bills')) && /Official receipt OR-55120/.test(await page.textContent('main')));
-  // PermitPal pays one
+  // Pinoy Permit pays one
   await page.click('#bills [data-act=bill-add]'); await page.waitForSelector('.modal');
   await page.check('.modal input[name=mode][value=permitpal]');
   await page.fill('.modal [name=amount]', '14230.50');
-  check(`bills ${label}: PermitPal paying shows what you send (the bill plus ₱499)`, /You send ₱14,729\.50/.test(await page.textContent('.modal .bill-total')));
+  check(`bills ${label}: Pinoy Permit paying shows what you send (the bill plus ₱499)`, /You send ₱14,729\.50/.test(await page.textContent('.modal .bill-total')));
   await submit(200);
   check(`bills ${label}: ...and needs a photo of the bill`, /photo of the bill/.test(await page.textContent('#modal-root .modal-error')));
   await page.setInputFiles('.modal input[name=file]', { name: 'soa.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('x') });
   await page.click('#modal-root button[type=submit]'); await page.waitForSelector('.modal .quote-hint');
-  check(`bills ${label}: saved: straight to paying PermitPal, with the payment details`, /₱14,729\.50/.test(await page.textContent('.modal .quote-hint')) && (await page.locator('.modal .paywith').count()) >= 1);
+  check(`bills ${label}: saved: straight to paying Pinoy Permit, with the payment details`, /₱14,729\.50/.test(await page.textContent('.modal .quote-hint')) && (await page.locator('.modal .paywith').count()) >= 1);
   await page.fill('.modal [name=ref]', '1009 555 0001'); await submit();
   check(`bills ${label}: paid: we check it`, /Checking your payment/.test(await page.textContent('#bills')));
   await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=office]'); await page.waitForTimeout(700);
@@ -1994,11 +1996,11 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.fill('.modal [name=or_no]', 'OR-7731905'); await page.setInputFiles('.modal input[type=file]', { name: 'or.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('x') });
   await submit(700);
   await go('#/requirement/' + req.id); await page.waitForSelector('#bills');
-  check(`bills ${label}: the customer sees it paid, with the receipt on the permit`, /PermitPal paid it: official receipt OR-7731905/.test(await page.textContent('#bills')) && /Official receipt OR-7731905/.test(await page.textContent('main')));
+  check(`bills ${label}: the customer sees it paid, with the receipt on the permit`, /Pinoy Permit paid it: official receipt OR-7731905/.test(await page.textContent('#bills')) && /Official receipt OR-7731905/.test(await page.textContent('main')));
   check(`bills ${label}: no sideways scroll`, (await over()) <= 0);
   await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'member'; });
   await page.click('#bills [data-act=bill-add]'); await page.waitForSelector('.modal');
-  check(`bills ${label}: a teammate can keep a bill, but only an owner or admin has PermitPal pay`, await page.isDisabled('.modal input[name=mode][value=permitpal]'));
+  check(`bills ${label}: a teammate can keep a bill, but only an owner or admin has Pinoy Permit pay`, await page.isDisabled('.modal input[name=mode][value=permitpal]'));
   await page.click('.modal [data-modal-close]');
   await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'owner'; });
   check(`clock+bills ${label}: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
@@ -2017,7 +2019,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   const mp = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.business_id === 'b1' && r.type_code === 'mayors_permit').id);
   await go('#/requirement/' + mp); await page.waitForSelector('#clock');
   check('clock demo: an office past its deadline, with the letters ready', /Late by/.test(await page.textContent('#clock .chip')) && (await page.locator('#clock [data-act=clock-letter]').count()) === 2);
-  check('bills demo: a bill PermitPal is paying, and when', /We're paying it/.test(await page.textContent('#bills')) && /by .*(AM|PM)/i.test(await page.textContent('#bills')));
+  check('bills demo: a bill Pinoy Permit is paying, and when', /We're paying it/.test(await page.textContent('#bills')) && /by .*(AM|PM)/i.test(await page.textContent('#bills')));
   await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=office]'); await page.waitForTimeout(700);
   check('admin: the late office is listed', /Late by/.test(await page.textContent('main')) && /Makati Business Permits and Licensing Office/.test(await page.textContent('main')));
   await page.click('[data-act=adm-bill-refund]'); await page.waitForSelector('.modal'); await submit(200);
@@ -2043,7 +2045,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.fill('.modal [name=office]', 'BFP Mandaue'); await page.fill('.modal [name=reference_no]', 'FSIC-88'); await submit(700);
   const fsicId = await page.evaluate(async () => (await import('/__mock/mock-data.js')).__office.filings.find((f) => f.request_id === 'ord1')?.requirement_id);
   await go('#/requirement/' + fsicId); await page.waitForSelector('#clock');
-  check('clock: on an order we filed, the customer sees the clock and that we follow up', /BFP Mandaue/.test(await page.textContent('#clock')) && /PermitPal filed this for you/.test(await page.textContent('#clock'))
+  check('clock: on an order we filed, the customer sees the clock and that we follow up', /BFP Mandaue/.test(await page.textContent('#clock')) && /Pinoy Permit filed this for you/.test(await page.textContent('#clock'))
     && (await page.locator('#clock [data-act=clock-edit]').count()) === 0);
   check('clock+bills demo: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
@@ -2127,7 +2129,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   check(`packet ${label}: "yes" asks what changed`, /Say briefly what changed/.test(await modalErr()) && await page.isVisible('.modal [name=changes]'));
   await page.fill('.modal [name=changes]', 'Bigger space next door'); await submit();
   await page.waitForSelector('.modal [name=tin]');
-  check(`packet ${label}: the last question asks only for the details PermitPal doesn't have`, (await page.locator('.modal [name=tin]').count()) === 1 && (await page.locator('.modal [name=owner_name]').count()) === 0);
+  check(`packet ${label}: the last question asks only for the details Pinoy Permit doesn't have`, (await page.locator('.modal [name=tin]').count()) === 1 && (await page.locator('.modal [name=owner_name]').count()) === 0);
   await page.click('.modal [data-pk-back]'); await page.waitForSelector('.modal [name=changes]');
   check(`packet ${label}: Back keeps the answer`, (await page.inputValue('.modal [name=changes]')) === 'Bigger space next door');
   await submit(); await page.waitForSelector('.modal [name=tin]');

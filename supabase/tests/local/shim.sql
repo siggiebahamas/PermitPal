@@ -1,4 +1,4 @@
--- Minimal stand-ins for what a Supabase project provides, so the PermitPal migrations and SQL tests run on plain Postgres.
+-- Minimal stand-ins for what a Supabase project provides, so the Pinoy Permit migrations and SQL tests run on plain Postgres.
 create role anon nologin noinherit; create role authenticated nologin noinherit; create role service_role nologin noinherit bypassrls;
 create role authenticator login noinherit; grant anon, authenticated, service_role to authenticator;
 create role supabase_admin superuser;

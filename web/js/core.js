@@ -12,7 +12,7 @@ export const S = {
   data: null,      // { types, services, businesses, locations, vehicles, people, reqs, requests, members }
   unread: 0,
   features: {},   // newer features this database supports: { errors, assign, filings, ... }
-  brand: null,    // a client workspace's accounting firm look (White-label), or null for PermitPal's own
+  brand: null,    // a client workspace's accounting firm look (White-label), or null for Pinoy Permit's own
 };
 // Is a newer feature switched on for this database?
 export const has = (name) => !!S.features?.[name];
@@ -40,7 +40,7 @@ export function effectivePlan() {
   return S.plans.find((p) => p.id === (lapsed ? 'free' : o.plan_id)) || S.plans[0];
 }
 
-// ---------------------------------------------------------------- PermitPal Plus and staff licenses
+// ---------------------------------------------------------------- Pinoy Permit Plus and staff licenses
 // The database decides (it refuses anything not paid for); these only decide what to show.
 export const TEAM_PLANS = ['fleet', 'firm', 'head_office', 'property', 'property_s'];
 const todayISO = () => new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 10);
@@ -80,7 +80,7 @@ export const locationsOf = (bizId) => S.data.locations.filter((l) => l.business_
 export const reqsOf = (subject, id) =>
   S.data.reqs.filter((r) => (subject === 'business' ? r.business_id === id : subject === 'person' ? r.person_id === id : r.vehicle_id === id));
 export const service = (code) => S.data?.services?.find((x) => x.code === code);
-// PermitPal only sells work it can do online for now: no lining up at city hall or the LTO, no
+// Pinoy Permit only sells work it can do online for now: no lining up at city hall or the LTO, no
 // inspections or visits (local rules and fees vary too much to quote them well). Those services,
 // Year-round care, rush fees on them and "renew several" stay in the code: set IN_PERSON to bring
 // them back. The tests switch it on to keep checking them.
@@ -103,11 +103,11 @@ export const coverOf = (r) => {
 export const tierOf = (code) => careOf().tiers.find((t) => t.code === code);
 export const subjectHref = (r) => (r.subject === 'business' ? `#/businesses/${r.business_id}` : r.subject === 'person' ? `#/people/${r.person_id}` : `#/vehicles/${r.vehicle_id}`);
 export function memberName(userId) {
-  if (!userId) return 'PermitPal';
+  if (!userId) return 'Pinoy Permit';
   if (userId === S.user?.id) return 'You';
   const m = S.data?.members.find((x) => x.user_id === userId);
   const p = m?.profile;
-  if (!p) return 'PermitPal team';
+  if (!p) return 'Pinoy Permit team';
   return [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'Team member';
 }
 

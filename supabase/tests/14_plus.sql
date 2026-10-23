@@ -1,4 +1,4 @@
--- PermitPal Plus and staff licenses: prices, the free 3 people and paid licenses, bills (moving up with
+-- Pinoy Permit Plus and staff licenses: prices, the free 3 people and paid licenses, bills (moving up with
 -- credit, moving down next period, renewals made ahead, paying late, online checkout), pauses when a plan
 -- ends, the public permit page (statuses, hidden permits, copies, paused), recipients, the worker's upload
 -- link, licenses by role, the automatic permit check, templates and the money views. Rolled back at the end.
@@ -113,7 +113,7 @@ exception when others then perform pg_temp.res('a screenshot must be in the bill
 select public.addon_report_payment(inv1, 'gcash', '1009 234 567', null, null) from t_ids;
 select pg_temp.res('paid: waiting for the one check', status = 'pending_verification' and pay_ref = '1009 234 567', status) from public.addon_invoices where id = (select inv1 from t_ids);
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
-select pg_temp.res('PermitPal staff are told what to confirm', exists (select 1 from public.notifications where user_id = 'd1000000-0000-4000-8000-0000000000f5' and title like 'Payment to confirm: PPA-%'), '');
+select pg_temp.res('Pinoy Permit staff are told what to confirm', exists (select 1 from public.notifications where user_id = 'd1000000-0000-4000-8000-0000000000f5' and title like 'Payment to confirm: PPA-%'), '');
 
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000d4');
 set local role authenticated;
@@ -235,10 +235,10 @@ select pg_temp.res('every workspace sees the templates list, without the full te
   (select count(*) from public.list_templates()) = 8 and not exists (select 1 from public.list_templates() where preview like '%{{%'), '');
 do $$ begin perform public.get_template((select org from t_ids), 'affidavit_of_loss');
   perform pg_temp.res('the full template is Plus only', false, 'was allowed');
-exception when others then perform pg_temp.res('the full template is Plus only', sqlerrm like 'Ready-to-use templates come with PermitPal Plus%', sqlerrm); end $$;
+exception when others then perform pg_temp.res('the full template is Plus only', sqlerrm like 'Ready-to-use templates come with Pinoy Permit Plus%', sqlerrm); end $$;
 do $$ begin perform public.trust_page_save((select org from t_ids), (select biz from t_ids), 'Sadie''s Kitchen');
   perform pg_temp.res('the public page is Plus only', false, 'was allowed');
-exception when others then perform pg_temp.res('the public page is Plus only', sqlerrm like 'Your public permit page comes with PermitPal Plus.', sqlerrm); end $$;
+exception when others then perform pg_temp.res('the public page is Plus only', sqlerrm like 'Your public permit page comes with Pinoy Permit Plus.', sqlerrm); end $$;
 select pg_temp.res('free workspaces see how many things the check found, not the list',
   (c ->> 'plus')::boolean = false and (c ->> 'fix')::int > 0 and not exists (select 1 from public.audit_findings where org_id = (select org from t_ids)), c::text)
   from (select public.run_permit_check(org) as c from t_ids) x;
@@ -249,7 +249,7 @@ do $$ begin perform public.start_plus_trial((select org from t_ids));
 exception when others then perform pg_temp.res('...once', sqlerrm = 'Plus is already on.', sqlerrm); end $$;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select pg_temp.res('the first permit check runs and is emailed', exists (select 1 from public.audit_runs where org_id = (select org from t_ids) and trigger = 'start')
-  and exists (select 1 from public.message_outbox where to_address = 'owner@plus.ph' and subject like 'PermitPal: Your first permit check: Sadie Foods'), '');
+  and exists (select 1 from public.message_outbox where to_address = 'owner@plus.ph' and subject like 'Pinoy Permit: Your first permit check: Sadie Foods'), '');
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 select pg_temp.res('paying during the trial keeps the free days', q ->> 'mode' = 'after_trial' and (q ->> 'period_start')::date = private.today_ph() + 14, q::text)

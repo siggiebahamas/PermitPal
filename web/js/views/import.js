@@ -51,7 +51,7 @@ export function openImport(kind = 'vehicles') {
       <li><b>Choose the file</b> <input type="file" id="imp-file" aria-label="Spreadsheet file (Excel or CSV)" accept=".xlsx,.csv,.txt,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
         <span class="muted small">Excel (.xlsx) or CSV.${canReadExcel() ? '' : ' This browser can only read CSV: in Excel use File → Save As → CSV.'}</span></li>
     </ol>
-    ${S.features?.revenue && (S.data.services || []).some((x) => x.code === 'setup_from_paper') ? html`<p class="muted small">Rather not do this yourself? <button type="button" class="linklike" data-act="svc-request" data-code="setup_from_paper">Have PermitPal set it up for you</button>.</p>` : ''}
+    ${S.features?.revenue && (S.data.services || []).some((x) => x.code === 'setup_from_paper') ? html`<p class="muted small">Rather not do this yourself? <button type="button" class="linklike" data-act="svc-request" data-code="setup_from_paper">Have Pinoy Permit set it up for you</button>.</p>` : ''}
     <div id="imp-sheet"></div>
     <div id="imp-dates"></div>
     <div id="imp-preview"></div>`, {
@@ -107,7 +107,7 @@ export function openImport(kind = 'vehicles') {
         if (e.target.id === 'imp-sheet-pick') loadSheet(Number(e.target.value));
       });
       form.querySelector('#imp-template').addEventListener('click', () =>
-        download(`permitpal-${FILE_NAMES[cur()]}-template.csv`, toCsv(templateRows(cur(), S.data.types))));
+        download(`pinoypermit-${FILE_NAMES[cur()]}-template.csv`, toCsv(templateRows(cur(), S.data.types))));
       form.querySelector('#imp-file').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         rows = null; book = null; checked = null; dayFirst = false;
@@ -154,7 +154,7 @@ export function openImport(kind = 'vehicles') {
       await reload();
       if (failed.length) {
         form.querySelector('#imp-preview').innerHTML = String(html`<p class="form-error" role="alert">${plural(good.length - failed.length, K.one, K.many)} imported. These didn't go in:</p>
-          <ul class="small">${failed.map((x) => html`<li>${x}</li>`)}</ul><p class="muted small">Fix those rows and import the file again: rows already in PermitPal are skipped.</p>`);
+          <ul class="small">${failed.map((x) => html`<li>${x}</li>`)}</ul><p class="muted small">Fix those rows and import the file again: rows already in Pinoy Permit are skipped.</p>`);
         btn.textContent = 'Done'; btn.disabled = true;
         return false;
       }

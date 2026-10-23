@@ -58,7 +58,7 @@ select pg_temp.res('no credit: the firm isn''t listed, its checklist line isn''t
 do $$ begin perform public.request_referral((select org from t_ids), (select firm from t_ids), (select fsic from t_ids), 'x', 'phone', '09171234567');
   perform pg_temp.res('...and can''t be sent a request', false, 'was allowed');
 exception when others then perform pg_temp.res('...and can''t be sent a request', sqlerrm like '%isn''t taking new requests%', sqlerrm); end $$;
-select pg_temp.res('customers never get a firm''s website (requests go through PermitPal)',
+select pg_temp.res('customers never get a firm''s website (requests go through Pinoy Permit)',
   not exists (select 1 from public.list_professionals() x where to_jsonb(x) ? 'website'), '');
 do $$ begin perform public.admin_add_credit((select firm from t_ids), 5000, 'GCash');
   perform pg_temp.res('only staff add credit', false, 'was allowed');
@@ -85,7 +85,7 @@ select pg_temp.res('...recorded in the credit history with the balance after it'
   from public.partner_credits where referral_id = (select ref1 from t_ids) and kind = 'lead';
 select pg_temp.res('no statement charge for a prepaid request', not exists (select 1 from public.partner_charges where referral_id = (select ref1 from t_ids)), '');
 select pg_temp.res('the lead email says what it used, what''s left, and has the report link', count(*) = 1
-  and bool_and(body_text like '%used ₱500.00 of your PermitPal credit%' and body_text like '%Credit left: ₱500.00 (1 more quote request)%' and body_text like '%#/lead/%'), count(*)::text)
+  and bool_and(body_text like '%used ₱500.00 of your Pinoy Permit credit%' and body_text like '%Credit left: ₱500.00 (1 more quote request)%' and body_text like '%#/lead/%'), count(*)::text)
   from public.message_outbox where to_address = 'leads@firepros.ph' and dedupe_key = 'lead:' || (select ref1 from t_ids);
 select pg_temp.res('one request left: the firm is told it''s running low', count(*) = 1, count(*)::text)
   from public.message_outbox where to_address = 'billing@firepros.ph' and subject like '%running low%';

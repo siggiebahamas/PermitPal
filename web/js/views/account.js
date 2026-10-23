@@ -118,7 +118,7 @@ export async function team(el) {
   el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   let pending = [];
   if (isOrgAdmin()) { try { pending = await db.invites(S.org.id); } catch (e) { toastError(e); } }
-  // Who is on the team right now (someone may have joined or left since the app loaded, including PermitPal for a set-up job).
+  // Who is on the team right now (someone may have joined or left since the app loaded, including Pinoy Permit for a set-up job).
   try {
     const [members, care] = await Promise.all([db.loadMembers(S.org.id), has('revenue') ? db.loadCare(S.org.id) : null]);
     S.data.members = members;
@@ -140,7 +140,7 @@ export async function team(el) {
         const me = m.user_id === S.user.id;
         const canChange = isOrgAdmin() && !me && (m.role !== 'owner' || isOwner());
         const staff = has('revenue') ? (S.data.care?.staff || []).find((x) => x.user_id === m.user_id) : null;
-        return html`<div class="row"><div class="row-main member">${avatar(name, null, 34)}<div><div class="row-title">${name}${me ? ' (you)' : ''}${staff ? html` <span class="tag staff-tag">PermitPal</span>` : ''}</div>
+        return html`<div class="row"><div class="row-main member">${avatar(name, null, 34)}<div><div class="row-title">${name}${me ? ' (you)' : ''}${staff ? html` <span class="tag staff-tag">Pinoy Permit</span>` : ''}</div>
           ${staff ? html`<div class="row-sub">Temporary access for "<a href="#/services/orders/${staff.request_id}">${staff.requirement_name}</a>". Ends automatically when that job is done.</div>` : ''}
           <div class="row-sub">${p.email}${p.role_title ? ' · ' + p.role_title : ''}${has('assign') && handledCount(m.user_id)
             ? html` · <a href="#/compliance?who=${m.user_id === S.user.id ? 'me' : m.user_id}">handles ${plural(handledCount(m.user_id), 'permit')}</a>` : ''}</div></div></div>
@@ -253,7 +253,7 @@ export async function settings(el, section) {
       ${toggle('weekly_digest', 'Monday summary email')}
     </section>
     ${when(has('revenue'), html`<section class="card"><h2>Suggestions</h2>
-      <label class="toggle"><div><div>Show partner firms on renewal checklists</div><div class="muted small">At most one partner firm on a checklist step, labelled "Partner". Firms pay PermitPal to be listed there.</div></div>
+      <label class="toggle"><div><div>Show partner firms on renewal checklists</div><div class="muted small">At most one partner firm on a checklist step, labelled "Partner". Firms pay Pinoy Permit to be listed there.</div></div>
         <input type="checkbox" data-profile-pref="show_partner_offers" ${p.show_partner_offers !== false ? 'checked' : ''}><span class="switch"></span></label></section>`)}
     ${when(has('sms'), smsSection(channels))}
     ${when(has('mfa'), html`<section class="card" id="mfa-section"><h2>Two-step login</h2><p class="muted">Loading…</p></section>`)}
@@ -265,11 +265,11 @@ export async function settings(el, section) {
           <td><span class="tag ${m.status === 'sent' ? 'green' : m.status === 'failed' ? 'red' : ''}" title="${m.last_error || ''}">${m.status}</span></td></tr>`)}
       </tbody></table></div>` : html`<p class="muted">Nothing sent yet.</p>`}
     </section>
-    <section class="card" id="install"><h2>Put PermitPal on your phone</h2>
+    <section class="card" id="install"><h2>Put Pinoy Permit on your phone</h2>
       <p class="muted small">It opens like an app, full screen, with no app store needed.</p>
       <div class="grid2">
-        <div><b>iPhone (Safari)</b><ol class="small"><li>Open PermitPal in Safari.</li><li>Tap the Share button (square with an arrow).</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol></div>
-        <div><b>Android (Chrome)</b><ol class="small"><li>Open PermitPal in Chrome.</li><li>Tap the ⋮ menu at the top right.</li><li>Tap <b>Add to Home screen</b> or <b>Install app</b>.</li></ol></div>
+        <div><b>iPhone (Safari)</b><ol class="small"><li>Open Pinoy Permit in Safari.</li><li>Tap the Share button (square with an arrow).</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol></div>
+        <div><b>Android (Chrome)</b><ol class="small"><li>Open Pinoy Permit in Chrome.</li><li>Tap the ⋮ menu at the top right.</li><li>Tap <b>Add to Home screen</b> or <b>Install app</b>.</li></ol></div>
       </div>
     </section>`)}
 
@@ -312,15 +312,15 @@ export async function settings(el, section) {
       <p class="muted small">Tagalog covers the menus for now; more screens will follow.</p>
     </section>
 
-    ${when(has('services'), html`<section class="card" id="staff-access"><div class="card-head"><div><h2>Who at PermitPal opened your files</h2>
-      <p class="card-sub">PermitPal staff can only open a permit's files while you have an open done-for-you request for it, and every open is listed here. It can't be edited or erased.</p></div></div>
+    ${when(has('services'), html`<section class="card" id="staff-access"><div class="card-head"><div><h2>Who at Pinoy Permit opened your files</h2>
+      <p class="card-sub">Pinoy Permit staff can only open a permit's files while you have an open done-for-you request for it, and every open is listed here. It can't be edited or erased.</p></div></div>
       ${access.length ? access.map((x) => html`<div class="line"><span class="line-main"><b>${x.file_name}</b>
         <small>${x.staff_name} · ${fmtDateTime(x.created_at)} · ${x.reason}</small></span></div>`)
-        : html`<p class="muted">No one at PermitPal has opened your files.</p>`}
+        : html`<p class="muted">No one at Pinoy Permit has opened your files.</p>`}
     </section>`)}
 
     <section class="card"><h2>Your data</h2>
-      <p class="muted small">Download everything you track as a spreadsheet, anytime. PermitPal backs up the database and every uploaded file every night, encrypted, and keeps past permit periods forever.</p>
+      <p class="muted small">Download everything you track as a spreadsheet, anytime. Pinoy Permit backs up the database and every uploaded file every night, encrypted, and keeps past permit periods forever.</p>
       <button class="btn btn-soft" data-act="export-csv">Download CSV</button>
     </section>
 
@@ -418,7 +418,7 @@ function billingSection(pay) {
   const plan = S.plans.find((p) => p.id === planId);
   const price = (id) => Number(S.plans.find((p) => p.id === id)?.price_php_monthly || 0);
   const choices = org.kind === 'property' ? ['property_s', 'property'] : [k?.plan];
-  const status = org.kind === 'business' ? html`<p>This workspace is a <b>single business</b>: PermitPal is <b>free</b>, with no limits on businesses, vehicles or team members.</p>`
+  const status = org.kind === 'business' ? html`<p>This workspace is a <b>single business</b>: Pinoy Permit is <b>free</b>, with no limits on businesses, vehicles or team members.</p>`
     : acc.why === 'plan' ? html`<p>You're on the <b>${plan?.name}</b> plan${org.plan_expires_at ? html`, paid until <b>${fmtDate(org.plan_expires_at.slice(0, 10))}</b>` : ''}.</p>`
     : acc.why === 'trial' ? html`<p>You're on a <b>free trial</b> of ${org.kind === 'property' ? 'the property plans' : plan?.name}: ${plural(acc.days, 'day')} left. Choose how to pay below to keep your board after the trial.</p>`
     : acc.why === 'staff' ? html`<p>Staff access: team tools are on.</p>`

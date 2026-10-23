@@ -560,7 +560,7 @@ function addPerson() {
         <label class="field"><span>Their email <small>(optional: we remind them too)</small></span><input type="email" name="email" maxlength="254" placeholder="name@example.com"></label>
         <label class="field"><span>Their mobile <small>(optional)</small></span><input name="mobile" maxlength="20" inputmode="tel" placeholder="0917 123 4567"></label>
       </div>`)}
-    <label class="check"><input type="checkbox" name="consent" required> This person knows we'll keep their license details in PermitPal to track renewals${has('plus') ? ', and may email them reminders' : ''}.</label>`, {
+    <label class="check"><input type="checkbox" name="consent" required> This person knows we'll keep their license details in Pinoy Permit to track renewals${has('plus') ? ', and may email them reminders' : ''}.</label>`, {
     submitLabel: 'Add person',
     onOpen: (form) => {
       if (!has('plus')) return;

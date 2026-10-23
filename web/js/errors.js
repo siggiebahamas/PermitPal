@@ -1,4 +1,4 @@
-// Error reporting: when something breaks in someone's browser, PermitPal staff find out (Admin > Errors)
+// Error reporting: when something breaks in someone's browser, Pinoy Permit staff find out (Admin > Errors)
 // instead of the customer quietly giving up. Nothing personal leaves the browser: emails, phone numbers,
 // long numbers, record ids and invite/share codes are removed before sending. Network drop-outs and
 // the customer's own validation messages are not errors and are never sent.

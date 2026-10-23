@@ -92,7 +92,7 @@ export async function loadMembers(orgId) {
   return members;
 }
 // Year-round care: the plans, bills, which permit each plan covers, claims, prices, and any temporary
-// PermitPal access (small lists, used on many pages; refreshed when the care or team page opens).
+// Pinoy Permit access (small lists, used on many pages; refreshed when the care or team page opens).
 export async function loadCare(orgId) {
   const [plans, invoices, coverage, claims, tiers, staff] = await Promise.all([
     sb.from('care_plans').select('*').eq('org_id', orgId).order('created_at').then(ok),
@@ -329,7 +329,7 @@ export const acceptInvite = async (token) => ok(await sb.rpc('accept_invite', { 
 export const payments = async (orgId) =>
   ok(await sb.from('payments').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(24));
 
-// ---------------------------------------------------------------- PermitPal staff console
+// ---------------------------------------------------------------- Pinoy Permit staff console
 export const adminOrgs = async () => ok(await sb.rpc('admin_orgs'));
 export const adminOrgKinds = async () => ok(await sb.from('orgs').select('id, kind, trial_ends_at'));
 export const adminSetPlan = async (orgId, plan, expires) => ok(await sb.rpc('admin_set_plan', { p_org: orgId, p_plan: plan, p_expires: expires }));
@@ -409,7 +409,7 @@ export const networkDocuments = async (owner, member) => ok(await sb.rpc('networ
 export const networkNudge = async (owner, links, orgs, message) => ok(await sb.rpc('network_nudge', { p_owner: owner, p_links: links || [], p_orgs: orgs || [], p_message: message || null }));
 export const requestPlan = async (orgId, plan, note) => ok(await sb.rpc('request_plan', { p_org: orgId, p_plan: plan, p_note: note || null }));
 
-// ---------------------------------------------------------------- contact PermitPal (works signed in or out)
+// ---------------------------------------------------------------- contact Pinoy Permit (works signed in or out)
 export const contactSupport = async ({ topic, message, name, email, orgId }) => ok(await sb.rpc('contact_support', {
   p_topic: topic, p_message: message, p_name: name || null, p_email: email || null, p_org: orgId || null,
 }));
@@ -560,7 +560,7 @@ export const adminApplications = async () => ok(await sb.from('partner_applicati
 export const adminApplicationToPartner = async (id) => ok(await sb.rpc('admin_application_to_partner', { p_app: id }));
 export const adminSetApplication = async (id, patch) => ok(await sb.from('partner_applications').update(patch).eq('id', id));
 
-// ---------------------------------------------------------------- PermitPal Plus and staff licenses
+// ---------------------------------------------------------------- Pinoy Permit Plus and staff licenses
 // Plans you add on, their bills, licenses by role and photos workers sent (small lists, loaded with the workspace).
 export async function loadPlus(orgId) {
   const [addons, invoices, roles, submissions, stopping] = await Promise.all([
@@ -661,7 +661,7 @@ export async function uploadBrandLogo(orgId, file) {
 export const removeBrandLogo = async (path) => { if (path) await sb.storage.from('brand').remove([path]); };
 export const brandLogoUrl = (path) => (path ? sb.storage.from('brand').getPublicUrl(path).data.publicUrl : null);
 
-// Staff (PermitPal): bills to confirm, plans, giving time.
+// Staff (Pinoy Permit): bills to confirm, plans, giving time.
 export const adminAddonInvoices = async () => ok(await sb.from('addon_invoices').select('*, orgs(name)').order('created_at', { ascending: false }).limit(300));
 export const adminAddons = async () => ok(await sb.from('addons').select('*, orgs(name)').order('updated_at', { ascending: false }).limit(1000));
 export const adminConfirmAddonPayment = async (id, okPaid, note, invoiceNo) => ok(await sb.rpc('admin_confirm_addon_payment', {
@@ -669,7 +669,7 @@ export const adminConfirmAddonPayment = async (id, okPaid, note, invoiceNo) => o
 export const adminVoidAddonInvoice = async (id, note) => ok(await sb.rpc('admin_void_addon_invoice', { p_invoice: id, p_note: note }));
 export const adminSetAddon = async (orgId, kind, people, until, note) => ok(await sb.rpc('admin_set_addon', { p_org: orgId, p_kind: kind, p_people: people ?? null, p_until: until, p_note: note || null }));
 
-// ---------------------------------------------------------------- PermitPal load
+// ---------------------------------------------------------------- Pinoy Permit load
 // A prepaid balance per workspace: top-ups (by transfer or online), text packs, single templates, papers checks,
 // the renewal season pass and invitations. Every price and rule is checked again by the database.
 export const loadSummary = async (orgId) => ok(await sb.rpc('load_summary', { p_org: orgId }));
@@ -733,7 +733,7 @@ export const adminLoadCashout = async (orgId, amount, method, ref, note) => ok(a
 
 // ---------------------------------------------------------------- the processing clock and city bills
 // The clock counts an office's legal processing time after you file; bills are the office's tax bills and statements,
-// kept on the permit, or paid by PermitPal on request. Every rule is checked again by the database.
+// kept on the permit, or paid by Pinoy Permit on request. Every rule is checked again by the database.
 export const filings = async (reqId) => ok(await sb.from('office_filings').select('*').eq('requirement_id', reqId).order('created_at', { ascending: false }).limit(10));
 export const holidays = async (from, to) => ok(await sb.from('ph_holidays').select('day, name, kind').gte('day', from).lte('day', to).order('day'));
 export const filingSave = async (f) => ok(await sb.rpc('filing_save', {
@@ -780,7 +780,7 @@ export const adminSetHoliday = async (day, name, kind, remove) => ok(await sb.rp
 
 // ---------------------------------------------------------------- renewal packets and city deadlines
 // The packet keeps this year's answers for the business permit renewal (next year starts from them). City deadlines:
-// rules like Quezon City's (a year from the issue date) and extensions PermitPal staff announce.
+// rules like Quezon City's (a year from the issue date) and extensions Pinoy Permit staff announce.
 export const packets = async (reqId) => ok(await sb.from('renewal_packets').select('*').eq('requirement_id', reqId).order('permit_year', { ascending: false }).limit(5));
 export const packetSave = async (reqId, year, answers, ready = false) => ok(await sb.rpc('packet_save', { p_requirement: reqId, p_year: year, p_answers: answers, p_ready: !!ready }));
 export async function cityDates() {

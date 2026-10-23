@@ -40,7 +40,7 @@ export async function render(el, id) {
     loadingId = null;
     if (!location.hash.includes(id)) return; // navigated away while loading
   } else if ((has('load') || has('clock') || has('billpay')) && detail.checksNav !== navs) {
-    // A papers check may have been answered, or a bill paid by PermitPal (its receipt filed here), since: small reads.
+    // A papers check may have been answered, or a bill paid by Pinoy Permit (its receipt filed here), since: small reads.
     const [checks, office, d] = await Promise.all([has('load') ? db.papersChecks(id).catch(() => detail.checks || []) : [], officeData(id),
       has('billpay') ? db.requirementDetail(id, { checklist: has('library2') }).catch(() => null) : null]);
     detail.checks = checks; detail.office = office;
@@ -114,7 +114,7 @@ function page(r) {
 
     ${when(r.confidence !== 'confirmed' && !r.cycle_id, html`
       <div class="banner info">
-        <div><b>Does this apply to you?</b> PermitPal added this because businesses like yours usually need it
+        <div><b>Does this apply to you?</b> Pinoy Permit added this because businesses like yours usually need it
         (${r.confidence === 'likely' ? 'likely required' : 'needs checking'}). Confirm it or remove it.</div>
         ${when(edit, html`<div class="banner-actions">
           <button class="btn btn-sm btn-primary" data-act="req-confirm" data-id="${r.id}">Yes, it applies</button>
@@ -123,7 +123,7 @@ function page(r) {
 
     ${when(r.status === 'in_progress', html`
       <div class="banner progress">
-        <div>${r.open_request_id ? html`PermitPal is handling this.${has('services') ? html` <a href="#/services/orders/${r.open_request_id}">Follow the request</a>.` : ''}` : 'You marked this renewal as started.'}
+        <div>${r.open_request_id ? html`Pinoy Permit is handling this.${has('services') ? html` <a href="#/services/orders/${r.open_request_id}">Follow the request</a>.` : ''}` : 'You marked this renewal as started.'}
         ${r.is_overdue ? ' It is past its expiry date, so finish it soon.' : ''} When you have the new permit, record it here.</div>
         ${when(edit, html`<div class="banner-actions">
           <button class="btn btn-sm btn-primary" data-act="req-renew" data-id="${r.id}">Record renewal</button>
@@ -403,7 +403,7 @@ on('doc-view', async (ds) => {
 });
 on('doc-download', async (ds) => {
   try {
-    // A link click, not a page change: the file downloads and PermitPal stays open.
+    // A link click, not a page change: the file downloads and Pinoy Permit stays open.
     const a = document.createElement('a');
     a.href = await db.fileUrl(ds.path, ds.name); a.download = ds.name || ''; a.rel = 'noopener';
     document.body.appendChild(a); a.click(); a.remove();

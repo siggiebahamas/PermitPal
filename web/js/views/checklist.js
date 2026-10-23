@@ -64,7 +64,7 @@ export function checklistCard(r, ticks = [], { offer = '' } = {}) {
           <input type="checkbox" data-ck="${i.k}" ${tick ? 'checked' : ''} ${edit ? '' : 'disabled'}>
           <span class="ck-text"><span class="ck-t">${i.t}</span>
             ${when(i.d, html`<small>${i.d}</small>`)}
-            ${dep ? html`<small class="ck-dep-status">In PermitPal: ${STATUS[dep.status]?.label || dep.status}${dep.status === 'compliant' && dep.expires_on ? ` until ${fmtDate(dep.expires_on)}` : ''}</small>` : ''}
+            ${dep ? html`<small class="ck-dep-status">In Pinoy Permit: ${STATUS[dep.status]?.label || dep.status}${dep.status === 'compliant' && dep.expires_on ? ` until ${fmtDate(dep.expires_on)}` : ''}</small>` : ''}
             ${tick ? html`<small class="ck-who">Ticked by ${tick.done_by === S.user?.id ? 'you' : memberName(tick.done_by)}, ${fmtDate(String(tick.done_at).slice(0, 10))}</small>` : ''}
           </span></label>
           ${when(i.u, html`<span class="ck-link">${external(i.u, 'Open')}</span>`)}

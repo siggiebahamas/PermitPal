@@ -1,4 +1,4 @@
-// PermitPal staff console: done-for-you orders (quote, payment, progress, finished permit) and their
+// Pinoy Permit staff console: done-for-you orders (quote, payment, progress, finished permit) and their
 // prices, workspaces and plans (team tools revenue), listed professionals and the quote requests
 // (leads) sent to them, payment details, the email log and browser errors.
 // Only accounts with profiles.is_platform_admin can load any of this (enforced in the database).
@@ -21,7 +21,7 @@ let tab = null; // Money first once the revenue features are on, else the Inbox
 const KIND_NAMES = { business: 'Business', head_office: 'Head office', firm: 'Accounting firm', property: 'Property', fleet: 'Fleet' };
 
 export async function admin(el) {
-  if (!S.profile?.is_platform_admin) { el.innerHTML = String(empty('Staff only', 'This page is for the PermitPal team.')); return; }
+  if (!S.profile?.is_platform_admin) { el.innerHTML = String(empty('Staff only', 'This page is for the Pinoy Permit team.')); return; }
   el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   const rev = has('revenue');
   tab ||= rev ? 'money' : 'inbox';
@@ -48,7 +48,7 @@ export async function admin(el) {
     else body = outboxTab(await db.adminOutbox(), await db.channelStatus().catch(() => ({})));
   } catch (e) { toastError(e); }
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>PermitPal admin</h1><p class="muted">Staff tools. Customers never see this page.</p></div></div>
+    <div class="page-head"><div><h1>Pinoy Permit admin</h1><p class="muted">Staff tools. Customers never see this page.</p></div></div>
     <div class="tabs">${rev ? tabBtn('money', 'Money') : ''}${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${rev && IN_PERSON ? tabBtn('care', 'Care') : ''}${tabBtn('services', 'Services & prices')}` : ''}${has('plus') ? tabBtn('plus', 'Plus & staff') : ''}${has('load') ? tabBtn('load', 'Load') : ''}${has('billpay') || has('clock') ? tabBtn('office', 'Bills & clock') : ''}${has('citydates') ? tabBtn('cities', 'City deadlines') : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${rev ? tabBtn('billing', 'Partner billing') : tabBtn('referrals', 'Quote requests')}
       ${tabBtn('payments', 'Payment details')}${tabBtn('outbox', 'Messages')}${has('errors') ? tabBtn('errors', 'Errors') : ''}</div>
     ${body}`);
@@ -116,7 +116,7 @@ function orderDetail(a, events) {
       <dl class="kv">
         <dt>Location</dt><dd>${a.location_label || '—'}</dd>
         <dt>Deadline</dt><dd>${a.due_on ? fmtDate(a.due_on) : '—'}</dd>
-        <dt>Documents</dt><dd>${{ have: 'Uploaded in PermitPal', need: 'Customer needs to get them', not_sure: 'Not sure' }[a.docs_status] || '—'}</dd>
+        <dt>Documents</dt><dd>${{ have: 'Uploaded in Pinoy Permit', need: 'Customer needs to get them', not_sure: 'Not sure' }[a.docs_status] || '—'}</dd>
         <dt>Contact</dt><dd>${a.contact_method}${a.contact_value ? ': ' + a.contact_value : ''}</dd>
         <dt>Authorized</dt><dd>${a.consented_at ? fmtDateTime(a.consented_at) + ' (ticked in the app; get the signed letter before filing)' : 'No — ask for written authorization before doing anything'}</dd>
         <dt>Notes</dt><dd class="pre">${a.notes || '—'}</dd>
@@ -188,7 +188,7 @@ function orderDetail(a, events) {
         <button class="btn btn-soft">Record refund</button></form></section>`)}
 
     <section class="card"><h2>Timeline</h2><ol class="timeline">${events.map((e) => html`<li class="${e.by_staff ? 'staff' : ''}"><div class="tl-dot"></div><div class="tl-body">
-      <div class="tl-head"><b>${e.by_staff ? 'PermitPal' : 'Customer'}</b><span class="muted small">${fmtDateTime(e.created_at)}</span></div>
+      <div class="tl-head"><b>${e.by_staff ? 'Pinoy Permit' : 'Customer'}</b><span class="muted small">${fmtDateTime(e.created_at)}</span></div>
       ${when(e.message, html`<div class="pre">${e.message}</div>`)}
       ${when(e.file_path, html`<button class="linklike doc-file" data-act="staff-file" data-path="${e.file_path}" data-name="${e.file_name || 'file'}">${ICON.file}${e.file_name || 'file'}</button>`)}</div></li>`)}</ol></section>`;
 }
@@ -347,9 +347,9 @@ function inboxTab(list) {
       <span class="muted small">${timeAgo(m.created_at)}</span></div>
     <div class="muted small">${m.name ? m.name + ' · ' : ''}<a href="mailto:${m.email}">${m.email}</a>${m.orgs?.name ? ' · ' + m.orgs.name : ''}${m.user_id ? '' : ' · no account'}</div>
     <p class="inbox-msg">${m.message}</p>
-    <div class="btn-row"><a class="btn btn-sm btn-primary" href="mailto:${m.email}?subject=${encodeURIComponent('Re: your message to PermitPal')}">Reply by email</a>
+    <div class="btn-row"><a class="btn btn-sm btn-primary" href="mailto:${m.email}?subject=${encodeURIComponent('Re: your message to Pinoy Permit')}">Reply by email</a>
       <button class="btn btn-sm btn-ghost" data-act="admin-support-status" data-id="${m.id}" data-status="${m.status === 'open' ? 'closed' : 'open'}">${m.status === 'open' ? 'Mark done' : 'Reopen'}</button></div></div>`;
-  return html`<section class="card"><div class="card-head"><div><h2>Inbox</h2><p class="card-sub">Messages from the Contact PermitPal form. Each one is also emailed to you. Reply to privacy requests first.</p></div>
+  return html`<section class="card"><div class="card-head"><div><h2>Inbox</h2><p class="card-sub">Messages from the Contact Pinoy Permit form. Each one is also emailed to you. Reply to privacy requests first.</p></div>
       <span class="chip ${open.length ? 'progress' : 'ok'}">${open.length} open</span></div>
     ${list.length ? list.map(row) : html`<p class="muted">No messages yet.</p>`}</section>
   ${when(has('mfa'), html`<section class="card"><h2>Lost phone: turn off someone's two-step login</h2>
@@ -370,7 +370,7 @@ function outboxTab(list, channels = {}) {
       <span class="chip ${channels.email ? 'ok' : 'overdue'}">${channels.email ? 'On' : 'Off'}</span></div>
     ${when(!channels.email, html`<ol class="small setup-steps">
       <li>Create a free account at resend.com (3,000 emails a month) and verify your domain.</li>
-      <li>Supabase → Edge Functions → Secrets: add <b>RESEND_API_KEY</b> and <b>EMAIL_FROM</b> (e.g. PermitPal &lt;reminders@yourdomain.ph&gt;).</li>
+      <li>Supabase → Edge Functions → Secrets: add <b>RESEND_API_KEY</b> and <b>EMAIL_FROM</b> (e.g. Pinoy Permit &lt;reminders@yourdomain.ph&gt;).</li>
       <li>Supabase → Authentication → Emails → SMTP: use the same Resend details so sign-up emails arrive too.</li>
       <li>Press the button below. You should get an email within a minute.</li></ol>`)}
     <button class="btn btn-soft btn-sm" data-act="admin-test-email">Send me a test email</button></section>

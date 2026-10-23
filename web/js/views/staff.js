@@ -209,7 +209,7 @@ on('staff-pack', async (ds, btn) => {
     const rows = reqs.slice().sort((a, b) => (a.subject_name || '').localeCompare(b.subject_name || '') || a.name.localeCompare(b.name));
     const summary = String(html`<!doctype html><html><head><meta charset="utf-8"><title>Staff licenses</title>
       <style>body{font-family:system-ui,sans-serif;max-width:900px;margin:32px auto;padding:0 16px;color:#111}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;padding:8px;text-align:left;font-size:14px}</style></head><body>
-      <h1>${S.org.name}: staff licenses</h1><p>As of ${fmtDate(todayPH())} · prepared with PermitPal</p>
+      <h1>${S.org.name}: staff licenses</h1><p>As of ${fmtDate(todayPH())} · prepared with Pinoy Permit</p>
       <table><tr><th>Person</th><th>Role</th><th>License</th><th>Status</th><th>No.</th><th>Expires</th><th>Copy</th></tr>
       ${rows.map((r) => html`<tr><td>${r.subject_name}</td><td>${r.person_role || ''}</td><td>${r.name}</td><td>${STATUS[r.status].label}</td><td>${r.reference_no || '—'}</td>
         <td>${r.expires ? (r.expires_on ? fmtDate(r.expires_on) : '—') : 'Does not expire'}</td><td>${r.document_count ? 'Included' : 'Missing'}</td></tr>`)}</table></body></html>`);

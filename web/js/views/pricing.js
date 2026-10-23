@@ -1,4 +1,4 @@
-// How PermitPal's prices are shown, on the website and under Settings > Plan: each plan with a plain
+// How Pinoy Permit's prices are shown, on the website and under Settings > Plan: each plan with a plain
 // checkmark list, the monthly price with what it comes to a day (and per client, vehicle or tenant), and
 // the yearly deal (pay for 10 months, get 12) made easy to see. Every price comes from the plans table or
 // prices.js, the same numbers the database charges; nothing here sets a price.
@@ -87,7 +87,7 @@ export const FREE_CHECKS = [
 const FREE_WINS = [[ICON.bell, 'We remind you', '30, 7 and 1 day before anything runs out'], [ICON.camera, "Snap, don't type", 'Take a photo of a permit; we read the dates'],
   [ICON.file, 'All in one place', 'Every permit, vehicle and staff license, kept safe forever']];
 const FREE_PREVIEW = { title: 'Your permits', rows: [["Mayor's Permit", 'soon', 'Due in 12 days'], ['Fire safety (FSIC)', 'ok', 'All good'], ['Health card · Ana', 'ok', 'All good']] };
-const PLUS_LINE = `PermitPal Plus included (worth ${peso(PLUS_MONTHLY)} a month)`;
+const PLUS_LINE = `Pinoy Permit Plus included (worth ${peso(PLUS_MONTHLY)} a month)`;
 const TENANT_PREVIEW = { title: 'Your tenants', rows: [['Unit 1 · Bakeshop', 'ok', 'All good'], ['Unit 5 · Salon', 'soon', 'Due in 14 days'], ['Unit 3 · Pharmacy', 'late', '3 days late', 'Remind']] };
 const TENANT_WINS = [[ICON.grid, 'Every tenant, one screen', 'Green is OK. Red is late.'], [ICON.upload, 'Tenants upload their own', 'No more chasing photocopies every January'],
   [ICON.list, 'You set the rules', 'Pick the permits every tenant must keep']];
@@ -144,7 +144,7 @@ const preview = (pv) => html`<div class="pp-preview" role="img" aria-label="Exam
     <span class="pv-pill pv-${st}" title="${LABEL[st]}">${txt}</span>${btn ? html`<span class="pv-btn">${btn}</span>` : ''}</div>`)}</div>`;
 const wins = (list) => html`<ul class="pp-wins">${list.map(([ic, t, d]) => html`<li><span class="pw-icon">${ic}</span><span><b>${t}</b><small>${d}</small></span></li>`)}</ul>`;
 const everything = (list) => html`<details class="pp-all"><summary><span>Everything included</span> <b>${list.length}</b></summary>${checks(list)}</details>`;
-const bonus = () => html`<div class="pp-bonus"><span>${ICON.check} PermitPal Plus included <s>${peso(PLUS_MONTHLY)}/mo</s></span><span>${ICON.check} Text reminders</span></div>`;
+const bonus = () => html`<div class="pp-bonus"><span>${ICON.check} Pinoy Permit Plus included <s>${peso(PLUS_MONTHLY)}/mo</s></span><span>${ICON.check} Text reminders</span></div>`;
 
 export function freeCard(cta = '') {
   return html`<section class="card pp-plan pp-free">
@@ -182,7 +182,7 @@ const COMPARE = [
   ['3 staff licenses', Y, Y, Y, Y, Y],
   ['Proof link and inspection download', Y, Y, Y, Y, Y],
   ['Text message (SMS) reminders', N, Y, Y, Y, Y],
-  [`PermitPal Plus (worth ${peso(PLUS_MONTHLY)} a month)`, N, Y, Y, Y, Y],
+  [`Pinoy Permit Plus (worth ${peso(PLUS_MONTHLY)} a month)`, N, Y, Y, Y, Y],
   ['Everyone you look after on one screen', N, 'Clients', 'Vehicles', 'Up to 20 tenants', 'Any number of tenants'],
   ['Remind them in one click', N, Y, N, Y, Y],
   ['They join free and keep their own permits current', N, Y, N, Y, Y],
@@ -220,7 +220,7 @@ export const BRAND_CHECKS = [
   'Replies go straight to you',
   "Your logo and color in your clients' app",
   'A report to every client on the 1st, from you',
-  '"Powered by PermitPal" stays small at the bottom',
+  '"Powered by Pinoy Permit" stays small at the bottom',
 ];
 export function addonCard({ id, icon, name, who, monthly, list, status = '', body = '', cta = '', current = false, note = '' }) {
   return html`<section class="card pp-plan pp-addon ${current ? 'pp-current' : ''}" id="${id}">

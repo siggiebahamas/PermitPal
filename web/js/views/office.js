@@ -1,9 +1,9 @@
 // Waiting on an office, and its bills, on each permit's page.
-// The processing clock: tell us the day you handed in your papers, and PermitPal counts the office's legal processing
+// The processing clock: tell us the day you handed in your papers, and Pinoy Permit counts the office's legal processing
 // time (Ease of Doing Business law, RA 11032) in working days. When it runs out, you're told, with a polite follow-up
 // letter ready, and a complaint to the Anti-Red Tape Authority (ARTA) if that doesn't work.
 // City bills: snap the office's bill; get reminded before it's due and keep the receipt with the permit, or let
-// PermitPal pay it. The database checks every rule and works out the real deadline; this page shows it.
+// Pinoy Permit pay it. The database checks every rule and works out the real deadline; this page shows it.
 import { html, openModal, confirmDialog, toast, toastError, when, fmtDate, peso, plural, todayPH, download, esc } from '../util.js';
 import { S, on, has, isOrgAdmin, canEdit, reqById, typeOf, business, location_, locationsOf } from '../core.js';
 import { ICON } from '../components.js';
@@ -67,7 +67,7 @@ export function clockCard(r, filings = []) {
   if (!open) {
     if (!edit || (r.status === 'compliant' && !last)) return last ? html`<p class="muted small clock-last">${lastLine(last)}</p>` : '';
     return html`<section class="card clock-card" id="clock"><div class="card-head"><h2>Waiting on the office?</h2></div>
-      <p>Tell us the day you handed in your papers. PermitPal counts the office's legal processing time (3 working days for most permits, by law)
+      <p>Tell us the day you handed in your papers. Pinoy Permit counts the office's legal processing time (3 working days for most permits, by law)
         and tells you the day it runs late, with a letter ready to send.</p>
       <div class="btn-row"><button class="btn btn-soft btn-sm" data-act="clock-start" data-id="${r.id}">${ICON.calendar} I filed it: start the clock</button></div>
       ${last ? html`<p class="muted small">${lastLine(last)}</p>` : ''}</section>`;
@@ -88,9 +88,9 @@ export function clockCard(r, filings = []) {
       <div><dt>Fees</dt><dd>${open.fees === 'paid' ? `Paid ${fmtDate(open.fees_paid_on)}` : FEES[open.fees]}</dd></div>
     </dl>
     ${late ? html`<div class="banner warn clock-late"><div><b>${open.office} is past its deadline.</b>
-      ${ours ? ' PermitPal filed this for you and is following up.' : html` Send the follow-up letter today: most offices act on a written, polite reminder.
+      ${ours ? ' Pinoy Permit filed this for you and is following up.' : html` Send the follow-up letter today: most offices act on a written, polite reminder.
       ${open.fees === 'paid' ? ' You handed in everything and paid, so the law treats your application as approved; the letter says so.' : ''}`}</div></div>`
-      : html`<p class="muted small">${open.extended ? `The office extended it once, in writing: "${open.extension_note}". ` : ''}${ours ? 'PermitPal filed this for you. If the office runs late, we follow up.'
+      : html`<p class="muted small">${open.extended ? `The office extended it once, in writing: "${open.extension_note}". ` : ''}${ours ? 'Pinoy Permit filed this for you. If the office runs late, we follow up.'
         : `If ${open.office} hasn't acted by then, we'll tell you, with a follow-up letter ready.`}</p>`}
     ${when(open.followup_at || open.complaint_at, html`<p class="small clock-letters">${open.followup_at ? html`Follow-up letter drafted ${fmtDate(open.followup_at.slice(0, 10))}. ` : ''}${open.complaint_at ? html`ARTA complaint drafted ${fmtDate(open.complaint_at.slice(0, 10))}${open.complaint_ref ? `, ARTA reference ${open.complaint_ref}` : ''}.` : ''}</p>`)}
     ${when(edit, html`<div class="btn-row">
@@ -327,14 +327,14 @@ export function billsCard(r, bills = []) {
 // "We pay it for you": what a trip to the office really costs, next to one flat fee.
 function billOffer(r, compact = false) {
   return html`<div class="bill-offer ${compact ? 'compact' : ''}">
-    <div class="bill-offer-top"><span class="bill-offer-tag">Skip the line</span><b>Let PermitPal pay it: ${peso(billFee())} flat</b></div>
+    <div class="bill-offer-top"><span class="bill-offer-tag">Skip the line</span><b>Let Pinoy Permit pay it: ${peso(billFee())} flat</b></div>
     ${compact ? '' : html`<ul class="bill-offer-list">
       <li>${ICON.check}<span><b>No queue, no half-day off.</b> Paying at the treasurer's window often takes a morning, plus transport and parking.</span></li>
       <li>${ICON.check}<span><b>Snap, send once, done.</b> We pay the office through its own payment channel.</span></li>
       <li>${ICON.check}<span><b>Receipt filed for you.</b> The official receipt lands on this permit, ready for next year.</span></li>
     </ul>
     <p class="bill-offer-math">A morning away from your business usually costs more than ${peso(billFee())}. This is the one bill you won't have to think about.</p>`}
-    <button class="btn btn-primary ${compact ? 'btn-sm' : ''}" data-act="bill-add" data-id="${r.id}" data-mode="permitpal">${compact ? `Have PermitPal pay it: ${peso(billFee())}` : `Have PermitPal pay my bill · ${peso(billFee())}`}</button>
+    <button class="btn btn-primary ${compact ? 'btn-sm' : ''}" data-act="bill-add" data-id="${r.id}" data-mode="permitpal">${compact ? `Have Pinoy Permit pay it: ${peso(billFee())}` : `Have Pinoy Permit pay my bill · ${peso(billFee())}`}</button>
     ${compact ? '' : html`<p class="muted small">Send it at least 3 business days before it's due. Bills up to ${peso(billMax())}.</p>`}
   </div>`;
 }
@@ -343,18 +343,18 @@ function billRow(r, b, edit) {
   const pp = b.mode === 'permitpal';
   const late = b.status === 'due' && b.pay_by && b.pay_by < todayPH();
   const admin = isOrgAdmin();
-  const line = b.status === 'due' ? (pp ? html`Send PermitPal <b>${peso(Number(b.amount_php) + Number(b.fee_php))}</b> (the bill plus our ${peso(b.fee_php)} fee) and we pay it.${b.note ? html` <span class="bill-note">${b.note}</span>` : ''}`
+  const line = b.status === 'due' ? (pp ? html`Send Pinoy Permit <b>${peso(Number(b.amount_php) + Number(b.fee_php))}</b> (the bill plus our ${peso(b.fee_php)} fee) and we pay it.${b.note ? html` <span class="bill-note">${b.note}</span>` : ''}`
       : html`You pay the office.${b.pay_by ? ` We remind you 3 days before and on ${fmtDate(b.pay_by)}.` : ''}`)
     : b.status === 'pending_verification' ? 'We confirm your payment within 1 business day, then pay the office.'
     : b.status === 'processing' ? html`We aim to pay ${b.office} by <b>${dueWhen(b.pay_deadline)}</b>. The official receipt will be here.`
-    : b.status === 'paid' ? html`${pp ? 'PermitPal paid it' : 'Paid'}${b.or_no ? html`: official receipt <b>${b.or_no}</b>` : ''}${b.or_date ? `, ${fmtDate(b.or_date)}` : ''}.${b.document_id ? " It's with this permit's files." : ''}`
+    : b.status === 'paid' ? html`${pp ? 'Pinoy Permit paid it' : 'Paid'}${b.or_no ? html`: official receipt <b>${b.or_no}</b>` : ''}${b.or_date ? `, ${fmtDate(b.or_date)}` : ''}.${b.document_id ? " It's with this permit's files." : ''}`
     : b.status === 'refunded' ? html`${b.refund_note || 'We sent your money back.'}` : '';
   return html`<div class="bill-row">
     <div class="bill-main"><div class="bill-top"><b>${b.office}</b> <span class="bill-amt">${peso(b.amount_php)}</span></div>
-      <small class="muted">${b.number}${b.bill_ref ? ` · bill no. ${b.bill_ref}` : ''}${b.pay_by ? ` · pay by ${fmtDate(b.pay_by)}` : ''}${pp ? ' · PermitPal pays it' : ''}</small>
+      <small class="muted">${b.number}${b.bill_ref ? ` · bill no. ${b.bill_ref}` : ''}${b.pay_by ? ` · pay by ${fmtDate(b.pay_by)}` : ''}${pp ? ' · Pinoy Permit pays it' : ''}</small>
       <p class="small bill-line">${line}</p>
       ${when(!pp && b.status === 'due' && edit && admin && billOpen(), html`<div class="bill-nudge"><span>Rather not queue for this one?</span>
-        <button class="btn btn-soft btn-sm" data-act="bill-switch" data-id="${b.id}" data-req="${r.id}">Have PermitPal pay it: ${peso(billFee())}</button></div>`)}</div>
+        <button class="btn btn-soft btn-sm" data-act="bill-switch" data-id="${b.id}" data-req="${r.id}">Have Pinoy Permit pay it: ${peso(billFee())}</button></div>`)}</div>
     <div class="bill-side"><span class="chip ${late ? 'overdue' : cls}">${late ? 'Past its pay-by date' : label}</span>
       ${when(edit && b.status === 'due', html`<div class="btn-row">
         ${pp ? (admin ? html`<button class="btn btn-primary btn-sm" data-act="bill-pay" data-id="${b.id}" data-req="${r.id}">Pay ${peso(Number(b.amount_php) + Number(b.fee_php))}</button>` : '')
@@ -381,8 +381,8 @@ function openBill(r, pre = {}) {
     <label class="field"><span>Bill or reference no. <small>(optional)</small></span><input name="bill_ref" maxlength="120" placeholder="e.g. SOA 2027-0145521" value="${pre.bill_ref || ''}"></label>
     <fieldset class="clock-kinds bill-modes"><legend>Who pays it?</legend>
       <label class="check bill-mode-pp ${can ? '' : 'is-off'}"><input type="radio" name="mode" value="permitpal" ${can ? '' : 'disabled'} ${want ? 'checked' : ''}><span>
-        <b>PermitPal pays it for me · ${peso(billFee())} flat</b> ${can ? html`<em class="bill-offer-tag">Skip the line</em>` : ''}
-        <small class="muted">${!billOpen() ? "PermitPal isn't paying bills right now." : !admin ? 'Ask your workspace owner or an admin: they can have PermitPal pay it.'
+        <b>Pinoy Permit pays it for me · ${peso(billFee())} flat</b> ${can ? html`<em class="bill-offer-tag">Skip the line</em>` : ''}
+        <small class="muted">${!billOpen() ? "Pinoy Permit isn't paying bills right now." : !admin ? 'Ask your workspace owner or an admin: they can have Pinoy Permit pay it.'
           : `No queue, no half-day off. Send the bill plus ${peso(billFee())} once (GCash, Maya or bank); we pay the office and put the official receipt here. Bills up to ${peso(billMax())}.`}</small></span></label>
       <label class="check"><input type="radio" name="mode" value="self" ${want ? '' : 'checked'}><span><b>I'll go pay the office myself</b> <small class="muted">We remind you 3 days before it's due and on the day. Add the receipt after.</small></span></label>
     </fieldset>
@@ -396,9 +396,9 @@ function openBill(r, pre = {}) {
         form.querySelector('[data-photo-hint]').textContent = pp ? '(needed, so we pay exactly what it says)' : '(optional when you pay it yourself)';
         const soon = pp && form.pay_by.value && form.pay_by.value <= addWorkdays(todayPH(), 1, hol());
         form.querySelector('.bill-total').innerHTML = pp && amt ? String(html`You send <b>${peso(amt + billFee())}</b>: the bill's ${peso(amt)} plus our ${peso(billFee())} fee.
-          ${amt > billMax() ? html`<span class="form-error">PermitPal pays bills up to ${peso(billMax())}. Pay this one at the office.</span>` : ''}
+          ${amt > billMax() ? html`<span class="form-error">Pinoy Permit pays bills up to ${peso(billMax())}. Pay this one at the office.</span>` : ''}
           ${soon ? html`<span class="form-error">It's due very soon. We may not pay it in time, and any surcharge would be yours: pay the office directly if you can.</span>` : ''}`)
-          : !pp && amt && can ? String(html`<span class="muted">Going yourself? Remember the line, the travel and the receipt. Switch to PermitPal anytime for ${peso(billFee())}.</span>`) : '';
+          : !pp && amt && can ? String(html`<span class="muted">Going yourself? Remember the line, the travel and the receipt. Switch to Pinoy Permit anytime for ${peso(billFee())}.</span>`) : '';
       };
       form.addEventListener('input', paint); form.addEventListener('change', paint); paint();
       wireBillScan(form, paint);
@@ -479,7 +479,7 @@ on('bill-add', async (ds) => {
   if (!HOL) await loadHolidays();
   openBill(r, { mode: ds.mode });
 });
-// A bill they meant to pay themselves, handed to PermitPal instead (the details carry over).
+// A bill they meant to pay themselves, handed to Pinoy Permit instead (the details carry over).
 on('bill-switch', async (ds) => {
   const r = reqById(ds.req); if (!r) return;
   const b = (await db.bills(r.id).catch(() => [])).find((x) => x.id === ds.id);
@@ -508,7 +508,7 @@ on('bill-paid', async (ds) => {
       if (!orNo && !(file && file.size)) throw new Error('Add the official receipt number or a photo of it.');
       await db.billPaidSelf(b, { or_no: orNo, or_date: fd.get('or_date'), file });
       changed(b.requirement_id);
-      toast(billOpen() && isOrgAdmin() ? `Saved, with the receipt. Next time, skip the trip: PermitPal pays bills for ${peso(billFee())}.` : 'Saved, with the receipt.');
+      toast(billOpen() && isOrgAdmin() ? `Saved, with the receipt. Next time, skip the trip: Pinoy Permit pays bills for ${peso(billFee())}.` : 'Saved, with the receipt.');
     },
   });
 });
