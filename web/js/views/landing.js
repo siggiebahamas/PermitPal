@@ -1,4 +1,5 @@
-// What a visitor sees before signing in. The home page sells the product: "Permits on autopilot", everything
+// What a visitor sees before signing in. The home page sells the product: "Track and manage every permit. Easily."
+// (with "Permits on autopilot" as its label), everything
 // to keep current on one screen, the headaches it takes away, a 5-step tour and the free plan as a receipt.
 // Prices have their own page (#/pricing): the free plan, the team plans (prices read live from the plans
 // table) and add-ons, monthly or yearly (2 months free). Anything whose database part isn't switched on
@@ -38,9 +39,9 @@ const wireScroll = (app) => app.querySelectorAll('[data-scroll-to]').forEach((a)
 // ---------------------------------------------------------------- home: the hero, with the app on a phone (example data)
 const hero = () => html`<section class="lp-hero2">
   <div class="lp-hero2-copy">
-    <p class="lp-tag">Made for Philippine businesses</p>
-    <h1>Permits on autopilot.</h1>
-    <p class="lp-lead">PermitPal tracks every permit, license${has('filings') ? ' and tax deadline' : ' and registration'}, and reminds you before each one is due${has('library2') ? ', with the steps to renew' : ''}.</p>
+    <p class="lp-tag">Permits on autopilot</p>
+    <h1>Track and manage every permit. <span class="lp-blue">Easily.</span></h1>
+    <p class="lp-lead">Add your permits once. PermitPal keeps track of every expiry date${has('filings') ? ' and tax deadline' : ''}${has('library2') ? ', reminds you before each one is due, and shows you how to renew' : ' and reminds you before each one is due'}.</p>
     <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#tour" data-scroll-to="tour">See how it works</a></div>
     <ul class="lp-ticks"><li>${ICON.check}Free plan, no card</li><li>${ICON.check}Works on any phone</li></ul>
   </div>
@@ -206,7 +207,7 @@ const receipt = () => {
       <p class="lp-lead">Everything on the receipt, every month, for nothing. Add more only when you need it.</p>
     </div>
     <div class="lp-receipt">
-      <div class="lp-rc-top"><img src="img/logo.png" alt=""><b class="lp-rc-name">PermitPal</b><span class="lp-rc-plan">FREE PLAN</span><span class="lp-rc-every">Every month</span></div>
+      <div class="lp-rc-top"><img src="img/logo.png" alt=""><b class="lp-rc-name wordmark"><span class="w1">Permit</span><span class="w2">Pal</span></b><span class="lp-rc-plan">Free plan</span><span class="lp-rc-every">Every month</span></div>
       <hr class="lp-rc-dash">
       <ul class="lp-rc-lines">${lines.map(([ic, t, n]) => html`<li><span class="lp-sq lp-sq-round ${t}">${ic}</span><span class="lp-rc-n">${tick}${n}</span><span class="lp-rc-inc">Included</span></li>`)}</ul>
       <hr class="lp-rc-dash">

@@ -100,7 +100,7 @@ input[type=file] { padding: 8px; font-size: 15px; }
 .auth-logo { width: 72px; display: block; margin: 0 auto 4px; }
 .wordmark { font-weight: 800; letter-spacing: -.3px; }
 .auth .wordmark { font-size: 28px; text-align: center; margin-bottom: 8px; }
-.w1 { color: var(--brand); } .w2 { color: var(--accent); }
+.w1 { color: var(--heading); } .w2 { color: var(--accent); }
 .tagline { text-align: center; color: var(--muted); margin-bottom: 20px; }
 .forgot { display: block; text-align: right; font-size: 14px; margin: -4px 0 14px; font-weight: 600; }
 .switch-auth { text-align: center; margin-top: 16px; font-size: 15px; }
@@ -545,9 +545,9 @@ iframe.preview { height: 70vh; }
 /* ================================================================ landing */
 .landing { max-width: 1040px; margin: 0 auto; padding: 0 16px 40px; }
 .lp-top { display: flex; align-items: center; gap: 8px; padding: 14px 0; }
-.lp-top .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-.lp-top .brand img { width: 34px; height: 34px; }
-.lp-top .wordmark { font-size: 21px; }
+.lp-top .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.lp-top .brand img { width: 50px; height: 50px; }
+.lp-top .wordmark { font-size: 26px; letter-spacing: -.6px; }
 .lp-top .spacer { flex: 1; }
 .lp-sub { text-align: center; color: var(--muted); margin: 0 0 16px; }
 .lp-foot { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; font-size: 14px; color: var(--muted); padding-top: 18px; border-top: 1px solid var(--border); }
@@ -764,8 +764,8 @@ tr.imp-bad td { background: var(--s-over-bg); }
 @media (max-width: 560px) {
   .lp-top { gap: 6px; }
   .lp-top .lp-nav { display: none; }
-  .lp-top .wordmark { font-size: 19px; }
-  .lp-top .brand img { width: 30px; height: 30px; }
+  .lp-top .wordmark { font-size: 22px; }
+  .lp-top .brand img { width: 42px; height: 42px; }
   .lp-top .btn-sm { padding: 7px 11px; }
 }
 /* History: one drop-down, changes grouped by day */
@@ -1618,8 +1618,8 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .pro-more { margin-top: 10px; }
 .pro-more summary { cursor: pointer; padding: 6px 0; }
 .pro-permits summary .linklike { white-space: nowrap; padding: 0; }
-@media (max-width: 380px) { .lp-top .wordmark { font-size: 17px; } .lp-top .brand img { width: 26px; height: 26px; } .lp-top .btn-sm { padding: 7px 9px; font-size: 14px; } }
-@media (max-width: 340px) { .lp-top { gap: 4px; } .lp-top .brand { gap: 6px; } .lp-top .wordmark { font-size: 15px; } .lp-top .brand img { width: 24px; height: 24px; } .lp-top .btn-sm { padding: 6px 7px; font-size: 13px; } }
+@media (max-width: 380px) { .lp-top .wordmark { font-size: 19px; } .lp-top .brand img { width: 36px; height: 36px; } .lp-top .btn-sm { padding: 7px 9px; font-size: 14px; } }
+@media (max-width: 340px) { .lp-top { gap: 4px; } .lp-top .brand { gap: 6px; } .lp-top .wordmark { font-size: 16px; } .lp-top .brand img { width: 30px; height: 30px; } .lp-top .btn-sm { padding: 6px 7px; font-size: 13px; } }
 
 /* Plans: a picture of the board, the big wins with icons, everything included one tap away */
 .pp-preview { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 8px 10px; margin: 12px 0 4px; box-shadow: 0 6px 16px -14px rgba(11, 27, 58, .5); }
@@ -1701,7 +1701,7 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .lp-tp-qr b { display: block; color: var(--heading); }
 .lp-tp-qr small { color: var(--muted); font-size: 13px; }
 
-/* ---------------------------------------------------------------- Website home: "Permits on autopilot"
+/* ---------------------------------------------------------------- Website home: "Track and manage every permit. Easily."
    One color per kind of thing (blue business, teal vehicles, green staff, lilac taxes, brown team): --c is
    the strong tone, --l the pale one, --r the glow around the tour's current step. No dark sections. */
 .t-blue { --c: #1B4DB5; --l: #EAF0FC; --r: rgba(27,77,181,.2); }
@@ -1856,18 +1856,18 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .lp-free2 .lp-lead { font-size: clamp(18px, 2vw, 21px); max-width: 30ch; }
 .lp-receipt { flex: 1 1 460px; min-width: 0; max-width: 560px; margin: 0 auto; position: relative; background: #fff; border-radius: 24px 24px 6px 6px; padding: 30px 30px 38px; box-shadow: 0 40px 70px -40px rgba(11,27,58,.45); transform: rotate(-1deg); }
 .lp-rc-top { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.lp-rc-top img { width: 46px; height: 46px; }
-.lp-rc-name { font-size: 26px; color: var(--brand); line-height: 1.2; }
-.lp-rc-plan { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 600; font-size: 22px; color: var(--heading); letter-spacing: .08em; margin-top: 4px; }
-.lp-rc-every { font-size: 17px; font-weight: 600; color: var(--text); }
+.lp-rc-top img { width: 72px; height: 72px; }
+.lp-rc-name { font-size: 30px; letter-spacing: -.7px; line-height: 1.1; margin-top: 4px; }
+.lp-rc-plan { margin-top: 14px; padding: 6px 14px; border-radius: 999px; background: var(--accent-soft); color: var(--brand); font-weight: 700; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
+.lp-rc-every { margin-top: 8px; font-size: 15px; font-weight: 500; color: var(--muted); }
 .lp-rc-dash { border: 0; border-top: 2px dashed #D9D2C4; margin: 18px 0 10px; }
 .lp-rc-lines { list-style: none; margin: 0; padding: 0; }
 .lp-rc-lines li { display: flex; gap: 14px; align-items: center; padding: 11px 0; }
 .lp-rc-n { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 19px; color: var(--heading); line-height: 1.25; }
-.lp-rc-inc { font-family: 'IBM Plex Mono', ui-monospace, monospace; color: #1D5A3C; font-weight: 600; font-size: 17px; }
+.lp-rc-inc { flex: none; padding: 4px 11px; border-radius: 999px; background: var(--s-ok-bg); color: var(--s-ok); font-weight: 700; font-size: 13px; letter-spacing: .02em; }
 .lp-rc-total { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px; padding: 8px 0 2px; }
 .lp-rc-total b:first-child { font-size: 22px; color: var(--heading); }
-.lp-rc-amt { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 46px; color: var(--heading); line-height: 1; }
+.lp-rc-amt { font-size: 46px; font-weight: 800; letter-spacing: -1.4px; font-variant-numeric: tabular-nums; color: var(--heading); line-height: 1; }
 .lp-rc-foot { margin: 6px 0 20px; font-size: 19px; font-weight: 700; color: var(--heading); text-align: right; }
 .lp-scallop { display: flex; justify-content: space-between; position: absolute; left: 10px; right: 10px; bottom: -10px; }
 .lp-scallop i { width: 20px; height: 20px; border-radius: 50%; background: var(--bg); }
@@ -1921,7 +1921,7 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
   .lp-rc-lines .lp-sq-round svg { width: 18px; height: 18px; }
   .lp-rc-n { font-size: 17px; }
   .lp-rc-n .lp-done { display: none; }
-  .lp-rc-inc { font-size: 15px; }
+  .lp-rc-inc { font-size: 12px; padding: 3px 9px; }
   .lp-rc-amt { font-size: 38px; }
   .lp-final2 { border-radius: 28px; gap: 22px; }
 }

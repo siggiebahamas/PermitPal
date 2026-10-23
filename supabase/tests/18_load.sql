@@ -16,7 +16,7 @@ create temp table t_ids (org uuid, biz uuid, mp uuid, fsic uuid, team uuid, newo
 grant all on t_ids to authenticated, anon; insert into t_ids default values;
 
 insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, email_confirmed_at) values
- ('e9000000-0000-4000-8000-0000000000a1','00000000-0000-0000-0000-000000000000','authenticated','authenticated','owner@load.ph','{"first_name":"Lorna"}', now()),
+ ('e9000000-0000-4000-8000-0000000000a1','00000000-0000-0000-0000-000000000000','authenticated','authenticated','owner@load.ph','{"first_name":"Sadie"}', now()),
  ('e9000000-0000-4000-8000-0000000000b2','00000000-0000-0000-0000-000000000000','authenticated','authenticated','member@load.ph','{"first_name":"Mio"}', now()),
  ('e9000000-0000-4000-8000-0000000000c3','00000000-0000-0000-0000-000000000000','authenticated','authenticated','other@load.ph','{"first_name":"Oscar"}', now()),
  ('e9000000-0000-4000-8000-0000000000d4','00000000-0000-0000-0000-000000000000','authenticated','authenticated','new@load.ph','{"first_name":"Nina"}', now()),
@@ -39,8 +39,8 @@ select pg_temp.res('the season pass sells September to January for the next Janu
 -- ---------------------------------------------------------------- set-up: a business, a teammate, someone else, a team workspace
 select pg_temp.as_user('e9000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
-update t_ids set org = public.create_org('Lorna Foods');
-update t_ids set biz = public.create_business(org, 'Lorna''s Kitchen', 'Corporation', 'restaurant', 'Pasig City', '12 Shaw Blvd');
+update t_ids set org = public.create_org('Sadie Foods');
+update t_ids set biz = public.create_business(org, 'Sadie''s Kitchen', 'Corporation', 'restaurant', 'Pasig City', '12 Shaw Blvd');
 update t_ids set mp = (select id from public.requirements where business_id = (select biz from t_ids) and type_code = 'mayors_permit' limit 1),
   fsic = (select id from public.requirements where business_id = (select biz from t_ids) and type_code = 'fsic' limit 1);
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
@@ -219,7 +219,7 @@ select pg_temp.res('asked: ₱149 from the load, answered by 6 pm on a weekday',
   and extract(isodow from c.due_by at time zone 'Asia/Manila') < 6 and to_char(c.due_by at time zone 'Asia/Manila', 'HH24:MI') = '18:00' and c.due_by > now()
   and (select paid_php from public.load_wallets where org_id = c.org_id) = 363, c.due_by::text)
   from public.papers_checks c where c.id = (select chk from t_ids);
-select pg_temp.res('it keeps the permit''s and business''s names', requirement_name = 'Mayor''s / Business Permit' and subject_label = 'Lorna''s Kitchen' and note = 'Is my lease enough?', subject_label)
+select pg_temp.res('it keeps the permit''s and business''s names', requirement_name = 'Mayor''s / Business Permit' and subject_label = 'Sadie''s Kitchen' and note = 'Is my lease enough?', subject_label)
   from public.papers_checks where id = (select chk from t_ids);
 select pg_temp.res('one open check per permit', pg_temp.err(format('select public.request_papers_check(%L, %L)', (select org from t_ids), (select mp from t_ids))) like 'A papers check for this permit is already waiting%', '');
 select pg_temp.res('photos go in the check''s own folder', pg_temp.err(format('select public.add_papers_check_file(%L, %L, %L)', (select chk from t_ids), (select org from t_ids) || '/x/a.jpg', 'a.jpg')) = 'Invalid file location.', '');
@@ -332,7 +332,7 @@ select pg_temp.as_user('e9000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 update t_ids set code = public.invite_code(org);
 select pg_temp.res('an 8-letter code, the same each time', length(code) = 8 and public.invite_code(org) = code, code) from t_ids;
-update t_ids set own2 = public.create_org('Lorna Second');
+update t_ids set own2 = public.create_org('Sadie Second');
 select pg_temp.res('a code from your own workspace doesn''t count', pg_temp.err(format('select public.claim_invite(%L, %L)', (select own2 from t_ids), (select code from t_ids))) like 'You can''t use an invitation from your own workspace%', '');
 reset role;
 select pg_temp.as_user('e9000000-0000-4000-8000-0000000000d4');

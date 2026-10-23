@@ -13,7 +13,7 @@ create temp table t_ids (org uuid, org2 uuid, biz uuid, mp uuid, fsic uuid, san 
 grant all on t_ids to authenticated, anon; insert into t_ids default values;
 
 insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, email_confirmed_at) values
- ('d1000000-0000-4000-8000-0000000000a1','00000000-0000-0000-0000-000000000000','authenticated','authenticated','owner@plus.ph','{"first_name":"Lorna"}', now()),
+ ('d1000000-0000-4000-8000-0000000000a1','00000000-0000-0000-0000-000000000000','authenticated','authenticated','owner@plus.ph','{"first_name":"Sadie"}', now()),
  ('d1000000-0000-4000-8000-0000000000b2','00000000-0000-0000-0000-000000000000','authenticated','authenticated','member@plus.ph','{"first_name":"Mio"}', now()),
  ('d1000000-0000-4000-8000-0000000000c3','00000000-0000-0000-0000-000000000000','authenticated','authenticated','viewer@plus.ph','{"first_name":"Vic"}', now()),
  ('d1000000-0000-4000-8000-0000000000d4','00000000-0000-0000-0000-000000000000','authenticated','authenticated','other@plus.ph','{"first_name":"Oscar"}', now()),
@@ -39,8 +39,8 @@ select pg_temp.res('yearly is 10 months; Plus is ₱199 or ₱1,990',
 -- ---------------------------------------------------------------- set-up
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
-update t_ids set org = public.create_org('Lorna Foods');
-update t_ids set biz = public.create_business(org, 'Lorna''s Kitchen', 'Corporation', 'restaurant', 'Pasig City', '12 Shaw Blvd');
+update t_ids set org = public.create_org('Sadie Foods');
+update t_ids set biz = public.create_business(org, 'Sadie''s Kitchen', 'Corporation', 'restaurant', 'Pasig City', '12 Shaw Blvd');
 update t_ids set mp = (select id from public.requirements where business_id = (select biz from t_ids) and type_code = 'mayors_permit' limit 1),
   fsic = (select id from public.requirements where business_id = (select biz from t_ids) and type_code = 'fsic' limit 1),
   san = (select id from public.requirements where business_id = (select biz from t_ids) and type_code = 'sanitary_permit' limit 1);
@@ -236,7 +236,7 @@ select pg_temp.res('every workspace sees the templates list, without the full te
 do $$ begin perform public.get_template((select org from t_ids), 'affidavit_of_loss');
   perform pg_temp.res('the full template is Plus only', false, 'was allowed');
 exception when others then perform pg_temp.res('the full template is Plus only', sqlerrm like 'Ready-to-use templates come with PermitPal Plus%', sqlerrm); end $$;
-do $$ begin perform public.trust_page_save((select org from t_ids), (select biz from t_ids), 'Lorna''s Kitchen');
+do $$ begin perform public.trust_page_save((select org from t_ids), (select biz from t_ids), 'Sadie''s Kitchen');
   perform pg_temp.res('the public page is Plus only', false, 'was allowed');
 exception when others then perform pg_temp.res('the public page is Plus only', sqlerrm like 'Your public permit page comes with PermitPal Plus.', sqlerrm); end $$;
 select pg_temp.res('free workspaces see how many things the check found, not the list',
@@ -249,7 +249,7 @@ do $$ begin perform public.start_plus_trial((select org from t_ids));
 exception when others then perform pg_temp.res('...once', sqlerrm = 'Plus is already on.', sqlerrm); end $$;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select pg_temp.res('the first permit check runs and is emailed', exists (select 1 from public.audit_runs where org_id = (select org from t_ids) and trigger = 'start')
-  and exists (select 1 from public.message_outbox where to_address = 'owner@plus.ph' and subject like 'PermitPal: Your first permit check: Lorna Foods'), '');
+  and exists (select 1 from public.message_outbox where to_address = 'owner@plus.ph' and subject like 'PermitPal: Your first permit check: Sadie Foods'), '');
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 select pg_temp.res('paying during the trial keeps the free days', q ->> 'mode' = 'after_trial' and (q ->> 'period_start')::date = private.today_ph() + 14, q::text)
@@ -343,7 +343,7 @@ reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); en
 -- ---------------------------------------------------------------- the public permit page
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
-update t_ids set page = (public.trust_page_save(org, biz, 'Lorna''s Kitchen', 'Family restaurant since 2009', false, true, true, 'off', array[]::uuid[], true)).id;
+update t_ids set page = (public.trust_page_save(org, biz, 'Sadie''s Kitchen', 'Family restaurant since 2009', false, true, true, 'off', array[]::uuid[], true)).id;
 update t_ids set code = (select code from public.trust_pages where id = (select page from t_ids));
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select pg_temp.res('the page gets a short random address', code ~ '^[a-z0-9]{10}$', code) from t_ids;
@@ -351,7 +351,7 @@ select set_config('request.jwt.claims', '{"role":"anon"}', true);
 set local role anon;
 create temp table t_page as select public.get_trust_page((select code from t_ids), 'qr', null) as p;
 select pg_temp.res('anyone can open it: green, amber and red, from live records',
-  p ->> 'state' = 'live' and p ->> 'business' = 'Lorna''s Kitchen' and p ->> 'city' = 'Pasig City'
+  p ->> 'state' = 'live' and p ->> 'business' = 'Sadie''s Kitchen' and p ->> 'city' = 'Pasig City'
   and exists (select 1 from jsonb_array_elements(p -> 'items') i where i ->> 'id' = (select fsic::text from t_ids) and i ->> 'state' = 'expired')
   and exists (select 1 from jsonb_array_elements(p -> 'items') i where i ->> 'id' = (select san::text from t_ids) and i ->> 'state' = 'ok')
   and exists (select 1 from jsonb_array_elements(p -> 'items') i where i ->> 'id' = (select mp::text from t_ids) and i ->> 'state' = 'ok'), left(p::text, 200)) from t_page;
@@ -376,7 +376,7 @@ select pg_temp.res('the visit is counted by where it came from', exists (select 
 
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
-select public.trust_page_save(org, biz, 'Lorna''s Kitchen', null, false, false, false, 'everyone', array[fsic], true) from t_ids;
+select public.trust_page_save(org, biz, 'Sadie''s Kitchen', null, false, false, false, 'everyone', array[fsic], true) from t_ids;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 set local role anon;
@@ -395,7 +395,7 @@ select pg_temp.res('...nor an old copy once renewed', not pg_temp.visible((selec
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
-select public.trust_page_save(org, biz, 'Lorna''s Kitchen', null, false, false, false, 'recipients', array[]::uuid[], true) from t_ids;
+select public.trust_page_save(org, biz, 'Sadie''s Kitchen', null, false, false, false, 'recipients', array[]::uuid[], true) from t_ids;
 update t_ids set rcpt = public.trust_add_recipient(page, 'Ana of SM Supermalls', 'SM Supermalls', 'Vendor.Desk@SMmalls.ph');
 do $$ begin perform public.trust_add_recipient((select page from t_ids), 'X', null, 'not-an-email');
   perform pg_temp.res('recipients need a real email', false, 'was allowed');
@@ -403,7 +403,7 @@ exception when others then perform pg_temp.res('recipients need a real email', s
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 update t_ids set rcpt_tok = (select token from public.trust_recipients where id = (select rcpt from t_ids));
 select pg_temp.res('a recipient gets a welcome with their own link and a way to stop', exists (select 1 from public.message_outbox where to_address = 'vendor.desk@smmalls.ph'
-  and subject = 'Lorna''s Kitchen will send you their permit renewals' and body_text like '%p.html?c=' || (select code from t_ids) || '&r=%' and body_text like '%&stop=1%'), '');
+  and subject = 'Sadie''s Kitchen will send you their permit renewals' and body_text like '%p.html?c=' || (select code from t_ids) || '&r=%' and body_text like '%&stop=1%'), '');
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 set local role anon;
 select pg_temp.res('"recipients only": visitors can''t download, recipients can',
@@ -431,7 +431,7 @@ insert into public.documents (org_id, requirement_id, cycle_id, storage_path, fi
   org || '/' || san || '/new.pdf', 'sanitary-2027.pdf' from t_ids;
 insert into storage.objects (bucket_id, name) select 'documents', org || '/' || san || '/new.pdf' from t_ids;
 select private.trust_updates();
-select pg_temp.res('a renewal is emailed to each recipient (records from before they joined are not)', (select count(*) from public.message_outbox where dedupe_key like 'trustupd:%' and subject = 'Lorna''s Kitchen updated their Sanitary Permit'
+select pg_temp.res('a renewal is emailed to each recipient (records from before they joined are not)', (select count(*) from public.message_outbox where dedupe_key like 'trustupd:%' and subject = 'Sadie''s Kitchen updated their Sanitary Permit'
   and body_text like '%Sanitary Permit, valid until%') = 2, '');
 select pg_temp.res('...once', private.trust_updates() = 0, '');
 select set_config('request.jwt.claims', '{"role":"anon"}', true);

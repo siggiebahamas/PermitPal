@@ -1222,7 +1222,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   inPerson = true;
 }
 
-// The website as customers see it (online only): "Permits on autopilot", everything on one screen, the
+// The website as customers see it (online only): "Track and manage every permit. Easily.", everything on one screen, the
 // worries it takes away, the 5-step tour and the free plan as a receipt; prices on their own page.
 {
   inPerson = false;
@@ -1235,7 +1235,18 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     p.on('pageerror', (x) => e.push(x.message));
     await p.goto('http://localhost:4173/'); await p.waitForSelector('.lp-home h1');
     const text = await p.textContent('.landing');
-    check(`website ${label}: the home page leads with "Permits on autopilot"`, /Permits on autopilot/.test(await p.textContent('.lp-home h1')));
+    check(`website ${label}: the home page leads with "Track and manage every permit. Easily." under "Permits on autopilot"`, /^Track and manage every permit\. Easily\.$/.test(await p.textContent('.lp-home h1'))
+      && (await p.textContent('.lp-hero2 .lp-tag')) === 'Permits on autopilot' && /^Add your permits once\./.test(await p.textContent('.lp-hero2 .lp-lead')));
+    check(`website ${label}: the logo is square and sharp, and big enough to read`, await p.evaluate(async () => {
+      const i = document.querySelector('.lp-top .brand img'), r = i.getBoundingClientRect();
+      await i.decode();
+      return i.naturalWidth >= 512 && i.naturalWidth === i.naturalHeight && Math.abs(r.width - r.height) < 1 && r.height >= (innerWidth > 640 ? 48 : 30);
+    }));
+    check(`website ${label}: the receipt uses the site's own type (no typewriter font) and the two-color name`, await p.evaluate(() => {
+      const f = (q) => getComputedStyle(document.querySelector(q)).fontFamily;
+      return ['.lp-rc-plan', '.lp-rc-every', '.lp-rc-inc', '.lp-rc-amt'].every((q) => !/Mono|monospace/.test(f(q)))
+        && document.querySelector('.lp-rc-name .w1').textContent === 'Permit' && getComputedStyle(document.querySelector('.lp-rc-name .w1')).color !== getComputedStyle(document.querySelector('.lp-rc-name .w2')).color;
+    }));
     check(`website ${label}: the example phone shows Sadie's Kitchen`, /Good morning, Sadie/.test(await p.textContent('.lp-screen')) && (await p.textContent('.lp-biz')) === "Sadie's Kitchen");
     check(`website ${label}: "One screen." sits on a line of its own`, await p.evaluate(() => {
       const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
@@ -1279,7 +1290,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`website ${label}: what load buys, with prices, only once its database part is on`, (await p.locator('.lp-load-card').count()) === (label === 'live' ? 0 : 5));
     check(`website ${label}: prices page: no sideways scroll`, (await over(p)) <= 1, `${await over(p)}px`);
     await p.click('.lp-top .brand'); await p.waitForSelector('.lp-home h1');
-    check(`website ${label}: the logo goes back home`, /Permits on autopilot/.test(await p.textContent('main h1')));
+    check(`website ${label}: the logo goes back home`, /Track and manage every permit/.test(await p.textContent('main h1')));
     check(`website ${label}: no JavaScript errors`, e.length === 0, e.slice(0, 3).join(' | '));
     await p.close();
   }
