@@ -63,7 +63,8 @@ export const renewable = () => S.data.reqs.filter((r) => r.subject !== 'person' 
 export function payDetails(st) {
   const gcash = st.gcash_number ? html`<div class="paywith"><b>GCash</b><span>${st.gcash_number}${st.gcash_name ? ' · ' + st.gcash_name : ''}</span></div>` : '';
   const bank = st.bank_account_number ? html`<div class="paywith"><b>${st.bank_name || 'Bank transfer'}</b><span>${st.bank_account_number}${st.bank_account_name ? ' · ' + st.bank_account_name : ''}</span></div>` : '';
-  return html`${gcash || bank ? html`<div class="paywiths">${gcash}${bank}</div>` : html`<p class="muted">Pinoy Permit will send you the payment details. Then enter the reference below.</p>`}
+  const qr = st.payment_qr ? html`<div class="payqr"><img src="${st.payment_qr}" alt="QR code to pay Pinoy Permit" width="200" height="200"><span><b>Scan to pay</b>Open GCash, Maya or your bank app and scan this code.</span></div>` : '';
+  return html`${gcash || bank ? html`<div class="paywiths">${gcash}${bank}</div>` : qr ? '' : html`<p class="muted">Pinoy Permit will send you the payment details. Then enter the reference below.</p>`}${qr}
     ${when(st.payment_note, html`<p class="muted small">${st.payment_note}</p>`)}
     <p class="muted small">Only pay to the accounts shown here. Pinoy Permit staff will never ask you to pay a personal account by text or chat.</p>`;
 }

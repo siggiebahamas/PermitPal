@@ -453,6 +453,7 @@ function payBox(p, pay) {
     ${html`${when(pay.gcash_number || pay.bank_account_number, html`<div class="paywiths">
           ${when(pay.gcash_number, html`<div class="paywith"><b>GCash</b><span>${pay.gcash_number}${pay.gcash_name ? ' · ' + pay.gcash_name : ''}</span></div>`)}
           ${when(pay.bank_account_number, html`<div class="paywith"><b>${pay.bank_name || 'Bank transfer'}</b><span>${pay.bank_account_number}${pay.bank_account_name ? ' · ' + pay.bank_account_name : ''}</span></div>`)}</div>`)}
+        ${pay.payment_qr ? html`<div class="payqr"><img src="${pay.payment_qr}" alt="QR code to pay Pinoy Permit" width="200" height="200"><span><b>Scan to pay</b>Open GCash, Maya or your bank app and scan this code.</span></div>` : ''}
         <p class="muted small">${pay.payment_note || `Send ${peso(m)} for a month or ${peso(y)} for a year, then press the button. We turn your plan on within 1 business day.`}</p>
         ${when(isOrgAdmin(), html`<button class="btn btn-primary" data-act="plan-request" data-plan="${p.id}">I've paid: turn on ${p.name}</button>`)}`}
   </div>`;

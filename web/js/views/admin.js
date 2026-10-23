@@ -327,6 +327,22 @@ function referralsTab(list) {
 }
 
 // ---------------------------------------------------------------- payment details
+// A payment QR photo or screenshot, made small enough to keep in the settings (at most 480 px, PNG, or JPEG if
+// the PNG is still too big). The database only takes png/jpeg/webp images up to about 110 KB.
+async function qrDataUrl(file) {
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error('Choose a PNG, JPG or WebP picture of the QR code.');
+  const img = await createImageBitmap(file);
+  const scale = Math.min(1, 480 / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(img, 0, 0, c.width, c.height);
+  let url = c.toDataURL('image/png');
+  if (url.length > 150000) url = c.toDataURL('image/jpeg', 0.9);
+  if (url.length > 150000) throw new Error('That picture is too big. Crop it to just the QR code and try again.');
+  return url;
+}
 function settingsTab(st) {
   const f = (k, label, ph = '') => html`<label class="field"><span>${label}</span><input name="${k}" value="${st[k] || ''}" maxlength="500" placeholder="${ph}"></label>`;
   return html`<section class="card"><h2>How customers pay for team plans</h2><p class="muted small">Customers pay by GCash, Maya or bank transfer to these accounts (no card checkout). After they pay, set their plan under Workspaces.</p><form class="admin-settings">
@@ -334,6 +350,10 @@ function settingsTab(st) {
       ${f('bank_name', 'Bank', 'e.g. BPI')}${f('bank_account_name', 'Account name')}${f('bank_account_number', 'Account number')}
       ${f('support_phone', 'Support phone')}${f('support_email', 'Support email')}</div>
     ${f('payment_note', 'Note shown under the payment details')}
+    ${when(has('payqr'), html`<div class="field qr-field"><span>QR code to pay <small>(for example your UnionBank QR Ph: GCash, Maya and every bank app can scan it)</small></span>
+      ${st.payment_qr ? html`<div class="qr-now"><img src="${st.payment_qr}" alt="Your current payment QR code" width="120" height="120">
+        <label class="check"><input type="checkbox" name="payment_qr_remove"> <span>Remove this QR code</span></label></div>` : ''}
+      <input type="file" name="payment_qr_file" accept="image/png,image/jpeg,image/webp"></div>`)}
     ${when(has('sms'), html`<label class="field"><span>Most text messages per month, all customers together <small>(each costs about ₱0.50–1)</small></span>
       <input name="sms_monthly_cap" type="number" min="0" max="100000" step="1" value="${st.sms_monthly_cap || '1000'}"></label>`)}
     <button class="btn btn-primary">Save</button></form></section>`;
@@ -463,6 +483,11 @@ function wire(el) {
   submit('.admin-settings', async (f, fd) => {
     for (const k of ['gcash_name', 'gcash_number', 'bank_name', 'bank_account_name', 'bank_account_number', 'support_phone', 'support_email', 'payment_note']) await db.adminSaveSetting(k, String(fd.get(k) || '').trim());
     await db.adminSaveSetting('online_payments', 'off');
+    if (has('payqr')) {
+      const file = fd.get('payment_qr_file');
+      if (file && file.size) await db.adminSaveSetting('payment_qr', await qrDataUrl(file));
+      else if (fd.get('payment_qr_remove')) await db.adminSaveSetting('payment_qr', '');
+    }
     if (fd.has('sms_monthly_cap')) {
       const cap = Number(fd.get('sms_monthly_cap'));
       if (!Number.isInteger(cap) || cap < 0) throw new Error('The text limit must be a whole number, 0 or more.');

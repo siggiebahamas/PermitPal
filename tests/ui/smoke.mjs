@@ -431,6 +431,16 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
 
   // Staff: quote it.
   await go('#/admin');
+  await page.click('[data-act=admin-tab][data-tab=payments]'); await page.waitForTimeout(300);
+  check('admin: payment details show the current QR code with a way to remove it', (await page.locator('.qr-now img').count()) === 1 && (await page.locator('[name=payment_qr_remove]').count()) === 1);
+  await page.setInputFiles('[name=payment_qr_file]', path.join(root, 'web/img/logo.png'));
+  await page.click('.admin-settings button.btn-primary'); await page.waitForTimeout(500);
+  const qrNow = await page.evaluate(async () => (await import('/__mock/mock-data.js')).appSettings().then((x) => x.payment_qr));
+  check('admin: a new QR picture is saved small, as an image the database accepts', /^data:image\/png;base64,/.test(qrNow) && qrNow.length < 150000, String(qrNow.length));
+  await page.click('[data-act=admin-tab][data-tab=payments]'); await page.waitForTimeout(300);
+  await page.check('[name=payment_qr_remove]'); await page.click('.admin-settings button.btn-primary'); await page.waitForTimeout(400);
+  check('admin: the QR code can be removed', (await page.evaluate(async () => (await import('/__mock/mock-data.js')).appSettings().then((x) => x.payment_qr))) === '');
+  await page.evaluate(async () => (await import('/__mock/mock-data.js')).adminSaveSetting('payment_qr', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='));
   await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
   check('admin: the new request waits under "send a quote"', (await page.locator('main .card', { hasText: 'New: send a quote' }).locator('.line', { hasText: "Renewal: Mayor's" }).count()) === 1);
   await page.locator('main .line', { hasText: "Renewal: Mayor's" }).click(); await page.waitForTimeout(300);
@@ -443,6 +453,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('order: the quote adds up', (await page.textContent('.qline.total')).includes('6,700'));
   await page.click('[data-act=quote-accept]'); await page.click('.modal button[type=submit]'); await page.waitForTimeout(400);
   check('order: after accepting, payment details show', (await page.locator('.pay-form').count()) === 1 && /0917 000 0000/.test(await page.textContent('.paywiths')));
+  check('order: the payment QR shows next to GCash and bank, with how to use it', (await page.locator('.payqr img[src^="data:image/png"]').count()) === 1 && /scan this code/.test(await page.textContent('.payqr')));
   await page.click('.pay-form button[type=submit]'); await page.waitForTimeout(200);
   check('order: "I\'ve paid" needs a reference or a screenshot', /reference number or a screenshot/.test(await page.textContent('#toast')));
   await page.fill('.pay-form [name=ref]', '1009 234 567890');

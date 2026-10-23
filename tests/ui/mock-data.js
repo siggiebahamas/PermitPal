@@ -339,7 +339,7 @@ const now = () => new Date().toISOString();
 function event(a, kind, message, byStaff = false, file = null) {
   db.events.push({ id: ++seq, request_id: a.id, org_id: a.org_id, by_staff: byStaff, kind, message, file_path: file, file_name: file, created_at: now() });
 }
-const settings = { gcash_name: 'Pinoy Permit Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'Pinoy Permit Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '', billpay_fee: '499', billpay_max: '50000', billpay_open: 'on' };
+const settings = { gcash_name: 'Pinoy Permit Services', gcash_number: '0917 000 0000', bank_name: 'BPI', bank_account_name: 'Pinoy Permit Services', bank_account_number: '0000 0000 00', payment_note: 'Send the exact amount, then enter the reference number below.', online_payments: 'off', support_phone: '', support_email: '', billpay_fee: '499', billpay_max: '50000', billpay_open: 'on', payment_qr: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=' };
 export const listServices = async () => SERVICES;
 export async function requestService(f) {
   // Same rules as the database: authorization ticked, one open request per permit, no flooding.
@@ -756,7 +756,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 
