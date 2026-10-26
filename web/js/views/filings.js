@@ -99,7 +99,7 @@ export async function filings(el) {
 
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Taxes & contributions</h1>
-      <p class="muted">BIR returns, SSS, PhilHealth, Pag-IBIG and SEC filings for each business, with reminders before every deadline.</p></div></div>
+      <p class="muted">BIR, SSS, PhilHealth, Pag-IBIG and SEC due dates. We remind you before each one.</p></div></div>
     ${when(notSet.length, html`<section class="card setup-card"><h2>${notSet.length === businesses.length ? 'Set up your deadlines' : 'Not set up yet'}</h2>
       <p class="muted">Answer a few questions per business (about a minute). We work out every return and payment and when each is due.</p>
       ${notSet.map((b) => html`<div class="line"><span class="line-main"><b>${b.name}</b><small>${b.structure}</small></span>

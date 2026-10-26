@@ -61,7 +61,7 @@ export async function historyPage(el, { keep = false } = {}) {
     days[days.length - 1].items.push(a);
   }
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>History</h1><p class="muted">Every change anyone on your team made, including deletions. Kept permanently.</p></div></div>
+    <div class="page-head"><div><h1>History</h1><p class="muted">Who changed what, and when. Kept forever.</p></div></div>
     <div class="hist-bar">
       <label for="hist-show">Show</label>
       <select id="hist-show" aria-label="Show">${HIST_SHOW.map(([k, label]) => html`<option value="${k}" ${k === histShow ? 'selected' : ''}>${label}</option>`)}</select>
@@ -99,7 +99,7 @@ export async function trashPage(el) {
   const bizName = (id) => business(id)?.name || 'a deleted business';
   const any = Object.values(t).some((a) => a.length);
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Trash</h1><p class="muted">Nothing is ever lost: deleted items stay here and can be restored. They are only erased if the whole workspace is deleted.</p></div></div>
+    <div class="page-head"><div><h1>Trash</h1><p class="muted">Deleted something by mistake? It's here. Tap Restore to bring it back.</p></div></div>
     ${any ? '' : empty('Trash is empty', 'Deleted businesses, vehicles, permits and files will appear here.')}
     ${section('Businesses', 'businesses', t.businesses, (x) => x.name)}
     ${section('Branches', 'business_locations', t.locations, (x) => `${x.name} (${bizName(x.business_id)})`)}

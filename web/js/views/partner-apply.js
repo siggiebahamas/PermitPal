@@ -21,7 +21,7 @@ export function partnerApplyPage(el, { signedIn = false } = {}) {
     <div class="spacer"></div><a class="btn btn-ghost btn-sm" href="#/login">Sign in</a></header>${inner}</main>`);
   el.innerHTML = String(wrap(html`
     <div class="page-head"><div><h1>List your firm on Pinoy Permit</h1>
-      <p class="muted">For liaison firms, accountants, fire-safety, pest-control and water-testing providers, clinics and notaries. Get quote requests from businesses whose permits are due.</p></div></div>
+      <p class="muted">Get customers whose permits are due. For liaison firms, accountants, notaries, clinics and other permit helpers.</p></div></div>
     <section class="card promises">${(has('leads') ? HOW_CREDIT : HOW).map(([t, d]) => html`<div class="promise"><div><b>${t}</b><span>${d}</span></div></div>`)}</section>
     <section class="card"><h2>Apply</h2>
       <p class="muted small">We reply within 3 business days.</p>

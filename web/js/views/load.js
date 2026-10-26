@@ -45,7 +45,7 @@ export async function loadPage(el) {
   const open = L.topups.filter((t) => ['due', 'pending_verification'].includes(t.status) && t.valid_until >= todayPH());
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Load</h1>
-      <p class="muted">Prepaid credit for small extras: text reminders, a single template, a papers check, the renewal season pass. It never expires.</p></div></div>
+      <p class="muted">Top up once. Use it for texts, templates and papers checks. It never expires.</p></div></div>
     ${s.invites?.invited_by?.status === 'pending' ? html`<div class="banner info"><div><b>You joined by invitation.</b>
       Add 3 permits with their dates (${s.invites.invited_by.permits} of 3 so far) and you both get a month of Pinoy Permit Plus, free.</div>
       <a class="btn btn-sm btn-primary" href="#/compliance">Add dates</a></div>` : ''}

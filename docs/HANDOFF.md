@@ -31,7 +31,7 @@ The founder said (October 23) that files 1 to 11 are run on the live project; fi
 
 ## Testing (run before every push)
 - Unit: `npm ci` then `node --test tests/unit.test.mjs`
-- Browser smoke test (in-memory data in `tests/ui/mock-data.js`, the real CSP): `node tests/ui/smoke.mjs`. It needs Playwright's Chromium (in Claude Code cloud sessions it's at `/opt/pw-browsers/chromium`). The last run was 970/970.
+- Browser smoke test (in-memory data in `tests/ui/mock-data.js`, the real CSP): `node tests/ui/smoke.mjs`. It needs Playwright's Chromium (in Claude Code cloud sessions it's at `/opt/pw-browsers/chromium`). The last run was 972/972.
 - SQL tests on a local Postgres 16: `bash supabase/tests/local/start.sh`, `bash supabase/tests/local/reset.sh pplocal`, then `bash supabase/tests/local/run.sh pplocal supabase/tests/0[6-9]_*.sql supabase/tests/[12]*.sql`. Tests 06 to 23 all passed. 01 to 05 use an older format and aren't run with this runner.
 - Any UI change needs the mock (`tests/ui/mock-data.js`) and smoke checks updated with it.
 

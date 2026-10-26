@@ -56,7 +56,7 @@ export async function notifications(el) {
   try { list = await db.listNotifications(); } catch (e) { toastError(e); }
   const todo = list.filter((n) => !n.read_at).length;
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Notifications</h1><p class="muted">${list.length ? `${todo} to do · ${list.length - todo} done` : 'Reminders and updates. Emails and texts follow your settings.'}</p></div>
+    <div class="page-head"><div><h1>Notifications</h1><p class="muted">${list.length ? `${todo} to do · ${list.length - todo} done` : 'Your reminders and updates, all in one place.'}</p></div>
       ${when(list.length, html`<div class="btn-row"><button class="btn btn-ghost btn-sm" data-act="notif-all-read">Mark all done</button>
       <button class="btn btn-ghost btn-sm" data-act="notif-clear">Clear all</button></div>`)}</div>
     ${list.length ? groups(list).map((g) => {

@@ -15,25 +15,25 @@ export const KINDS = {
   head_office: {
     hidden: true, // no longer offered: Pinoy Permit serves small businesses, not large chains
     title: 'Head office or franchisor', nav: 'Branches', plan: 'head_office', relation: 'franchisee', one: 'branch', many: 'branches',
-    icon: ICON.building, page: 'Branches', sub: 'Every branch and franchisee, one screen. Spot the store that is about to lapse before the city does.',
+    icon: ICON.building, page: 'Branches', sub: 'Every branch on one screen. Spot the one about to expire, early.',
     pitch: 'See every branch and franchisee on one screen, remind the ones falling behind, and export it all for audits.',
     cols: ['mayors_permit', 'barangay_clearance', 'fsic', 'sanitary_permit', 'bir_cor'],
   },
   firm: {
     title: 'Accounting or bookkeeping firm', nav: 'Clients', plan: 'firm', relation: 'client', one: 'client', many: 'clients',
-    icon: ICON.briefcase, page: 'Clients', sub: "Every client's permits on one screen, and a reminder to the ones who need it in one click.",
+    icon: ICON.briefcase, page: 'Clients', sub: "Every client's permits on one screen. Remind them in one tap.",
     pitch: "Stop tracking clients' renewals in spreadsheets. Every client on one board, with one-click reminders.",
     cols: ['mayors_permit', 'barangay_clearance', 'fsic', 'sanitary_permit', 'bir_cor'],
   },
   property: {
     title: 'Mall or property manager', nav: 'Tenants', plan: 'property', relation: 'tenant', one: 'tenant', many: 'tenants',
-    icon: ICON.grid, page: 'Tenants', sub: "Every tenant's permits, always current. No more chasing photocopies every January.",
+    icon: ICON.grid, page: 'Tenants', sub: "Every tenant's permits, always up to date. No more chasing photocopies.",
     pitch: "Tenants keep their own permits current in Pinoy Permit; you see who is compliant and download their shared copies.",
     cols: ['mayors_permit', 'barangay_clearance', 'fsic', 'sanitary_permit'],
   },
   fleet: {
     title: 'Fleet operator', nav: 'Fleet', plan: 'fleet', one: 'vehicle', many: 'vehicles',
-    icon: ICON.car, page: 'Fleet', sub: 'Every vehicle, every renewal, one screen. Keep every unit on the road.',
+    icon: ICON.car, page: 'Fleet', sub: 'Every vehicle on one screen. Keep them all on the road.',
     pitch: "Every vehicle's registration, CTPL, emission test and inspection on one board, with spreadsheet import.",
     cols: ['lto_registration', 'ctpl', 'emission_test', 'mvir'],
   },
@@ -223,7 +223,7 @@ function fleetBoard(el, k, acc) {
 function chooser(el) {
   const price = (id) => Number(S.plans.find((p) => p.id === id)?.price_php_monthly || 0);
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Team tools</h1><p class="muted">For people who look after more than their own permits: clients, vehicles or tenants. Free for 30 days, no card needed.</p></div></div>
+    <div class="page-head"><div><h1>Team tools</h1><p class="muted">Looking after permits for clients, vehicles or tenants? See them all on one board. Free for 30 days.</p></div></div>
     <h2 class="section-label">Pick what fits you</h2>
     ${billToggle('How often to pay for a team plan')}
     <div class="pp-grid four">${plansShown(S.plans).map((id) => planCard(id, price(id),

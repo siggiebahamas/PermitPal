@@ -32,7 +32,7 @@ export function contactPage(el, { signedIn = !!S.user } = {}) {
       ${signedIn ? html`<a class="btn btn-ghost" href="#/">Back to dashboard</a>` : html`<a class="btn btn-ghost" href="#/">Back to Pinoy Permit</a>`}
     </div>`;
   el.innerHTML = String(signedIn
-    ? html`<div class="page-head"><div><h1>Contact Pinoy Permit</h1><p class="muted">Questions, problems, plans and payment, or a request about your personal data.</p></div></div>
+    ? html`<div class="page-head"><div><h1>Contact Pinoy Permit</h1><p class="muted">Got a question or a problem? Message us here.</p></div></div>
         <section class="card contact-card">${body}</section>`
     : html`<main class="auth"><div class="auth-card contact-public">
         <a href="#/"><img class="brand-wm auth-wm" src="img/wordmark.png" alt="Pinoy Permit"></a>

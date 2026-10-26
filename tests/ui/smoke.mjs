@@ -475,7 +475,10 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('order: the permit now shows the new record and a fresh checklist', /MP-2027-0001/.test(await page.textContent('main .kv')) && (await page.textContent('.ck-count')).includes('0 of 6'));
   await go('#/services');
   check('done for you page: lists the request as completed', (await page.locator('main .line', { hasText: 'Completed' }).count()) === 1);
-  check('done for you page: every service has a "Get a quote" button', (await page.locator('.svc-grid .svc').count()) === (await page.locator('.svc-grid [data-act=svc-request]').count()));
+  check('done for you page: every service has a "Get a price" button', (await page.locator('.svc-grid .svc').count()) === (await page.locator('.svc-grid [data-act=svc-request]').count()));
+  check('done for you page: 3 steps, 5 short promise badges that open, and a menu grouped by kind', (await page.locator('main .dfy-steps li').count()) === 3
+    && (await page.locator('main .dfy-badge').count()) === 5 && ((await page.locator('main .dfy-jump a').count()) >= 3 || (await page.locator('main .svc .svc-tag').count()) === (await page.locator('main .svc').count())) && (await page.locator('main .svc details.svc-more').count()) === (await page.locator('main .svc').count()));
+  check('done for you page: the no-fixers rule and the terms link stay on the page', /RA 11032/.test(await page.textContent('main .dfy-rules')) && (await page.locator('main .dfy-rules a[href="terms.html#services"]').count()) === 1);
   check('done for you: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
 }
@@ -1204,7 +1207,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('online only: Done for you lists only online services', names.length >= 4 && names.some((x) => /Set up my account/.test(x)) && names.some((x) => /DTI business name/.test(x))
     && !names.some((x) => /Mayor|Barangay|Fire Safety|Sanitary|LTO|walk-through|New business|branch opening|closure|replacement/i.test(x)), names.join(' | '));
   check('online only: no care teaser and no "Renew several"', (await page.locator('main .care-teaser, main [data-act=svc-bulk]').count()) === 0
-    && /Online paperwork, done for you/.test(await page.textContent('main .page-head')));
+    && /We do the paperwork online/.test(await page.textContent('main .page-head')));
   check('online only: the demo\'s sample order is the online set-up job', (await page.locator('main .line', { hasText: 'Set up my account for me' }).count()) >= 1);
   await go('#/services/orders/ord1');
   check('online only: an account set-up (no office involved) offers no authorization letter', /Set up my account/.test(await page.textContent('main')) && (await page.locator('[data-act=auth-letter]').count()) === 0);

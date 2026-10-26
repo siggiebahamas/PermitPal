@@ -34,7 +34,7 @@ export async function templatesPage(el) {
   const cats = [...new Set(listCache.map((t) => t.category))];
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Templates</h1>
-      <p class="muted">Letters and sworn statements offices ask for, filled in with your details. Print, sign, done.</p></div></div>
+      <p class="muted">Ready-made letters and forms, filled in for you. Print, sign, done!</p></div></div>
     ${when(!plus && has('plus'), html`<div class="banner info"><div><b>Templates come with Pinoy Permit Plus.</b> ${one ? html`Or get just the one you need from ${peso(Math.min(one, ...Object.values(prices)))}, yours to keep.` : 'Preview any of them below.'}</div>
       <button class="btn btn-sm btn-primary" data-act="plus-upsell" data-what="Templates">See Plus</button></div>`)}
     ${cats.map((c) => html`<h2 class="section-label">${c}</h2><div class="svc-grid">${listCache.filter((t) => t.category === c).map((t) => html`

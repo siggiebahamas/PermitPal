@@ -72,7 +72,7 @@ export async function partners(el, params = new URLSearchParams()) {
   const myCities = [...new Set(S.data.locations.map((l) => l.city).filter(Boolean))];
   const shown = list.filter((p) => (proCat === 'all' || p.category === proCat) && (proCity === 'all' || !p.cities?.length || p.cities.includes(proCity)));
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Find a professional</h1><p class="muted">Firms that file and renew permits in person, so you don't have to queue. You deal with them directly.</p></div></div>
+    <div class="page-head"><div><h1>Find a professional</h1><p class="muted">Need someone to line up at city hall for you? Ask a firm near you for a price.</p></div></div>
     <section class="card promises pro-promises">
       <div class="promise">${ICON.check}<div><b>Independent firms</b><span>Each firm told us it is registered and holds the licenses its work needs. Pinoy Permit doesn't check their papers, so ask to see them before you hire.</span></div></div>
       <div class="promise">${ICON.check}<div><b>Straight to them</b><span>Your request goes directly to the firm. They reply within 1 business day.</span></div></div>
@@ -186,7 +186,7 @@ export async function costs(el) {
   const busiest = months.reduce((b, m) => (known(m.items) > known(b?.items || []) ? m : b), null);
 
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Costs & budget</h1><p class="muted">What your permits cost, and what's coming, based on what you paid last time.</p></div></div>
+    <div class="page-head"><div><h1>Costs & budget</h1><p class="muted">How much your permits cost, and what's coming next.</p></div></div>
     <div class="stats four">
       <div class="stat ok"><div class="stat-n">${peso(spentTotal)}</div><div class="stat-l">Paid in the last 12 months</div></div>
       <div class="stat soon"><div class="stat-n">${peso(known(all))}</div><div class="stat-l">Expected in the next 12 months</div></div>
@@ -265,7 +265,7 @@ export async function shares(el) {
         ${when(canEdit(), html`<button class="btn btn-sm btn-ghost danger" data-act="share-revoke" data-id="${x.id}">Turn off</button>`)}</span>` : html`<span class="chip needinfo">Off</span>`}</div>`;
   };
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Share proof</h1><p class="muted">Someone asking if your permits are up to date? Send them one link instead of photocopies.</p></div></div>
+    <div class="page-head"><div><h1>Share proof</h1><p class="muted">Someone asking for your permits? Send one link. No more photocopies.</p></div></div>
     ${when(has('plus'), html`<div id="trust-root"></div>${when(hasPlus(), html`<h3 class="section-label">Or a link that expires</h3>`)}`)}
 
     <section class="card proof-how">

@@ -19,7 +19,7 @@ const optionList = (items, cur) => items.map(([v, l]) => html`<option value="${v
 export function businessList(el, params) {
   const list = S.data.businesses;
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Businesses</h1><p class="muted">Every business, branch and the permits each one needs.</p></div>
+    <div class="page-head"><div><h1>Businesses</h1><p class="muted">Your businesses and branches, and the permits each one needs.</p></div>
       ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-ghost" data-act="imp-open" data-kind="businesses">${ICON.upload} Import from spreadsheet</button>
         <button class="btn btn-primary" data-act="biz-add">+ Add business</button></div>`)}</div>
     ${list.length ? html`${timeline('business', list)}${businessRows(list)}`
@@ -363,7 +363,7 @@ on('req-add', (ds) => {
 export function vehicleList(el, params) {
   const list = S.data.vehicles;
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Vehicles</h1><p class="muted">LTO registration, CTPL, emission and inspection for every vehicle.</p></div>
+    <div class="page-head"><div><h1>Vehicles</h1><p class="muted">Every vehicle's LTO, CTPL and emission dates in one place.</p></div>
       ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-ghost" data-act="veh-import">${ICON.upload} Import from spreadsheet</button>
         <button class="btn btn-primary" data-act="veh-add">+ Add vehicle</button></div>`)}</div>
     ${list.length ? html`${timeline('vehicle', list)}<h3 class="section-label">Your vehicles</h3><div class="cards">${list.map(entityCard('vehicle'))}</div>`
@@ -531,7 +531,7 @@ async function activityTab(body, column, id) {
 export function personList(el, params) {
   const list = S.data.people || [];
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>People</h1><p class="muted">Driver's licenses, PRC licenses, health cards and clearances your staff need.</p></div>
+    <div class="page-head"><div><h1>People</h1><p class="muted">Your staff's licenses, health cards and clearances, all tracked.</p></div>
       ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-ghost" data-act="imp-open" data-kind="staff">${ICON.upload} Import from spreadsheet</button>
         <button class="btn btn-primary" data-act="person-add">+ Add person</button></div>`)}</div>
     ${staffTop()}

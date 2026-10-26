@@ -14,12 +14,12 @@ export function dashboard(el) {
   const first = S.profile.first_name || 'there';
   if (!businesses.length && !vehicles.length) {
     el.innerHTML = String(html`
-      <div class="page-head"><div><h1>Welcome, ${first}.</h1><p class="muted">Let's set up what you need to keep compliant.</p></div></div>
+      <div class="page-head"><div><h1>Welcome, ${first}.</h1><p class="page-sub">Let's get your permits in order. Pick one to start:</p></div></div>
       <div class="onboard">
-        <a class="onboard-card" href="#/businesses?add=1">${ICON.building}<b>Add a business</b><span>We'll build its permit checklist for you: Mayor's Permit, Barangay Clearance, BIR, FSIC and more, based on what it does.</span></a>
-        <a class="onboard-card" href="#/vehicles?add=1">${ICON.car}<b>Add a vehicle</b><span>Track LTO registration, CTPL, emission and inspection. We'll work out the renewal month from the plate.</span></a>
+        <a class="onboard-card" href="#/businesses?add=1">${ICON.building}<b>Add a business</b><span>We list the permits it needs for you: Mayor's Permit, Barangay, BIR, FSIC and more.</span></a>
+        <a class="onboard-card" href="#/vehicles?add=1">${ICON.car}<b>Add a vehicle</b><span>LTO, CTPL and emission dates. We figure out the month from the plate.</span></a>
         ${when_(has('revenue') && canEdit() && service('setup_from_paper'), html`<button class="onboard-card" data-act="svc-request" data-code="setup_from_paper">${ICON.briefcase}<b>Have a box of papers?</b>
-          <span>Send us photos of your permits and we'll set everything up for you, with the right dates and reminders. ${service('setup_from_paper')?.price_from != null ? 'From ₱' + Number(service('setup_from_paper').price_from).toLocaleString() : ''}.</span></button>`)}
+          <span>Send photos. We set it all up for you. ${service('setup_from_paper')?.price_from != null ? 'From ₱' + Number(service('setup_from_paper').price_from).toLocaleString() : ''}.</span></button>`)}
       </div>
       ${accountantCard()}`);
     return;
@@ -154,7 +154,7 @@ export function compliance(el, params) {
   const team = has('assign') ? assignable() : [];
   const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Compliance</h1><p class="muted">Every permit and registration across your businesses and vehicles.</p></div>
+    <div class="page-head"><div><h1>Compliance</h1><p class="muted">All your permits in one list, most urgent on top.</p></div>
       <div class="btn-row">${when_(has('revenue') && IN_PERSON && canEdit(), html`<button class="btn btn-soft btn-sm" data-act="svc-bulk">${ICON.briefcase} Have Pinoy Permit renew several</button>`)}
         ${when_(canEdit(), html`<button class="btn btn-ghost btn-sm" data-act="imp-open" data-kind="permits">${ICON.upload} Import permit records</button>`)}
         <button class="btn btn-ghost btn-sm" data-act="calendar-export">${ICON.calendar} Add to calendar</button>
@@ -258,7 +258,7 @@ export async function documents(el) {
   };
 
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Documents</h1><p class="muted">Proof of compliance for every business, vehicle and staff license, with past years kept on file.</p></div>
+    <div class="page-head"><div><h1>Documents</h1><p class="muted">Every permit paper, saved and easy to find. Old years too.</p></div>
       <button class="btn btn-soft" data-act="inspection-pack" data-scope="org">${ICON.download} Inspection pack</button></div>
     <div class="stats four">
       <div class="stat ok"><div class="stat-n">${onFile}<small>/${needDoc.length}</small></div><div class="stat-l">On file</div></div>

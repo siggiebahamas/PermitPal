@@ -16,10 +16,10 @@ const label = (i) => addonLabel(i.kind, i.people_max, i.billing);
 const openBills = () => plusOf().invoices.filter((i) => ['due', 'pending_verification'].includes(i.status) && i.valid_until >= todayPH());
 const activePeople = () => (S.data?.people || []).length;
 export const PLUS_PERKS = [
-  ['Public permit page', 'One link and a QR poster for your wall: customers, clients and inspectors see each permit\'s status, live. Badges for your email and website.'],
-  ['Renewals sent for you', 'Your clients, mall or landlord get an email, with the copy, each time you renew a permit.'],
-  ['Automatic permit check', 'Every morning Pinoy Permit looks for expired permits, missing copies and dates that look wrong, and emails you a report on the 1st.'],
-  ['Ready-to-use templates', 'Authorization letter, SPA, affidavit of loss and more, filled in with your details.'],
+  ['Public permit page', 'One link and a QR poster. Anyone can see your permits are current.'],
+  ['Renewals sent for you', 'Renew a permit and your mall, landlord or clients get the copy by email.'],
+  ['Automatic permit check', 'Every morning we look for problems. A report every 1st of the month.'],
+  ['Ready-to-use templates', 'Authorization letter, SPA, affidavit of loss and more, filled in for you.'],
 ];
 
 // ---------------------------------------------------------------- "this comes with Plus"
