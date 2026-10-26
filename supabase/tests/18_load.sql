@@ -26,8 +26,8 @@ update private.settings set value = '{}' where key = 'channel_status';
 delete from public.message_outbox;
 
 select pg_temp.res('the feature switch is on', exists (select 1 from private.features where name = 'load'), '');
-select pg_temp.res('prices: 50 texts ₱49, 200 texts ₱179, a template ₱39, a papers check ₱149, the season pass ₱149',
-  (select string_agg(code || '=' || price_php::int, ',' order by sort) from public.load_products) = 'texts_50=49,texts_200=179,template=39,papers_check=149,season_pass=149',
+select pg_temp.res('prices: 50 texts ₱49, 200 texts ₱179, a template ₱99, a papers check ₱149, the season pass ₱149',
+  (select string_agg(code || '=' || price_php::int, ',' order by sort) from public.load_products) = 'texts_50=49,texts_200=179,template=99,papers_check=149,season_pass=149',
   (select string_agg(code || '=' || price_php::int, ',' order by sort) from public.load_products));
 select pg_temp.res('the next business day ends at 6 pm Manila time (Friday afternoon answers Monday)',
   private.next_business_6pm('2026-10-23 15:00+08') = '2026-10-26 18:00+08' and private.next_business_6pm('2026-10-21 23:30+08') = '2026-10-22 18:00+08'
@@ -193,10 +193,10 @@ select pg_temp.as_user('e9000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 select pg_temp.res('without Plus, a template''s full text is locked', pg_temp.err(format('select public.get_template(%L, %L)', (select org from t_ids), 'authorization_letter')) like 'Ready-to-use templates come with Pinoy Permit Plus, or one at a time%', '');
 select public.unlock_template(org, 'authorization_letter') from t_ids;
-select pg_temp.res('bought for ₱39: it opens', (public.get_template(org, 'authorization_letter') ->> 'title') = 'Authorization letter'
-  and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 512, '') from t_ids;
+select pg_temp.res('bought for ₱99 (its own price): it opens', (public.get_template(org, 'authorization_letter') ->> 'title') = 'Authorization letter'
+  and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 452, '') from t_ids;
 select public.unlock_template(org, 'authorization_letter') from t_ids;
-select pg_temp.res('buying it again costs nothing', (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 512
+select pg_temp.res('buying it again costs nothing', (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 452
   and (select count(*) from public.template_unlocks where org_id = (select org from t_ids)) = 1, '');
 select pg_temp.res('other templates stay locked', pg_temp.err(format('select public.get_template(%L, %L)', (select org from t_ids), 'sworn_declaration_gross_sales')) like 'Ready-to-use%'
   or pg_temp.err(format('select public.get_template(%L, %L)', (select org from t_ids), 'sworn_declaration_gross_sales')) = 'Template not found.', '');
@@ -217,7 +217,7 @@ set local role authenticated;
 update t_ids set chk = public.request_papers_check(org, mp, 'Is my lease enough?');
 select pg_temp.res('asked: ₱149 from the load, answered by 6 pm on a weekday', c.status = 'waiting' and c.paid_with = 'load' and c.price_php = 149
   and extract(isodow from c.due_by at time zone 'Asia/Manila') < 6 and to_char(c.due_by at time zone 'Asia/Manila', 'HH24:MI') = '18:00' and c.due_by > now()
-  and (select paid_php from public.load_wallets where org_id = c.org_id) = 363, c.due_by::text)
+  and (select paid_php from public.load_wallets where org_id = c.org_id) = 303, c.due_by::text)
   from public.papers_checks c where c.id = (select chk from t_ids);
 select pg_temp.res('it keeps the permit''s and business''s names', requirement_name = 'Mayor''s / Business Permit' and subject_label = 'Sadie''s Kitchen' and note = 'Is my lease enough?', subject_label)
   from public.papers_checks where id = (select chk from t_ids);
@@ -240,7 +240,7 @@ select pg_temp.as_user('e9000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 select public.cancel_papers_check(chk) from t_ids;
 select pg_temp.res('cancelled before an answer: the ₱149 comes back', (select status from public.papers_checks where id = (select chk from t_ids)) = 'cancelled'
-  and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 512, '');
+  and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 452, '');
 update t_ids set chk = public.request_papers_check(org, mp, null);
 reset role;
 select pg_temp.as_user('e9000000-0000-4000-8000-0000000000f5');
@@ -265,7 +265,7 @@ set local role authenticated;
 select public.admin_refund_papers_check(chk, 'We read the wrong permit year. Sorry!') from t_ids;
 reset role;
 select pg_temp.res('staff can give it back: ₱149 returns, the customer is told why', (select status from public.papers_checks where id = (select chk from t_ids)) = 'refunded'
-  and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 512
+  and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 452
   and exists (select 1 from public.notifications where user_id = 'e9000000-0000-4000-8000-0000000000a1' and title = 'Papers check refunded: Mayor''s / Business Permit' and body like 'We read the wrong permit year.%'), '');
 -- past its target time: no refund; staff get a nudge to answer it
 select pg_temp.as_user('e9000000-0000-4000-8000-0000000000a1');
@@ -275,7 +275,7 @@ reset role;
 update public.papers_checks set due_by = now() - interval '1 hour' where id = (select chk2 from t_ids);
 select private.load_daily();
 select pg_temp.res('past its target time: still waiting (no refund), staff are nudged to answer', (select status from public.papers_checks where id = (select chk2 from t_ids)) = 'waiting'
-  and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 512 - 149
+  and (select paid_php from public.load_wallets where org_id = (select org from t_ids)) = 452 - 149
   and exists (select 1 from public.notifications where title like 'Papers check waiting: %'), (select paid_php from public.load_wallets where org_id = (select org from t_ids))::text);
 select pg_temp.as_user('e9000000-0000-4000-8000-0000000000f5');
 set local role authenticated;

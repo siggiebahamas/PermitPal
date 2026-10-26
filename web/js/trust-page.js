@@ -14,7 +14,7 @@ const home = new URL('./', location.href).href;
 const STATE = { ok: ['Current', 'ok'], due: ['Renewal due soon', 'soon'], expired: ['Expired', 'overdue'], pending: ['Details being added', 'needinfo'] };
 const label = (i) => (i.in_progress ? (i.state === 'expired' ? ['Expired · renewal in progress', 'overdue'] : ['Being renewed', 'progress']) : STATE[i.state] || STATE.pending);
 const checkedWhen = (ts) => (Date.now() - Date.parse(ts) < 7 * 864e5 ? timeAgo(ts).toLowerCase() : `on ${fmtDate(String(ts).slice(0, 10))}`);
-const brand = html`<span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span>`;
+const brand = html`<img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit">`;
 
 function shell(inner) {
   app.innerHTML = String(html`<div class="share-wrap">

@@ -230,7 +230,7 @@ function renderShell() {
   renderPage();
 }
 
-const ppBrand = () => html`<a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span></a>`;
+const ppBrand = () => html`<a class="brand" href="#/"><img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit"></a>`;
 // The firm's look switched on or off while the app was open (it comes and goes with the add-on).
 function paintBrand() {
   const set = (slot, v) => { const el = document.querySelector(`[data-brand-slot="${slot}"]`); if (el) el.innerHTML = String(v); };

@@ -4,8 +4,7 @@ import { GOOGLE_SIGN_IN } from '../config.js';
 import * as db from 'pp/data';
 
 const shell = (inner) => html`<main class="auth"><div class="auth-card">
-  <img class="auth-logo" src="img/logo.png" alt="">
-  <div class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></div>
+  <img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit">
   ${inner}</div></main>`;
 
 export function authPage(el, mode, ctx = {}) {

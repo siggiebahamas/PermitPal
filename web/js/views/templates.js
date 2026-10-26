@@ -14,6 +14,8 @@ let unlocked = new Set(); // templates this workspace bought one by one (with lo
 const owned = (code) => hasPlus() || unlocked.has(code);
 const longDate = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-PH', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
+let prices = {};
+const priceOf = (code, one) => prices[code] ?? one;
 export async function templatesPage(el) {
   el.innerHTML = String(html`<div class="page-head"><div><h1>Templates</h1></div></div><div class="loading">Loading…</div>`);
   const single = has('load') && !hasPlus();
@@ -21,10 +23,11 @@ export async function templatesPage(el) {
   try {
     listCache ||= await db.listTemplates();
     if (single) {
-      const [u, st] = await Promise.all([db.templateUnlocks(S.org.id), loadState()]);
+      const [u, st, pr] = await Promise.all([db.templateUnlocks(S.org.id), loadState(), has('tplprice') ? db.templatePrices() : []]);
       unlocked = new Set(u.map((x) => x.code));
       const p = st?.products?.find((x) => x.code === 'template');
       one = p?.active ? Number(p.price_php) : 0;
+      prices = Object.fromEntries(pr.filter((x) => x.price_php != null).map((x) => [x.code, Number(x.price_php)]));
     }
   } catch (e) { toastError(e); return; }
   const plus = hasPlus();
@@ -32,13 +35,13 @@ export async function templatesPage(el) {
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Templates</h1>
       <p class="muted">Letters and sworn statements offices ask for, filled in with your details. Print, sign, done.</p></div></div>
-    ${when(!plus && has('plus'), html`<div class="banner info"><div><b>Templates come with Pinoy Permit Plus.</b> ${one ? html`Or get just the one you need for ${peso(one)}, yours to keep.` : 'Preview any of them below.'}</div>
+    ${when(!plus && has('plus'), html`<div class="banner info"><div><b>Templates come with Pinoy Permit Plus.</b> ${one ? html`Or get just the one you need from ${peso(Math.min(one, ...Object.values(prices)))}, yours to keep.` : 'Preview any of them below.'}</div>
       <button class="btn btn-sm btn-primary" data-act="plus-upsell" data-what="Templates">See Plus</button></div>`)}
     ${cats.map((c) => html`<h2 class="section-label">${c}</h2><div class="svc-grid">${listCache.filter((t) => t.category === c).map((t) => html`
       <section class="card svc tpl-card"><div class="svc-top"><h2>${t.title}</h2>${t.notarize ? html`<span class="tag">Needs a notary</span>` : ''}</div>
         <p>${t.summary}</p><p class="muted small"><b>Use it:</b> ${t.use_when}</p>
         <div class="svc-foot">${owned(t.code) ? html`<button class="btn btn-primary btn-sm" data-act="tpl-fill" data-code="${t.code}">Fill in</button>${when(!plus, html`<span class="chip ok">Yours</span>`)}`
-          : html`<button class="btn btn-soft btn-sm" data-act="tpl-preview" data-code="${t.code}">Preview</button>${when(one && isOrgAdmin(), html`<button class="btn btn-primary btn-sm" data-act="tpl-unlock" data-code="${t.code}">Get it · ${peso(one)}</button>`)}`}</div></section>`)}</div>`)}
+          : html`<button class="btn btn-soft btn-sm" data-act="tpl-preview" data-code="${t.code}">Preview</button>${when(one && isOrgAdmin(), html`<button class="btn btn-primary btn-sm" data-act="tpl-unlock" data-code="${t.code}">Get it · ${peso(priceOf(t.code, one))}</button>`)}`}</div></section>`)}</div>`)}
     <p class="fineprint">General templates for common permit paperwork, not legal advice. Offices sometimes have their own forms: if they do, use theirs. For anything with legal consequences, have a lawyer look it over.</p>`);
 }
 
@@ -78,7 +81,7 @@ function sources(bizId, req) {
 const fill = (body, v) => body.replace(/\{\{([a-z0-9_]+)\}\}/g, (m, k) => (String(v[k] ?? '').trim() || '__________'));
 
 async function unlockOne(t) {
-  if (await unlockTemplateFlow(t)) { unlocked.add(t.code); rerender(); }
+  if (await unlockTemplateFlow(t, prices[t.code])) { unlocked.add(t.code); rerender(); }
 }
 on('tpl-unlock', (ds) => { const t = (listCache || []).find((x) => x.code === ds.code); if (t) unlockOne(t); });
 

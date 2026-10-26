@@ -67,7 +67,7 @@ function page({ up, rel, title, desc, body, here }) {
 <body class="rn-body">
 <a class="skip-link" href="#main">Skip to the guide</a>
 <div class="lp-wrap rn-wrap">
-<header class="lp-top"><a class="brand" href="${up}"><img src="${up}img/logo.png" alt="" width="34" height="34"><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span></a>
+<header class="lp-top"><a class="brand" href="${up}"><img class="brand-wm" src="${up}img/wordmark.png" alt="Pinoy Permit"></a>
   <div class="spacer"></div>
   <a class="btn btn-ghost btn-sm" href="${up}renew/"${here === 'index' ? ' aria-current="page"' : ''}>Guides</a><a class="btn btn-ghost btn-sm lp-nav" href="${up}#/login">Sign in</a><a class="btn btn-primary btn-sm" href="${up}#/signup">Start free</a></header>
 <main id="main" class="rn" tabindex="-1">

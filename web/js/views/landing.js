@@ -27,7 +27,7 @@ const PIC = {
 const pill = (st, t) => html`<span class="pv-pill pv-${st}">${t}</span>`;
 const tick = html`<span class="lp-done">${ICON.check}</span>`;
 
-const header = (onHome) => html`<header class="lp-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span></a>
+const header = (onHome) => html`<header class="lp-top"><a class="brand" href="#/"><img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit"></a>
   <div class="spacer"></div>
   ${onHome ? html`<a class="btn btn-ghost btn-sm lp-nav" href="#tour" data-scroll-to="tour">How it works</a><a class="btn btn-ghost btn-sm lp-nav" href="#for-you" data-scroll-to="for-you">Who it's for</a>`
     : html`<a class="btn btn-ghost btn-sm lp-nav" href="#/">How it works</a>`}
@@ -207,7 +207,7 @@ const receipt = () => {
       <p class="lp-lead">Everything on the receipt, every month, for nothing. Add more only when you need it.</p>
     </div>
     <div class="lp-receipt">
-      <div class="lp-rc-top"><img src="img/logo.png" alt=""><b class="lp-rc-name wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></b><span class="lp-rc-plan">Free plan</span><span class="lp-rc-every">Every month</span></div>
+      <div class="lp-rc-top"><img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit"><span class="lp-rc-plan">Free plan</span><span class="lp-rc-every">Every month</span></div>
       <hr class="lp-rc-dash">
       <ul class="lp-rc-lines">${lines.map(([ic, t, n]) => html`<li><span class="lp-sq lp-sq-round ${t}">${ic}</span><span class="lp-rc-n">${tick}${n}</span><span class="lp-rc-inc">Included</span></li>`)}</ul>
       <hr class="lp-rc-dash">
@@ -260,7 +260,7 @@ const plusShowcase = () => (has('plus') ? html`<section class="lp-show card" ari
 </section>` : '');
 // What load buys (prices come from the database once they arrive; these are only shown until then).
 const LOAD_FALLBACK = [{ code: 'texts_50', name: '50 text reminders', price_php: 49, active: true }, { code: 'texts_200', name: '200 text reminders', price_php: 179, active: true },
-  { code: 'template', name: 'One template, yours to keep', price_php: 39, active: true }, { code: 'papers_check', name: 'Papers check', price_php: 149, active: true },
+  { code: 'template', name: 'One template, yours to keep', price_php: 99, active: true }, { code: 'papers_check', name: 'Papers check', price_php: 149, active: true },
   { code: 'season_pass', name: 'Renewal season pass', price_php: 149, active: true }];
 const LOAD_WHY = {
   texts_50: 'A text on the days your permits and tax deadlines need you. Credits never expire.',

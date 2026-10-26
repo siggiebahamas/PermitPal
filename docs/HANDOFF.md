@@ -15,13 +15,14 @@ Pinoy Permit tracks Philippine business permits, vehicle registrations and staff
 1. `2026-10-17-new-features.sql`  2. `2026-10-19-revenue.sql` (already run on the live project)
 3. `2026-10-20-autorenew.sql`  4. `2026-10-21-leads.sql`  5. `2026-10-22-plus.sql`  6. `2026-10-23-whitelabel.sql`
 7. `2026-10-24-yearly.sql`  8. `2026-10-25-small-property.sql`  9. `2026-10-26-load.sql`  10. `2026-10-27-clock-and-bills.sql`
-11. `2026-10-28-packets-and-city-dates.sql`  12. `2026-10-29-pinoy-permit.sql` (the name change)  13. `2026-10-30-payment-qr.sql` (payment QR code)
+11. `2026-10-28-packets-and-city-dates.sql`  12. `2026-10-29-pinoy-permit.sql` (the name change)  13. `2026-10-30-payment-qr.sql` (payment QR code)  14. `2026-10-31-check-fix-and-template-prices.sql` (Permit check fix, template prices, logo in emails)
 
 The founder said (October 23) that files 1 to 11 are run on the live project; file 12 is new. Whether file 11 was run before commit `d6e5582` is still unconfirmed: check the live `private.features` table (each file adds a name: autorenew, leads, plus, brand, yearly, property_s, load, clock + billpay, packet + citydates). If file 11 was run before commit `d6e5582`, its later changes (₱499 fee, guarantee removal, no auto-refund on late papers checks) are missing: write a small file 12 with just those changes instead of editing file 11. A new database change = a new migration in `supabase/migrations/` **and** a matching `supabase/manual/` file with the same guard pattern, plus a test in `supabase/tests/`.
 
 ## Decisions already made (don't undo them)
 - **No guarantees, no liability for penalties.** The terms (`web/terms.html`) say penalties and surcharges stay with the business. Removed: the on-time guarantee, the late-bill surcharge promise, and the papers-check refund when an answer is late. Don't add any promise to pay penalties.
 - **The name is Pinoy Permit** (it was PermitPal). Written as two words; the wordmark is `<span class="w1">Pinoy</span> <span class="w2">Permit</span>`. The GitHub repo and the site's `/PermitPal/` address keep the old spelling until a domain is bought, and so do stored codes (bill mode `'permitpal'`) and calendar event IDs (`@permitpal`), so nothing breaks for existing data.
+- **Supabase refuses DELETE or UPDATE without WHERE** on the live project ("DELETE requires a WHERE clause"). Always add a WHERE (use `where true` to empty a scratch table); test 23 checks every function.
 - **No card checkout, no PayMongo or PayMaya integration** (the founder can't integrate them). Payment is GCash, Maya or bank transfer (UnionBank), plus an optional QR Ph code staff upload in Admin → Payment details; staff confirm every payment in Admin.
 - **Paying a city bill through Pinoy Permit costs ₱499**, an app setting (`billpay_fee`) editable in Admin → Bills & clock. The bill card shows a "Skip the line" offer. Keep it honest: no fake countdowns or fake scarcity.
 - **Online-only for now:** in-person services and Year-round care are switched off (`IN_PERSON` in `web/js/core.js`).
@@ -30,8 +31,8 @@ The founder said (October 23) that files 1 to 11 are run on the live project; fi
 
 ## Testing (run before every push)
 - Unit: `npm ci` then `node --test tests/unit.test.mjs`
-- Browser smoke test (in-memory data in `tests/ui/mock-data.js`, the real CSP): `node tests/ui/smoke.mjs`. It needs Playwright's Chromium (in Claude Code cloud sessions it's at `/opt/pw-browsers/chromium`). The last run was 966/966.
-- SQL tests on a local Postgres 16: `bash supabase/tests/local/start.sh`, `bash supabase/tests/local/reset.sh pplocal`, then `bash supabase/tests/local/run.sh pplocal supabase/tests/0[6-9]_*.sql supabase/tests/[12]*.sql`. Tests 06 to 22 all passed. 01 to 05 use an older format and aren't run with this runner.
+- Browser smoke test (in-memory data in `tests/ui/mock-data.js`, the real CSP): `node tests/ui/smoke.mjs`. It needs Playwright's Chromium (in Claude Code cloud sessions it's at `/opt/pw-browsers/chromium`). The last run was 970/970.
+- SQL tests on a local Postgres 16: `bash supabase/tests/local/start.sh`, `bash supabase/tests/local/reset.sh pplocal`, then `bash supabase/tests/local/run.sh pplocal supabase/tests/0[6-9]_*.sql supabase/tests/[12]*.sql`. Tests 06 to 23 all passed. 01 to 05 use an older format and aren't run with this runner.
 - Any UI change needs the mock (`tests/ui/mock-data.js`) and smoke checks updated with it.
 
 ## Rules

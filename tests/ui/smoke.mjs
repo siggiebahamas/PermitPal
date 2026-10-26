@@ -1248,18 +1248,17 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const text = await p.textContent('.landing');
     check(`website ${label}: the home page leads with "Track and manage every permit. Easily." under "Permits on autopilot"`, /^Track and manage every permit\. Easily\.$/.test(await p.textContent('.lp-home h1'))
       && (await p.textContent('.lp-hero2 .lp-tag')) === 'Permits on autopilot' && /^Add your permits once\./.test(await p.textContent('.lp-hero2 .lp-lead')));
-    check(`website ${label}: the logo is square and sharp, and big enough to read`, await p.evaluate(async () => {
-      const i = document.querySelector('.lp-top .brand img'), r = i.getBoundingClientRect();
+    check(`website ${label}: the sticker logo is sharp, uncropped and big enough to read`, await p.evaluate(async () => {
+      const i = document.querySelector('.lp-top .brand img.brand-wm'), r = i.getBoundingClientRect();
       await i.decode();
-      return i.naturalWidth >= 512 && i.naturalWidth === i.naturalHeight && Math.abs(r.width - r.height) < 1 && r.height >= (innerWidth > 640 ? 48 : 30);
+      return i.alt === 'Pinoy Permit' && i.naturalWidth >= 1000 && Math.abs(r.width / r.height - i.naturalWidth / i.naturalHeight) < 0.05 && r.height >= (innerWidth > 640 ? 64 : 38);
     }));
-    check(`website ${label}: the receipt uses the site's own type (no typewriter font) and the two-color name`, await p.evaluate(() => {
+    check(`website ${label}: the receipt uses the site's own type (no typewriter font) and the sticker logo`, await p.evaluate(() => {
       const f = (q) => getComputedStyle(document.querySelector(q)).fontFamily;
-      return ['.lp-rc-plan', '.lp-rc-every', '.lp-rc-inc', '.lp-rc-amt'].every((q) => !/Mono|monospace/.test(f(q)))
-        && document.querySelector('.lp-rc-name .w1').textContent === 'Pinoy' && getComputedStyle(document.querySelector('.lp-rc-name .w1')).color !== getComputedStyle(document.querySelector('.lp-rc-name .w2')).color;
+      return ['.lp-rc-plan', '.lp-rc-every', '.lp-rc-inc', '.lp-rc-amt'].every((q) => !/Mono|monospace/.test(f(q))) && document.querySelector('.lp-rc-top img.brand-wm')?.alt === 'Pinoy Permit';
     }));
     check(`website ${label}: the name is Pinoy Permit everywhere on the page and in the tab`, !/PermitPal|Permit ?Pal\b/.test(text) && !/PermitPal/.test(await p.title())
-      && /Pinoy Permit/.test(await p.title()) && (await p.textContent('.lp-top .brand')).trim() === 'Pinoy Permit');
+      && (await p.title()) === 'Pinoy Permit' && (await p.getAttribute('.lp-top .brand img', 'alt')) === 'Pinoy Permit');
     check(`website ${label}: the example phone shows Sadie's Kitchen`, /Good morning, Sadie/.test(await p.textContent('.lp-screen')) && (await p.textContent('.lp-biz')) === "Sadie's Kitchen");
     check(`website ${label}: "One screen." sits on a line of its own`, await p.evaluate(() => {
       const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
@@ -1404,6 +1403,14 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('[data-act=finding-dismiss]'); await page.waitForSelector('#modal-root .modal');
     await page.fill('#modal-root [name=note]', 'The building has one'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(700);
     check(`plus ${label}: "Doesn't apply" moves it to your answers, with Undo`, /You answered/.test(await mainText(page)) && (await page.locator('[data-act=finding-reopen]').count()) === 1);
+    // the check with no permits: a friendly empty screen, not a blank page; and if the check fails, a retry card
+    await page.evaluate(async () => { const c = await import('/js/core.js'); window.__reqs = c.S.data.reqs; c.S.data.reqs = []; });
+    await go('#/'); await go('#/check'); await page.waitForTimeout(300);
+    check(`plus ${label}: the check with no permits shows "Nothing to check yet" and a way to start`, /Nothing to check yet/.test(await mainText(page)) && (await page.locator('main .empty-hero .btn-primary').count()) === 1);
+    await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.data.reqs = window.__reqs; const m = await import('/__mock/mock-data.js'); window.__run = m.runPermitCheck; });
+    await page.evaluate(async () => { const m = await import('/__mock/mock-data.js'); m.__failNextCheck?.(); });
+    await go('#/'); await go('#/check'); await page.waitForTimeout(300);
+    check(`plus ${label}: if the check fails, the page says so and offers Check again`, /didn't finish/.test(await mainText(page)) && (await page.locator('main [data-act=check-run]').count()) === 1);
     // people: the worker's photo, the not-cleared list, the link, roles
     await go('#/people');
     check(`plus ${label}: a lapsed license shows under Not cleared to work`, /Not cleared to work/.test(await mainText(page)) && /Jun Reyes/.test(await page.textContent('.not-cleared')));
@@ -1852,7 +1859,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   check(`load ${label}: the customer sees the answer, line by line`, /Almost there/.test(card) && /Needs a fix/.test(card) && /Bring the renewed lease/.test(card) && /One fix: the renewed lease/.test(card));
   // one template at a time (no Plus here)
   await go('#/templates'); await page.waitForSelector('[data-act=tpl-unlock]');
-  check(`load ${label}: without Plus, each template can be bought on its own`, /₱39/.test(await page.locator('[data-act=tpl-unlock]').first().textContent()));
+  check(`load ${label}: without Plus, each template can be bought on its own`, /₱(99|149|199|249)/.test(await page.locator('[data-act=tpl-unlock]').first().textContent()));
   await page.locator('[data-act=tpl-unlock]').first().click(); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
   check(`load ${label}: bought: it's yours, and it fills in`, (await page.locator('main .chip', { hasText: 'Yours' }).count()) === 1);
   await page.locator('[data-act=tpl-fill]').first().click(); await page.waitForTimeout(500);

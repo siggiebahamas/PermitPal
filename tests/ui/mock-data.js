@@ -756,7 +756,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 
@@ -1633,7 +1633,11 @@ export const trustDecide = async (id, yes) => { plusDb.recipients.find((r) => r.
 export const trustViews = async (pageId) => plusDb.views.filter((v) => v.page_id === pageId).map((v) => ({ ...v }));
 
 // the permit check
+// The live database once refused the check ("DELETE requires a WHERE clause"); the smoke test replays a failure.
+let failNextCheck = false;
+export const __failNextCheck = () => { failNextCheck = true; };
 export async function runPermitCheck() {
+  if (failNextCheck) { failNextCheck = false; throw offErr('DELETE requires a WHERE clause', '21000'); }
   const rows = statusRows().filter((r) => !(r.person_id && db.people.find((p) => p.id === r.person_id)?.paused_at));
   const found = [];
   const who = (r) => r.subject_name + (r.plate_no ? ' · ' + r.plate_no : '');
@@ -1676,6 +1680,8 @@ const TEMPLATES = [
     fields: [{ key: 'owner_name', label: 'Your full name', source: 'me_name', required: true }, { key: 'business_name', label: 'Business name', source: 'business_name', required: true }, { key: 'lost_document', label: 'Document lost', source: 'permit_name', required: true }, { key: 'lost_no', label: 'Its number', source: 'permit_no' }],
     body: 'AFFIDAVIT OF LOSS\n\nI, {{owner_name}}, of legal age, Filipino, state that:\n\n1. {{business_name}} was issued a {{lost_document}}, No. {{lost_no}};\n\n2. The document is now lost.\n\n_____________________________\n{{owner_name}}\nAffiant' },
 ];
+const TEMPLATE_PRICE = { authorization_letter: 99, certified_copy_request: 99, landlord_letter: 99, accreditation_cover_letter: 99, affidavit_of_loss: 149, gross_sales_declaration: 149, special_power_of_attorney: 199, secretary_certificate: 249 };
+export const templatePrices = async () => TEMPLATES.map((t) => ({ code: t.code, price_php: TEMPLATE_PRICE[t.code] ?? null }));
 export const listTemplates = async () => TEMPLATES.map((t) => ({ code: t.code, title: t.title, category: t.category, summary: t.summary, use_when: t.use_when, notarize: t.notarize, sort: t.sort, version: t.version,
   preview: t.body.replace(/\{\{[a-z0-9_]+\}\}/g, '______').split('\n').slice(0, 7).join('\n') }));
 export async function getTemplate(orgId, code) {
@@ -1772,7 +1778,7 @@ const loadDb = { wallet: { paid_php: 0, bonus_php: 0, texts: 0 }, entries: [], t
   products: [
     { code: 'texts_50', name: '50 text reminders', price_php: 49, texts: 50, active: true, sort: 10 },
     { code: 'texts_200', name: '200 text reminders', price_php: 179, texts: 200, active: true, sort: 20 },
-    { code: 'template', name: 'One template, yours to keep', price_php: 39, texts: 0, active: true, sort: 30 },
+    { code: 'template', name: 'One template, yours to keep', price_php: 99, texts: 0, active: true, sort: 30 },
     { code: 'papers_check', name: 'Papers check', price_php: 149, texts: 0, active: true, sort: 40 },
     { code: 'season_pass', name: 'Renewal season pass', price_php: 149, texts: 0, active: true, sort: 50 }] };
 export const __load = loadDb; // the smoke test reads and nudges this
@@ -1877,7 +1883,7 @@ export async function unlockTemplate(orgId, code) {
   if (loadDb.unlocks.some((u) => u.code === code)) return;
   const t = TEMPLATES.find((x) => x.code === code);
   if (!product('template').active) throw loadErr("Templates can't be bought one by one right now.");
-  loadSpend(product('template').price_php, 'template:' + code, 'Template: ' + t.title, null);
+  loadSpend(TEMPLATE_PRICE[code] ?? product('template').price_php, 'template:' + code, 'Template: ' + t.title, null);
   loadDb.unlocks.push({ code, unlocked_at: lnow() });
 }
 export const papersChecks = async (reqId) => loadDb.checks.filter((c) => c.requirement_id === reqId).map((c) => ({ ...c, items: c.items.map((i) => ({ ...i })) }));

@@ -269,10 +269,10 @@ on('load-season', () => {
 });
 
 // ---------------------------------------------------------------- one template at a time (used by the templates page)
-export async function unlockTemplateFlow(t) {
+export async function unlockTemplateFlow(t, own) {
   const st = await loadState();
   if (!st || !onSale('template')) return toast("Templates can't be bought one by one right now.", 'error');
-  return spend({ title: `Get "${t.title}"?`, what: `"${t.title}", yours to keep (with future updates)`, amount: price('template'),
+  return spend({ title: `Get "${t.title}"?`, what: `"${t.title}", yours to keep (with future updates)`, amount: own ?? price('template'),
     run: () => db.unlockTemplate(S.org.id, t.code), done: `"${t.title}" is yours. Tap Fill in.` });
 }
 

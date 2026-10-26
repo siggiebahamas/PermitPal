@@ -152,7 +152,7 @@ select pg_temp.res('the client''s permit reminder comes under the firm''s name, 
   and o.body_text like '%Sent for Dela Cruz & Co. by Pinoy Permit.%', o.subject)
   from public.message_outbox o where o.to_address = 'carlo@bakery.ph' and o.dedupe_key like 'remmail:%';
 select pg_temp.res('everyone else gets Pinoy Permit''s usual email', o.subject like 'Pinoy Permit: %' and o.from_name is null and o.reply_to is null
-  and o.body_html like '%<span style="color:#0C2A57">Pinoy</span> <span style="color:#2F6FED">Permit</span>%', o.subject)
+  and o.body_html like '%img/wordmark.png" alt="Pinoy Permit"%', o.subject)
   from public.message_outbox o where o.to_address = 'olive@other.ph' and o.dedupe_key like 'remmail:%';
 select private.notify('e1000000-0000-4000-8000-0000000000b2', client, 'filing', 'BIR 2551Q due in 3 days', 'File and pay by the 25th.', '#/filings', null, 'tfil:1', true) from t_ids;
 select private.notify('e1000000-0000-4000-8000-0000000000b2', client, 'billing', 'Your plan ends soon', 'Renew anytime.', '#/settings/billing', null, 'tbill:1', true) from t_ids;

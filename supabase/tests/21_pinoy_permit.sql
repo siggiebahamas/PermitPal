@@ -10,8 +10,8 @@ select pg_temp.res('the feature switch is on', exists (select 1 from private.fea
 select pg_temp.res('no database function says PermitPal any more', not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname in ('public', 'private') and p.prosrc ~ '(^|[^/A-Za-z])PermitPal'),
   (select string_agg(p.proname, ', ') from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'private') and p.prosrc ~ '(^|[^/A-Za-z])PermitPal'));
-select pg_temp.res('every email starts with the two-color Pinoy Permit name', private.email_html('Hi', '<p>x</p>', null, null)
-  like '%<span style="color:#0C2A57">Pinoy</span> <span style="color:#2F6FED">Permit</span>%', '');
+select pg_temp.res('every email starts with the Pinoy Permit logo', private.email_html('Hi', '<p>x</p>', null, null)
+  like '%img/wordmark.png" alt="Pinoy Permit"%', '');
 select pg_temp.res('the email footer names Pinoy Permit', private.email_html('Hi', '<p>x</p>', null, null) like '%your Pinoy Permit settings%', '');
 select pg_temp.res('service descriptions say Pinoy Permit', not exists (select 1 from public.services where summary ~ 'PermitPal' or name ~ 'PermitPal')
   and exists (select 1 from public.services where summary like '%Pinoy Permit%'), '');

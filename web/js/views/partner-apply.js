@@ -17,7 +17,7 @@ const HOW_CREDIT = [
 ];
 
 export function partnerApplyPage(el, { signedIn = false } = {}) {
-  const wrap = (inner) => (signedIn ? inner : html`<main class="landing apply-page"><header class="lp-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span></a>
+  const wrap = (inner) => (signedIn ? inner : html`<main class="landing apply-page"><header class="lp-top"><a class="brand" href="#/"><img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit"></a>
     <div class="spacer"></div><a class="btn btn-ghost btn-sm" href="#/login">Sign in</a></header>${inner}</main>`);
   el.innerHTML = String(wrap(html`
     <div class="page-head"><div><h1>List your firm on Pinoy Permit</h1>

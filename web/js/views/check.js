@@ -13,20 +13,27 @@ const DISMISS_LABEL = { missing_common: "Doesn't apply", vehicle_missing: "Doesn
 let busy = false;
 
 export async function checkPage(el) {
-  el.innerHTML = String(html`<div class="page-head"><div><h1>Permit check</h1></div></div><div class="loading">Checking your records…</div>`);
+  el.innerHTML = String(html`${head()}<div class="loading">Checking your records…</div>`);
+  // Nothing tracked yet: nothing to check, so show how to start instead of an empty page.
+  if (!S.data.reqs.length) { el.innerHTML = String(html`${head()}${emptyCheck()}`); return; }
   let run;
   let list = [];
   try {
     run = await db.runPermitCheck(S.org.id);
     if (run.plus) list = await db.findings(S.org.id);
-  } catch (e) { toastError(e); el.querySelector('.loading').textContent = "Couldn't run the check. Try again in a minute."; return; }
+  } catch (e) {
+    toastError(e);
+    el.innerHTML = String(html`${head()}<section class="card empty-hero"><div class="empty-art" aria-hidden="true">${ICON.refresh || ICON.check}</div>
+      <h2>The check didn't finish</h2><p>Your permits are safe. Try again in a minute.</p>
+      <button class="btn btn-primary" data-act="check-run">Check again</button></section>`);
+    return;
+  }
   const open = list.filter((f) => f.status === 'open');
   const by = (sev) => open.filter((f) => f.severity === sev).sort((a, b) => a.title.localeCompare(b.title));
   const answered = list.filter((f) => f.status === 'dismissed');
   const pct = run.items ? Math.round((run.in_order / run.items) * 100) : 100;
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Permit check</h1>
-      <p class="muted">Pinoy Permit goes through your records every morning: what's expired, what's missing, and dates that don't look right.</p></div>
+    <div class="page-head"><div><h1>Permit check</h1><p class="page-sub">We look over your permits every morning and tell you what needs fixing.</p></div>
       <div class="btn-row"><button class="btn btn-ghost" data-act="check-run">Check again</button></div></div>
     <section class="card check-score">
       <div class="check-ring" style="--p:${pct}" role="img" aria-label="${run.in_order} of ${run.items} in order"><b>${run.in_order}</b><span>of ${run.items}</span></div>
@@ -54,6 +61,17 @@ export async function checkPage(el) {
         <ul class="plus-perks">${PLUS_PERKS.map(([t, d]) => html`<li><b>${t}.</b> ${d}</li>`)}</ul>
         <button class="btn btn-primary" data-act="plus-upsell" data-what="The full permit check">See Plus</button></section>`}
     <p class="fineprint">Pinoy Permit checks your own records automatically. It doesn't issue permits or verify them with the government: anything it isn't sure about is asked, not stated.</p>`);
+}
+
+const head = () => html`<div class="page-head"><div><h1>Permit check</h1><p class="page-sub">We look over your permits every morning and tell you what needs fixing.</p></div></div>`;
+// Shown when the workspace has no permits yet.
+function emptyCheck() {
+  return html`<section class="card empty-hero">
+    <div class="empty-art" aria-hidden="true">${ICON.check}</div>
+    <h2>Nothing to check yet</h2>
+    <p>Add your first permit and we'll start checking it every morning: what's expired, what's missing, what's coming up.</p>
+    <div class="btn-row center">${canEdit() ? html`<a class="btn btn-primary" href="${S.data.businesses.length ? '#/compliance' : '#/businesses?add=1'}">${S.data.businesses.length ? 'See my permits' : 'Add my business'}</a>` : ''}<a class="btn btn-ghost" href="#/">Go home</a></div>
+  </section>`;
 }
 
 function section(title, sub, items, sev) {

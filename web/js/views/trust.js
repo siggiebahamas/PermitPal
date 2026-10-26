@@ -137,7 +137,7 @@ on('trust-poster', () => {
   const page = state.pages.find((p) => p.id === state.pageId);
   const url = pageUrl(page.code, 'qr');
   printSheet(String(html`<div class="poster">
-    <div class="poster-brand"><span class="w1">Pinoy</span> <span class="w2">Permit</span></div>
+    <div class="poster-brand"><img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit"></div>
     <h1>${page.title}</h1>
     <p class="poster-lead">Our permits, live</p>
     <img src="${qrPng(url, 900)}" alt="QR code">

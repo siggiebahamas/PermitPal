@@ -35,7 +35,7 @@ export function contactPage(el, { signedIn = !!S.user } = {}) {
     ? html`<div class="page-head"><div><h1>Contact Pinoy Permit</h1><p class="muted">Questions, problems, plans and payment, or a request about your personal data.</p></div></div>
         <section class="card contact-card">${body}</section>`
     : html`<main class="auth"><div class="auth-card contact-public">
-        <a href="#/"><img class="auth-logo" src="img/logo.png" alt="Pinoy Permit"></a>
+        <a href="#/"><img class="brand-wm auth-wm" src="img/wordmark.png" alt="Pinoy Permit"></a>
         <h1>Contact Pinoy Permit</h1>
         <p class="tagline">Questions, problems, or a request about your personal data. Our Data Protection Officer reads privacy messages.</p>
         ${body}

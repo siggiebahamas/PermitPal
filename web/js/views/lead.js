@@ -14,7 +14,7 @@ const REASON_NAME = Object.fromEntries(REASONS.map(([k, t]) => [k, t]));
 const day = (ts) => fmtDate(String(ts).slice(0, 10));
 
 export async function leadPage(el, token, { signedIn = false } = {}) {
-  const wrap = (inner) => (signedIn ? inner : html`<main class="landing lead-page"><header class="lp-top"><a class="brand" href="#/"><img src="img/logo.png" alt=""><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span></a>
+  const wrap = (inner) => (signedIn ? inner : html`<main class="landing lead-page"><header class="lp-top"><a class="brand" href="#/"><img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit"></a>
     <div class="spacer"></div></header>${inner}</main>`);
   el.innerHTML = String(wrap(html`<div class="loading">Loading…</div>`));
   let l = null;

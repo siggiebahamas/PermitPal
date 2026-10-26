@@ -19,6 +19,7 @@ const res = await build({
 const js = res.outputFiles[0].text;
 const css = fs.readFileSync('web/css/app.css', 'utf8');
 const logo = 'data:image/png;base64,' + fs.readFileSync('web/img/logo.png').toString('base64');
+const wordmark = 'data:image/png;base64,' + fs.readFileSync('web/img/wordmark.png').toString('base64');
 const badge = 'data:image/png;base64,' + fs.readFileSync('web/img/badge-email.png').toString('base64');
 const fonts = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
   + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">';
@@ -29,7 +30,7 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 @media (max-width:899px){.demo-flag{position:static;transform:none;display:block;border-radius:0;opacity:1;text-align:center;padding:5px 12px}}
 </style></head><body><div class="demo-flag">DEMO — sample data, nothing is saved</div>
 <div id="app"><div class="boot">Loading Pinoy Permit…<span class="boot-slow">Taking too long? <a href="./">Reload the page</a>. If it keeps happening, update your browser or open this link in Chrome or Safari.</span></div></div><div id="modal-root"></div><div id="toast" class="toast" role="status"></div>
-<script>window.PP_DEMO=true;</script><script>${js.replace(/<\/script/g, '<\\/script').replaceAll('img/logo.png', logo).replaceAll('src="img/badge-email.png"', `src="${badge}"`)}</script></body></html>`;
+<script>window.PP_DEMO=true;</script><script>${js.replace(/<\/script/g, '<\\/script').replaceAll('img/logo.png', logo).replaceAll('img/wordmark.png', wordmark).replaceAll('src="img/badge-email.png"', `src="${badge}"`)}</script></body></html>`;
 // Published at /PermitPal/demo/ (and the older /PermitPal/demo.html link keeps working).
 const out = html.replaceAll('src="img/logo.png"', `src="${logo}"`);
 fs.mkdirSync('web/demo', { recursive: true });

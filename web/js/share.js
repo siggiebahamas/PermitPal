@@ -31,7 +31,7 @@ async function main() {
   }
   const counts = Object.keys(STATUS).map((s) => [s, data.items.filter((i) => i.status === s).length]).filter(([, n]) => n);
   app.innerHTML = String(html`<div class="share-wrap">
-    <header class="share-top"><span class="wordmark"><span class="w1">Pinoy</span> <span class="w2">Permit</span></span>
+    <header class="share-top"><img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit">
       <button class="btn btn-ghost btn-sm no-print" id="print">Print or save as PDF</button></header>
     <section class="card">
       <div class="card-head"><h1>${data.org_name}</h1></div>

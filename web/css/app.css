@@ -98,6 +98,15 @@ input[type=file] { padding: 8px; font-size: 15px; }
 .auth { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; background: var(--bg) var(--bg-grad); }
 .auth-card { background: var(--card); border: 1px solid var(--border); width: 100%; max-width: 440px; border-radius: 20px; padding: 28px 22px; box-shadow: 0 8px 28px rgba(15, 35, 75, .1); }
 .auth-logo { width: 72px; display: block; margin: 0 auto 4px; }
+/* The sticker logo (logo + "Pinoy Permit" lettering in one picture). Height sets the size; width follows. */
+.brand-wm { display: block; height: 44px; width: auto; max-width: 100%; }
+.auth-card > .brand-wm, .auth-wm { height: 92px; margin: 0 auto 12px; }
+.sidebar .brand .brand-wm { height: 54px; }
+.topbar .brand .brand-wm { height: 40px; }
+.share-top .brand-wm { height: 42px; }
+.poster-brand .brand-wm { height: 22mm; }
+.lp-top .brand img.brand-wm { height: 72px; width: auto; }
+.lp-rc-top .brand-wm { height: 100px; margin: 0 auto 4px; }
 .wordmark { font-weight: 800; letter-spacing: -.3px; }
 .auth .wordmark { font-size: 28px; text-align: center; margin-bottom: 8px; }
 .w1 { color: var(--heading); } .w2 { color: var(--accent); }
@@ -772,6 +781,7 @@ tr.imp-bad td { background: var(--s-over-bg); }
   .lp-top .lp-nav { display: none; }
   .lp-top .wordmark { font-size: 22px; }
   .lp-top .brand img { width: 42px; height: 42px; }
+  .lp-top .brand img.brand-wm { height: 56px; width: auto; }
   .lp-top .btn-sm { padding: 7px 11px; }
 }
 /* History: one drop-down, changes grouped by day */
@@ -1624,8 +1634,8 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .pro-more { margin-top: 10px; }
 .pro-more summary { cursor: pointer; padding: 6px 0; }
 .pro-permits summary .linklike { white-space: nowrap; padding: 0; }
-@media (max-width: 380px) { .lp-top .wordmark { font-size: 19px; } .lp-top .brand img { width: 36px; height: 36px; } .lp-top .btn-sm { padding: 7px 9px; font-size: 14px; } }
-@media (max-width: 340px) { .lp-top { gap: 4px; } .lp-top .brand { gap: 6px; } .lp-top .wordmark { font-size: 16px; } .lp-top .brand img { width: 30px; height: 30px; } .lp-top .btn-sm { padding: 6px 7px; font-size: 13px; } }
+@media (max-width: 380px) { .lp-top .wordmark { font-size: 19px; } .lp-top .brand img { width: 36px; height: 36px; } .lp-top .brand img.brand-wm { height: 48px; width: auto; } .lp-top .btn-sm { padding: 7px 9px; font-size: 14px; } }
+@media (max-width: 340px) { .lp-top { gap: 4px; } .lp-top .brand { gap: 6px; } .lp-top .wordmark { font-size: 16px; } .lp-top .brand img { width: 30px; height: 30px; } .lp-top .brand img.brand-wm { height: 40px; width: auto; } .lp-top .btn-sm { padding: 6px 7px; font-size: 13px; } }
 
 /* Plans: a picture of the board, the big wins with icons, everything included one tap away */
 .pp-preview { border: 1px solid var(--border); border-radius: 12px; background: #fff; padding: 8px 10px; margin: 12px 0 4px; box-shadow: 0 6px 16px -14px rgba(11, 27, 58, .5); }
@@ -2156,3 +2166,13 @@ a.pk-tag:hover { filter: brightness(.96); text-decoration: underline; }
 .bill-modes .bill-mode-pp { border: 2px solid var(--brand); border-radius: 12px; padding: 10px 12px; background: var(--accent-soft); }
 .bill-modes .bill-mode-pp.is-off { border-color: var(--border); background: transparent; }
 .bill-modes .bill-mode-pp em { margin-left: 4px; }
+
+/* ---------------------------------------------------------------- page intros and empty states
+   Every page opens with a big title and one short, readable line under it (not small grey text). */
+.page-sub { margin: 6px 0 0; font-size: 17px; line-height: 1.45; color: var(--text); max-width: 60ch; }
+.empty-hero { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 40px 24px; }
+.empty-hero h2 { margin: 0; font-size: 24px; }
+.empty-hero p { margin: 0; max-width: 46ch; font-size: 17px; color: var(--text); }
+.empty-art { width: 72px; height: 72px; border-radius: 24px; display: grid; place-items: center; background: var(--accent-soft); color: var(--brand); }
+.empty-art svg { width: 34px; height: 34px; }
+.btn-row.center { justify-content: center; }

@@ -639,6 +639,7 @@ export const unreadPhotos = async (orgId) => ok(await sb.from('documents').selec
 
 // Templates.
 export const listTemplates = async () => ok(await sb.rpc('list_templates'));
+export const templatePrices = async () => ok(await sb.rpc('template_prices'));
 export const getTemplate = async (orgId, code) => ok(await sb.rpc('get_template', { p_org: orgId, p_code: code }));
 
 // White-label (accounting firms): the firm's look, its logo file, and the look a client workspace shows.
