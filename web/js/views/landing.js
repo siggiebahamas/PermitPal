@@ -8,7 +8,9 @@ import { html, raw, peso } from '../util.js';
 import { ICON } from '../components.js';
 import { has } from '../core.js';
 import { PLUS_MONTHLY, BRAND_MONTHLY } from '../prices.js';
-import { billToggle, freeCard, planCard, plansShown, PLANS, compareTable, paintPrices, addonCard, checks, PLUS_CHECKS, BRAND_CHECKS, STAFF_CHECKS, staffTracks, staffLadder, staffExamples } from './pricing.js';
+import { billToggle, freeCard, planCard, plansShown, compareTable, paintPrices, addonCard, checks, PLUS_CHECKS, BRAND_CHECKS, STAFF_CHECKS, staffTracks, staffLadder, staffExamples,
+  tierCard, tierPrice, tiersShown, TIER_SMALL, TIER_FLEET, softwareBanner, peaceBand, helpServices, SOFTWARE_ONLY } from './pricing.js';
+import { passHeader, passPerks, passList } from './load.js';
 import * as db from 'pp/data';
 
 // A few pictures the app itself doesn't need.
@@ -193,12 +195,11 @@ const tour = () => html`<section id="tour" class="lp-sec" aria-labelledby="tour-
     <h2 class="lp-big lp-narrow" id="tour-h">From adding a permit to proving it.</h2>
     <div data-tour>${tourBody(1)}</div>
   </div>
-  <p class="lp-note lp-center">Want to click around first? <a href="demo/">Open the demo</a>: sample data, no sign-up.</p>
 </section>`;
 
 // ---------------------------------------------------------------- home: what the free plan gives, as a receipt
 const receipt = () => {
-  const lines = [[ICON.list, 't-blue', 'Every permit, one list'], [ICON.bell, 't-green', "Reminders before it's late"],
+  const lines = [[ICON.building, 't-blue', '1 business + 1 vehicle'], [ICON.list, 't-blue', 'Every permit, one list'], [ICON.bell, 't-green', "Reminders before it's late"],
     ...(has('filings') ? [[ICON.calendar, 't-teal', 'Tax and contribution dates']] : []), ...(has('library2') ? [[PIC.todo, 't-lilac', 'Step-by-step renewals']] : []),
     [ICON.file, 't-green', 'Papers safe for years'], [ICON.share, 't-blue', 'Proof in one link'], [ICON.download, 't-lilac', 'Inspection-ready download'],
     ...(has('mfa') ? [[PIC.lock, 't-teal', 'Two-step login']] : [])];
@@ -206,7 +207,7 @@ const receipt = () => {
     <div class="lp-free2-copy">
       <span class="lp-chip-free">Free plan</span>
       <h2 class="lp-big" id="free-h">Yours on the free plan.</h2>
-      <p class="lp-lead">Everything on the receipt, every month, for nothing. Add more only when you need it.</p>
+      <p class="lp-lead">One business and one vehicle, with everything on the receipt, every month, for nothing. Move up only when you track more.</p>
     </div>
     <div class="lp-receipt">
       <div class="lp-rc-top"><img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit"><span class="lp-rc-plan">Free plan</span><span class="lp-rc-every">Every month</span></div>
@@ -223,7 +224,7 @@ const receipt = () => {
 
 const finalCta = () => html`<section class="lp-sec"><div class="lp-final2">
   <div><h2 class="lp-big">Start free. Grow when you're ready.</h2>
-    <p class="lp-lead">Track your own business on the free plan. Add ${has('plus') ? 'Plus, more staff or ' : ''}a team plan only when you need it. Team plans start with 30 days free.</p></div>
+    <p class="lp-lead">Track one business and one vehicle on the free plan. Add ${has('plus') ? 'Plus, more staff or ' : ''}a bigger plan only when you track more. Fleet plans start with 30 days free.</p></div>
   <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-lg lp-btn-demo" href="demo/">${PLAY}Try the demo first</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#/pricing">See plans and prices</a></div>
 </div></section>`;
 
@@ -262,34 +263,50 @@ const plusShowcase = () => (has('plus') ? html`<section class="lp-show card" ari
 </section>` : '');
 // What load buys (prices come from the database once they arrive; these are only shown until then).
 const LOAD_FALLBACK = [{ code: 'texts_50', name: '50 text reminders', price_php: 49, active: true }, { code: 'texts_200', name: '200 text reminders', price_php: 179, active: true },
-  { code: 'template', name: 'One template, yours to keep', price_php: 350, active: true }, { code: 'papers_check', name: 'Papers check', price_php: 499, active: true },
-  { code: 'season_pass', name: 'Renewal season pass', price_php: 149, active: true }];
+  { code: 'template', name: 'One template, yours to keep', price_php: 150, active: true }, { code: 'papers_check', name: 'Papers check', price_php: 499, active: true },
+  { code: 'season_pass', name: 'Renewal season pass', price_php: 600, active: true }];
 const LOAD_WHY = {
   texts_50: 'A text on the days your permits and tax deadlines need you. Credits never expire.',
   texts_200: 'The same texts, for bigger teams: works out cheaper per text.',
   template: 'An authorization letter, SPA or affidavit of loss, filled in with your details. Buy only the one you need.',
   papers_check: 'Before you queue, we check photos of your papers against the checklist. Usually answered by 6 pm the next weekday.',
-  season_pass: 'For the January rush: up to 100 texts, one papers check and your renewal plan by email. September to February.',
+  season_pass: 'For the January rush: up to 100 texts, one papers check, one template of your choice and your renewal plan by email. September to February.',
 };
-const loadCards = (list) => list.filter((p) => p.active).map((p) => html`<div class="card lp-load-card"><b>${p.name}</b><span class="lp-load-price">${peso(p.price_php)}</span><p>${LOAD_WHY[p.code] || ''}</p></div>`);
+const loadCards = (list) => {
+  const priceOf = (code) => Number(list.find((x) => x.code === code)?.price_php ?? 0);
+  const pass = list.find((p) => p.code === 'season_pass' && p.active);
+  return html`${list.filter((p) => p.active && p.code !== 'season_pass').map((p) => html`<div class="card lp-load-card"><b>${p.name}</b><span class="lp-load-price">${peso(p.price_php)}</span><p>${LOAD_WHY[p.code] || ''}</p></div>`)}
+    ${pass ? html`<div class="card pass-card lp-pass">${passHeader(Number(pass.price_php), passPerks({}, priceOf), 'Most cities want renewals by January 20')}${passList(passPerks({}, priceOf))}</div>` : ''}`;
+};
 const FAQ = [
-  ['Is the free plan really free?', 'Yes. Your own businesses, vehicles, team and reminders cost nothing, with no time limit and no card. Team plans and add-ons are for people who need more.'],
+  ['Is the free plan really free?', 'Yes. One business and one vehicle, with reminders and checklists, cost nothing, with no time limit and no card. Track more with Plus (up to 5), Core (up to 15) or a fleet plan.'],
+  ['Does a plan include someone renewing for me?', 'No. Every plan is tracking and planning software only. Renewal Assistance (₱499, a review of your papers and a written plan) is a separate service. Full-Service Vehicle Renewal (from ₱1,000) is coming soon. Government and third-party fees are always separate.'],
+  ['What happens if I reach my plan\'s limit?', 'Everything you already track stays, and you can still edit it. You just can\'t add another business or vehicle until you move up. If a paid plan ends, nothing is deleted either.'],
   ['What happens after the 30-day trial?', 'You choose to pay monthly or yearly. Nothing is charged by itself: we send a bill, you pay by GCash, Maya or bank transfer.'],
   ['How does yearly work?', 'You pay for 10 months and get 12. That is 2 months free, every year.'],
   ['Can I stop anytime?', 'Yes. Your plan runs to the end of what you paid. Your data is never locked or deleted, and you can download it anytime.'],
 ];
 const faq = () => [...FAQ, ...(has('load') ? [['What is Pinoy Permit load?', "Prepaid credit for the small extras: text reminders, one template at a time, a papers check, the renewal season pass. Top up from ₱100. It never expires, and unused paid load can be paid back to you if you ask."]] : [])];
-// The plans and add-ons, with a "start" button for each (sign-up remembers which plan they picked).
+// The plans: software by size (small, then fleets), the per-vehicle band, landlords, then the separate services.
+const TIER_CTA = { plus: ['#/signup', 'Try free for 14 days'], core: ['#/signup', 'Start with Core'], multi: ['#/signup?type=fleet', 'Try free for 30 days'],
+  fleet: ['#/signup?type=fleet', 'Try free for 30 days'], fleet_pro: ['#/signup?type=fleet', 'Try free for 30 days'], enterprise: ['#/signup?type=fleet', 'Start a trial, then ask for a quote'] };
 function pricingCards(plans) {
   const price = (id) => Number(plans.find((p) => p.id === id)?.price_php_monthly || 0);
-  const start = (id) => html`<a class="btn btn-primary btn-block" href="#/signup?type=${PLANS[id].kind}">Try free for 30 days</a>`;
-  return html`<div class="pp-grid four">${freeCard(html`<a class="btn btn-primary btn-block" href="#/signup">Start free</a>`)}${plansShown(plans).map((id) => planCard(id, price(id), start(id)))}</div>
-    ${compareTable(plansShown(plans))}`;
+  const cta = (id) => html`<a class="btn ${id === 'core' ? 'btn-primary' : 'btn-soft'} btn-block" href="${TIER_CTA[id][0]}">${TIER_CTA[id][1]}</a>`;
+  const props = plansShown(plans);
+  return html`${softwareBanner()}
+    <h3 class="pp-group-h">For you and your small business</h3>
+    <div class="pp-grid three">${freeCard(html`<a class="btn btn-primary btn-block" href="#/signup">Start free</a>`)}${tiersShown(plans, TIER_SMALL).map((id) => tierCard(id, tierPrice(plans, id), cta(id)))}</div>
+    <h3 class="pp-group-h">For big households and fleets</h3>
+    <div class="pp-grid four">${tiersShown(plans, TIER_FLEET).map((id) => tierCard(id, tierPrice(plans, id), cta(id)))}</div>
+    ${peaceBand(plans)}
+    ${props.length ? html`<h3 class="pp-group-h">For landlords and malls</h3>
+      <div class="pp-grid">${props.map((id) => planCard(id, price(id), html`<a class="btn btn-primary btn-block" href="#/signup?type=property">Try free for 30 days</a>`))}</div>` : ''}
+    ${helpServices({ assistCta: html`<a class="btn btn-soft btn-block" href="#/signup">Sign up, then open a permit</a>`, complexCta: html`<a class="btn btn-soft btn-block" href="#/signup">Sign up and tell us your case</a>` })}
+    ${compareTable()}`;
 }
 const addons = () => (has('plus') ? html`<h2 class="lp-h3">Add-ons for any workspace</h2>
   <div class="pp-grid">
-    ${addonCard({ id: 'lp-plus', icon: ICON.share, name: 'Pinoy Permit Plus', who: 'Show customers you are legit, and let Pinoy Permit check your permits for you', monthly: PLUS_MONTHLY, list: PLUS_CHECKS,
-      cta: html`<a class="btn btn-soft btn-block" href="#/signup">Try free for 14 days</a>` })}
     ${addonCard({ id: 'lp-staff', icon: ICON.person, name: 'Staff licenses', who: 'Every license your team needs, tracked for you. They renew, you approve.',
       body: html`${staffTracks()}${checks(STAFF_CHECKS)}${staffLadder()}${staffExamples()}`, cta: html`<a class="btn btn-soft btn-block" href="#/signup">Start free with 3 people</a>` })}
     ${has('brand') ? addonCard({ id: 'lp-brand', icon: ICON.briefcase, name: 'White-label', who: 'For accounting firms: your brand on everything your clients see', monthly: BRAND_MONTHLY, list: BRAND_CHECKS,
@@ -303,8 +320,10 @@ export async function pricingPage(app) {
     <main class="landing lp-prices">
       ${header(false)}
       <section class="lp-pricing" id="pricing" aria-labelledby="pricing-h">
-        <h1 class="lp-title" id="pricing-h">Simple prices. Start free.</h1>
-        <p class="lp-sub">The free plan is for your own business, with no time limit. Team plans are for people who look after many businesses, vehicles or tenants: 30 days free, no card needed.</p>
+        <h1 class="lp-title" id="pricing-h">Peace of mind for every vehicle you manage.</h1>
+        <p class="lp-sub">Keep registration dates, documents, requirements, and renewal tasks organized in one place, so you can plan ahead instead of scrambling at the last minute.</p>
+        <p class="lp-sub lp-sub-strong">${SOFTWARE_ONLY}</p>
+        <p class="lp-trust">Clear prices. Clear deliverables. No hidden government or third-party charges. We show the scope and costs before you pay.</p>
         <h2 class="sr-only">Plans</h2>
         ${billToggle()}
         <div data-plans>${pricingCards([])}</div>

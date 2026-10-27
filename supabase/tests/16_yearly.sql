@@ -17,7 +17,7 @@ select pg_temp.res('a year of the firm plan costs 10 months (₱19,900), 2 month
   (r ->> 'amount_php')::numeric = 19900 and (r ->> 'months')::int = 12 and (r ->> 'months_free')::int = 2, r::text)
   from (select public.billing_start(org, 'firm', 12) r from t_ids) x;
 select pg_temp.res('one month costs one month', (public.billing_start(org, 'firm', 1) ->> 'amount_php')::numeric = 1990, '') from t_ids;
-select pg_temp.res('3 months cost 3 months', (public.billing_start(org, 'fleet', 3) ->> 'amount_php')::numeric = 4470, '') from t_ids;
+select pg_temp.res('3 months cost 3 months', (public.billing_start(org, 'fleet', 3) ->> 'amount_php')::numeric = 3 * (select price_php_monthly from public.plans where id = 'fleet'), '') from t_ids;
 select pg_temp.res('the property plan for a year: ₱99,900', (public.billing_start(org, 'property', 12) ->> 'amount_php')::numeric = 99900, '') from t_ids;
 select pg_temp.res('the payment row keeps 12 months for that price', exists (select 1 from public.payments where org_id = (select org from t_ids) and plan_id = 'firm' and months = 12 and amount_php = 19900), '');
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;

@@ -26,6 +26,23 @@ const plans = [
 ];
 // A database before the Small property file doesn't sell that plan.
 if (globalThis.PP_FEATURES === 'none' || (Array.isArray(globalThis.PP_FEATURES) && !globalThis.PP_FEATURES.includes('property_s'))) plans.splice(plans.findIndex((p) => p.id === 'property_s'), 1);
+// The size plans (database file 16): Core, Multi-Vehicle, Fleet Pro, Enterprise; Fleet repriced.
+const LIMITS_ON = globalThis.PP_FEATURES !== 'none' && (!Array.isArray(globalThis.PP_FEATURES) || globalThis.PP_FEATURES.includes('lgus'));
+if (LIMITS_ON) {
+  plans.push({ id: 'core', name: 'Core', available: true, paid_channels: true, price_php_monthly: 799, features: ['Up to 15 businesses and vehicles together'] },
+    { id: 'multi', name: 'Multi-Vehicle', available: true, paid_channels: true, price_php_monthly: 1499, features: ['16 to 30 vehicles'] },
+    { id: 'fleet_pro', name: 'Fleet Pro', available: true, paid_channels: true, price_php_monthly: 4999, features: ['76 to 150 vehicles'] },
+    { id: 'enterprise', name: 'Enterprise', available: false, paid_channels: true, price_php_monthly: null, features: ['151 or more vehicles'] });
+  Object.assign(plans.find((p) => p.id === 'fleet'), { price_php_monthly: 2999 });
+}
+export const PLAN_LIMITS = {
+  free: { name: 'Free', record_limit: 2, vehicle_limit: 1, business_limit: 1, seat_limit: 1, docs_per_record: 3 },
+  plus: { name: 'Plus', record_limit: 5, vehicle_limit: null, business_limit: null, seat_limit: 1, docs_per_record: 20 },
+  core: { name: 'Core', record_limit: 15, vehicle_limit: null, business_limit: null, seat_limit: 3, docs_per_record: 20 },
+  multi: { name: 'Multi-Vehicle', record_limit: null, vehicle_limit: 30, business_limit: 3, seat_limit: 3, docs_per_record: 20 },
+  fleet: { name: 'Fleet', record_limit: null, vehicle_limit: 75, business_limit: 3, seat_limit: 5, docs_per_record: 20 },
+  fleet_pro: { name: 'Fleet Pro', record_limit: null, vehicle_limit: 150, business_limit: 3, seat_limit: 10, docs_per_record: 20 },
+};
 const types = [
   { code: 'mayors_permit', name: "Mayor's / Business Permit", subject: 'business', expires: true, due_rule: 'jan20', per_location: true, help_text: 'Renew by Jan 20.' },
   { code: 'bir_cor', name: 'BIR Certificate of Registration (Form 2303)', subject: 'business', expires: false, due_rule: 'manual', per_location: true, help_text: 'Does not expire.' },
@@ -149,12 +166,54 @@ export async function loadOrgData() {
     members: db.members.map((m) => ({ ...m, profile: { ...m.profile } })),
     care: careData(),
     plus: plusData(),
+    tasks: __tasks.map((t) => ({ ...t })),
+    usage: LIMITS_ON && globalThis.PP_LIMITS ? planUsageMock() : null, // older tests keep sample data past the Free limits
   };
 }
+// Which limits apply now, and what's used (the same rules as private.limits_code / public.plan_usage).
+function limitsCode() {
+  if (['core', 'multi', 'fleet', 'fleet_pro', 'enterprise', 'property_s', 'property', 'firm', 'head_office'].includes(org.plan_id)) return org.plan_id;
+  if (org.kind !== 'business' && org.trial_ends_at && new Date(org.trial_ends_at) > new Date()) return { fleet: 'fleet_pro', property: 'property', firm: 'firm' }[org.kind] || 'core';
+  return active(addonMock('plus')) ? 'plus' : 'free';
+}
+function planUsageMock() {
+  const code = limitsCode();
+  const l = PLAN_LIMITS[code] || { name: code, record_limit: null, vehicle_limit: null, business_limit: null, seat_limit: null, docs_per_record: null };
+  return { code, ...l, businesses: db.businesses.filter((b) => !b.deleted_at).length, vehicles: db.vehicles.filter((v) => !v.deleted_at).length, seats: db.members.length };
+}
+export const planUsage = async () => planUsageMock();
+export const planLimits = async () => Object.entries(PLAN_LIMITS).map(([code, l]) => ({ code, ...l }));
+// Limits are only enforced in the tests that ask for it (PP_LIMITS), so the older tests keep their sample data.
+function checkRoom(what) {
+  if (!globalThis.PP_LIMITS || !LIMITS_ON) return;
+  const u = planUsageMock();
+  const lim = what === 'vehicle' ? u.vehicle_limit : u.business_limit;
+  const have = what === 'vehicle' ? u.vehicles : u.businesses;
+  const err = (m) => Object.assign(new Error(m), { code: 'P0001', hint: 'plan_limit' });
+  if (lim != null && have >= lim) throw err(`Your ${u.name} plan tracks up to ${lim} ${lim === 1 ? what : what === 'business' ? 'businesses' : 'vehicles'}. To add another, move up to a bigger plan in Settings > Plan.`);
+  if (u.record_limit != null && u.businesses + u.vehicles >= u.record_limit) throw err(`Your ${u.name} plan tracks up to ${u.record_limit} businesses and vehicles together, and you have ${u.businesses + u.vehicles}. To add another, move up to a bigger plan in Settings > Plan.`);
+}
+// Your own to-dos on the Home calendar, and the calendar link.
+export const __tasks = [];
+const canWriteTasks = () => { if (!['owner', 'admin', 'member'].includes(org.role)) throw Object.assign(new Error('Workspace not found.'), { code: '42501' }); };
+export async function taskSave(orgId, t) {
+  canWriteTasks();
+  if (!String(t.title || '').trim() || String(t.title).length > 160) throw new Error('What do you want to remember? (up to 160 characters)');
+  if (!t.due_on) throw new Error('Pick a date.');
+  if (t.id) { const x = __tasks.find((y) => y.id === t.id); if (!x) throw new Error('To-do not found.'); Object.assign(x, { title: t.title.trim(), note: t.note || null, due_on: t.due_on }); return x.id; }
+  const x = { id: uid(), org_id: orgId, title: t.title.trim(), note: t.note || null, due_on: t.due_on, done_at: null, created_at: new Date().toISOString() };
+  __tasks.push(x); return x.id;
+}
+export async function taskDone(id, done) { canWriteTasks(); const x = __tasks.find((y) => y.id === id); if (!x) throw new Error('To-do not found.'); x.done_at = done ? new Date().toISOString() : null; }
+export async function taskDelete(id) { canWriteTasks(); const i = __tasks.findIndex((y) => y.id === id); if (i < 0) throw new Error('To-do not found.'); __tasks.splice(i, 1); }
+let feedToken = null;
+export async function calendarFeedToken(orgId, fresh = false) { canWriteTasks(); if (!feedToken || fresh) feedToken = Math.random().toString(36).slice(2).padEnd(40, 'x'); return feedToken; }
+export const calendarFeedUrl = (token) => `https://example.supabase.co/functions/v1/calendar-feed?t=${token}`;
 export const setCurrentOrg = async () => {};
 export const unreadCount = async () => db.notifications.filter((n) => !n.read_at).length;
 export const onNewNotification = () => () => {};
 export async function createBusiness(orgId, f) {
+  checkRoom('business');
   const id = uid();
   db.businesses.push({ id, org_id: orgId, name: f.name, activity: f.activity, structure: f.structure, tin: null, deleted_at: null });
   const lid = uid();
@@ -173,6 +232,7 @@ export async function addLocation(bizId, f) {
 }
 export const updateLocation = async (id, patch) => Object.assign(db.locations.find((l) => l.id === id), patch);
 export async function createVehicle(orgId, f) {
+  checkRoom('vehicle');
   const id = uid();
   db.vehicles.push({ id, org_id: orgId, make_model: f.make_model, plate_no: (f.plate_no || '').toUpperCase(), vehicle_type: f.vehicle_type, cr_no: f.cr_no || '', mv_file_no: '', business_id: null, deleted_at: null });
   const reg = addReq('vehicle', id, null, types[3], f.registration_expires ? { reference_no: f.or_no, expires_on: f.registration_expires } : null);
@@ -756,7 +816,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 
@@ -820,8 +880,10 @@ Object.assign(T('fsic'), { category: 'safety', where_to_file: 'The Bureau of Fir
   checklist: [{ k: 'prev', t: "Last year's FSIC" }, { k: 'ready', t: 'Fire extinguishers refilled and tagged; exits clear and marked' }, { k: 'pay', t: 'Pay the fire code fee' }] });
 Object.assign(T('lto_registration'), { category: 'registration', where_to_file: 'Any LTO district office, or online in LTMS for plain renewals.', depends_on: ['ctpl', 'emission_test'],
   online_url: 'https://portal.lto.gov.ph/', online_label: 'LTO LTMS portal', validity_note: 'Renew every year in the week set by your plate number.',
-  checklist: [{ k: 'ctpl', t: 'CTPL insurance for the coming year', dep: 'ctpl' }, { k: 'emission', t: 'Passed emission test', dep: 'emission_test' },
-    { k: 'orcr', t: 'Current OR/CR' }, { k: 'pay', t: 'Pay the registration fee', u: 'https://portal.lto.gov.ph/' }] });
+  checklist: [{ k: 'ctpl', t: 'CTPL insurance for the coming year', dep: 'ctpl', send: 'digital', agency: 'issuer' }, { k: 'emission', t: 'Passed emission test', dep: 'emission_test', send: 'digital', agency: 'original_submit' },
+    { k: 'orcr', t: 'Current OR/CR', send: 'digital', agency: 'unverified' }, { k: 'pay', t: 'Pay the registration fee', u: 'https://portal.lto.gov.ph/' }],
+  ...(LIMITS_ON ? { source_url: 'https://www.ltoncr.com/renewal-of-motor-vehicle-mv-registration/', source_title: 'LTO NCR: Renewal of Motor Vehicle Registration', checked_on: '2026-10-24', verify: 'partial' } : {}) });
+if (LIMITS_ON) Object.assign(T('mayors_permit'), { verify: 'partial', source_title: 'Depends on your city: see its entry in the Metro Manila register' });
 Object.assign(T('ctpl'), { category: 'registration', checklist: [{ k: 'buy', t: 'Buy CTPL for the next registration year' }] });
 Object.assign(T('emission_test'), { category: 'registration' });
 Object.assign(T('mvir'), { category: 'registration' });
@@ -1470,7 +1532,7 @@ const PLUS_ON = globalThis.PP_FEATURES !== 'none';
 const plusDb = { addons: [], invoices: [], roles: [], submissions: [], stopping: {}, pages: [], recipients: [], views: [], findings: [], runs: [], links: [] };
 const active = (a) => !!a && a.paid_through >= today();
 const addonMock = (kind) => plusDb.addons.find((a) => a.kind === kind) || null;
-const plusIncludedMock = () => org.kind !== 'business' && ((org.trial_ends_at && new Date(org.trial_ends_at) > new Date()) || ['fleet', 'firm', 'head_office', 'property'].includes(org.plan_id));
+const plusIncludedMock = () => ['core', 'multi', 'fleet', 'fleet_pro', 'enterprise'].includes(org.plan_id) || (org.kind !== 'business' && ((org.trial_ends_at && new Date(org.trial_ends_at) > new Date()) || ['fleet', 'firm', 'head_office', 'property'].includes(org.plan_id)));
 const hasPlusMock = () => active(addonMock('plus')) || plusIncludedMock();
 const peopleAllowedMock = () => Math.max(FREE_PEOPLE, active(addonMock('staff')) ? addonMock('staff').people_max : 0);
 function peopleCapMock() { const a = addonMock('staff'); return active(a) && a.next_people_max ? Math.min(peopleAllowedMock(), a.next_people_max) : peopleAllowedMock(); }
@@ -1680,7 +1742,7 @@ const TEMPLATES = [
     fields: [{ key: 'owner_name', label: 'Your full name', source: 'me_name', required: true }, { key: 'business_name', label: 'Business name', source: 'business_name', required: true }, { key: 'lost_document', label: 'Document lost', source: 'permit_name', required: true }, { key: 'lost_no', label: 'Its number', source: 'permit_no' }],
     body: 'AFFIDAVIT OF LOSS\n\nI, {{owner_name}}, of legal age, Filipino, state that:\n\n1. {{business_name}} was issued a {{lost_document}}, No. {{lost_no}};\n\n2. The document is now lost.\n\n_____________________________\n{{owner_name}}\nAffiant' },
 ];
-const TEMPLATE_PRICE = { authorization_letter: 350, certified_copy_request: 350, landlord_letter: 350, accreditation_cover_letter: 350, affidavit_of_loss: 700, gross_sales_declaration: 700, special_power_of_attorney: 1050, secretary_certificate: 2100 };
+const TEMPLATE_PRICE = { authorization_letter: 150, certified_copy_request: 150, landlord_letter: 150, accreditation_cover_letter: 150, affidavit_of_loss: 250, gross_sales_declaration: 250, special_power_of_attorney: 350, secretary_certificate: 500 };
 export const templatePrices = async () => TEMPLATES.map((t) => ({ code: t.code, price_php: TEMPLATE_PRICE[t.code] ?? null }));
 export const listTemplates = async () => TEMPLATES.map((t) => ({ code: t.code, title: t.title, category: t.category, summary: t.summary, use_when: t.use_when, notarize: t.notarize, sort: t.sort, version: t.version,
   preview: t.body.replace(/\{\{[a-z0-9_]+\}\}/g, '______').split('\n').slice(0, 7).join('\n') }));
@@ -1778,9 +1840,9 @@ const loadDb = { wallet: { paid_php: 0, bonus_php: 0, texts: 0 }, entries: [], t
   products: [
     { code: 'texts_50', name: '50 text reminders', price_php: 49, texts: 50, active: true, sort: 10 },
     { code: 'texts_200', name: '200 text reminders', price_php: 179, texts: 200, active: true, sort: 20 },
-    { code: 'template', name: 'One template, yours to keep', price_php: 350, texts: 0, active: true, sort: 30 },
+    { code: 'template', name: 'One template, yours to keep', price_php: 150, texts: 0, active: true, sort: 30 },
     { code: 'papers_check', name: 'Papers check', price_php: 499, texts: 0, active: true, sort: 40 },
-    { code: 'season_pass', name: 'Renewal season pass', price_php: 149, texts: 0, active: true, sort: 50 }] };
+    { code: 'season_pass', name: 'Renewal season pass', price_php: 600, texts: 0, active: true, sort: 50 }] };
 export const __load = loadDb; // the smoke test reads and nudges this
 export function __verifyPhone(phone = '+639171234567') { Object.assign(me, { phone, phone_verified_at: new Date().toISOString() }); myPrefs.sms_enabled = true; }
 let lseq = 0;
@@ -1824,7 +1886,7 @@ export async function loadSummary() {
   return { paid: loadDb.wallet.paid_php, bonus: loadDb.wallet.bonus_php, total: loadDb.wallet.paid_php + loadDb.wallet.bonus_php, texts: loadDb.wallet.texts,
     text_source: textSource(), plan_texts: planTexts(), sms_ready: !!globalThis.PP_SMS, phones: me.phone_verified_at ? 1 : 0, my_phone: !!me.phone_verified_at,
     texts_month: loadDb.outbox.filter((m) => m.created_at.slice(0, 7) === today().slice(0, 7)).length,
-    pass: p ? { id: p.id, season: p.season, starts_on: p.starts_on, ends_on: p.ends_on, texts_cap: p.texts_cap, check_used: !!p.check_id, texts_used: passTextsUsed(p) } : null,
+    pass: p ? { id: p.id, season: p.season, starts_on: p.starts_on, ends_on: p.ends_on, texts_cap: p.texts_cap, check_used: !!p.check_id, template_used: !!p.template_code, texts_used: passTextsUsed(p) } : null,
     season_on_sale: season && !loadDb.passes.some((x) => x.season === season) && product('season_pass').active ? season : null,
     season_ends: season ? febEnd(season) : null, has_plus: hasPlusMock(), can_spend: ['owner', 'admin'].includes(org.role),
     invites: ['owner', 'admin'].includes(org.role) ? { joined: loadDb.invites.length, rewarded: loadDb.invites.filter((i) => i.status === 'rewarded').length,
@@ -1871,7 +1933,7 @@ export async function buySeasonPass() {
   if (!season) throw loadErr('The renewal season pass is on sale from September to January.');
   if (loadDb.passes.some((x) => x.season === season)) throw loadErr(`This workspace already has the ${season} season pass.`);
   const p = product('season_pass');
-  const pass = { id: uid(), org_id: org.id, season, starts_on: today(), ends_on: febEnd(season), texts_cap: 100, check_id: null, price_php: p.price_php, created_at: lnow() };
+  const pass = { id: uid(), org_id: org.id, season, starts_on: today(), ends_on: febEnd(season), texts_cap: 100, check_id: null, template_code: null, price_php: p.price_php, created_at: lnow() };
   loadSpend(p.price_php, 'season_pass', `Renewal season pass ${season}`, pass.id);
   loadDb.passes.unshift(pass);
   return pass.id;
@@ -1882,6 +1944,8 @@ export async function unlockTemplate(orgId, code) {
   if (hasPlusMock()) throw loadErr('Your workspace has Pinoy Permit Plus, so every template is already yours.');
   if (loadDb.unlocks.some((u) => u.code === code)) return;
   const t = TEMPLATES.find((x) => x.code === code);
+  const pass = loadDb.passes.find((p) => today() >= p.starts_on && today() <= p.ends_on && !p.template_code);
+  if (pass) { pass.template_code = code; loadDb.unlocks.push({ code, unlocked_at: lnow() }); return; }
   if (!product('template').active) throw loadErr("Templates can't be bought one by one right now.");
   loadSpend(TEMPLATE_PRICE[code] ?? product('template').price_php, 'template:' + code, 'Template: ' + t.title, null);
   loadDb.unlocks.push({ code, unlocked_at: lnow() });
@@ -2065,11 +2129,17 @@ export async function filingLetter(id, kind, ref) {
   else { if (!f.complaint_at) log(`Drafted a complaint to ARTA about ${f.office}.`, { entity: 'office_filing', action: 'clock_complaint', ...ids(r) }); f.complaint_at ||= new Date().toISOString(); if (ref) f.complaint_ref = ref; }
 }
 export const bills = async (reqId) => office.bills.filter((b) => b.requirement_id === reqId).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((b) => ({ ...b }));
+function billOnlineMock(r) {
+  if (r.type_code !== 'mayors_permit') return false;
+  const l = db.locations.find((x) => x.id === r.location_id) || db.locations.find((x) => x.business_id === r.business_id && x.is_main);
+  return __lgus.some((g) => g.online_payment === 'yes' && g.city_key === cityKeyOf(l?.city));
+}
 export async function billAdd(orgId, reqId, v, file) {
   if (!BILLS_ON) throw offErr('City bills are not switched on yet.');
   const r = reqFor(reqId);
   if (v.mode === 'permitpal' && !isAdminRole()) throw offErr('Only the workspace owner or an admin can have Pinoy Permit pay a bill.', '42501');
   if (v.mode === 'permitpal' && settings.billpay_open !== 'on') throw offErr("Pinoy Permit isn't paying bills for customers right now. Keep the bill here and pay it yourself.");
+  if (v.mode === 'permitpal' && !billOnlineMock(r)) throw offErr('We can only pay this bill where the office takes payment online. In-person payments are coming soon; for now, pay this one at the office.');
   if (String(v.office || '').trim().length < 2) throw offErr('Which office sent the bill?');
   if (!(v.amount > 0)) throw offErr('Enter the amount on the bill.');
   if (v.mode === 'permitpal' && v.amount > Number(settings.billpay_max)) throw offErr(`Pinoy Permit pays bills up to ${pesoB(settings.billpay_max)}. For this one, pay the office directly and keep the receipt here.`);
@@ -2235,6 +2305,37 @@ export async function packetSave(reqId, year, answers, ready) {
   else { p.answers = a; if (ready && !p.ready_at) p.ready_at = new Date().toISOString(); }
   if (ready && !was) log(`Renewal packet for ${year} is ready`, { entity: 'renewal_packet', action: 'update', ...ids(r) });
   return p.id;
+}
+// The Metro Manila city register (the same 17 rows the database starts with, shortened).
+const LGU = (city_key, name, status, online_filing, online_payment, extra = {}) => ({ city_key, name, kind: city_key === 'pateros' ? 'municipality' : 'city', region: 'NCR', status, online_filing, online_payment,
+  source_title: extra.source_title ?? `${name} official source`, source_url: extra.source_url ?? (city_key === 'pateros' ? null : `https://www.${city_key.replace(' ', '')}.gov.ph/`), portal_url: extra.portal_url ?? null,
+  payment_note: extra.payment_note ?? null, release_note: null, representative: extra.representative ?? null, originals: extra.originals ?? null, deadline_note: extra.deadline_note ?? null,
+  notes: extra.notes ?? null, checked_on: '2026-10-24', updated_at: '2026-10-24T00:00:00Z' });
+export const __lgus = [
+  LGU('quezon', 'Quezon City', 'verified', 'yes', 'yes', { payment_note: 'Business tax assessment and payment through QC E-Services (GCash, Maya or online banking).', representative: 'QC authorization form signed by the owner, with scanned IDs of the owner and the representative.', deadline_note: 'Renew one year from the issue date of the current permit (not January 20).' }),
+  LGU('manila', 'City of Manila', 'partial', 'unknown', 'likely', { payment_note: 'News reports describe paying business tax in the Go Manila app; not yet confirmed on an official page.' }),
+  LGU('makati', 'Makati City', 'needs_confirmation', 'likely', 'likely', { payment_note: 'News reports describe online assessment and payment (MAKA-Connect); not yet confirmed on an official page.' }),
+  LGU('pasig', 'Pasig City', 'verified', 'unknown', 'unknown', { representative: 'An authorization letter and a government-issued ID with photo and signature.' }),
+  LGU('taguig', 'Taguig City', 'verified', 'likely', 'likely', { representative: 'Sole proprietor: SPA or letter of authority. Corporation: Secretary\'s Certificate or board resolution.', originals: 'Only originals or officially certified true copies are accepted for the relevant documents.' }),
+  LGU('mandaluyong', 'Mandaluyong City', 'verified', 'unknown', 'unknown'), LGU('marikina', 'Marikina City', 'needs_confirmation', 'unknown', 'unknown'),
+  LGU('pasay', 'Pasay City', 'verified', 'yes', 'yes', { payment_note: 'Apply online through eODB Business; the statement of account is sent online for payment.' }),
+  LGU('paranaque', 'Parañaque City', 'needs_confirmation', 'unknown', 'unknown'), LGU('las pinas', 'Las Piñas City', 'partial', 'unknown', 'unknown'),
+  LGU('caloocan', 'Caloocan City', 'partial', 'yes', 'unknown'), LGU('malabon', 'Malabon City', 'verified', 'yes', 'yes', { payment_note: 'Pay through LandBank online or at the cashier.' }),
+  LGU('navotas', 'Navotas City', 'partial', 'unknown', 'unknown'), LGU('valenzuela', 'Valenzuela City', 'needs_confirmation', 'unknown', 'unknown'),
+  LGU('san juan', 'San Juan City', 'needs_confirmation', 'unknown', 'unknown'), LGU('muntinlupa', 'Muntinlupa City', 'verified', 'unknown', 'unknown'),
+  LGU('pateros', 'Pateros', 'needs_confirmation', 'unknown', 'unknown', { source_title: null, notes: 'We have not confirmed the official municipal website yet, so no link is shown.' }),
+];
+const lguLog = [];
+export const lgus = async () => __lgus.map((x) => ({ ...x })).sort((a, b) => a.name.localeCompare(b.name));
+export const lguChanges = async (key) => lguLog.filter((c) => c.city_key === key).map((c) => ({ ...c }));
+export async function lguUpdate(key, patch, reason) {
+  staffOnly();
+  const g = __lgus.find((x) => x.city_key === key);
+  if (!g) throw new Error('City not found.');
+  const old = { ...g };
+  for (const k of Object.keys(patch)) if (k in g && !['city_key', 'updated_at'].includes(k)) g[k] = typeof patch[k] === 'string' ? (patch[k].trim() || null) : patch[k];
+  g.updated_at = new Date().toISOString();
+  lguLog.unshift({ id: lguLog.length + 1, city_key: key, old_row: old, new_row: { ...g }, reason: reason || null, changed_at: g.updated_at });
 }
 export async function cityDates() { return { rules: city.rules.map((x) => ({ ...x })), deadlines: city.deadlines.filter((d) => !d.withdrawn_at).map((d) => ({ ...d })) }; }
 // Business permits in a city, with their current record.

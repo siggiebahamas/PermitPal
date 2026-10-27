@@ -32,9 +32,9 @@ select pg_temp.res('staff prices: 3 free, then ₱100 to the 20th, ₱60 to the 
   private.staff_monthly(21)::text || ' ' || private.staff_monthly(101)::text);
 select pg_temp.res('one more person never costs less than before (no cliff)',
   not exists (select 1 from generate_series(3, 400) n where private.staff_monthly(n + 1) < private.staff_monthly(n)), '');
-select pg_temp.res('yearly is 10 months; Plus is ₱199 or ₱1,990',
-  private.addon_price('staff', 25, 'yearly') = 10 * private.addon_price('staff', 25, 'monthly') and private.addon_price('plus', null, 'monthly') = 199
-  and private.addon_price('plus', null, 'yearly') = 1990, '');
+select pg_temp.res('yearly is 10 months; Plus is ₱149 or ₱1,490',
+  private.addon_price('staff', 25, 'yearly') = 10 * private.addon_price('staff', 25, 'monthly') and private.addon_price('plus', null, 'monthly') = 149
+  and private.addon_price('plus', null, 'yearly') = 1490, '');
 
 -- ---------------------------------------------------------------- set-up
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000a1');
@@ -566,7 +566,7 @@ do $$ begin perform public.start_plus_trial((select org from t_ids));
   perform pg_temp.res('one free trial per workspace', false, 'was allowed');
 exception when others then perform pg_temp.res('one free trial per workspace', sqlerrm = 'This workspace has already had its free trial.', sqlerrm); end $$;
 update t_ids set inv4 = (public.addon_checkout(org, 'plus', null, 'yearly') ->> 'id')::uuid;
-select pg_temp.res('Plus yearly after the trial: ₱1,990 from today', amount_php = 1990 and months = 12 and period_start = private.today_ph(), amount_php::text)
+select pg_temp.res('Plus yearly after the trial: ₱1,490 from today', amount_php = 1490 and months = 12 and period_start = private.today_ph(), amount_php::text)
   from public.addon_invoices where id = (select inv4 from t_ids);
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;
 
@@ -600,7 +600,7 @@ set local role authenticated;
 create temp table t_money as select * from public.admin_money(private.today_ph() - 5, private.today_ph());
 select pg_temp.res('Money counts staff licenses as income, and open bills as to collect',
   (select sum(amount) from t_money where kind = 'staff_licences' and state = 'collected') = 700 + 1300 + 900
-  and exists (select 1 from t_money where kind = 'plus' and state = 'to_collect' and amount = 1990), '');
+  and exists (select 1 from t_money where kind = 'plus' and state = 'to_collect' and amount = 1490), '');
 select pg_temp.res('the summary shows what to confirm and the monthly income', (s ->> 'addon_payments_to_check')::int = 1 and (s ->> 'mrr_addons')::numeric = 900
   and (s ->> 'staff_paying')::int = 1, s ->> 'mrr_addons') from (select public.admin_money_summary() as s) x;
 select public.admin_set_invoice_no('addon', inv2, 'INV-777') from t_ids;

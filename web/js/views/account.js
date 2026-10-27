@@ -5,6 +5,7 @@ import {
 } from '../util.js';
 import {
   S, on, reload, rerender, canEdit, isOrgAdmin, isOwner, memberName, empty, effectivePlan, ROLES, business, vehicle, person, has,
+  hasPlus, plusIncluded, SIZE_PLANS,
 } from '../core.js';
 import { handledCount } from './assign.js';
 import { avatar, ICON } from '../components.js';
@@ -13,7 +14,7 @@ import { mfaSection, requireCard } from './mfa.js';
 import { addonSection, wireAddons, showBrandCard } from './plus.js';
 import { loadSettingsCard, loadState, loadStateNow } from './load.js';
 import { brandPage, brandTabShown } from './brand.js';
-import { billToggle, freeCard, planCard, plansShown, PLANS, compareTable } from './pricing.js';
+import { billToggle, freeCard, planCard, plansShown, PLANS, compareTable, TIERS, TIER_SMALL, TIER_FLEET, tierCard, tierPrice, tiersShown, softwareBanner, peaceBand, helpServices } from './pricing.js';
 import { planTotal } from '../prices.js';
 import * as db from 'pp/data';
 
@@ -412,35 +413,58 @@ on('org-undelete', async () => { try { await db.cancelOrgDeletion(S.org.id); awa
 function billingSection(pay) {
   const org = S.org;
   const acc = teamAccess();
-  const k = KINDS[org.kind || 'business'];
-  // A property workspace is on Small property (up to 20 tenants) or Mall & property.
-  const planId = org.kind === 'property' && org.plan_id === 'property_s' ? 'property_s' : k?.plan;
-  const plan = S.plans.find((p) => p.id === planId);
+  const kind = org.kind || 'business';
+  const eff = effectivePlan()?.id;
   const price = (id) => Number(S.plans.find((p) => p.id === id)?.price_php_monthly || 0);
-  const choices = org.kind === 'property' ? ['property_s', 'property'] : [k?.plan];
-  const status = org.kind === 'business' ? html`<p>This workspace is a <b>single business</b>: Pinoy Permit is <b>free</b>, with no limits on businesses, vehicles or team members.</p>`
-    : acc.why === 'plan' ? html`<p>You're on the <b>${plan?.name}</b> plan${org.plan_expires_at ? html`, paid until <b>${fmtDate(org.plan_expires_at.slice(0, 10))}</b>` : ''}.</p>`
-    : acc.why === 'trial' ? html`<p>You're on a <b>free trial</b> of ${org.kind === 'property' ? 'the property plans' : plan?.name}: ${plural(acc.days, 'day')} left. Choose how to pay below to keep your board after the trial.</p>`
+  const sells = (id) => S.plans.some((p) => p.id === id && p.available !== false);
+  // What this kind of workspace can pay for here.
+  const choices = kind === 'property' ? ['property_s', 'property'] : kind === 'fleet' ? ['multi', 'fleet', 'fleet_pro'].filter(sells)
+    : kind === 'firm' ? ['firm'] : ['core'].filter(sells);
+  const paid = acc.why === 'plan' || (kind === 'business' && SIZE_PLANS.includes(eff));
+  const current = paid ? S.plans.find((p) => p.id === eff) : null;
+  const u = S.data?.usage;
+  const status = paid ? html`<p>You're on the <b>${current?.name}</b> plan${org.plan_expires_at ? html`, paid until <b>${fmtDate(org.plan_expires_at.slice(0, 10))}</b>` : ''}.</p>`
+    : acc.why === 'trial' ? html`<p>You're on a <b>free trial</b>: ${plural(acc.days, 'day')} left. Choose how to pay below to keep it after the trial.</p>`
     : acc.why === 'staff' ? html`<p>Staff access: team tools are on.</p>`
+    : kind === 'business' ? html`<p>This workspace is on <b>${u?.name || (hasPlus() ? 'Plus' : 'Free')}</b>.</p>`
     : html`<p>Your free trial has ended. Your data is safe; pay below to open your board again.</p>`;
+  const usage = u ? html`<div class="plan-usage">
+      ${u.record_limit != null ? meter('Businesses and vehicles', Number(u.businesses) + Number(u.vehicles), u.record_limit) : ''}
+      ${u.vehicle_limit != null ? meter('Vehicles', u.vehicles, u.vehicle_limit) : ''}
+      ${u.business_limit != null ? meter('Businesses', u.businesses, u.business_limit) : ''}
+      ${u.seat_limit != null ? meter('People who can sign in', u.seats, u.seat_limit) : ''}
+      ${u.docs_per_record != null ? html`<p class="small muted">Up to ${u.docs_per_record} files for each business or vehicle.</p>` : ''}
+      <p class="small muted">Reaching a limit never deletes or hides anything: you just can't add more until you move up.</p></div>` : '';
+  const pickable = kind === 'business' && !paid ? choices : acc.why !== 'plan' && acc.why !== 'staff' && kind !== 'business' ? choices : [];
   const cta = (id) => {
-    if (acc.why === 'plan' && id === planId) return html`<span class="chip ok">Your plan</span>`;
-    if (PLANS[id].kind === org.kind) return html`<span class="chip progress">${acc.why === 'trial' ? 'In your free trial' : 'Pay for it above'}</span>`;
-    if (!isOrgAdmin()) return '';
-    return html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${PLANS[id].kind}">Try free for 30 days</button>`;
+    if (paid && id === eff) return html`<span class="chip ok">Your plan</span>`;
+    if (TIERS[id]?.quote) return isOrgAdmin() ? html`<a class="btn btn-soft btn-block" href="#/contact">Ask for a quote</a>` : '';
+    if (id === 'plus') return hasPlus() ? html`<span class="chip ok">${plusIncluded() ? 'Included' : 'On'}</span>` : isOrgAdmin() ? html`<a class="btn btn-soft btn-block" href="#addons">Turn on Plus below</a>` : '';
+    if (TIERS[id]?.kind === 'fleet' && kind !== 'fleet') return isOrgAdmin() ? html`<button class="btn btn-soft btn-block" data-act="nb-set-kind" data-kind="fleet">Try free for 30 days</button>` : '';
+    if (TIERS[id]?.kind === 'fleet' || id === 'core') return isOrgAdmin() ? html`<a class="btn btn-primary btn-block" href="#pay-${id}">Pay for ${TIERS[id].name}</a>` : '';
+    return '';
   };
-  return html`<section class="card"><h2>Your plan</h2>${status}
-      ${org.kind !== 'business' && plan && acc.why !== 'plan' && acc.why !== 'staff'
-        ? choices.map((id) => S.plans.find((p) => p.id === id)).filter(Boolean).map((p) => html`${choices.length > 1 ? html`<h3 class="h4 pay-for">${p.name}: ${PLANS[p.id]?.who.split(': ')[1] || ''}</h3>` : ''}${payBox(p, pay)}`) : ''}</section>
+  return html`<section class="card"><h2>Your plan</h2>${status}${usage}
+      ${pickable.map((id) => S.plans.find((p) => p.id === id)).filter(Boolean).map((p) => html`<h3 class="h4 pay-for" id="pay-${p.id}">${p.name}${TIERS[p.id] ? html`: ${TIERS[p.id].range}` : PLANS[p.id] ? `: ${PLANS[p.id]?.who.split(': ')[1] || ''}` : ''}</h3>${payBox(p, pay)}`)}</section>
     <h3 class="section-label">Plans</h3>
-    <p class="pp-lead">Free for your own business, forever. Team plans are for people who look after many businesses, vehicles or tenants.</p>
-    ${billToggle('How often to pay for a team plan')}
-    <div class="pp-grid four">${freeCard(org.kind === 'business' ? html`<span class="chip ok">Your plan</span>` : '')}
-      ${plansShown(S.plans).map((id) => planCard(id, price(id), cta(id), { current: acc.why === 'plan' ? id === planId : PLANS[id].kind === org.kind, trialLine: PLANS[id].kind !== org.kind }))}</div>
-    ${compareTable(plansShown(S.plans))}
-    <p class="fineprint">Single businesses stay free. Nothing is charged by itself, and you can stop anytime: your data is never locked or deleted, and you can always export it.</p>
+    ${softwareBanner()}
+    ${billToggle('How often to pay')}
+    <h4 class="pp-group-h">For you and your small business</h4>
+    <div class="pp-grid three">${freeCard(!paid && !hasPlus() && kind === 'business' ? html`<span class="chip ok">Your plan</span>` : '')}
+      ${tiersShown(S.plans, TIER_SMALL).map((id) => tierCard(id, tierPrice(S.plans, id), cta(id), { current: paid ? id === eff : id === 'plus' && hasPlus() && !plusIncluded() }))}</div>
+    <h4 class="pp-group-h">For big households and fleets</h4>
+    <div class="pp-grid four">${tiersShown(S.plans, TIER_FLEET).map((id) => tierCard(id, tierPrice(S.plans, id), cta(id), { current: paid && id === eff }))}</div>
+    ${peaceBand(S.plans)}
+    ${kind === 'property' ? html`<h4 class="pp-group-h">For landlords and malls</h4><div class="pp-grid">${plansShown(S.plans).map((id) => planCard(id, price(id),
+      acc.why === 'plan' && id === org.plan_id ? html`<span class="chip ok">Your plan</span>` : html`<span class="chip progress">${acc.why === 'trial' ? 'In your free trial' : 'Pay for it above'}</span>`,
+      { current: true, trialLine: false }))}</div>` : ''}
+    ${compareTable()}
+    ${helpServices({ assistCta: html`<a class="btn btn-soft btn-block" href="#/compliance">Open a permit, then "Check my papers"</a>`, complexCta: html`<a class="btn btn-soft btn-block" href="#/contact">Tell us your case</a>` })}
+    <p class="fineprint">Nothing is charged by itself, and you can stop anytime: your data is never locked or deleted, and you can always export it.</p>
     ${addonSection(pay)}`;
 }
+const meter = (label, n, max) => html`<div class="plan-meter ${Number(n) >= Number(max) ? 'full' : Number(n) >= Number(max) - 1 ? 'near' : ''}">
+  <span><b>${n} of ${max}</b> ${label.toLowerCase()} used</span><i style="--w:${Math.min(100, Math.round((100 * Number(n)) / Math.max(1, Number(max))))}%"></i></div>`;
 // Paying for the team plan: a month, or a year with 2 months free.
 function payBox(p, pay) {
   const m = Number(p.price_php_monthly);

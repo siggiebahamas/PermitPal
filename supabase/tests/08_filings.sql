@@ -1,6 +1,7 @@
 -- Government filing deadlines: which filings apply, their due dates, marking them filed, who may do
 -- what, and the reminders. Rolled back at the end; every row should say ok = true.
 begin;
+set local pp.skip_limits = 'on'; -- plan limits (database file 16) have their own test (25)
 create temp table t_res (n serial primary key, step text, ok boolean, info text);
 grant all on t_res to authenticated, anon; grant all on sequence t_res_n_seq to authenticated, anon;
 create function pg_temp.res(s text, ok boolean, info text default '') returns void language sql as

@@ -142,7 +142,7 @@ async function start() {
 }
 
 async function loadData() {
-  [S.data] = await Promise.all([db.loadOrgData(S.org.id, { revenue: has('revenue'), plus: has('plus') }), loadCityDates()]);
+  [S.data] = await Promise.all([db.loadOrgData(S.org.id, { revenue: has('revenue'), plus: has('plus'), tasks: has('lgus') }), loadCityDates()]);
   // A client of an accounting firm with White-label sees the firm's logo and color (Powered by Pinoy Permit).
   const prev = JSON.stringify(S.brand);
   S.brand = has('brand') && S.org.kind === 'business' ? await db.clientBrand(S.org.id).catch(() => null) : null;

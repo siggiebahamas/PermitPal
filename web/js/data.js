@@ -65,10 +65,10 @@ export async function avatarUrl(path) {
 // ---------------------------------------------------------------- workspace data
 let typesCache = null;
 let servicesCache = null;
-export async function loadOrgData(orgId, { revenue = false, plus = false } = {}) {
+export async function loadOrgData(orgId, { revenue = false, plus = false, tasks = false } = {}) {
   if (!typesCache) typesCache = ok(await sb.from('requirement_types').select('*').order('sort'));
   if (!servicesCache) servicesCache = ok(await sb.from('services').select('*').eq('active', true).order('sort'));
-  const [businesses, locations, vehicles, people, reqs, requests, members, care, plusData] = await Promise.all([
+  const [businesses, locations, vehicles, people, reqs, requests, members, care, plusData, taskList, usage] = await Promise.all([
     sb.from('businesses').select('*').eq('org_id', orgId).is('deleted_at', null).order('name').then(ok),
     sb.from('business_locations').select('*').eq('org_id', orgId).is('deleted_at', null).order('is_main', { ascending: false }).order('name').then(ok),
     sb.from('vehicles').select('*').eq('org_id', orgId).is('deleted_at', null).order('make_model').then(ok),
@@ -78,9 +78,18 @@ export async function loadOrgData(orgId, { revenue = false, plus = false } = {})
     loadMembers(orgId),
     revenue ? loadCare(orgId) : { plans: [], invoices: [], coverage: [], claims: [], tiers: [], staff: [] },
     plus ? loadPlus(orgId) : { addons: [], invoices: [], roles: [], submissions: [], stopping: {} },
+    tasks ? sb.from('org_tasks').select('*').eq('org_id', orgId).order('due_on').limit(1000).then(ok) : [],
+    tasks ? sb.rpc('plan_usage', { p_org: orgId }).then(ok).catch(() => null) : null,
   ]);
-  return { types: typesCache, services: servicesCache, businesses, locations, vehicles, people, reqs, requests, members, care, plus: plusData };
+  return { types: typesCache, services: servicesCache, businesses, locations, vehicles, people, reqs, requests, members, care, plus: plusData, tasks: taskList, usage };
 }
+
+// Your own to-dos on the Home calendar, and the private calendar link for Google Calendar.
+export const taskSave = async (orgId, t) => ok(await sb.rpc('task_save', { p_org: orgId, p_id: t.id || null, p_title: t.title, p_due: t.due_on, p_note: t.note || null }));
+export const taskDone = async (id, done) => ok(await sb.rpc('task_done', { p_id: id, p_done: !!done }));
+export const taskDelete = async (id) => ok(await sb.rpc('task_delete', { p_id: id }));
+export const calendarFeedToken = async (orgId, fresh = false) => ok(await sb.rpc('calendar_feed_token', { p_org: orgId, p_new: !!fresh }));
+export const calendarFeedUrl = (token) => `${SUPABASE_URL}/functions/v1/calendar-feed?t=${encodeURIComponent(token)}`;
 
 // The team, with each teammate's profile (org_members points at auth.users, so profiles come separately).
 export async function loadMembers(orgId) {
@@ -791,6 +800,12 @@ export async function cityDates() {
   ]);
   return { rules, deadlines };
 }
+// The Metro Manila city register (official sources, online filing and payment, who may file) and staff edits to it.
+export const planLimits = async () => ok(await sb.from('plan_limits').select('*'));
+export const adminPlanLimit = async (code, patch) => ok(await sb.rpc('admin_plan_limit', { p_code: code, p_patch: patch }));
+export const lgus = async () => ok(await sb.from('lgus').select('*').order('name'));
+export const lguChanges = async (key) => ok(await sb.from('lgu_changes').select('*').eq('city_key', key).order('changed_at', { ascending: false }).limit(50));
+export const lguUpdate = async (key, patch, reason) => ok(await sb.rpc('lgu_update', { p_key: key, p_patch: patch, p_reason: reason || null }));
 export const useCityDeadline = async (id, reqIds) => ok(await sb.rpc('use_city_deadline', { p_deadline: id, p_requirements: reqIds }));
 export const adminCityCounts = async () => ok(await sb.rpc('admin_city_counts'));
 export const adminCityDeadlines = async () => ok(await sb.rpc('admin_city_deadlines'));

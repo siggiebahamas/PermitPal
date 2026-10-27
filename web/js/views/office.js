@@ -5,7 +5,8 @@
 // City bills: snap the office's bill; get reminded before it's due and keep the receipt with the permit, or let
 // Pinoy Permit pay it. The database checks every rule and works out the real deadline; this page shows it.
 import { html, openModal, confirmDialog, toast, toastError, when, fmtDate, peso, plural, todayPH, download, esc } from '../util.js';
-import { S, on, has, isOrgAdmin, canEdit, reqById, typeOf, business, location_, locationsOf } from '../core.js';
+import { S, on, has, isOrgAdmin, canEdit, reqById, typeOf, business, vehicle, location_, locationsOf } from '../core.js';
+import { cityKey } from '../citydates.js';
 import { ICON } from '../components.js';
 import { payDetails } from './services.js';
 import { printSheet } from '../print.js';
@@ -16,12 +17,21 @@ import * as db from 'pp/data';
 // ---------------------------------------------------------------- what the page needs
 let HOL = null;      // national holidays, as a Set of dates (a year back and ahead)
 let SET = null;      // payment details and the bill-paying settings
+let LGUS = null;     // the Metro Manila city register: which offices take payment online
+export const lgusLoaded = () => LGUS;
+export const lguFor = (city) => { const k = cityKey(city || ''); return k ? (LGUS || []).find((g) => g.city_key === k) || null : null; };
+export async function loadLgus(fresh = false) {
+  if (!has('lgus')) return [];
+  if (!LGUS || fresh) LGUS = await db.lgus().catch(() => null);
+  return LGUS || [];
+}
 export async function officeData(reqId) {
   const [filings, bills] = await Promise.all([
     has('clock') ? db.filings(reqId).catch(() => []) : [],
     has('billpay') ? db.bills(reqId).catch(() => []) : [],
     has('clock') && !HOL ? loadHolidays() : null,
     has('billpay') && !SET ? db.appSettings().then((s) => { SET = s; }).catch(() => {}) : null,
+    has('lgus') ? loadLgus(true) : null,
   ]);
   return { filings, bills };
 }
@@ -322,21 +332,72 @@ export function billsCard(r, bills = []) {
   }
   return html`<section class="card bills-card" id="bills"><div class="card-head"><div><h2>Bills and receipts</h2><p class="card-sub">From the office, for this permit</p></div>
     ${when(edit, html`<button class="btn btn-soft btn-sm" data-act="bill-add" data-id="${r.id}">${ICON.camera} Add a bill</button>`)}</div>
-    ${shown.map((b) => billRow(r, b, edit))}</section>`;
+    ${shown.map((b) => billRow(r, b, edit))}
+    ${billOpen() && isOrgAdmin() && !shown.some((b) => b.mode === 'permitpal' && ['due', 'pending_verification', 'processing'].includes(b.status)) ? billOffer(r) : ''}</section>`;
 }
-// "We pay it for you": what a trip to the office really costs, next to one flat fee.
+// Can Pinoy Permit pay this one? Only where the office takes payment online (confirmed on an official page):
+// a Mayor's Permit in such a city. Everything else needs someone at a counter, which is coming later.
+const subjectName = (r) => (r.business_id ? business(r.business_id)?.name : r.vehicle_id ? [vehicle(r.vehicle_id)?.plate_no, vehicle(r.vehicle_id)?.make_model].filter(Boolean).join(' · ') : '') || '';
+export function billOnline(r) {
+  if (!has('lgus')) return { ok: true };
+  const city = placeOf(r).city;
+  const key = cityKey(city);
+  const lgu = (LGUS || []).find((g) => g.city_key === key) || null;
+  if (r.type_code !== 'mayors_permit') return { ok: false, lgu, why: r.subject === 'vehicle' ? 'LTO and insurance payments' : `${typeOf(r.type_code)?.agency || 'This office'} payments` };
+  if (lgu?.online_payment === 'yes') return { ok: true, lgu };
+  return { ok: false, lgu, why: lgu ? `${lgu.name} business tax` : city ? `${city} business tax` : 'This city' };
+}
+const billable = () => (S.data?.reqs || []).filter((r) => r.subject !== 'person');
+// "We pay it for you": pick the bill, see straight away if we can pay it online. The price, what a trip to the office
+// really costs, and one flat fee; or, when it needs a counter, a heads-up that in-person runs are coming.
 function billOffer(r, compact = false) {
-  return html`<div class="bill-offer ${compact ? 'compact' : ''}">
-    <div class="bill-offer-top"><span class="bill-offer-tag">Skip the line</span><b>Let Pinoy Permit pay it: ${peso(billFee())} flat</b></div>
+  const list = has('lgus') && !compact ? billable() : [];
+  const yes = list.filter((x) => billOnline(x).ok);
+  const no = list.filter((x) => !billOnline(x).ok);
+  const opt = (x) => html`<option value="${x.id}" ${x.id === r.id ? 'selected' : ''}>${x.name}${subjectName(x) ? ` · ${subjectName(x)}` : ''}</option>`;
+  return html`<div class="bill-offer ${compact ? 'compact' : ''}" data-bill-offer>
+    ${list.length > 1 ? html`<label class="field bill-pick"><span>Which bill should we pay?</span><select data-bill-pick>
+      ${yes.length ? html`<optgroup label="We can pay these online">${yes.map(opt)}</optgroup>` : ''}
+      ${no.length ? html`<optgroup label="Coming soon: these need a trip to the counter">${no.map(opt)}</optgroup>` : ''}</select></label>` : ''}
+    <div data-bill-body>${billBody(r, compact)}</div>
+  </div>`;
+}
+function billBody(r, compact = false) {
+  const can = billOnline(r);
+  if (!can.ok) {
+    return html`<div class="bill-offer-top"><span class="bill-offer-tag bill-soon-tag">Coming soon</span><b>In-person bill runs are on the way</b></div>
+      <p class="bill-soon">${can.why} still need someone at the counter. We're building a team of trusted runners so we can take this off your hands too.
+        Until then, add the bill below: we'll remind you before it's due and keep the receipt with your permit.</p>
+      ${can.lgu?.payment_note ? html`<p class="muted small"><b>How ${can.lgu.name} takes payment:</b> ${can.lgu.payment_note}</p>` : ''}
+      <button class="btn btn-soft ${compact ? 'btn-sm' : ''}" data-act="bill-add" data-id="${r.id}">${ICON.camera} Add a bill I'll pay myself</button>`;
+  }
+  return html`<div class="bill-offer-top"><span class="bill-offer-tag">Skip the line</span><b>Let Pinoy Permit pay it: ${peso(billFee())} flat</b></div>
     ${compact ? '' : html`<ul class="bill-offer-list">
       <li>${ICON.check}<span><b>No queue, no half-day off.</b> Paying at the treasurer's window often takes a morning, plus transport and parking.</span></li>
-      <li>${ICON.check}<span><b>Snap, send once, done.</b> We pay the office through its own payment channel.</span></li>
+      <li>${ICON.check}<span><b>Snap, send once, done.</b> We pay the office online, through its own payment channel, with the bill's reference number. We never ask for your login.</span></li>
       <li>${ICON.check}<span><b>Receipt filed for you.</b> The official receipt lands on this permit, ready for next year.</span></li>
     </ul>
     <p class="bill-offer-math">A morning away from your business usually costs more than ${peso(billFee())}. This is the one bill you won't have to think about.</p>`}
     <button class="btn btn-primary ${compact ? 'btn-sm' : ''}" data-act="bill-add" data-id="${r.id}" data-mode="permitpal">${compact ? `Have Pinoy Permit pay it: ${peso(billFee())}` : `Have Pinoy Permit pay my bill · ${peso(billFee())}`}</button>
-    ${compact ? '' : html`<p class="muted small">Send it at least 3 business days before it's due. Bills up to ${peso(billMax())}.</p>`}
-  </div>`;
+    ${compact ? '' : html`<p class="muted small">Send it at least 3 business days before it's due. Bills up to ${peso(billMax())}.</p>`}`;
+}
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest?.('[data-bill-pick]');
+  if (!sel) return;
+  const r = reqById(sel.value);
+  const body = sel.closest('[data-bill-offer]')?.querySelector('[data-bill-body]');
+  if (r && body) body.innerHTML = String(billBody(r));
+});
+// For the Done for you page: the same offer, starting on a bill we can pay online if there is one.
+export async function billPayCard() {
+  if (!has('billpay') || !billOpen() || !isOrgAdmin()) return '';
+  if (!SET) SET = await db.appSettings().catch(() => null);
+  await loadLgus();
+  const list = billable();
+  if (!list.length) return '';
+  const first = list.find((x) => billOnline(x).ok && x.type_code === 'mayors_permit') || list.find((x) => billOnline(x).ok) || list[0];
+  return html`<section class="card bills-card dfy-bills" id="bills"><div class="card-head"><div><h2>Got a bill from the city?</h2><p class="card-sub">We pay it online for you, and file the official receipt</p></div></div>
+    ${billOffer(first)}</section>`;
 }
 function billRow(r, b, edit) {
   const [label, cls] = BILL_STATUS[b.status] || ['', 'needinfo'];
@@ -353,7 +414,7 @@ function billRow(r, b, edit) {
     <div class="bill-main"><div class="bill-top"><b>${b.office}</b> <span class="bill-amt">${peso(b.amount_php)}</span></div>
       <small class="muted">${b.number}${b.bill_ref ? ` · bill no. ${b.bill_ref}` : ''}${b.pay_by ? ` · pay by ${fmtDate(b.pay_by)}` : ''}${pp ? ' · Pinoy Permit pays it' : ''}</small>
       <p class="small bill-line">${line}</p>
-      ${when(!pp && b.status === 'due' && edit && admin && billOpen(), html`<div class="bill-nudge"><span>Rather not queue for this one?</span>
+      ${when(!pp && b.status === 'due' && edit && admin && billOpen() && billOnline(r).ok, html`<div class="bill-nudge"><span>Rather not queue for this one?</span>
         <button class="btn btn-soft btn-sm" data-act="bill-switch" data-id="${b.id}" data-req="${r.id}">Have Pinoy Permit pay it: ${peso(billFee())}</button></div>`)}</div>
     <div class="bill-side"><span class="chip ${late ? 'overdue' : cls}">${late ? 'Past its pay-by date' : label}</span>
       ${when(edit && b.status === 'due', html`<div class="btn-row">
@@ -365,7 +426,8 @@ function billRow(r, b, edit) {
 
 function openBill(r, pre = {}) {
   const admin = isOrgAdmin();
-  const can = admin && billOpen();
+  const online = billOnline(r).ok;
+  const can = admin && billOpen() && online;
   const want = can && pre.mode === 'permitpal';
   openModal(`Add a bill: ${r.name}`, html`
     <div class="scan-box"><button type="button" class="btn btn-soft btn-sm" data-bill-scan>${ICON.camera} Snap the bill</button>
@@ -382,7 +444,7 @@ function openBill(r, pre = {}) {
     <fieldset class="clock-kinds bill-modes"><legend>Who pays it?</legend>
       <label class="check bill-mode-pp ${can ? '' : 'is-off'}"><input type="radio" name="mode" value="permitpal" ${can ? '' : 'disabled'} ${want ? 'checked' : ''}><span>
         <b>Pinoy Permit pays it for me · ${peso(billFee())} flat</b> ${can ? html`<em class="bill-offer-tag">Skip the line</em>` : ''}
-        <small class="muted">${!billOpen() ? "Pinoy Permit isn't paying bills right now." : !admin ? 'Ask your workspace owner or an admin: they can have Pinoy Permit pay it.'
+        <small class="muted">${!billOpen() ? "Pinoy Permit isn't paying bills right now." : !online ? "This office needs someone at the counter. In-person bill runs are coming soon; for now, pay this one yourself." : !admin ? 'Ask your workspace owner or an admin: they can have Pinoy Permit pay it.'
           : `No queue, no half-day off. Send the bill plus ${peso(billFee())} once (GCash, Maya or bank); we pay the office and put the official receipt here. Bills up to ${peso(billMax())}.`}</small></span></label>
       <label class="check"><input type="radio" name="mode" value="self" ${want ? '' : 'checked'}><span><b>I'll go pay the office myself</b> <small class="muted">We remind you 3 days before it's due and on the day. Add the receipt after.</small></span></label>
     </fieldset>

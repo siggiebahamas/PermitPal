@@ -2,6 +2,7 @@
 -- (kept on record, or paid by Pinoy Permit: confirming, paying, receipts on the permit, refunds, reminders, money views,
 -- who can see and open what). Rolled back at the end.
 begin;
+set local pp.skip_limits = 'on'; -- plan limits (database file 16) have their own test (25)
 create temp table t_res (n serial primary key, step text, ok boolean, info text);
 grant all on t_res to authenticated, anon; grant all on sequence t_res_n_seq to authenticated, anon;
 create function pg_temp.res(s text, ok boolean, info text default '') returns void language sql as
@@ -211,14 +212,15 @@ select pg_temp.res('the owner is told it''s paid', exists (select 1 from public.
 -- a bill Pinoy Permit can't pay goes back in full
 select pg_temp.as_user('ea000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
-update t_ids set b3 = public.bill_add(org, fsic, 'BFP Quezon City', 'FSIF-88', 1200, null, 'permitpal', org || '/bills/ef01/bill.jpg', 'bill.jpg');
+-- (since database file 16 Pinoy Permit only takes bills it can pay online: a Quezon City business permit bill)
+update t_ids set b3 = public.bill_add(org, mp, 'Quezon City Treasurer', 'TB-2027-0088', 1200, null, 'permitpal', org || '/bills/ef01/bill.jpg', 'bill.jpg');
 select public.bill_report(b3, 'bank_transfer', 'BDO-5512') from t_ids;
 reset role;
 select pg_temp.as_user('ea000000-0000-4000-8000-0000000000f5');
 set local role authenticated;
 select public.admin_bill_received(b3, true) from t_ids;
 select pg_temp.res('a refund needs a reason the customer will read', pg_temp.err(format('select public.admin_bill_refund(%L, %L)', (select b3 from t_ids), '')) like 'Say why%', '');
-select public.admin_bill_refund(b3, 'BFP Quezon City only takes payment at its own window.', 'gcash', 'GC-9') from t_ids;
+select public.admin_bill_refund(b3, 'The Treasurer''s Office only took this one at its own window.', 'gcash', 'GC-9') from t_ids;
 select pg_temp.res('refunded: the office''s part and our fee both go back',
   (select status from public.gov_bills where id = (select b3 from t_ids)) = 'refunded'
   and (select sum(m.amount) from public.admin_money(private.today_ph() - 1, private.today_ph()) m where m.ref_id = (select b3 from t_ids) and m.state = 'held') = 0
@@ -226,13 +228,13 @@ select pg_temp.res('refunded: the office''s part and our fee both go back',
 select pg_temp.res('the money summary counts what''s left to do', (public.admin_money_summary() ->> 'bills_to_pay')::int = 0 and (public.admin_money_summary() ->> 'bills_to_check')::int = 0, public.admin_money_summary()::text);
 reset role;
 select pg_temp.res('the owner is told why, and that the money is coming back', exists (select 1 from public.notifications where user_id = 'ea000000-0000-4000-8000-0000000000a1'
-  and title like 'We couldn''t pay bill G-%' and body like 'BFP Quezon City only takes payment at its own window.%'), '');
+  and title like 'We couldn''t pay bill G-%' and body like 'The Treasurer''s Office only took this one at its own window.%'), '');
 
 -- reminders and clean-up
 select pg_temp.as_user('ea000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 update t_ids set b4 = public.bill_add(org, fsic, 'BFP Quezon City', 'FSIF-90', 300, private.today_ph() + 3, 'self');
-update t_ids set b3 = public.bill_add(org, brgy, 'Barangay Teachers Village', 'BC-200', 500, null, 'permitpal', org || '/bills/aa/bill.jpg', 'bill.jpg');
+update t_ids set b3 = public.bill_add(org, mp, 'Quezon City Treasurer', 'TB-2027-0200', 500, null, 'permitpal', org || '/bills/aa/bill.jpg', 'bill.jpg');
 reset role;
 update public.gov_bills set created_at = now() - interval '15 days' where id = (select b3 from t_ids);
 select private.clock_daily();

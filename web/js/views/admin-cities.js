@@ -3,8 +3,8 @@
 // city still due before the new date is told at once (in the app and by email), and each customer moves the date in
 // one tap. A second entry for the same city and year replaces the first (permits already moved follow along); taking one
 // back puts moved permits on their old date and sends a correction. The database checks every rule.
-import { html, fmtDate, fmtDateTime, toast, toastError, when, plural, confirmDialog, todayPH } from '../util.js';
-import { on, rerender } from '../core.js';
+import { html, fmtDate, fmtDateTime, toast, toastError, when, plural, confirmDialog, todayPH, openModal } from '../util.js';
+import { on, rerender, has } from '../core.js';
 import { loadCityDates } from './citydates.js';
 import * as db from 'pp/data';
 
@@ -12,8 +12,8 @@ let cache = { counts: [], list: [] };
 const year = () => Number(todayPH().slice(0, 4));
 
 export async function citiesTab() {
-  const [counts, list] = await Promise.all([db.adminCityCounts(), db.adminCityDeadlines()]);
-  cache = { counts, list };
+  const [counts, list, lgus] = await Promise.all([db.adminCityCounts(), db.adminCityDeadlines(), has('lgus') ? db.lgus().catch(() => []) : []]);
+  cache = { counts, list, lgus };
   const live = list.filter((d) => !d.withdrawn_at);
   // January: the coming deadline is this year's; the rest of the year, it's next year's.
   const y = year(), m = Number(todayPH().slice(5, 7));
@@ -44,11 +44,52 @@ export async function citiesTab() {
           : html`<span class="chip ok">Live</span><button class="btn btn-sm btn-ghost" data-act="adm-city-withdraw" data-id="${d.id}">Withdraw</button>`}</div></div>`)
         : html`<p class="muted">Nothing yet. Cities usually announce extensions in mid-January.</p>`}
     </section>
+    ${lgus.length ? html`<section class="card lgu-admin"><div class="card-head"><div><h2>Metro Manila register</h2>
+      <p class="card-sub">What customers see for each city: the official source, online filing and payment, who may file, originals and copies.
+        Only use official city pages. Pinoy Permit pays a bill only where "Pay online" is Yes. Every change is kept.</p></div></div>
+      <div class="lgu-table">${lgus.map((g) => html`<div class="line"><div class="line-main"><b>${g.name}</b>
+          <small>${STATUS[g.status] || g.status} · file online: ${g.online_filing} · pay online: ${g.online_payment}${g.checked_on ? ` · checked ${fmtDate(g.checked_on)}` : ''}</small></div>
+        <span class="chip ${g.status === 'verified' ? 'ok' : g.status === 'partial' ? 'soon' : 'needinfo'}">${STATUS[g.status] || g.status}</span>
+        <button class="btn btn-sm btn-soft" data-act="adm-lgu-edit" data-key="${g.city_key}">Edit</button></div>`)}</div>
+    </section>` : ''}
     <section class="card"><div class="card-head"><div><h2>Business permits by city</h2><p class="card-sub">How customers spell the city, grouped ("QC" and "Quezon City" are one).</p></div></div>
       ${counts.length ? html`<div class="city-counts">${counts.slice(0, 40).map((c) => html`<div class="hol-row"><span><b>${c.city_name}</b></span>
         <span class="muted small">${plural(c.workspaces, 'workspace')} · ${plural(c.permits, 'permit')}</span></div>`)}</div>` : html`<p class="muted">No business permits yet.</p>`}
     </section>`;
 }
+
+const STATUS = { verified: 'Verified', partial: 'Partly verified', needs_confirmation: 'Needs official confirmation' };
+const YN = [['yes', 'Yes (official page)'], ['likely', 'Reported, not confirmed'], ['no', 'No'], ['unknown', 'Not known']];
+on('adm-lgu-edit', (ds) => {
+  const g = (cache.lgus || []).find((x) => x.city_key === ds.key);
+  if (!g) return;
+  const opt = (list, cur) => list.map(([v, l]) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`);
+  const txt = (name, label, rows = 2) => html`<label class="field"><span>${label}</span><textarea name="${name}" rows="${rows}" maxlength="800">${g[name] || ''}</textarea></label>`;
+  openModal(`Edit ${g.name}`, html`
+    <div class="grid2">
+      <label class="field"><span>How sure are we?</span><select name="status">${opt(Object.entries(STATUS), g.status)}</select></label>
+      <label class="field"><span>Checked on</span><input type="date" name="checked_on" value="${g.checked_on || ''}"></label>
+      <label class="field"><span>File online</span><select name="online_filing">${opt(YN, g.online_filing)}</select></label>
+      <label class="field"><span>Pay online</span><select name="online_payment">${opt(YN, g.online_payment)}</select></label>
+    </div>
+    <label class="field"><span>Official source title</span><input name="source_title" maxlength="200" value="${g.source_title || ''}"></label>
+    <label class="field"><span>Official source link</span><input type="url" name="source_url" maxlength="500" value="${g.source_url || ''}" placeholder="https://"></label>
+    <label class="field"><span>Online portal link</span><input type="url" name="portal_url" maxlength="500" value="${g.portal_url || ''}" placeholder="https://"></label>
+    ${txt('payment_note', 'How the city takes payment')}${txt('release_note', 'How the permit is released')}${txt('representative', 'Someone filing for the owner')}
+    ${txt('originals', 'Originals and copies')}${txt('deadline_note', 'Deadline')}${txt('notes', 'Notes (shown to customers)')}
+    <label class="field"><span>Why the change?</span><input name="reason" maxlength="500" required placeholder="e.g. Confirmed on the BPLO page, Nov 2"></label>`, {
+    wide: true, submitLabel: 'Save',
+    onSubmit: async (fd) => {
+      const v = Object.fromEntries(fd);
+      for (const k of ['source_url', 'portal_url']) if (v[k] && !/^https:\/\/\S{4,}$/.test(v[k])) throw new Error('Links must start with https://');
+      const reason = v.reason; delete v.reason;
+      if (!v.checked_on) v.checked_on = null;
+      await db.lguUpdate(g.city_key, v, reason);
+      toast(`${g.name} saved.`);
+      await rerender();
+    },
+  });
+});
 
 // this browser's own copy of the list too (staff are often customers of their own app)
 const reload = async () => { try { await loadCityDates(true); await rerender(); } catch (e) { toastError(e); } };

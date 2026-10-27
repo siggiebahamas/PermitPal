@@ -15,11 +15,13 @@ const owned = (code) => hasPlus() || unlocked.has(code);
 const longDate = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-PH', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 let prices = {};
+let passFree = false; // a season pass with its template unused
 const priceOf = (code, one) => prices[code] ?? one;
 export async function templatesPage(el) {
   el.innerHTML = String(html`<div class="page-head"><div><h1>Templates</h1></div></div><div class="loading">Loading…</div>`);
   const single = has('load') && !hasPlus();
   let one = 0;
+  passFree = false;
   try {
     listCache ||= await db.listTemplates();
     if (single) {
@@ -27,6 +29,7 @@ export async function templatesPage(el) {
       unlocked = new Set(u.map((x) => x.code));
       const p = st?.products?.find((x) => x.code === 'template');
       one = p?.active ? Number(p.price_php) : 0;
+      passFree = !!(st?.summary?.pass && !st.summary.pass.template_used && st.summary.pass.starts_on <= todayPH());
       prices = Object.fromEntries(pr.filter((x) => x.price_php != null).map((x) => [x.code, Number(x.price_php)]));
     }
   } catch (e) { toastError(e); return; }
@@ -41,7 +44,7 @@ export async function templatesPage(el) {
       <section class="card svc tpl-card"><div class="svc-top"><h2>${t.title}</h2>${t.notarize ? html`<span class="tag">Needs a notary</span>` : ''}</div>
         <p>${t.summary}</p><p class="muted small"><b>Use it:</b> ${t.use_when}</p>
         <div class="svc-foot">${owned(t.code) ? html`<button class="btn btn-primary btn-sm" data-act="tpl-fill" data-code="${t.code}">Fill in</button>${when(!plus, html`<span class="chip ok">Yours</span>`)}`
-          : html`<button class="btn btn-soft btn-sm" data-act="tpl-preview" data-code="${t.code}">Preview</button>${when(one && isOrgAdmin(), html`<button class="btn btn-primary btn-sm" data-act="tpl-unlock" data-code="${t.code}">Get it · ${peso(priceOf(t.code, one))}</button>`)}`}</div></section>`)}</div>`)}
+          : html`<button class="btn btn-soft btn-sm" data-act="tpl-preview" data-code="${t.code}">Preview</button>${when(one && isOrgAdmin(), html`<button class="btn btn-primary btn-sm" data-act="tpl-unlock" data-code="${t.code}">Get it · ${passFree ? 'free with your pass' : peso(priceOf(t.code, one))}</button>`)}`}</div></section>`)}</div>`)}
     <p class="fineprint">General templates for common permit paperwork, not legal advice. Offices sometimes have their own forms: if they do, use theirs. For anything with legal consequences, have a lawyer look it over.</p>`);
 }
 

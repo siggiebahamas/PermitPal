@@ -1,7 +1,7 @@
 // Prices for Pinoy Permit Plus, staff licenses and White-label. The database works out every bill the same way
 // (private.staff_monthly / private.addon_price); these only show the price before asking it.
 export const FREE_PEOPLE = 3;
-export const PLUS_MONTHLY = 199;
+export const PLUS_MONTHLY = 149;
 export const BRAND_MONTHLY = 1000; // White-label, for accounting firms
 export const YEAR_MONTHS = 10; // yearly = 10 months' price (2 months free)
 export const FREE_MONTHS = 12 - YEAR_MONTHS;

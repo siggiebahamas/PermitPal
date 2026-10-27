@@ -6,6 +6,7 @@ import { html, fmtDate, toast, toastError, when, plural, peso } from '../util.js
 import { S, canEdit, has, typeOf, memberName, reqById, coverOf, tierOf, offered } from '../core.js';
 import { STATUS, statusChip } from '../components.js';
 import { placementFor, placementLine } from './extras.js';
+import { lguFor } from './office.js';
 import * as db from 'pp/data';
 
 // Permits for the same business branch (or the whole business), vehicle or person, by type.
@@ -16,6 +17,38 @@ function sibling(r, code) {
 }
 const round = (r) => (r.cycle_id ? String(r.cycle_id) : 'first');
 const external = (url, label) => html`<a class="ext-link" href="${url}" target="_blank" rel="noopener noreferrer">${label} <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>`;
+
+// What you send Pinoy Permit vs what the office itself needs: two separate labels, never merged.
+const SEND = { digital: 'Digital copy for pre-check', photocopy: 'Photocopy', na: 'Not needed' };
+const AGENCY = { digital: 'Digital copy accepted', photocopy: 'Photocopy required by agency', original_present: 'Original must be presented',
+  original_submit: 'Original must be submitted', ctc: 'Certified true copy required', issuer: 'Electronic transmission by issuer required',
+  na: 'Not applicable', unverified: 'Unverified: confirm first' };
+const agencyName = (r, t) => (r.subject === 'vehicle' ? (t.agency || 'LTO').split(/[\s/]/)[0] : 'The office');
+const VERIFY = { verified: ['Verified', 'ok'], partial: ['Partly verified', 'soon'], needs_confirmation: ['Needs official confirmation', 'needinfo'] };
+// Where this checklist comes from and how sure we are; for a city permit, the city's entry in the register.
+function sourceLine(t) {
+  if (!has('lgus') || !t.verify) return '';
+  const [label, cls] = VERIFY[t.verify] || VERIFY.needs_confirmation;
+  return html`<p class="ck-source"><span class="chip ${cls}">${label}</span> ${t.source_url ? html`Source: ${external(t.source_url, t.source_title || 'official source')}` : t.source_title || 'Source being checked'}${t.checked_on ? html` · checked ${fmtDate(t.checked_on)}` : ''}</p>`;
+}
+function cityEntry(r) {
+  if (!has('lgus') || r.subject !== 'business' || !['mayors_permit', 'barangay_clearance'].includes(r.type_code)) return '';
+  const g = lguFor(r.location_city);
+  if (!g) return r.location_city ? html`<div class="ck-city"><b>${r.location_city}</b> isn't in our Metro Manila register yet. Check the city's own .gov.ph site or its BPLO before you go.</div>` : '';
+  const [label, cls] = VERIFY[g.status] || VERIFY.needs_confirmation;
+  const yn = { yes: 'Yes', likely: 'Reported, not yet confirmed', no: 'No', unknown: 'Not confirmed' };
+  return html`<div class="ck-city"><div class="ck-city-head"><b>${g.name}</b> <span class="chip ${cls}">${label}</span></div>
+    ${g.status === 'needs_confirmation' ? html`<p class="small"><b>Requirements being verified.</b> We haven't confirmed ${g.name}'s current checklist yet, so treat this list as a general guide and check with the office${g.source_url ? html` (${external(g.source_url, 'official site')})` : ''} before you file.</p>` : ''}
+    <dl class="ck-facts">
+      <dt>File online</dt><dd>${yn[g.online_filing] || 'Not confirmed'}${g.portal_url ? html` · ${external(g.portal_url, 'portal')}` : ''}</dd>
+      <dt>Pay online</dt><dd>${yn[g.online_payment] || 'Not confirmed'}${g.payment_note ? html`<small>${g.payment_note}</small>` : ''}</dd>
+      ${g.representative ? html`<dt>Someone filing for you</dt><dd>${g.representative}</dd>` : ''}
+      ${g.originals ? html`<dt>Originals and copies</dt><dd>${g.originals}</dd>` : ''}
+      ${g.deadline_note ? html`<dt>Deadline</dt><dd>${g.deadline_note}</dd>` : ''}
+      ${g.release_note ? html`<dt>Getting the permit</dt><dd>${g.release_note}</dd>` : ''}
+    </dl>
+    <p class="muted small">${g.source_url ? html`Source: ${external(g.source_url, g.source_title || 'official source')}` : 'No official source linked yet'}${g.checked_on ? ` · checked ${fmtDate(g.checked_on)}` : ''}. Pay government fees only through the office's official channels.</p></div>`;
+}
 
 // What the card is about, in plain words.
 function heading(r) {
@@ -44,12 +77,15 @@ export function checklistCard(r, ticks = [], { offer = '' } = {}) {
     <summary><span class="ck-title">${heading(r)}</span>
       ${when(items.length, html`<span class="ck-count" aria-live="polite"><b data-ck-done>${doneCount}</b> of ${items.length} ready</span>`)}</summary>
     <p class="muted small">A general guide. Your ${r.subject === 'business' ? 'city, barangay or agency' : 'agency'} may ask for more or less, so check with them before you go.</p>
+    ${sourceLine(t)}
+    ${items.some((i) => i.agency && i.agency.startsWith('original')) ? html`<p class="ck-orig"><b class="ck-orig-ic" aria-hidden="true">!</b><span>A scan or photo you send us is only for checking. It doesn't replace an original the office asks for. Never mail an original to anyone you haven't verified.</span></p>` : ''}
     <dl class="ck-facts">
       ${when(t.where_to_file, html`<dt>Where</dt><dd>${t.where_to_file}</dd>`)}
       ${when(t.online_url, html`<dt>Online</dt><dd>${external(t.online_url, t.online_label || 'Official website')}</dd>`)}
       ${when(cityLink, html`<dt>Online</dt><dd>${external(cityLink, `Find ${city}'s online renewal`)} <small class="muted">(a web search; use the city's own .gov.ph site)</small></dd>`)}
       ${when(t.validity_note, html`<dt>Valid for</dt><dd>${t.validity_note}</dd>`)}
     </dl>
+    ${cityEntry(r)}
     ${when(deps.length, html`<div class="ck-deps"><b>Do these first</b>
       ${deps.map((d) => d.req
         ? html`<a class="ck-dep" href="#/requirement/${d.req.id}"><span>${d.req.name}</span>${statusChip(d.req.status)}</a>`
@@ -64,6 +100,7 @@ export function checklistCard(r, ticks = [], { offer = '' } = {}) {
           <input type="checkbox" data-ck="${i.k}" ${tick ? 'checked' : ''} ${edit ? '' : 'disabled'}>
           <span class="ck-text"><span class="ck-t">${i.t}</span>
             ${when(i.d, html`<small>${i.d}</small>`)}
+            ${i.send || i.agency ? html`<span class="ck-copy">${i.send ? html`<span class="ck-send">Send us: <b>${SEND[i.send] || i.send}</b></span>` : ''}${i.agency ? html`<span class="ck-agency ${i.agency === 'unverified' ? 'unv' : ''}">${agencyName(r, t)} needs: <b>${AGENCY[i.agency] || i.agency}</b></span>` : ''}</span>` : ''}
             ${dep ? html`<small class="ck-dep-status">In Pinoy Permit: ${STATUS[dep.status]?.label || dep.status}${dep.status === 'compliant' && dep.expires_on ? ` until ${fmtDate(dep.expires_on)}` : ''}</small>` : ''}
             ${tick ? html`<small class="ck-who">Ticked by ${tick.done_by === S.user?.id ? 'you' : memberName(tick.done_by)}, ${fmtDate(String(tick.done_at).slice(0, 10))}</small>` : ''}
           </span></label>

@@ -7,7 +7,7 @@
 import { html, fmtDate, toast, toastError, when, plural, timeAgo, openModal, formObject, confirmDialog, download, toCsv, todayPH } from '../util.js';
 import { S, on, go, reload, canEdit, isOrgAdmin, empty } from '../core.js';
 import { STATUS, ICON } from '../components.js';
-import { billToggle, planCard, compareTable, paintPrices, plansShown, PLANS } from './pricing.js';
+import { billToggle, planCard, compareTable, paintPrices, plansShown, PLANS, tierCard, tierPrice, tiersShown } from './pricing.js';
 import * as db from 'pp/data';
 
 export const KINDS = {
@@ -38,7 +38,7 @@ export const KINDS = {
     cols: ['lto_registration', 'ctpl', 'emission_test', 'mvir'],
   },
 };
-const TEAM_PLANS = ['head_office', 'firm', 'property', 'property_s', 'fleet'];
+const TEAM_PLANS = ['head_office', 'firm', 'property', 'property_s', 'fleet', 'multi', 'fleet_pro', 'enterprise'];
 export const kindOf = () => S.org?.kind || 'business';
 // Is the paid side switched on for this workspace (trial, plan, or Pinoy Permit staff)?
 export function teamAccess(org = S.org) {
@@ -226,9 +226,13 @@ function chooser(el) {
     <div class="page-head"><div><h1>Team tools</h1><p class="muted">Looking after permits for clients, vehicles or tenants? See them all on one board. Free for 30 days.</p></div></div>
     <h2 class="section-label">Pick what fits you</h2>
     ${billToggle('How often to pay for a team plan')}
-    <div class="pp-grid four">${plansShown(S.plans).map((id) => planCard(id, price(id),
+    <h3 class="pp-group-h">Fleets: one board for every vehicle</h3>
+    <div class="pp-grid three">${tiersShown(S.plans, ['multi', 'fleet', 'fleet_pro']).map((id) => tierCard(id, tierPrice(S.plans, id),
+      isOrgAdmin() ? html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="fleet">Try free for 30 days</button>` : ''))}</div>
+    <h3 class="pp-group-h">Landlords and malls: every tenant's permits</h3>
+    <div class="pp-grid">${plansShown(S.plans).map((id) => planCard(id, price(id),
       isOrgAdmin() ? html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${PLANS[id].kind}">Try free for 30 days</button>` : ''))}</div>
-    ${compareTable(plansShown(S.plans))}
+    ${compareTable()}
     ${when(!isOrgAdmin(), html`<p class="muted">Ask your workspace owner to switch this on.</p>`)}
     <p class="fineprint">Your own businesses, vehicles and documents stay exactly as they are. You can switch back anytime in Settings → Workspace.</p>`);
   paintPrices(el);

@@ -3,7 +3,7 @@
 -- inviting a business, staff gifts and pay-backs, money views and who can see what. Rolled back at the end.
 begin;
 -- This test checks how load works with the original prices; test 24 checks today's prices.
-update public.load_products set price_php = case code when 'template' then 39 when 'papers_check' then 149 else price_php end;
+update public.load_products set price_php = case code when 'template' then 39 when 'papers_check' then 149 when 'season_pass' then 149 else price_php end;
 update public.doc_templates set price_php = 99 where code = 'authorization_letter';
 create temp table t_res (n serial primary key, step text, ok boolean, info text);
 grant all on t_res to authenticated, anon; grant all on sequence t_res_n_seq to authenticated, anon;
@@ -370,8 +370,8 @@ select pg_temp.res('the month is a gift (no bill follows)', (select comped and n
 select pg_temp.res('both are told', exists (select 1 from public.notifications where user_id = 'e9000000-0000-4000-8000-0000000000d4' and title = 'Your welcome gift is here')
   and exists (select 1 from public.notifications where user_id = 'e9000000-0000-4000-8000-0000000000a1' and title = 'Thank you for inviting a business'), '');
 -- someone who already pays for Plus gets the value as bonus load instead
-select pg_temp.res('a workspace whose plan includes Plus gets ₱199 bonus load instead', (select private.give_plus_month((select team from t_ids), 'test')) = 'bonus_load', '');
-select pg_temp.res('...in its load', (select bonus_php from public.load_wallets where org_id = (select team from t_ids)) = 199, '');
+select pg_temp.res('a workspace whose plan includes Plus gets a month of Plus as bonus load instead', (select private.give_plus_month((select team from t_ids), 'test')) = 'bonus_load', '');
+select pg_temp.res('...in its load', (select bonus_php from public.load_wallets where org_id = (select team from t_ids)) = private.addon_price('plus', null, 'monthly'), '');
 -- six thank-you months a year at most; the invited business still gets its gift
 do $$ declare i int; v uuid; b uuid; r record; begin
   for i in 1..6 loop
@@ -431,7 +431,7 @@ select pg_temp.res('Money lists top-ups as money in, with the invoice number', e
 select pg_temp.res('...and paying load back as money out', exists (select 1 from public.admin_money(private.today_ph() - 1, private.today_ph())
   where stream = 'load' and kind = 'refund' and amount = -100), '');
 select pg_temp.res('the summary shows load held for customers and checks waiting', (s ->> 'load_held')::numeric > 0 and (s ? 'papers_waiting') and (s ? 'load_topups_to_check')
-  and (s ->> 'load_bonus')::numeric >= 199, s::text) from (select public.admin_money_summary() as s) x;
+  and (s ->> 'load_bonus')::numeric >= private.addon_price('plus', null, 'monthly'), s::text) from (select public.admin_money_summary() as s) x;
 select public.admin_set_invoice_no('load', top3, 'SI-0043') from t_ids;
 select pg_temp.res('an invoice number can be added later', (select bir_invoice_no from public.load_topups where id = (select top3 from t_ids)) = 'SI-0043', '');
 select public.admin_save_load_product('template', 45, true);

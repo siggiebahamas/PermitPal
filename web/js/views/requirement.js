@@ -50,6 +50,11 @@ export async function render(el, id) {
   }
   el.innerHTML = String(page(r));
   trackPlacements(el);
+  // Arriving from a due date on the Home calendar: start the renewal (or whatever comes next) once.
+  if (/[?&]renew=1/.test(location.hash)) {
+    history.replaceState(null, '', location.hash.replace(/[?&]renew=1/, ''));
+    if (canEdit()) setTimeout(() => nextAction(r), 30);
+  }
   // Arriving from "Papers check" on the Load page: open the form once.
   if (has('load') && /[?&]check=1/.test(location.hash)) {
     history.replaceState(null, '', location.hash.replace(/[?&]check=1/, ''));

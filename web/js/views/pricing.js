@@ -72,20 +72,18 @@ export const billButton = (attrs, m, y, cls = 'btn btn-primary') => html`<button
 const tick = (t) => html`<li>${ICON.check}<span>${t}</span></li>`;
 export const checks = (list) => html`<ul class="pp-checks">${list.map(tick)}</ul>`;
 export const FREE_CHECKS = [
-  'Add all your businesses, branches and vehicles',
-  'We remind you before anything runs out: 30, 7 and 1 day before',
-  'Reminders by email and in the app',
-  'A Monday email with what is due',
-  'Every permit photo kept safe, forever',
+  'Track 1 business and 1 vehicle',
+  'Your status board and renewal timeline',
+  'We remind you 30, 7 and 1 day before anything runs out (email and in the app)',
+  'Checklists with links to the official sources',
+  'Keep up to 3 files for each business or vehicle',
   'Snap a photo: we read the dates for you',
   'Tax, SSS, PhilHealth and Pag-IBIG due dates',
-  'Your whole team, at no extra cost',
   "3 staff licenses free (health card, NBI, driver's license)",
-  'Send proof to your landlord with one link',
-  'All your papers in one download for inspectors',
+  'Tracking and planning software only: hands-on help is a separate service',
 ];
 const FREE_WINS = [[ICON.bell, 'We remind you', '30, 7 and 1 day before anything runs out'], [ICON.camera, "Snap, don't type", 'Take a photo of a permit; we read the dates'],
-  [ICON.file, 'All in one place', 'Every permit, vehicle and staff license, kept safe forever']];
+  [ICON.file, 'All in one place', '1 business and 1 vehicle, with their files']];
 const FREE_PREVIEW = { title: 'Your permits', rows: [["Mayor's Permit", 'soon', 'Due in 12 days'], ['Fire safety (FSIC)', 'ok', 'All good'], ['Health card · Ana', 'ok', 'All good']] };
 const PLUS_LINE = `Pinoy Permit Plus included (worth ${peso(PLUS_MONTHLY)} a month)`;
 const TENANT_PREVIEW = { title: 'Your tenants', rows: [['Unit 1 · Bakeshop', 'ok', 'All good'], ['Unit 5 · Salon', 'soon', 'Due in 14 days'], ['Unit 3 · Pharmacy', 'late', '3 days late', 'Remind']] };
@@ -131,9 +129,103 @@ export const PLANS = {
       'Made for big buildings: 100 tenants × 4 permits = 400 deadlines a year', 'One shop closed for a missing fire permit costs you more in lost rent'] },
   },
 };
-export const PLAN_ORDER = ['firm', 'fleet', 'property_s', 'property'];
+export const PLAN_ORDER = ['property_s', 'property'];
 // The plans this database sells (Small property only once its file has run). Before the prices load: all.
 export const plansShown = (plans) => (plans?.length ? PLAN_ORDER.filter((id) => plans.some((p) => p.id === id)) : PLAN_ORDER);
+
+// ---------------------------------------------------------------- software plans by size (the November lineup)
+// Every plan below is tracking and planning software only. Hands-on renewal work is a separate, separately priced
+// service (see helpServices). Prices come from the plans table (Plus from prices.js); capacity from plan_limits.
+export const SOFTWARE_ONLY = 'All plans below are for tracking and planning software only. They do not include someone physically handling your registration. Optional Renewal Assistance and Full-Service Vehicle Renewal are available for separate fees.';
+export const TIERS = {
+  plus: { icon: ICON.share, name: 'Plus', who: 'For a few businesses or vehicles', range: 'Up to 5 businesses and vehicles, any mix', users: '1 user', kind: 'business',
+    checks: ['Up to 20 files for each business or vehicle', 'Reminders, timelines, checklists and your document vault', 'History of every change',
+      'Your own permit page and QR poster', 'Ready letters and forms, filled in for you', 'Everything in Free'] },
+  core: { icon: ICON.briefcase, name: 'Core', who: 'For households and small businesses', range: 'Up to 15 businesses and vehicles together', users: 'Up to 3 users (you + 2 staff)', kind: 'business',
+    per: 15, perLine: (v) => `Effective equivalent: ${v} per vehicle/month when all 15 records are vehicles.`,
+    checks: ['Group by business and branch', 'One dashboard, reminders and renewal tasks for everything', 'Text message reminders', 'Pinoy Permit Plus included', 'Everything in Plus'] },
+  multi: { icon: ICON.car, name: 'Multi-Vehicle', who: 'For big households and small fleets', range: '16 to 30 vehicles', users: 'Up to 3 users', kind: 'fleet',
+    per: 30, perLine: (v) => `At 30 vehicles: about ${v} per vehicle/month.`,
+    checks: ['Up to 20 files for each vehicle', 'Fleet board: who can’t drive today', 'Status and history for every vehicle', 'Includes up to 3 business records', 'Everything in Core'] },
+  fleet: { icon: ICON.car, name: 'Fleet', who: 'For companies with many vehicles', range: '31 to 75 vehicles', users: 'Up to 5 users', kind: 'fleet',
+    per: 75, perLine: (v) => `At 75 vehicles: about ${v} per vehicle/month.`,
+    checks: ['Filter by plate, status, expiry and business', 'Import vehicles from a spreadsheet', 'A renew-this-month list', 'Includes up to 3 business records', 'Everything in Multi-Vehicle'] },
+  fleet_pro: { icon: ICON.car, name: 'Fleet Pro', who: 'For large fleets', range: '76 to 150 vehicles', users: 'Up to 10 users', kind: 'fleet',
+    per: 150, perLine: (v) => `At 150 vehicles: about ${v} per vehicle/month.`,
+    checks: ['Fleet-wide renewal planning', 'Export for your records', 'Includes up to 3 business records', 'Everything in Fleet'] },
+  enterprise: { icon: ICON.grid, name: 'Enterprise', who: 'For the biggest fleets', range: '151 or more vehicles', users: 'Users agreed in your quote', kind: 'fleet', quote: true,
+    checks: ['A written plan and quote for your fleet', 'We show the cost per vehicle in your quote', 'Tracking and planning software, like every plan'] },
+};
+export const TIER_SMALL = ['plus', 'core'];
+export const TIER_FLEET = ['multi', 'fleet', 'fleet_pro', 'enterprise'];
+const two = (n) => `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const perVehicle = (monthly, n) => (monthly > 0 && n ? two(Math.round((monthly / n) * 100) / 100) : '');
+export const tierPrice = (plans, id) => (id === 'plus' ? PLUS_MONTHLY : Number(plans?.find((p) => p.id === id)?.price_php_monthly || 0));
+// Plans the database sells now (Plus is an add-on, always there; Enterprise is quoted).
+export const tiersShown = (plans, ids) => (plans?.length ? ids.filter((id) => id === 'plus' || id === 'enterprise' || plans.some((p) => p.id === id && p.available !== false)) : ids);
+
+export function tierCard(id, monthly, cta = '', { current = false } = {}) {
+  const t = TIERS[id];
+  if (!t) return '';
+  return html`<section class="card pp-plan pp-tier ${current ? 'pp-current' : ''}" data-plan-card="${id}">
+    <div class="pp-plan-head"><span class="pp-icon">${t.icon}</span><div><h3>${t.name}</h3><p class="pp-who">${t.who}</p></div></div>
+    <p class="pp-range">${t.range} · ${t.users}</p>
+    ${t.quote ? html`<div class="pp-price"><div class="pp-amount"><b>Quoted</b></div><p class="pp-day">For your exact fleet size</p></div>`
+      : monthly > 0 ? priceSlot(monthly) : html`<div class="pp-price"><p class="pp-day">Loading the price…</p></div>`}
+    ${t.per && monthly > 0 ? html`<p class="pp-pervehicle">${t.perLine(perVehicle(monthly, t.per))}</p>` : ''}
+    ${checks(t.checks)}
+    <p class="pp-swonly">Tracking and planning software only. Hands-on help costs extra.</p>
+    <div class="pp-cta">${cta}</div></section>`;
+}
+
+// Right above the plans: what a subscription is, and isn't.
+export const softwareBanner = () => html`<div class="pp-swbanner" role="note"><b>SOFTWARE SUBSCRIPTIONS = TRACKING &amp; PLANNING ONLY.</b>
+  <span>Hands-on renewal services are optional and cost extra.</span></div>`;
+
+// Right below the monthly prices: the plan price divided by the vehicles it holds, with every assumption shown.
+export function peaceBand(plans) {
+  const rows = ['core', 'multi', 'fleet', 'fleet_pro'].map((id) => ({ id, m: tierPrice(plans, id), n: TIERS[id].per })).filter((r) => r.m > 0 && plans?.some((p) => p.id === r.id && p.available !== false));
+  if (!rows.length) return '';
+  const low = rows.reduce((a, b) => (a.m / a.n <= b.m / b.n ? a : b));
+  const foot = rows.map((r) => (r.id === 'core' ? `Core ${perVehicle(r.m, r.n)}/vehicle at 15 vehicles only when all 15 records are vehicles`
+    : `${TIERS[r.id].name} ${perVehicle(r.m, r.n)}/vehicle at ${r.n} vehicles`)).join('; ');
+  return html`<section class="pp-peace" aria-labelledby="peace-h">
+    <div class="pp-peace-copy"><h3 id="peace-h">A little peace of mind, for less than you might think.</h3>
+      <p>Keep registration dates, documents, requirements and renewal tasks organized in one place, so you can plan ahead instead of scrambling at the last minute.</p></div>
+    <div class="pp-peace-num"><span>As low as</span><b>${perVehicle(low.m, low.n)}*</b><small>per vehicle / month</small>
+      <em>${TIERS[low.id].name}: ${peso(low.m)} a month for up to ${low.n} vehicles</em></div>
+    <p class="pp-peace-note">That is the subscription equivalent when you use the plan's full vehicle capacity. Your plan is billed at the monthly plan price, not as a separate per-car charge.
+      <br>*Illustrative effective monthly cost at maximum vehicle capacity: ${foot}. Actual cost per vehicle is higher if fewer vehicles are tracked. Core allows a mix of vehicle and business records, so its per-vehicle figure does not apply when some records are businesses. Enterprise pricing is quoted individually.
+      ${SOFTWARE_ONLY}</p>
+  </section>`;
+}
+
+// "Need us to handle the renewal?": the separately paid services, each with exactly what it is and isn't.
+export const ASSIST_FULL = "Renewal Assistance — ₱499 one-time per vehicle, per renewal case. Get a clear, personalized plan before you spend time or money on a renewal. We review the documents and vehicle details you submit, compare them with the requirements we can verify for your transaction, prepare a tailored checklist, flag missing, unclear, inconsistent, or potentially expired items, explain which documents may need an original, photocopy, certified copy, or issuer-sent electronic record, and provide a written summary of what is ready, what is missing, and what you should do next. The price includes one consolidated round of follow-up questions about our review. This is a defined document-review and guidance service: we do not contact or visit the LTO on your behalf, submit or collect documents, book or perform inspections, arrange courier, or manage the renewal process under this service. It does not include government or third-party costs and does not guarantee agency approval. If you want Pinoy Permit to coordinate the process for you, choose Full-Service Vehicle Renewal instead.";
+export const FULL_SERVICE_FULL = "Full-Service Vehicle Renewal — from ₱1,000 Pinoy Permit coordination fee per eligible standard renewal, per vehicle. Prefer not to coordinate the process yourself? After confirming eligibility and coverage, we manage the renewal workflow within a written scope: intake and transaction triage; a tailored checklist and document-gap follow-up; coordination of required insurance or inspection with you and verified providers where applicable; preparation of the case file; arranging authorized submission, agency follow-up, and document/permit pickup where legally permitted and available; status updates at meaningful milestones; and a close-out summary with available receipt/renewal evidence and the next recorded expiry date. Before you pay, you receive a written scope, task owner, itemized quote, exclusions, and any steps you must personally complete. The ₱1,000 is a starting coordination fee, not the total cost of every renewal. LTO/government charges, insurance, inspection/emissions, courier, and third-party/provider fees are separate and itemized. You may still need to sign declarations, present originals, attend in person, or bring the vehicle for inspection. We offer this service only when the case is eligible and verified service coverage is available; otherwise we will explain the limitation or provide a custom quote. Approval and processing times are controlled by the relevant agency and cannot be guaranteed.";
+export const COMPLEX_FULL = "Complex / Special Registration Case — custom quote after review. For cases that need additional research, approvals, or a non-standard process—such as new registration, ownership transfer, lost plates/documents, reactivation, for-hire or other special vehicle categories, and record corrections—we first assess the transaction, verify applicable requirements, identify what the owner must personally do, and check whether a suitable verified provider can lawfully support it. Before any paid work starts, you receive a written case-specific scope, milestones, service fee, exclusions, and separate estimates or confirmed amounts for government and third-party costs. We do not price complex work as if it were a routine renewal, and we do not promise approval or bypass official requirements.";
+export const CHOOSE_HELP = 'Choose what kind of help you need: Software plan = track vehicles/businesses, documents, deadlines, and renewal tasks yourself. ₱499 Renewal Assistance = a human review of your submitted documents plus a personalized written checklist and next-step plan; no agency handling. Full-Service Vehicle Renewal from ₱1,000 = we coordinate an eligible standard renewal within a written scope, including authorized filing/follow-up/pickup where permitted and available. Complex registration = custom quote after review. Software plans and all service fees are separate from government charges, insurance, inspection, courier, and third-party/provider fees.';
+export function helpServices({ assistCta = '', complexCta = '' } = {}) {
+  const card = (cls, tag, name, price, lines, full, cta) => html`<section class="card pp-help ${cls}">
+    <span class="pp-help-tag">${tag}</span><h3>${name}</h3><p class="pp-help-price">${price}</p>
+    ${checks(lines)}
+    <details class="pp-all"><summary><span>Exactly what's included</span></summary><p class="small">${full}</p></details>
+    <div class="pp-cta">${cta}</div></section>`;
+  return html`<section class="pp-helpwrap" aria-labelledby="help-h">
+    <h2 class="lp-h3" id="help-h">Need us to handle the renewal?</h2>
+    <p class="pp-help-lead">${CHOOSE_HELP}</p>
+    <div class="pp-grid three">
+      ${card('', 'Available now', 'Renewal Assistance', '₱499 one-time', ['A human review of the papers you send', 'A tailored checklist and a written plan: ready, missing, next steps', 'Which papers need an original, a copy or an issuer-sent record', 'Guidance only: no agency visits or filing'], ASSIST_FULL, assistCta)}
+      ${card('pp-help-soon', 'Coming soon', 'Full-Service Vehicle Renewal', 'From ₱1,000 coordination fee', ['We coordinate an eligible standard renewal within a written scope', 'Itemized quote before you pay; government and third-party costs separate', "We're building a team of trusted, verified runners so we can offer this soon"], FULL_SERVICE_FULL,
+        html`<p class="pp-soon-note">Not available yet. We'll tell you when it opens.</p>`)}
+      ${card('', 'Custom quote', 'Complex / special case', 'Quoted after review', ['New registration, transfer, lost plates or papers, reactivation, special categories', 'A written scope and quote before any paid work starts'], COMPLEX_FULL, complexCta)}
+    </div>
+    <p class="pp-paynote">We accept GCash or bank transfer to our UnionBank account for Pinoy Permit fees only. Government and third-party charges are always shown as separate line items, and approval is always up to the agency.</p>
+  </section>`;
+}
+// The short version, for Home, each vehicle and Done for you.
+export const serviceStrip = () => html`<p class="pp-strip-help">${ICON.check}<span><b>Your plan is tracking and planning software.</b> Want hands-on help? Renewal Assistance ₱499 one-time ·
+  Full-Service Vehicle Renewal from ₱1,000 (coming soon) · Complex cases: custom quote. <a href="#/settings/billing">See what each includes</a></span></p>`;
 
 // ---------------------------------------------------------------- cards
 const LABEL = { ok: 'OK', soon: 'Soon', late: 'Late' };
@@ -149,9 +241,10 @@ const bonus = () => html`<div class="pp-bonus"><span>${ICON.check} Pinoy Permit 
 export function freeCard(cta = '') {
   return html`<section class="card pp-plan pp-free">
     <div class="pp-free-a">
-      <div class="pp-plan-head"><span class="pp-icon">${ICON.home}</span><div><h3>Free</h3><p class="pp-who">For your own business</p></div></div>
+      <div class="pp-plan-head"><span class="pp-icon">${ICON.home}</span><div><h3>Free</h3><p class="pp-who">For one business and one vehicle</p></div></div>
       <p class="pp-promise">Never miss a permit again</p>
-      <div class="pp-price"><div class="pp-amount"><b>₱0</b><span>forever</span></div><p class="pp-day">No card. No time limit. No catch.</p></div>
+      <p class="pp-range">1 business + 1 vehicle · 1 user</p>
+      <div class="pp-price"><div class="pp-amount"><b>₱0</b><span>forever</span></div><p class="pp-day">No card. No time limit.</p></div>
       <div class="pp-cta">${cta}</div>
     </div>
     <div class="pp-free-b">${preview(FREE_PREVIEW)}${wins(FREE_WINS)}${everything(FREE_CHECKS)}</div></section>`;
@@ -169,51 +262,42 @@ export function planCard(id, monthly, cta = '', { current = false, trialLine = t
     <div class="pp-cta">${cta}${trialLine ? html`<p class="pp-trial">30 days free · no card needed</p>` : ''}</div></section>`;
 }
 
-// Everything side by side (a tick, a dash, or a few words).
+// Everything side by side (a tick, a dash, or a few words): the software plans by size.
 const Y = true; const N = false;
 const COMPARE = [
-  ['All your businesses, branches and vehicles', Y, Y, Y, Y, Y],
-  ['Reminders before anything runs out (email and app)', Y, Y, Y, Y, Y],
-  ['Monday email with what is due', Y, Y, Y, Y, Y],
-  ['Permit photos kept safe, forever', Y, Y, Y, Y, Y],
-  ['Snap a photo, we read the dates', Y, Y, Y, Y, Y],
-  ['Tax, SSS, PhilHealth, Pag-IBIG due dates', Y, Y, Y, Y, Y],
-  ['Your whole team', Y, Y, Y, Y, Y],
-  ['3 staff licenses', Y, Y, Y, Y, Y],
-  ['Proof link and inspection download', Y, Y, Y, Y, Y],
-  ['Text message (SMS) reminders', N, Y, Y, Y, Y],
-  [`Pinoy Permit Plus (worth ${peso(PLUS_MONTHLY)} a month)`, N, Y, Y, Y, Y],
-  ['Everyone you look after on one screen', N, 'Clients', 'Vehicles', 'Up to 20 tenants', 'Any number of tenants'],
-  ['Remind them in one click', N, Y, N, Y, Y],
-  ['They join free and keep their own permits current', N, Y, N, Y, Y],
-  ['Download the copies they share', N, Y, N, Y, Y],
-  ['Choose the permits they must keep', N, N, N, Y, Y],
-  ['Vehicles that should not be on the road today', N, N, Y, N, N],
-  ['Renew-this-month list for vehicles', N, N, Y, N, N],
-  ['Your logo on client emails (White-label add-on)', N, Y, N, N, N],
-  ['Download a list for audits', N, Y, Y, Y, Y],
+  ['Businesses and vehicles you can track', '1 + 1', 'Up to 5', 'Up to 15', '16–30 vehicles', '31–75 vehicles', '76–150 vehicles'],
+  ['Users (owner included)', '1', '1', '3', '3', '5', '10'],
+  ['Files for each business or vehicle', '3', '20', '20', '20', '20', '20'],
+  ['Reminders 30, 7 and 1 day before (email and app)', Y, Y, Y, Y, Y, Y],
+  ['Status board and renewal timeline', Y, Y, Y, Y, Y, Y],
+  ['Checklists with official source links', Y, Y, Y, Y, Y, Y],
+  ['Snap a photo, we read the dates', Y, Y, Y, Y, Y, Y],
+  ['Permit page, QR poster and ready letters (Plus)', N, Y, Y, Y, Y, Y],
+  ['Text message (SMS) reminders', N, N, Y, Y, Y, Y],
+  ['Fleet board and spreadsheet import', N, N, N, Y, Y, Y],
+  ['Business records included', '1', 'Any mix', 'Any mix', 'Up to 3', 'Up to 3', 'Up to 3'],
+  ['Someone handling your renewal', 'Separate service', 'Separate service', 'Separate service', 'Separate service', 'Separate service', 'Separate service'],
 ];
 const cellOf = (c) => (c === true ? html`<span class="pp-yes">${ICON.check}<span class="sr-only">Included</span></span>`
   : c === false ? html`<span class="pp-no"><span aria-hidden="true">–</span><span class="sr-only">Not included</span></span>` : html`<span class="pp-word">${c}</span>`);
-const COLS = ['free', ...PLAN_ORDER];
-export const compareTable = (ids = PLAN_ORDER) => {
-  const keep = COLS.map((c) => c === 'free' || ids.includes(c));
-  return html`<details class="card pp-compare"><summary><b>See everything side by side</b></summary>
+const COLS = ['Free', 'Plus', 'Core', 'Multi-Vehicle', 'Fleet', 'Fleet Pro'];
+export const compareTable = () => html`<details class="card pp-compare"><summary><b>See everything side by side</b></summary>
   <div class="table-wrap" tabindex="0" role="region" aria-label="Plans side by side"><table class="table pp-table">
-    <thead><tr><th scope="col">What you get</th>${COLS.filter((c, i) => keep[i]).map((c) => html`<th scope="col">${c === 'free' ? 'Free' : PLANS[c].name}</th>`)}</tr></thead>
-    <tbody>${COMPARE.filter(([, ...cols]) => cols.some((c, i) => keep[i] && c !== false)).map(([t, ...cols]) => html`<tr><th scope="row">${t}</th>${cols.filter((c, i) => keep[i]).map((c) => html`<td>${cellOf(c)}</td>`)}</tr>`)}</tbody>
-  </table></div></details>`;
-};
+    <thead><tr><th scope="col">What you get</th>${COLS.map((c) => html`<th scope="col">${c}</th>`)}</tr></thead>
+    <tbody>${COMPARE.map(([t, ...cols]) => html`<tr><th scope="row">${t}</th>${cols.map((c) => html`<td>${cellOf(c)}</td>`)}</tr>`)}</tbody>
+  </table></div><p class="fineprint">Every plan is tracking and planning software only. Small property and Mall &amp; property are priced by tenants; Enterprise is quoted.</p></details>`;
 
 // ---------------------------------------------------------------- add-ons
 export const PLUS_CHECKS = [
+  'Track up to 5 businesses and vehicles, any mix (Free: 1 + 1)',
+  'Up to 20 files for each business or vehicle',
   "Your own permit page and a QR poster: customers see you're legit",
   'Badges for your website and email signature',
   'Your mall or landlord gets each renewal by itself',
   "We check your permits every morning and tell you what's wrong",
   'A report in your inbox on the 1st of every month',
   '8 ready letters and forms, filled in for you (authorization letter, SPA, affidavit of loss…)',
-  'Free inside every team plan',
+  'Included in Core and every fleet plan',
 ];
 export const BRAND_CHECKS = [
   'Your name and logo on every email your clients get',

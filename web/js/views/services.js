@@ -6,6 +6,7 @@
 import { html, fmtDate, fmtDateTime, peso, toast, toastError, confirmDialog, when, normalizePhone, timeAgo, openModal, formObject, plural, todayPH } from '../util.js';
 import { S, on, go, reload, canEdit, has, reqById, service, serviceFor, offered, IN_PERSON, business, vehicle, person, empty, careOf, coverOf, tierOf, location_ } from '../core.js';
 import { byPriority, subjectLabel, dueShort, ICON } from '../components.js';
+import { serviceStrip } from './pricing.js';
 import * as db from 'pp/data';
 
 // Customer-facing names for each stage of an order.
@@ -91,6 +92,7 @@ export function services(el, params) {
     <ol class="dfy-steps">${STEPS.map(([t, d], i) => html`<li><span class="dfy-n">${i + 1}</span><b>${t}</b><span>${d}</span></li>`)}</ol>
     ${due.map((i) => html`<div class="banner ${i.due_on < todayPH() ? 'warn' : 'info'}"><div><b>Year-round care bill ${i.number}:</b> ${peso(i.amount_php)}${i.first ? ', coverage starts when it\'s paid' : `, due ${fmtDate(i.due_on)}`}.</div>
       <div class="banner-actions"><a class="btn btn-sm btn-primary" href="#/care?pay=${i.id}">Pay</a></div></div>`)}
+    ${serviceStrip()}
     <div class="dfy-trust">${PROMISES.map(([t, d]) => html`<details class="dfy-badge"><summary>${ICON.check}<b>${t}</b></summary><p>${d}</p></details>`)}</div>
     ${when(rev && IN_PERSON, careTeaser())}
 
@@ -104,6 +106,7 @@ export function services(el, params) {
       <div><span class="dfy-kicker">New here? Start with this</span><h2>${setup?.name}</h2><p>Send photos of your permits. We type everything in for you.</p>
         <p class="dfy-ho-meta"><b>${price(setup || {})}</b> · ${setup?.turnaround}</p></div>
       ${when(canEdit(), html`<button class="btn btn-primary" data-act="svc-request" data-code="setup_from_paper">Get a price</button>`)}</section>`)}
+    ${when(has('billpay'), html`<div data-billpay-slot></div>`)}
     <h2 class="dfy-menu-h">What we can do for you</h2>
     ${svc.length <= 8 ? '' : html`<nav class="dfy-jump" aria-label="Jump to a kind of service">${CATEGORIES.filter(([cat]) => svc.some((s) => s.category === cat)).map(([cat, title, , ic]) => html`<a href="#svc-${cat}" data-scroll-to="svc-${cat}">${ICON[ic] || ICON.check}${title}</a>`)}</nav>`}
     ${svc.length <= 8 ? html`<div class="svc-grid">${CATEGORIES.flatMap(([cat, title, , ic]) => svc.filter((s) => s.category === cat).map((s) => serviceCard(s, [title, ic])))}</div>`
@@ -117,6 +120,8 @@ export function services(el, params) {
         We only act with your written OK and follow each office's normal process. We never pay "fixers": that's against the law (RA 11032).</p>
       <details><summary>The full rules</summary><p class="small">${FINE_PRINT}</p></details>
       <a href="terms.html#services" target="_blank" rel="noopener">Done-for-you terms</a></section>`);
+  const slot = el.querySelector('[data-billpay-slot]');
+  if (slot) import('./office.js').then((m) => m.billPayCard()).then((h) => { if (slot.isConnected) slot.innerHTML = String(h || ''); }).catch(() => {});
   el.querySelectorAll('[data-scroll-to]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); document.getElementById(a.dataset.scrollTo)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
   // Links from a permit page or a notification open the request form straight away.
   const pre = params?.get('req');

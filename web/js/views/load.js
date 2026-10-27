@@ -6,6 +6,7 @@ import { html, openModal, confirmDialog, toast, toastError, when, fmtDate, fmtDa
 import { S, on, go, has, isOrgAdmin, reqById, typeOf, rerender } from '../core.js';
 import { ICON } from '../components.js';
 import { payDetails, paySettings } from './services.js';
+import { PLUS_MONTHLY } from '../prices.js';
 import * as db from 'pp/data';
 
 // ---------------------------------------------------------------- what's loaded for the page
@@ -116,36 +117,55 @@ function templatesCardUse(s) {
     <a class="btn btn-sm btn-soft" href="#/templates">See the templates</a>
   </section>`;
 }
+// The renewal season pass: a blue header with the price and what it's worth, then every benefit with its value.
+export const passPerks = (s, priceOf) => [
+  ...(!s?.plan_texts && s?.sms_ready !== false ? [[ICON.bell, 'Up to 100 text reminders', 'A text before each deadline, without using your credits', 2 * priceOf('texts_50')]] : []),
+  [ICON.check, 'One papers check', 'We check photos of your papers before you queue, so you file once', priceOf('papers_check')],
+  [ICON.file, 'One template of your choice', 'An authorization letter, SPA, affidavit or Secretary\'s Certificate, filled in for you', 500],
+  [ICON.calendar, 'Your January renewal plan', 'By email now, on December 1 and January 5: everything due, in order', 0],
+];
+export function passHeader(priceNow, perks, sub = '') {
+  const worth = perks.reduce((t, x) => t + Number(x[3] || 0), 0);
+  return html`<div class="pass-head"><div><span class="pass-kick">RENEWAL SEASON PASS</span><b class="pass-title">Breeze through the January rush</b>
+      ${sub ? html`<span class="pass-sub">${sub}</span>` : ''}</div>
+    <div class="pass-price">${worth > priceNow ? html`<s>Worth up to ${peso(worth)}</s>` : ''}<b>${peso(priceNow)}</b><span>once, September to February</span></div></div>`;
+}
+export const passList = (perks, used = {}) => html`<ul class="pass-perks">${perks.map(([ic, t, d, v], i) => html`<li class="${used[i] ? 'is-used' : ''}"><span class="pass-ic">${ic}</span>
+  <span><b>${t}</b><small>${d}</small></span><em>${used[i] ? used[i] : v ? `worth ${peso(v)}` : 'included'}</em></li>`)}</ul>`;
 function seasonCard(s, admin) {
   const p = s.pass;
-  const body = p ? html`<p><b>You have the ${p.season} pass</b>, good until ${fmtDate(p.ends_on)}.</p>
-      <ul class="load-list">
-        <li>${s.plan_texts ? 'Texts: included in your plan anyway' : html`Texts: ${p.texts_used} of ${p.texts_cap} used`}</li>
-        <li>Papers check: ${p.check_used ? 'used' : html`<b>one free check waiting</b>: open a permit and tap "Check my papers"`}</li>
-        <li>Your renewal plan by email on December 1 and January 5</li></ul>`
-    : s.season_on_sale ? html`<p>For the January rush, ${peso(price('season_pass'))} until ${fmtDate(s.season_ends)}:</p>
-      <ul class="load-list">
-        ${when(!s.plan_texts && s.sms_ready, html`<li>Up to 100 text reminders (no credits used)</li>`)}
-        <li>One papers check (worth ${peso(price('papers_check'))})</li>
-        <li>Your renewal plan by email: today, on December 1 and on January 5, listing everything due before ${fmtDate(s.season_ends)}</li></ul>
-      ${when(admin, html`<button class="btn btn-primary" data-act="load-season">Get the ${s.season_on_sale} pass · ${peso(price('season_pass'))}</button>`)}`
-    : html`<p>Texts, a papers check and a renewal plan for the January rush. On sale again from September 1.</p>`;
-  return html`<section class="card load-use ${p ? 'is-on' : ''}">
-    <div class="load-use-head"><span class="load-ic">${ICON.calendar}</span><div><h3>Renewal season pass</h3><p class="muted small">Most cities want permits renewed by January 20</p></div></div>
-    ${body}</section>`;
+  const perks = passPerks(s, price);
+  if (p) {
+    const used = {};
+    perks.forEach(([, t], i) => {
+      if (/text/.test(t)) used[i] = s.plan_texts ? 'in your plan' : `${p.texts_used} of ${p.texts_cap} used`;
+      if (/papers check/.test(t)) used[i] = p.check_used ? 'used' : 'ready';
+      if (/template/.test(t)) used[i] = p.template_used ? 'used' : 'ready';
+      if (/plan/.test(t) && !/text/.test(t)) used[i] = 'on';
+    });
+    return html`<section class="card load-use pass-card is-on">${passHeader(Number(p.price_php || price('season_pass')), perks, `You have the ${p.season} pass, good until ${fmtDate(p.ends_on)}`)}
+      ${passList(perks, used)}
+      <p class="muted small">${p.check_used ? '' : 'To use your papers check, open a permit and tap "Check my papers". '}${p.template_used ? '' : 'To use your template, open Templates and tap "Get it".'}</p></section>`;
+  }
+  if (!s.season_on_sale) {
+    return html`<section class="card load-use pass-card">${passHeader(price('season_pass'), perks, 'On sale again from September 1')}${passList(perks)}</section>`;
+  }
+  return html`<section class="card load-use pass-card">${passHeader(price('season_pass'), perks, `Good until ${fmtDate(s.season_ends)}. Most cities want renewals by January 20.`)}
+    ${passList(perks)}
+    ${when(admin, html`<div class="btn-row"><button class="btn btn-primary" data-act="load-season">Get the ${s.season_on_sale} pass · ${peso(price('season_pass'))}</button></div>`)}</section>`;
 }
 
 function inviteSection(s) {
   const n = s.invites;
   return html`<h2 class="section-label" id="invite">Invite a business</h2>
   <section class="card invite-card">
-    <p><b>Know another business owner who juggles permits?</b> Send them your link. When they've added 3 permits with their dates, you both get a month of Pinoy Permit Plus, free${s.has_plus ? ' (you already have Plus, so yours comes as ₱199 bonus load)' : ''}.</p>
+    <p><b>Know another business owner who juggles permits?</b> Send them your link. When they've added 3 permits with their dates, you both get a month of Pinoy Permit Plus, free${s.has_plus ? ' (you already have Plus, so yours comes as ${peso(PLUS_MONTHLY)} bonus load)' : ''}.</p>
     <div class="invite-row"><div class="invite-link" data-invite-link><span class="muted small">Getting your link…</span></div>
       <button class="btn btn-soft" data-act="invite-copy" disabled>Copy link</button>
       ${when(typeof navigator !== 'undefined' && navigator.share, html`<button class="btn btn-ghost" data-act="invite-share" disabled>Share</button>`)}</div>
     ${when(n.joined, html`<p class="small"><b>${plural(n.joined, 'business has', 'businesses have')} joined with your link.</b> ${n.rewarded} set up${n.pending ? `, ${n.pending} still adding permits` : ''}.</p>
       <div class="load-hist">${L.invites.map((i) => html`<div class="line"><div class="line-main"><b>A business joined ${fmtDate(i.joined_on)}</b>
-        <small>${i.status === 'rewarded' ? (i.my_reward === 'capped' ? "Set up. You've had this year's 6 thank-you months." : i.my_reward === 'bonus_load' ? 'Set up: ₱199 bonus load added' : 'Set up: your free month of Plus was added')
+        <small>${i.status === 'rewarded' ? (i.my_reward === 'capped' ? "Set up. You've had this year's 6 thank-you months." : i.my_reward === 'bonus_load' ? `Set up: ${peso(PLUS_MONTHLY)} bonus load added` : 'Set up: your free month of Plus was added')
           : i.status === 'void' ? "Didn't add permits within 90 days" : `${i.permits_with_dates} of 3 permits with dates so far`}</small></div>
         <span class="chip ${i.status === 'rewarded' ? 'ok' : i.status === 'void' ? 'needinfo' : 'progress'}">${i.status === 'rewarded' ? 'Thanked' : i.status === 'void' ? 'Closed' : 'Waiting'}</span></div>`)}</div>`)}
     <p class="muted small">Up to 6 thank-you months a year. Your link only works for new workspaces, and you can't invite yourself.</p>
@@ -247,7 +267,7 @@ async function spend({ title, what, amount, run, done }) {
     });
     return false;
   }
-  const yes = await confirmDialog(title, html`${what} for <b>${peso(amount)}</b> from your load. You'll have ${peso(have - amount)} left.`, { confirmLabel: amount ? `Yes, use ${peso(amount)}` : 'Yes', danger: false, cancelLabel: 'Not now' });
+  const yes = await confirmDialog(title, amount ? html`${what} for <b>${peso(amount)}</b> from your load. You'll have ${peso(have - amount)} left.` : html`${what}. Nothing comes out of your load.`, { confirmLabel: amount ? `Yes, use ${peso(amount)}` : 'Yes', danger: false, cancelLabel: 'Not now' });
   if (!yes) return false;
   try { await run(); await fetchLoad(); toast(done); rerender(); return true; }
   catch (e) {
@@ -272,7 +292,8 @@ on('load-season', () => {
 export async function unlockTemplateFlow(t, own) {
   const st = await loadState();
   if (!st || !onSale('template')) return toast("Templates can't be bought one by one right now.", 'error');
-  return spend({ title: `Get "${t.title}"?`, what: `"${t.title}", yours to keep (with future updates)`, amount: own ?? price('template'),
+  const pass = st.summary?.pass && !st.summary.pass.template_used && st.summary.pass.starts_on <= todayPH();
+  return spend({ title: `Get "${t.title}"?`, what: `"${t.title}", yours to keep (with future updates)${pass ? ', free with your season pass' : ''}`, amount: pass ? 0 : own ?? price('template'),
     run: () => db.unlockTemplate(S.org.id, t.code), done: `"${t.title}" is yours. Tap Fill in.` });
 }
 

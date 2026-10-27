@@ -42,7 +42,9 @@ export function effectivePlan() {
 
 // ---------------------------------------------------------------- Pinoy Permit Plus and staff licenses
 // The database decides (it refuses anything not paid for); these only decide what to show.
-export const TEAM_PLANS = ['fleet', 'firm', 'head_office', 'property', 'property_s'];
+export const TEAM_PLANS = ['fleet', 'multi', 'fleet_pro', 'enterprise', 'firm', 'head_office', 'property', 'property_s'];
+// Plans that come with Plus whatever the workspace type (the size plans).
+export const SIZE_PLANS = ['core', 'multi', 'fleet', 'fleet_pro', 'enterprise'];
 const todayISO = () => new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 10);
 export const plusOf = () => S.data?.plus || { addons: [], invoices: [], roles: [], submissions: [], stopping: {} };
 export const addonOf = (kind) => plusOf().addons.find((a) => a.kind === kind) || null;
@@ -50,7 +52,9 @@ export const addonActive = (a) => !!a && !!a.paid_through && a.paid_through >= t
 // Plus comes with every team plan (and its free trial).
 export function plusIncluded() {
   const o = S.org;
-  if (!o || o.kind === 'business') return false;
+  if (!o) return false;
+  if (SIZE_PLANS.includes(effectivePlan()?.id)) return true;
+  if (o.kind === 'business') return false;
   return (o.trial_ends_at && new Date(o.trial_ends_at) > new Date()) || TEAM_PLANS.includes(effectivePlan()?.id);
 }
 export const hasPlus = () => has('plus') && (addonActive(addonOf('plus')) || plusIncluded());

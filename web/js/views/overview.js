@@ -1,11 +1,13 @@
 // Dashboard, Compliance (filterable list) and Documents.
 import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js';
-import { S, on, hooks, canEdit, empty, has, memberName, serviceFor, careOf, service, coverOf, IN_PERSON } from '../core.js';
+import { S, on, hooks, canEdit, empty, has, memberName, careOf, service, IN_PERSON } from '../core.js';
 import { assignable, bulk, bulkBar } from './assign.js';
 import { filingsBrief } from './filings.js';
-import { STATUS, NEXT_ACTION, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, dueShort, dateTile, ICON } from '../components.js';
+import { STATUS, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, ICON } from '../components.js';
 import { accountantCard } from './brand.js';
 import { cityDashBanner } from './citydates.js';
+import { homeCal } from './homecal.js';
+import { serviceStrip } from './pricing.js';
 import * as db from 'pp/data';
 
 // ---------------------------------------------------------------- dashboard
@@ -26,10 +28,9 @@ export function dashboard(el) {
   }
   const c = counts(reqs);
   const open = reqs.filter((r) => r.status !== 'compliant').sort(byPriority);
-  if (skip >= open.length) skip = 0;
 
   el.innerHTML = String(html`
-    ${brief(first, c, open)}
+    ${homeCal(first, c)}
     ${cityDashBanner()}
     ${statTiles(c)}
     ${careNudge(open)}
@@ -38,6 +39,7 @@ export function dashboard(el) {
       ${open.length ? open.slice(0, 8).map((r) => reqRow(r)) : html`<div class="all-good">${ICON.check} Everything is compliant. Nice work.</div>`}
       ${when_(open.length, html`<div class="sheet-foot">${plural(open.length, 'open item')} across your businesses and vehicles</div>`)}
     </section>
+    ${serviceStrip()}
     ${accountantCard()}
   `);
   filingsBrief(el.querySelector('[data-filings-brief]'));
@@ -57,56 +59,6 @@ function careNudge(open) {
 }
 on('nudge-close', (ds, btn) => { try { localStorage.setItem(nudgeKey(), '1'); } catch { /* fine */ } btn.closest('.nudge')?.remove(); });
 
-// ---------------------------------------------------------------- daily brief
-// Greeting and a one-line summary on the left; "Do this first" on the right, with one button to press.
-let skip = 0;
-function greeting() {
-  const h = Number(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', hour12: false })) % 24;
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-}
-function brief(first, c, open) {
-  const today = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Manila', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  const parts = [];
-  if (c.action_required) parts.push(html`<b class="due overdue">${plural(c.action_required, 'overdue permit')}</b>`);
-  if (c.renew_soon) parts.push(html`<b class="due soon">${c.renew_soon} due within 30 days</b>`);
-  if (c.needs_information) parts.push(html`<b class="due needinfo">${plural(c.needs_information, 'permit')} missing details</b>`);
-  const say = !open.length ? html`Everything is compliant. Nothing needs you today.`
-    : html`You have ${parts.map((x, i) => html`${i ? (i === parts.length - 1 ? ' and ' : ', ') : ''}${x}`)}.${open.length > 1 ? ' Start with the one under “Do this first”.' : ''}`;
-  const r = open[skip];
-  const t = r && S.data.types.find((x) => x.code === r.type_code);
-  const hint = !r ? '' : r.status === 'action_required' ? 'It is past its expiry date. Late renewals usually pay a surcharge, so renew it as soon as you can.'
-    : r.status === 'renew_soon' ? 'Renew before the due date to avoid penalties and long queues.'
-    : r.status === 'in_progress' ? 'A renewal is under way. Record the new permit once you have it.'
-    : 'Add the missing details or document so Pinoy Permit can remind you on time.';
-  return html`
-    <section class="brief card">
-      <div class="brief-hello">
-        <div class="brief-date">${today}</div>
-        <h1>${greeting()}, ${first}.</h1>
-        <p class="brief-say">${say}</p>
-        <p class="brief-note">${c.compliant} of ${c.total} permits compliant${open.length ? html` · <a href="#/compliance">see all ${plural(open.length, 'open item')}</a>` : ''}</p>
-        ${(() => { const mine = has('assign') ? open.filter((r) => r.assignee_id === S.user?.id).length : 0;
-          return mine ? html`<p class="brief-note mine">${ICON.person} <a href="#/compliance?who=me">${plural(mine, 'open item')} handled by you</a></p>` : ''; })()}
-        <p class="brief-note mine" data-filings-brief hidden></p>
-      </div>
-      <div class="brief-focus">
-        ${r ? html`
-          <div class="brief-date">Do this first</div>
-          <a class="focus-item" href="#/requirement/${r.id}">${dateTile(r)}
-            <div><div class="focus-name">${r.name}</div><div class="focus-who">${subjectLabel(r)}</div><b class="due ${STATUS[r.status].cls}">${dueShort(r)}</b></div></a>
-          <p class="focus-hint">${t?.help_text ? t.help_text + ' ' : ''}${hint}</p>
-          <div class="btn-row">
-            ${canEdit() && r.next_action ? html`<button class="btn ${r.next_action === 'renew' ? 'btn-primary' : 'btn-soft'} focus-go" data-act="req-next" data-id="${r.id}">${NEXT_ACTION[r.next_action]}</button>`
-              : html`<a class="btn btn-primary focus-go" href="#/requirement/${r.id}">Open it</a>`}
-            ${when_(open.length > 1, html`<button class="btn btn-ghost" data-act="brief-skip">Skip for now</button>`)}
-          </div>
-          ${when_(has('revenue') && coverOf(r) && !r.open_request_id, html`<p class="focus-alt">${ICON.check} Covered by Year-round care: we'll start this renewal for you.</p>`)}
-          ${when_(has('services') && canEdit() && !r.open_request_id && !coverOf(r) && ['action_required', 'renew_soon'].includes(r.status) && serviceFor(r),
-            html`<p class="focus-alt">No time? <button class="linklike" data-act="svc-for-req" data-id="${r.id}">Have Pinoy Permit ${r.cycle_id ? 'renew' : 'get'} it for you</button></p>`)}` : html`<div class="brief-date">Do this first</div><div class="all-good">${ICON.check} Nothing to do. You're all caught up.</div>`}
-      </div>
-    </section>`;
-}
-on('brief-skip', () => { skip++; hooks.render(); });
 
 // ---------------------------------------------------------------- compliance
 const filters = { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', who: 'all', q: '' };

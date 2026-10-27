@@ -106,7 +106,7 @@ export function addonSection(pay) {
     ${billToggle('How often to pay for add-ons')}
     ${open.length ? html`<section class="card bills-due"><div class="card-head"><h2>To pay</h2></div>${open.map(billRow)}</section>` : ''}
     <div class="pp-grid">
-      ${addonCard({ id: 'plus-card', icon: ICON.share, name: 'Pinoy Permit Plus', who: 'Show customers you are legit, and let Pinoy Permit check your permits for you',
+      ${addonCard({ id: 'plus-card', icon: ICON.share, name: 'Pinoy Permit Plus', who: 'Track up to 5 businesses and vehicles, show customers you are legit, and let Pinoy Permit check your permits for you',
         monthly: included ? 0 : PLUS_MONTHLY, list: PLUS_CHECKS, status: plusStatus, cta: plusActions, current: plusOn || included,
         note: included ? '' : plus?.trial_used_on || plusOn ? '' : 'Try it free for 14 days. Nothing is charged after.' })}
       ${has('brand') && S.org.kind === 'firm' ? brandCard() : ''}

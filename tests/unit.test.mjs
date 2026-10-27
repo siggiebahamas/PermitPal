@@ -329,10 +329,10 @@ test('prices: 3 people free, ₱100 to the 20th, ₱60 to the 100th, ₱40 after
   for (let n = 3; n < 600; n++) assert.ok(staffMonthly(n + 1) > staffMonthly(n), `one more than ${n} never costs less`);
   assert.deepEqual(staffBands(25).map((b) => [b.count, b.each, b.amount]), [[17, 100, 1700], [5, 60, 300]]);
 });
-test('prices: yearly is 10 months; Plus is ₱199 or ₱1,990', () => {
+test('prices: yearly is 10 months; Plus is ₱149 or ₱1,490 (supabase/tests/25_brief.sql checks the same)', () => {
   assert.equal(addonPrice('staff', 25, 'yearly'), 20000);
-  assert.equal(addonPrice('plus', null, 'monthly'), 199);
-  assert.equal(addonPrice('plus', null, 'yearly'), 1990);
+  assert.equal(addonPrice('plus', null, 'monthly'), 149);
+  assert.equal(addonPrice('plus', null, 'yearly'), 1490);
   assert.equal(addonLabel('staff', 25, 'monthly'), 'Staff licenses, up to 25 people (monthly)');
   assert.equal(addonLabel('plus', null, 'yearly'), 'Pinoy Permit Plus (yearly)');
 });

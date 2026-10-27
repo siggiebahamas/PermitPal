@@ -46,6 +46,12 @@ browser.newPage = async (opts) => {
 };
 const results = [];
 const check = (name, cond, extra = '') => { results.push([cond ? 'PASS' : 'FAIL', name, extra]); };
+// A step that throws (a missing button, a timeout) stops the run: show every check so far, then the error.
+process.on('uncaughtException', (e) => {
+  for (const [s, n, x] of results) if (s === 'FAIL' || process.env.SMOKE_ALL) console.log(`${s} ${n}${s === 'FAIL' && x ? ' -> ' + x : ''}`);
+  console.log(`\nStopped after ${results.length} checks (${results.filter((r) => r[0] === 'FAIL').length} failed):`, e);
+  process.exit(1);
+});
 
 for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 860 }]]) {
   const page = await browser.newPage({ viewport });
@@ -63,6 +69,35 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: business name is escaped, not injected`, (await page.locator('text=Corner <Bakery> & Co').count()) > 0 && (await page.locator('main Bakery').count()) === 0);
   check(`${label}: BIR COR (never recorded) is NOT shown as compliant`,
     (await page.locator('.row.needinfo', { hasText: 'BIR Certificate' }).count()) > 0);
+
+  // Home: the month calendar with progress beside it; the old "Do this first" box is gone
+  check(`${label}: Home shows the month calendar with progress beside it`, (await page.locator('.home-cal .hc-grid .hc-day').count()) >= 28 && (await page.locator('.home-cal .hc-side .hc-bar').count()) === 1
+    && (await page.locator('.brief-focus').count()) === 0);
+  check(`${label}: today is marked on the calendar`, (await page.locator('.hc-day.is-today').count()) === 1);
+  check(`${label}: the status tiles and Next actions stay under it`, (await page.locator('.stats .stat').count()) === 5 && /Next actions/.test(await page.textContent('main')));
+  // an empty day: add a to-do
+  await page.locator('.hc-day:not(.has-due):not(.has-task):not(.is-past)').last().click(); await page.waitForSelector('#modal-root .modal');
+  check(`${label}: an empty day opens "Add a to-do" with that date`, /Add a to-do/.test(await page.textContent('#modal-root h3')) && !!(await page.inputValue('#modal-root [name=due_on]')));
+  await page.fill('#modal-root [name=title]', 'Pick up the cedula'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+  check(`${label}: the to-do shows on its day and in "Your to-dos"`, (await page.locator('.hc-day.has-task', { hasText: 'Pick up the cedula' }).count()) === 1 && /Pick up the cedula/.test(await page.textContent('.hc-todos')));
+  await page.locator('.hc-day.has-task').first().click(); await page.waitForSelector('#modal-root .modal');
+  check(`${label}: a day with a to-do lists it, with a Google Calendar link`, /Pick up the cedula/.test(await page.textContent('#modal-root')) && (await page.locator('#modal-root a[href^="https://calendar.google.com/"]').count()) === 1);
+  await page.keyboard.press('Escape');
+  await page.locator('.hc-todos [data-task-done]').first().click(); await page.waitForTimeout(400);
+  check(`${label}: ticking it off takes it off "Your to-dos"`, (await page.locator('.hc-todos').count()) === 0);
+  // a day with a deadline: straight to that permit, with the renewal open
+  const dueDay = page.locator('.hc-day.has-due').first();
+  if (await dueDay.count()) {
+    await dueDay.click(); await page.waitForTimeout(700);
+    check(`${label}: a deadline on the calendar opens that permit with its renewal started`, /#\/requirement\//.test(page.url()) && (await page.locator('#modal-root .modal').count()) === 1);
+    await page.keyboard.press('Escape'); await go('#/'); await page.waitForSelector('.home-cal');
+  }
+  await page.click('[data-act=cal-sync]'); await page.waitForSelector('#modal-root .modal');
+  check(`${label}: "Google Calendar" explains how to add the deadlines`, /Google Calendar/.test(await page.textContent('#modal-root')) && (await page.locator('#modal-root [data-act=calendar-export]').count()) >= 1);
+  await page.keyboard.press('Escape');
+  await page.click('[data-act=cal-month][data-n="1"]'); await page.waitForTimeout(200);
+  check(`${label}: the arrows move the month, and "Today" comes back`, (await page.locator('[data-act=cal-month][data-n="0"]').count()) === 1);
+  await page.click('[data-act=cal-month][data-n="0"]'); await page.waitForTimeout(200);
 
   for (const h of ['#/businesses', '#/businesses/b1', '#/vehicles', '#/vehicles/v1', '#/compliance', '#/documents', '#/pros', '#/network', '#/people', '#/costs', '#/sharing', '#/notifications', '#/history', '#/trash', '#/team', '#/settings', '#/settings/billing', '#/settings/workspace', '#/admin', '#/contact']) {
     await go(h);
@@ -100,7 +135,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check('desktop: sidebar always visible, no ☰ button', (await page.locator('.sidebar').isVisible()) && !(await page.locator('[data-act=menu-open]').isVisible()));
     // Keyboard: "Skip to content" comes first; a pop-up keeps Tab inside it, Escape closes it, focus goes back to its button.
     await go('#/businesses');
-    await page.evaluate(() => document.activeElement?.blur());
+    await page.evaluate(() => { document.activeElement?.blur(); document.body.tabIndex = -1; document.body.focus(); document.body.removeAttribute('tabindex'); });
     await page.keyboard.press('Tab');
     check('keyboard: the first Tab stop is "Skip to content"', await page.evaluate(() => document.activeElement?.classList.contains('skip-link')));
     await page.focus('main [data-act=biz-add]'); await page.keyboard.press('Enter'); await page.waitForSelector('#modal-root .modal');
@@ -112,14 +147,17 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   }
 
   if (label === 'phone') {
-    // Businesses list: one row per business, most urgent first, the overdue one shows its days-late box.
+    // Businesses list: the same cards as vehicles, most urgent first: every permit with its due date, the usual
+    // permits not tracked yet, and the name opens the business.
     await go('#/businesses');
-    const bizRows = page.locator('.blist .brow');
-    check('businesses list: one row per business, overdue first with a days-late box',
-      (await bizRows.count()) >= 1 && (await bizRows.first().locator('.days-box.late').count()) === 1 && (await bizRows.first().locator('.brow-req.overdue').count()) === 1);
-    await bizRows.first().click();
+    const bizCards = page.locator('main .cards .entity');
+    check('businesses list: one card per business, overdue first with a days-late box and every permit listed',
+      (await bizCards.count()) >= 1 && (await bizCards.first().locator('.days-box.late').count()) >= 1 && (await bizCards.first().locator('a.line').count()) >= 3);
+    check('businesses list: each card has a way to add a permit', (await page.locator('main .entity [data-act=req-add]').count()) >= (await bizCards.count()));
+    check('businesses list: no pop-up until you tap something', (await page.locator('#modal-root .modal').count()) === 0);
+    await bizCards.first().locator('.entity-head').click();
     await page.waitForTimeout(300);
-    check('tapping a business row opens that business', /^#\/businesses\/b\d/.test(await page.evaluate(() => location.hash)));
+    check('tapping a business card opens that business', /^#\/businesses\/b\d/.test(await page.evaluate(() => location.hash)));
 
     // Renew the overdue Mayor's Permit without a new file -> must not become compliant (bug #2).
     await go('#/businesses/b1');
@@ -209,7 +247,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await go('#/network');
     check('fleet board shows vehicles', (await page.locator('main h1:has-text("Fleet")').count()) === 1 && (await page.locator('.nb-table tbody tr').count()) >= 1);
     await go('#/settings/billing');
-    check('plans page shows team plans with prices', (await page.locator('main', { hasText: '₱1,490' }).count()) === 1);
+    check('plans page shows the fleet plans with prices', (await page.locator('main', { hasText: '₱2,999' }).count()) === 1 && (await page.locator('main [data-plan-card=fleet_pro]').count()) === 1);
     // Back to a single business for the rest of the tests.
     await go('#/settings/workspace');
     await page.click('#kind-form input[value=business]');
@@ -1270,8 +1308,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
       const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
       return b.textContent === 'One screen.' && b.getClientRects().length === 1 && b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 2;
     }));
-    check(`website ${label}: 8 worries taken away, and 8 lines on the free-plan receipt at ₱0.00`, (await p.locator('.lp-worry').count()) === 8
-      && (await p.locator('.lp-rc-lines li').count()) === 8 && /Total each month\s*₱0\.00/.test(await p.textContent('.lp-receipt')));
+    check(`website ${label}: 8 worries taken away, and 9 lines on the free-plan receipt at ₱0.00 (1 business + 1 vehicle first)`, (await p.locator('.lp-worry').count()) === 8
+      && (await p.locator('.lp-rc-lines li').count()) === 9 && /1 business \+ 1 vehicle/.test(await p.textContent('.lp-rc-lines li')) && /Total each month\s*₱0\.00/.test(await p.textContent('.lp-receipt')));
     check(`website ${label}: no prices on the home page`, (await p.locator('[data-plan-card], .bill-toggle, #pricing').count()) === 0);
     check(`website ${label}: nothing removed, and nothing Pinoy Permit doesn't do`, !/Head office|Year-round care|licensed firm|we verify|verified by Pinoy Permit|vetted|legal/i.test(text));
     check(`website ${label}: Plus mentioned only once its database part is on`, /Plus, more staff/.test(text) === (label !== 'live'));
@@ -1299,13 +1337,13 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
       check('website: "How it works" scrolls to the tour and keeps the address', (await p.evaluate(() => location.hash)) === before
         && (await p.evaluate(() => document.getElementById('tour').getBoundingClientRect().top)) < 200);
       await p.click('.lp-nav[href="#/pricing"]'); await p.waitForTimeout(500);
-      check('website: "Prices" opens the prices page at the top', /Simple prices/.test(await p.textContent('main h1')) && (await p.evaluate(() => scrollY)) === 0);
+      check('website: "Prices" opens the prices page at the top', /Peace of mind for every vehicle/.test(await p.textContent('main h1')) && (await p.evaluate(() => scrollY)) === 0);
     } else await p.evaluate(() => { location.hash = '#/pricing'; });
     await p.waitForSelector('#pricing [data-plan-card] .pp-amount');
     check(`website ${label}: the prices page lists Free and every team plan on sale`, (await p.locator('#pricing .pp-plan.pp-free').count()) === 1
-      && (await p.locator('#pricing [data-plan-card]').count()) === (label === 'live' ? 3 : 4)); // Small property comes with database file 8
+      && (await p.locator('#pricing [data-plan-card]').count()) === (label === 'live' ? 4 : 8)); // the size plans and Small property come with their database files
     check(`website ${label}: Plus shown on the prices page only once its database part is on`, (await p.locator('.lp-show').count()) === (label === 'live' ? 0 : 1));
-    check(`website ${label}: what load buys, with prices, only once its database part is on`, (await p.locator('.lp-load-card').count()) === (label === 'live' ? 0 : 5));
+    check(`website ${label}: what load buys, with prices, only once its database part is on`, (await p.locator('.lp-load-card').count()) === (label === 'live' ? 0 : 4) && (await p.locator('.lp-pass .pass-head').count()) === (label === 'live' ? 0 : 1));
     check(`website ${label}: prices page: no sideways scroll`, (await over(p)) <= 1, `${await over(p)}px`);
     await p.click('.lp-top .brand'); await p.waitForSelector('.lp-home h1');
     check(`website ${label}: the logo goes back home`, /Track and manage every permit/.test(await p.textContent('main h1')));
@@ -1675,41 +1713,52 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(450); };
     return { page, errs, go };
   };
-  const firm = (page) => page.locator('[data-plan-card=firm]').first();
+  const core = (page) => page.locator('[data-plan-card=core]').first();
   for (const [label, vp] of [['phone', { width: 360, height: 760 }], ['desktop', { width: 1280, height: 860 }]]) {
     const { page, errs } = await newPage({ PP_LOGGED_OUT: true }, vp);
-    await page.goto('http://localhost:4173/#/pricing'); await page.waitForSelector('#pricing [data-plan-card=property] .pp-amount');
-    check(`prices ${label}: the website lists Free and the 3 team plans, each with checkmarks`, (await page.locator('#pricing .pp-plan.pp-free').count()) === 1
-      && (await page.locator('#pricing [data-plan-card]').count()) === 4 && (await page.locator('#pricing [data-plan-card=firm] .pp-checks li').count()) >= 8);
-    check(`prices ${label}: each plan shows a picture of its board and 3 big wins`, (await page.locator('#pricing [data-plan-card] .pp-preview').count()) === 4
-      && (await page.locator('#pricing [data-plan-card=fleet] .pp-wins li').count()) === 3 && /Off the road/.test(await page.locator('#pricing [data-plan-card=fleet] .pp-preview').textContent()));
-    check(`prices ${label}: the full list opens from "Everything included"`, !(await page.locator('#pricing [data-plan-card=firm] .pp-all .pp-checks').isVisible()));
-    await page.locator('#pricing [data-plan-card=firm] .pp-all summary').click(); await page.waitForTimeout(100);
-    check(`prices ${label}: ...and shows every checkmark`, await page.locator('#pricing [data-plan-card=firm] .pp-all .pp-checks').isVisible());
+    await page.goto('http://localhost:4173/#/pricing'); await page.waitForSelector('#pricing [data-plan-card=core] .pp-amount');
+    // the software-only rule, above the fold and above the cards
+    check(`prices ${label}: the headline, and that plans are tracking and planning software only`, /Peace of mind for every vehicle you manage/.test(await page.textContent('main h1'))
+      && /tracking and planning software only/.test(await page.textContent('.lp-pricing')) && /SOFTWARE SUBSCRIPTIONS = TRACKING & PLANNING ONLY/.test(await page.textContent('#pricing .pp-swbanner')));
+    const order = await page.evaluate(() => { const b = document.querySelector('#pricing .pp-swbanner'); const c = document.querySelector('#pricing [data-plan-card]'); return !!(b && c && (b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING)); });
+    check(`prices ${label}: the banner sits directly above the plan cards`, order);
+    check(`prices ${label}: Free, Plus and Core, then Multi-Vehicle, Fleet, Fleet Pro and Enterprise, then the property plans`, (await page.locator('#pricing .pp-plan.pp-free').count()) === 1
+      && (await page.locator('#pricing [data-plan-card]').count()) === 8 && (await page.locator('#pricing .pp-tier').count()) === 6);
+    const c = await core(page).textContent();
+    check(`prices ${label}: Core: ₱799 a month, up to 15 records, 3 users, the per-vehicle line with its condition`, /₱799\s*\/month/.test(c) && /Up to 15 businesses and vehicles together/.test(c)
+      && /Up to 3 users/.test(c) && /₱53\.27 per vehicle\/month when all 15 records are vehicles/.test(c), c.replace(/\s+/g, ' ').slice(0, 260));
+    check(`prices ${label}: each fleet plan shows its range and per-vehicle figure`, /16 to 30 vehicles/.test(await page.textContent('[data-plan-card=multi]')) && /₱49\.97/.test(await page.textContent('[data-plan-card=multi]'))
+      && /₱39\.99/.test(await page.textContent('[data-plan-card=fleet]')) && /₱33\.33/.test(await page.textContent('[data-plan-card=fleet_pro]')) && /Quoted/.test(await page.textContent('[data-plan-card=enterprise]')));
+    check(`prices ${label}: every card says software only`, (await page.locator('#pricing .pp-tier .pp-swonly').count()) === 6);
+    const band = await page.textContent('#pricing .pp-peace');
+    check(`prices ${label}: under the plans, "As low as ₱33.33" per vehicle, with every assumption`, /A little peace of mind, for less than you might think/.test(band) && /As low as\s*₱33\.33\*/.test(band)
+      && /billed at the monthly plan price, not as a separate per-car charge/.test(band) && /Core ₱53\.27\/vehicle at 15 vehicles only when all 15 records are vehicles/.test(band) && /Actual cost per vehicle is higher/.test(band));
+    const help = await page.textContent('#pricing .pp-helpwrap');
+    check(`prices ${label}: "Need us to handle the renewal?" with three separate services`, /Need us to handle the renewal\?/.test(help) && (await page.locator('#pricing .pp-help').count()) === 3
+      && /Renewal Assistance/.test(help) && /₱499 one-time/.test(help) && /From ₱1,000/.test(help) && /Coming soon/.test(help) && /Quoted after review/.test(help));
+    check(`prices ${label}: Full-Service says it's coming, with no button to buy it`, (await page.locator('#pricing .pp-help-soon .btn').count()) === 0 && /building a team of trusted, verified runners/.test(await page.textContent('#pricing .pp-help-soon')));
+    check(`prices ${label}: monthly shows the price, a day, and offers yearly with the saving`, /less than ₱27 a day/.test(c) && /Pay yearly and get 2 months FREE: save ₱1,598/.test(c));
     const small = await page.locator('#pricing [data-plan-card=property_s]').textContent();
     check(`prices ${label}: a Small property plan for up to 20 tenants at ₱2,990`, /₱2,990/.test(small) && /up to 20 tenants/i.test(small) && /less than ₱150 a tenant/.test(small), small.replace(/\s+/g, ' ').slice(0, 160));
-    const f = await firm(page).textContent();
-    check(`prices ${label}: monthly shows the price, a day and per client`, /₱1,990\s*\/month/.test(f) && /less than ₱66 a day/.test(f) && /With 40 clients: less than ₱50 a client/.test(f), f.replace(/\s+/g, ' ').slice(0, 200));
-    check(`prices ${label}: monthly also offers yearly with the saving`, /Pay yearly and get 2 months FREE: save ₱3,980/.test(f));
     const prop = await page.locator('#pricing [data-plan-card=property]').textContent();
     check(`prices ${label}: the property plan says why it costs more`, /Why it costs more/.test(prop) && /full-time admin/.test(prop) && /₱9,990/.test(prop));
     await page.locator('#pricing .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
-    const y = await firm(page).textContent();
-    check(`prices ${label}: yearly shows 2 months free, the old price crossed out and the saving`, /2 months FREE/i.test(y) && /₱1,658\s*\/month/.test(y) && /₱23,880\s*₱19,900 once a year/.test(y) && /You save ₱3,980/.test(y), y.replace(/\s+/g, ' ').slice(0, 220));
-    const cal = firm(page).locator('.year-cal');
+    const y = await core(page).textContent();
+    check(`prices ${label}: yearly shows 2 months free, the old price crossed out and the saving`, /2 months FREE/i.test(y) && /₱666\s*\/month/.test(y) && /₱9,588\s*₱7,990 once a year/.test(y) && /You save ₱1,598/.test(y), y.replace(/\s+/g, ' ').slice(0, 220));
+    const cal = core(page).locator('.year-cal');
     check(`prices ${label}: the next 12 months as calendar pages, the last 2 free`, (await cal.locator('.yc').count()) === 12 && (await cal.locator('.yc-free').count()) === 2
-      && /FREE/.test(await cal.locator('.yc-free').first().textContent()) && /You pay \w{3} to \w{3}\. \w{3} and \w{3} are on us\./.test(await firm(page).textContent()));
+      && /FREE/.test(await cal.locator('.yc-free').first().textContent()) && /You pay \w{3} to \w{3}\. \w{3} and \w{3} are on us\./.test(await core(page).textContent()));
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const thisMonth = months[Number(new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(5, 7)) - 1];
     check(`prices ${label}: the calendar starts this month`, (await cal.locator('.yc b').first().textContent()) === thisMonth);
     check(`prices ${label}: every switch on the page moved to yearly`, (await page.locator('.bill-toggle input[value=yearly]:checked').count()) === (await page.locator('.bill-toggle').count()));
     check(`prices ${label}: add-ons show the staff price ladder with savings`, /FREE/.test(await page.locator('#lp-staff .ladder').textContent()) && /40% off/.test(await page.locator('#lp-staff').textContent())
       && /60% off/.test(await page.locator('#lp-staff').textContent()) && /save ₱9,200/.test(await page.locator('#lp-staff .staff-ex').textContent()));
-    check(`prices ${label}: Plus yearly is ₱1,990 with ₱398 saved`, /₱1,990 once a year/.test(await page.locator('#lp-plus').textContent()) && /You save ₱398/.test(await page.locator('#lp-plus').textContent()));
+    check(`prices ${label}: Plus yearly is ₱1,490 with ₱298 saved`, /₱1,490 once a year/.test(await page.locator('[data-plan-card=plus]').textContent()) && /You save ₱298/.test(await page.locator('[data-plan-card=plus]').textContent()));
     await page.locator('#pricing .pp-compare summary').click(); await page.waitForTimeout(100);
-    check(`prices ${label}: everything side by side`, (await page.locator('#pricing .pp-table tbody tr').count()) >= 15);
-    await page.reload(); await page.waitForSelector('#pricing [data-plan-card=firm] .pp-amount');
-    check(`prices ${label}: the choice is remembered on this device`, /₱1,658/.test(await firm(page).textContent()));
+    check(`prices ${label}: everything side by side`, (await page.locator('#pricing .pp-table tbody tr').count()) >= 10 && /Separate service/.test(await page.textContent('#pricing .pp-table')));
+    await page.reload(); await page.waitForSelector('#pricing [data-plan-card=core] .pp-amount');
+    check(`prices ${label}: the choice is remembered on this device`, /₱666/.test(await core(page).textContent()));
     const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     check(`prices ${label}: no sideways scroll on the website`, over <= 1, `${over}px`);
     check(`prices ${label}: website: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
@@ -1718,15 +1767,18 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
 
   // In the app: the Plan page, the add-ons switch, paying a team plan for a year.
   {
-    const { page, errs, go } = await newPage({ PP_TEAM: true });
+    const { page, errs, go } = await newPage({ PP_TEAM: true, PP_LIMITS: true });
     await page.goto('http://localhost:4173/#/settings/billing'); await page.waitForSelector('#addons');
-    check('prices app: the Plan page shows the plan cards', (await page.locator('main [data-plan-card]').count()) === 4 && (await page.locator('main .pp-free .chip', { hasText: 'Your plan' }).count()) === 1);
+    check('prices app: the Plan page shows the size plans, Free marked as yours', (await page.locator('main [data-plan-card]').count()) === 6 && (await page.locator('main .pp-free .chip', { hasText: 'Your plan' }).count()) === 1);
+    check('prices app: how much of the plan is used, and that nothing is ever deleted', /of 2\s*businesses and vehicles used/.test(await page.textContent('main .plan-usage')) && /never deletes or hides anything/.test(await page.textContent('main .plan-usage')));
+    check('prices app: Core can be paid for right here', (await page.locator('main .plan-pay').count()) === 1 && /₱799/.test(await page.textContent('main .plan-pay')));
+    check('prices app: the separate services are on the Plan page too', (await page.locator('main .pp-help').count()) === 3);
     const plusBtn = page.locator('#plus-card [data-act=addon-choose][data-kind=plus]');
-    check('prices app: Plus is offered monthly', /₱199 a month/.test(await plusBtn.textContent()));
+    check('prices app: Plus is offered monthly at ₱149', /₱149 a month/.test(await plusBtn.textContent()));
     await page.locator('main .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
-    check('prices app: switching to yearly changes the button too', /₱1,990 a year \(2 months free\)/.test(await plusBtn.textContent()) && (await plusBtn.getAttribute('data-billing')) === 'yearly');
+    check('prices app: switching to yearly changes the button too', /₱1,490 a year \(2 months free\)/.test(await plusBtn.textContent()) && (await plusBtn.getAttribute('data-billing')) === 'yearly');
     await plusBtn.click(); await page.waitForSelector('#modal-root .modal');
-    check('prices app: the yearly bill is ₱1,990', /Pinoy Permit Plus \(yearly\)/.test(await page.textContent('#modal-root')) && /Get the bill: ₱1,990/.test(await page.textContent('#modal-root')));
+    check('prices app: the yearly bill is ₱1,490', /Pinoy Permit Plus \(yearly\)/.test(await page.textContent('#modal-root')) && /Get the bill: ₱1,490/.test(await page.textContent('#modal-root')));
     await page.click('#modal-root [data-modal-close]');
     await page.fill('[data-staff-calc] [name=people]', '50'); await page.waitForTimeout(100);
     const calc = await page.textContent('[data-staff-calc] .calc-out');
@@ -1777,8 +1829,54 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   {
     const { page, errs } = await newPage({ PP_TEAM: true }, { width: 390, height: 844 });
     await page.goto('http://localhost:4173/#/network'); await page.waitForSelector('main [data-plan-card]');
-    check('prices team tools: the plans with checkmarks and a trial button each', (await page.locator('main [data-plan-card]').count()) === 4 && (await page.locator('main [data-act=nb-set-kind]').count()) === 4);
+    check('prices team tools: the fleet and property plans, with a trial button each', (await page.locator('main [data-plan-card]').count()) === 5 && (await page.locator('main [data-act=nb-set-kind]').count()) === 5);
     check('prices team tools: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // Plan limits: the Free plan's room is shown before you hit it; when it's full, "Add" explains and points to the plans.
+  {
+    const { page, errs, go } = await newPage({ PP_LIMITS: true }, { width: 390, height: 844 });
+    await page.goto('http://localhost:4173/#/businesses'); await page.waitForSelector('main h1');
+    check('limits: the Businesses page says how much of the plan is used', /of 2 businesses and vehicles on Free/.test(await page.textContent('main .room-line')) && (await page.locator('main .room-line.full').count()) === 1);
+    await page.click('button:has-text("Add business")'); await page.waitForSelector('#modal-root .modal');
+    check('limits: when full, "Add" explains the limit and that nothing is removed', /Your plan is full/.test(await page.textContent('#modal-root h3')) && /Everything you track now stays/.test(await page.textContent('#modal-root')));
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+    check('limits: "See plans" opens the Plan page', /#\/settings\/billing/.test(page.url()));
+    await go('#/vehicles');
+    check('limits: the Vehicles page shows it too', (await page.locator('main .room-line').count()) === 1);
+    const blocked = await page.evaluate(async () => { try { await (await import('/__mock/mock-data.js')).createVehicle('o1', { make_model: 'X', plate_no: 'ZZZ 999', vehicle_type: 'Sedan' }); return 'added'; } catch (e) { return e.message; } });
+    check('limits: the data layer refuses past the limit too, with what to do', /Your Free plan tracks up to/.test(blocked) && /Settings > Plan/.test(blocked), blocked);
+    check('limits: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // Sources and copies: the LTO checklist says what you send us and what the LTO itself needs, with its source; a city
+  // permit shows the city's entry in the register (Makati: not confirmed yet), and staff can edit the register.
+  {
+    const { page, errs, go } = await newPage({}, { width: 1280, height: 900 });
+    await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+    const ids = await page.evaluate(async () => { const d = await (await import('/__mock/mock-data.js')).loadOrgData();
+      return { lto: d.reqs.find((r) => r.type_code === 'lto_registration').id, mp: d.reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b1').id }; });
+    await go('#/requirement/' + ids.lto); await page.waitForSelector('.checklist');
+    await page.evaluate(() => { document.querySelector('.checklist').open = true; });
+    const ck = await page.textContent('.checklist');
+    check('sources: the LTO checklist names its official source and when it was checked', /LTO NCR: Renewal of Motor Vehicle Registration/.test(ck) && /checked/.test(ck) && /Partly verified/.test(ck));
+    check('sources: each LTO item says what to send us and, separately, what the LTO needs', /Send us:\s*Digital copy for pre-check/.test(ck) && /LTO needs:\s*Original must be submitted/.test(ck)
+      && /LTO needs:\s*Electronic transmission by issuer required/.test(ck) && /Unverified: confirm first/.test(ck));
+    check('sources: a red note that a scan never replaces an original', /doesn't replace an original/.test(await page.textContent('.ck-orig')));
+    await go('#/requirement/' + ids.mp); await page.waitForSelector('.checklist');
+    await page.evaluate(() => { document.querySelector('.checklist').open = true; });
+    const city = await page.textContent('.ck-city');
+    check('sources: a Makati business permit shows Makati\'s entry: not confirmed yet, with how it takes payment', /Makati City/.test(city) && /Needs official confirmation/.test(city)
+      && /Requirements being verified/.test(city) && /Reported, not yet confirmed/.test(city));
+    await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=cities]'); await page.waitForSelector('.lgu-admin');
+    check('register: staff see all 17 Metro Manila cities', (await page.locator('.lgu-admin .line').count()) === 17);
+    await page.locator('.lgu-admin [data-act=adm-lgu-edit][data-key=makati]').click(); await page.waitForSelector('#modal-root [name=online_payment]');
+    await page.selectOption('#modal-root [name=online_payment]', 'yes'); await page.selectOption('#modal-root [name=status]', 'partial');
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(200);
+    check('register: a change needs a reason', /Please fill in: Why the change\?/.test(await page.textContent('#modal-root .modal-error')));
+    await page.fill('#modal-root [name=reason]', 'Confirmed on the city page'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+    check('register: saved, and Makati now takes online payment', /pay online: yes/.test(await page.textContent('.lgu-admin')) && (await page.evaluate(async () => (await import('/__mock/mock-data.js')).__lgus.find((g) => g.city_key === 'makati').online_payment)) === 'yes');
+    check('sources/register: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
     await page.close();
   }
 }
@@ -1828,13 +1926,17 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   // the season pass (on sale September to January)
   const season = await mock(async () => (await (await import('/__mock/mock-data.js')).loadSummary()).season_on_sale);
   if (season) {
+    check(`load ${label}: the season pass has a blue header, its price and what it's worth`, (await page.locator('.pass-card .pass-head').count()) === 1 && /₱600/.test(await page.textContent('.pass-card .pass-price')) && /Worth up to/.test(await page.textContent('.pass-card .pass-price')));
+    check(`load ${label}: ...and lists all four benefits, template included`, (await page.locator('.pass-card .pass-perks li').count()) === 4 && /One template of your choice/.test(await page.textContent('.pass-card')));
+    await mock(async () => { (await import('/__mock/mock-data.js')).__load.wallet.paid_php = 1000; });
+    await go('#/'); await go('#/load'); await page.waitForSelector('.load-hero');
     await page.click('[data-act=load-season]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
-    check(`load ${label}: the season pass is on, with its check waiting`, (await bal()) === '₱302' && /You have the \d{4} pass/.test(await page.textContent('main')) && /one free check waiting/.test(await page.textContent('main')));
+    check(`load ${label}: the season pass is on, with its check and template ready`, (await bal()) === '₱400' && /You have the \d{4} pass/.test(await page.textContent('main')) && (await page.locator('.pass-card li.is-used em', { hasText: 'ready' }).count()) === 2);
   }
   // a papers check, from the permit's page
   const mp = await mock(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b1').id);
   await go('#/requirement/' + mp); await page.waitForSelector('.papers-card');
-  check(`load ${label}: a permit offers a papers check${season ? ', free with the pass' : ' for ₱149'}`, new RegExp(season ? 'free with your season pass' : '₱149').test(await page.textContent('.papers-card')));
+  check(`load ${label}: a permit offers a papers check${season ? ', free with the pass' : ' for ₱499'}`, new RegExp(season ? 'free with your season pass' : '₱499').test(await page.textContent('.papers-card')));
   await page.click('[data-act=papers-open]'); await page.waitForSelector('#modal-root .modal');
   check(`load ${label}: the form lists the permit's checklist and the deadline`, (await page.locator('#modal-root .pc-list li').count()) >= 3 && /answers by/.test(await page.textContent('#modal-root')));
   await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(200);
@@ -1866,7 +1968,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   // one template at a time (no Plus here); enough load for the dearest one
   await mock(async () => { (await import('/__mock/mock-data.js')).__load.wallet.paid_php = 3000; });
   await go('#/'); await go('#/load'); await page.waitForSelector('.load-hero'); await go('#/templates'); await page.waitForSelector('[data-act=tpl-unlock]');
-  check(`load ${label}: without Plus, each template can be bought on its own`, /₱(350|700|1,050|2,100)/.test(await page.locator('[data-act=tpl-unlock]').first().textContent()));
+  check(`load ${label}: without Plus, each template can be bought on its own${season ? ' (the first is free with the pass)' : ''}`, (season ? /free with your pass/ : /₱(150|250|350|500)/).test(await page.locator('[data-act=tpl-unlock]').first().textContent()));
   await page.locator('[data-act=tpl-unlock]').first().click(); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
   check(`load ${label}: bought: it's yours, and it fills in`, (await page.locator('main .chip', { hasText: 'Yours' }).count()) === 1);
   await page.locator('[data-act=tpl-fill]').first().click(); await page.waitForTimeout(500);
@@ -1975,6 +2077,15 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await submit();
   check(`clock ${label}: got it: the clock stops and says how late the office was`, /working days? late/.test(await page.textContent('#clock')) && /Waiting on the office/.test(await page.textContent('#clock')));
 
+  // the offer: a business permit in Makati (online payment not confirmed yet) says in-person runs are coming
+  check(`bills ${label}: Makati isn't confirmed for online payment, so the offer says in-person runs are coming soon`, /In-person bill runs are on the way/.test(await page.textContent('#bills'))
+    && /building a team of trusted runners/.test(await page.textContent('#bills')) && (await page.locator('#bills [data-act=bill-add][data-mode=permitpal]').count()) === 0);
+  const groups = await page.$$eval('#bills [data-bill-pick] optgroup', (gs) => gs.map((g) => g.label));
+  check(`bills ${label}: the dropdown splits bills we can pay online from the ones that need a counter`, groups.some((g) => /Coming soon/.test(g)));
+  // once Makati's online payment is confirmed (staff mark it in the city register), Pinoy Permit can pay it
+  await page.evaluate(async () => { (await import('/__mock/mock-data.js')).__lgus.find((g) => g.city_key === 'makati').online_payment = 'yes'; });
+  await page.evaluate(async () => { location.hash = '#/'; }); await page.waitForTimeout(200);
+  await go('#/requirement/' + req.id); await page.waitForSelector('#bills');
   // the offer: Pinoy Permit pays it, flat fee, up front
   check(`bills ${label}: the card offers "Let Pinoy Permit pay it" at ₱499 flat, with why`, /Let Pinoy Permit pay it: ₱499 flat/.test(await page.textContent('#bills'))
     && (await page.locator('#bills .bill-offer-list li').count()) === 3 && !/guarantee|we pay the surcharge|we cover/i.test(await page.textContent('#bills')));
