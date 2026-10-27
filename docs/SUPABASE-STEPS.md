@@ -1,8 +1,8 @@
-# Supabase: every step, in order (as of database file 17)
+# Going live: every step, in order (as of database file 17)
 
 Do these on a computer, in your Pinoy Permit project (`zeaiwvgktakbwnqpchbo`). Never the Nifti project.
-About 10 minutes. The website and the phone app update by themselves when code is pushed; these steps are only the
-database and the calendar link, which have to be done in Supabase.
+The website and the phone app update by themselves when code is pushed (about 10 minutes). Everything below has to be
+done by you, once, in Supabase, Resend or GitHub. Parts A–E are needed before real customers; Part F is optional.
 
 ## Part A: the database (5 minutes)
 
@@ -42,8 +42,53 @@ database and the calendar link, which have to be done in Supabase.
     - It shows **ok** → done.
     - It mentions JWT or "unauthorized" → step 13 didn't save; do it again.
 
-## Part C: see it working (1 minute)
+15. Reload Pinoy Permit (on a phone: close the app and open it again). On Home, tap **Google Calendar**: it should say
+    **Add to Google Calendar**.
 
-15. Open Pinoy Permit and reload the page (on a phone: close the app and open it again).
-16. On Home, tap **Google Calendar**. It should now say **Add to Google Calendar**. Tap it, Google asks
-    "Add this calendar?", tap **Add**. Every deadline and to-do now shows in Google Calendar and stays up to date.
+## Part C: email, so reminders and sign-up emails actually go out (20 minutes, free)
+
+Without this, nobody gets reminder emails and new customers can't confirm their sign-up.
+
+16. Buy a domain, e.g. at https://dash.cloudflare.com (Domain Registration; a `.com` is about US$10 a year).
+    Tell Claude the domain and it will point the website at it too.
+17. Make a free account at https://resend.com. Click **Domains** → **Add domain**, type your domain, and copy the
+    records it shows into your domain's DNS (in Cloudflare: your domain → **DNS** → **Add record**). Wait until Resend
+    says **Verified**.
+18. In Resend: **API Keys** → **Create API key**. Copy it (it starts with `re_`).
+19. Supabase → https://supabase.com/dashboard/project/zeaiwvgktakbwnqpchbo/functions/secrets → add two secrets:
+    - `RESEND_API_KEY` = the key from step 18
+    - `EMAIL_FROM` = `Pinoy Permit <reminders@YOURDOMAIN.com>`
+20. Supabase → **Authentication** → **Emails** → **SMTP Settings** → turn on **Custom SMTP** and fill in:
+    host `smtp.resend.com`, port `465`, username `resend`, password = the key from step 18,
+    sender email `hello@YOURDOMAIN.com`, sender name `Pinoy Permit`. Save.
+21. In Pinoy Permit: **Admin** → **Messages** → **Send me a test email**. It should arrive within a minute.
+
+## Part D: logins (2 minutes)
+
+22. Supabase → **Authentication** → **URL Configuration**. Set **Site URL** to `https://siggiebahamas.github.io/PermitPal/`
+    (or your own domain once Claude has pointed it), and add the same address under **Redirect URLs**. Save.
+23. Sign up in Pinoy Permit with your own admin email and confirm it. That account becomes staff automatically.
+
+## Part E: nightly backups (5 minutes)
+
+24. GitHub → https://github.com/siggiebahamas/PermitPal/settings/secrets/actions → **New repository secret**, four times:
+    - `SUPABASE_DB_URL`: Supabase → **Connect** → **Session pooler** string, with your database password in it
+    - `SUPABASE_URL`: `https://zeaiwvgktakbwnqpchbo.supabase.co`
+    - `SUPABASE_SERVICE_ROLE_KEY`: Supabase → **Project Settings** → **API Keys** → the secret key
+    - `BACKUP_PASSPHRASE`: any long phrase you make up. Keep it in a password manager: backups can't be opened without it.
+25. GitHub → **Actions** → **Nightly backup** → **Run workflow**. It should finish green.
+
+## Part F (optional, costs money): WhatsApp reminders
+
+WhatsApp reminders are already built; they switch on when these are added. They are **not free**: Meta charges per
+reminder (rates by country at https://developers.facebook.com/docs/whatsapp/pricing) and needs your business verified.
+Viber is not built: it costs at least about €100 a month before any messages.
+
+26. Make a Meta Business account and verify your business (DTI/SEC papers), then set up WhatsApp at
+    https://developers.facebook.com/apps → **Create app** → **Business** → add **WhatsApp**.
+27. Create a message template named `permit_reminder` (category **Utility**, language **English**) with this text, and
+    submit it for approval:
+    `Hi {{1}}, you have {{2}} permit deadline(s) coming up, starting with {{3}}. See them here: {{4}}`
+28. Supabase → Edge Functions → Secrets → add `WHATSAPP_TOKEN` (a permanent access token) and `WHATSAPP_PHONE_ID`
+    (from WhatsApp → API Setup).
+29. Tell Claude it's on, so the "WhatsApp reminders" switch can be shown in Settings.
