@@ -3,7 +3,7 @@
 Do this once. It takes about 5 minutes. Until you do, the "Google Calendar" button on Home gives customers a
 one-time file instead.
 
-**Before you start:** run database file 16 (`supabase/manual/2026-11-02-brief.sql`) in the SQL Editor.
+**Before you start:** run database file 16 (see `docs/SUPABASE-STEPS.md`, which has every step in one place).
 
 1. Open https://github.com/siggiebahamas/PermitPal/blob/main/supabase/functions/calendar-feed/index.ts
    and click the **Copy raw file** button (two overlapping squares, top right of the code).

@@ -71,8 +71,18 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     (await page.locator('.row.needinfo', { hasText: 'BIR Certificate' }).count()) > 0);
 
   // Home: the month calendar with progress beside it; the old "Do this first" box is gone
-  check(`${label}: Home shows the month calendar with progress beside it`, (await page.locator('.home-cal .hc-grid .hc-day').count()) >= 28 && (await page.locator('.home-cal .hc-side .hc-bar').count()) === 1
-    && (await page.locator('.brief-focus').count()) === 0);
+  check(`${label}: Home shows the month calendar with "Up next", New to-do and Google Calendar beside it`, (await page.locator('.home-cal .hc-grid .hc-day').count()) >= 28
+    && (await page.locator('.home-cal .hc-side .hc-up').count()) >= 1 && (await page.locator('.hc-side .hc-btns [data-act=cal-sync]').count()) === 1
+    && (await page.locator('.hc-side .hc-btns [data-new="1"]').count()) === 1 && (await page.locator('.hc-bar').count()) === 0 && (await page.locator('.brief-focus').count()) === 0);
+  check(`${label}: the navy band says what's past due, in white, with a link to the list`,
+    /1 permit is past due/.test(await page.textContent('.hs-band')) && (await page.locator('.hs-band a[href="#/compliance?status=action_required"]').count()) === 1
+    && await page.evaluate(() => getComputedStyle(document.querySelector('.hs-line')).color) === 'rgb(255, 255, 255)');
+  check(`${label}: Next actions: renew-soon rows show "Due in N days" in the pill and no days under the name; Overdue stays`,
+    (await page.locator('.home-next .row.soon .chip.soon', { hasText: /^Due in \d+ days?$/ }).count()) >= 1 && (await page.locator('.home-next .row.soon .row-sub .due').count()) === 0
+    && (await page.locator('.home-next .row.overdue .chip.overdue', { hasText: 'Overdue' }).count()) >= 1 && (await page.locator('.home-next .row.overdue .row-sub .due').count()) === 0);
+  await go('#/compliance'); await page.waitForSelector('.row');
+  check(`${label}: the Compliance list keeps the days under each name`, (await page.locator('.row .row-sub .due').count()) >= 1);
+  await go('#/'); await page.waitForSelector('.home-cal');
   check(`${label}: today is marked on the calendar`, (await page.locator('.hc-day.is-today').count()) === 1);
   check(`${label}: the status tiles and Next actions stay under it`, (await page.locator('.stats .stat').count()) === 5 && /Next actions/.test(await page.textContent('main')));
   // an empty day: add a to-do

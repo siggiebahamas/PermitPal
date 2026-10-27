@@ -2272,15 +2272,9 @@ a.pk-tag:hover { filter: brightness(.96); text-decoration: underline; }
 .dfy-bills { margin-bottom: 18px; }
 
 /* Home: the month calendar with your progress beside it */
-.home-cal { padding: 0; overflow: hidden; }
-.hc-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 18px 20px 12px; }
-.hc-head h1 { margin: 2px 0 0; font-size: clamp(24px, 3.4vw, 32px); letter-spacing: -.5px; }
-.hc-date { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-.hc-body { display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--rule); }
-@media (min-width: 900px) { .hc-body { grid-template-columns: minmax(0, 1fr) 290px; } .hc-side { border-left: 1px solid var(--rule); border-top: 0 !important; } }
+@media (min-width: 900px) { .home-cal .hc-body { grid-template-columns: minmax(0, 1fr) 320px; } .hc-side { border-left: 1px solid var(--rule); border-top: 0 !important; } }
 .hc-month { padding: 14px 16px 12px; min-width: 0; }
 .hc-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.hc-nav b { font-size: 17px; color: var(--heading); min-width: 150px; text-align: center; }
 .hc-arrow { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--heading); font-size: 18px; line-height: 1; cursor: pointer; }
 .hc-arrow:hover { border-color: var(--brand); color: var(--brand); }
 .hc-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
@@ -2290,31 +2284,18 @@ a.pk-tag:hover { filter: brightness(.96); text-decoration: underline; }
 .hc-day b { font-size: 14px; }
 .hc-day:hover, .hc-day:focus-visible { border-color: var(--brand); background: var(--accent-soft); }
 .hc-day.is-past b { color: var(--muted); }
-.hc-day.is-today { background: var(--heading); color: #fff; }
-.hc-day.is-today b { color: #fff; }
 .hc-day.has-due.overdue { background: var(--s-over-bg); } .hc-day.has-due.soon, .hc-day.has-due.progress { background: var(--s-soon-bg); }
 .hc-day.has-due.needinfo { background: var(--s-info-bg); } .hc-day.has-due.ok { background: var(--s-ok-bg); }
-.hc-day.is-today.has-due { outline: 3px solid var(--heading); outline-offset: -3px; }
-.hc-day.is-today.has-due b { color: var(--heading); }
 .hc-chip { display: block; font-size: 10.5px; font-weight: 800; line-height: 1.25; padding: 1px 4px; border-radius: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #fff; }
 .hc-chip.overdue { color: var(--s-over); } .hc-chip.soon, .hc-chip.progress { color: var(--s-soon); } .hc-chip.ok { color: var(--s-ok); } .hc-chip.needinfo { color: var(--s-info); }
 .hc-more { font-size: 10.5px; font-weight: 800; color: var(--muted); }
 .hc-todo { display: block; font-size: 10.5px; font-weight: 700; color: #6B3FA0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hc-todo::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #8B5CF6; margin-right: 3px; vertical-align: 1px; }
-.hc-day.is-today .hc-todo { color: #E9D5FF; }
 .hc-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--text); }
 .hc-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .hc-legend i.overdue { background: var(--s-over-mid); } .hc-legend i.soon { background: var(--s-soon-mid); } .hc-legend i.ok { background: var(--s-ok-mid); } .hc-legend i.task { background: #8B5CF6; border-radius: 50%; }
 .hc-legend em { font-style: normal; color: var(--muted); flex-basis: 100%; }
 .hc-side { padding: 16px 18px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 12px; }
-.hc-kick { font-size: 12.5px; font-weight: 800; letter-spacing: .12em; color: var(--muted); }
-.hc-big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.hc-big b { font-size: 40px; line-height: 1; color: var(--heading); }
-.hc-big span { font-weight: 700; color: var(--heading); }
-.hc-bar { display: flex; gap: 3px; height: 12px; border-radius: 999px; overflow: hidden; background: var(--rule); }
-.hc-seg.ok { background: #2F9E62; } .hc-seg.soon { background: #F5D547; } .hc-seg.needinfo { background: #C5C8CF; } .hc-seg.overdue { background: #E5484D; }
-.hc-progress p { margin: 6px 0 0; font-size: 14px; color: var(--text); }
-.hc-go { text-align: center; white-space: normal; }
 .hc-allgood { margin: 0; font-weight: 700; color: var(--s-ok); display: flex; gap: 6px; align-items: center; }
 .hc-todos { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; border-top: 1px solid var(--rule); }
 .hc-todos > b { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: 8px; }
@@ -2322,7 +2303,6 @@ a.pk-tag:hover { filter: brightness(.96); text-decoration: underline; }
 .hc-todo-row input { width: 18px; height: 18px; margin-top: 2px; accent-color: #2F9E62; }
 .hc-todo-row small { display: block; font-weight: 600; color: var(--muted); font-size: 12.5px; }
 .hc-todo-row small.late { color: var(--s-over); }
-.hc-note { margin: 0; font-size: 14px; font-weight: 600; color: var(--muted); }
 .hc-daylist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .hc-dayrow { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; color: var(--heading); text-decoration: none; flex-wrap: wrap; }
 .hc-dayrow > span { display: flex; flex-direction: column; flex: 1; min-width: 0; }
@@ -2332,13 +2312,53 @@ a.pk-tag:hover { filter: brightness(.96); text-decoration: underline; }
 a.hc-dayrow:hover { border-color: var(--brand); background: var(--accent-soft); }
 .hc-steps { padding-left: 20px; } .hc-steps li { margin: 4px 0; }
 .hc-feed { flex: 1; min-width: 0; font-size: 13px; }
+/* Home, "Signature": a navy band with the greeting and what needs you; the calendar card overlaps it. */
+.main-col { overflow-x: clip; }
+.home-cal { margin-bottom: 16px; }
+@media (min-width: 900px) { .hs-band { margin-top: -26px; } }
+.hs-band { position: relative; isolation: isolate; color: #fff; padding: 22px 4px 118px; margin: -16px 0 0; }
+.hs-band::before { content: ''; position: absolute; z-index: -1; inset: 0 -100vmax; background: linear-gradient(180deg, #0B1B3A, #13295A); box-shadow: inset 0 -1px 0 rgba(233, 185, 73, .45); }
+.hc-date { margin: 0 0 10px; font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #E9B949; }
+.hs-band h1 { margin: 0; color: #fff; font-size: clamp(28px, 4.2vw, 42px); font-weight: 700; letter-spacing: -.03em; line-height: 1.08; }
+.hs-sum { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
+.hs-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0; font-size: 17px; font-weight: 600; color: #fff; }
+.hs-line a { color: #E9B949; font-size: 15px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.hs-line a:hover { color: #F4D27E; }
+.hs-line .due.overdue { color: #FF9A8F; }
+.hs-line svg { width: 16px; height: 16px; }
+.hs-ic { flex: none; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: #1A1A1A; }
+.hs-ic svg { stroke-width: 2.2; }
+.hs-ic.overdue { background: #FF8A7A; } .hs-ic.soon { background: #F6C85F; } .hs-ic.ok { background: #7EE2B0; }
+.home-cal .hc-body { position: relative; z-index: 1; display: grid; padding: 0; margin-top: -96px; border-radius: 20px; box-shadow: 0 24px 60px -30px rgba(11, 27, 58, .45), 0 1px 2px rgba(11, 27, 58, .06); overflow: hidden; }
+.hc-nav b { font-size: 18px; font-weight: 700; color: var(--heading); flex: 1; }
+.hc-day.is-today b { align-self: flex-start; display: inline-grid; place-items: center; min-width: 26px; height: 26px; border-radius: 999px; background: #E9B949; color: #0B1B3A; }
+.hc-kick { font-size: 12.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.hc-upnext { display: flex; flex-direction: column; }
+.hc-up { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 0; color: var(--heading); text-decoration: none; }
+.hc-up + .hc-up { border-top: 1px solid var(--rule); }
+.hc-up:hover b { text-decoration: underline; }
+.hc-up-d { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.hc-up-m { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hc-up-m b { font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hc-up-m small { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hc-up em { font-style: normal; font-size: 13px; font-weight: 700; white-space: nowrap; color: var(--s-info); }
+.hc-up em.overdue { color: var(--s-over); } .hc-up em.soon, .hc-up em.progress { color: #8A5E00; }
+.hc-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 6px; }
+.btn-gold { background: #E9B949; color: #0B1B3A; }
+.btn-gold:hover { background: #F0C860; box-shadow: var(--lift); }
+.hc-note { color: #fff; }
+.hc-note a { color: #fff; text-decoration: none; } .hc-note .due.overdue { color: #FF9A8F; }
+.home-next .row-side .btn-primary { background: #0E3B2E; color: #fff; }
+.home-next .row-side .btn-primary:hover { background: #12503E; }
+.home-next .card-head { border-bottom: 2px solid var(--heading); }
 @media (max-width: 560px) {
   .hc-day { min-height: 46px; padding: 4px 3px; }
   .hc-chip, .hc-todo { font-size: 0; padding: 0; height: 5px; border-radius: 3px; }
   .hc-chip.overdue { background: #E5484D; } .hc-chip.soon, .hc-chip.progress { background: #F5A524; } .hc-chip.ok { background: #2F9E62; } .hc-chip.needinfo { background: #9CA3AF; }
   .hc-todo { background: #8B5CF6; } .hc-todo::before { display: none; }
   .hc-more { font-size: 9.5px; }
-  .hc-nav b { min-width: 0; flex: 1; }
+  .hs-band { padding-bottom: 104px; }
+  .hs-line { font-size: 16px; }
 }
 
 /* Plans: the size lineup, the software-only banner, the per-vehicle band and the separate services */

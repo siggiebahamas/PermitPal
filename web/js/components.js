@@ -110,8 +110,11 @@ export function dateTile(r) {
   return html`<div class="dtile ${s.cls}" title="${fmtDate(r.expires_on)}"><small>${MON[m - 1]}${thisYear ? '' : " '" + String(y).slice(2)}</small><b>${d}</b></div>`;
 }
 
+// On Home, overdue and renew-soon rows say it in the pill; other states keep their hint ("Add the details").
+const homeDays = (r) => ['action_required', 'renew_soon'].includes(r.status) && r.expires_on;
 // One requirement as a row. Clicking the row opens its page; the button does the next step.
-export function reqRow(r, { showSubject = true } = {}) {
+// home: the Home list. The days left move into the status pill ("Due in 5 days"), so the line under the name is just whose it is.
+export function reqRow(r, { showSubject = true, home = false } = {}) {
   const s = STATUS[r.status];
   // Only ask while nothing is on file yet: once a permit has a record, it clearly applies.
   const hint = r.confidence !== 'confirmed' && !r.cycle_id ? html`<span class="tag" title="We think you need this permit. Open it to confirm or remove it.">Does this apply?</span>` : '';
@@ -123,9 +126,10 @@ export function reqRow(r, { showSubject = true } = {}) {
       ${selectBox(r)}${dateTile(r)}
       <div class="row-main">
         <div class="row-title">${r.name} ${hint}</div>
-        <div class="row-sub">${showSubject ? html`<span>${subjectLabel(r)}</span><span class="sep"> · </span>` : ''}<b class="due ${s.cls}">${dueShort(r)}</b>${whoPill(r)}</div>
+        <div class="row-sub">${home && homeDays(r) ? html`<span>${subjectLabel(r)}</span>`
+          : html`${showSubject ? html`<span>${subjectLabel(r)}</span><span class="sep"> · </span>` : ''}<b class="due ${s.cls}">${dueShort(r)}</b>`}${whoPill(r)}</div>
       </div>
-      <div class="row-side">${statusChip(r.status)}${btn}</div>
+      <div class="row-side">${home && r.status === 'renew_soon' && r.days_left != null ? html`<span class="chip soon">${r.days_left === 0 ? 'Due today' : `Due in ${plural(r.days_left, 'day')}`}</span>` : statusChip(r.status)}${btn}</div>
     </div>`;
 }
 

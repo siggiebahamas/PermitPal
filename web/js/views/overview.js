@@ -34,9 +34,9 @@ export function dashboard(el) {
     ${cityDashBanner()}
     ${statTiles(c)}
     ${careNudge(open)}
-    <section class="card next">
+    <section class="card next home-next">
       <div class="card-head"><div><h2>Next actions</h2><p class="card-sub">Most urgent first</p></div><a class="link" href="#/compliance">See all</a></div>
-      ${open.length ? open.slice(0, 8).map((r) => reqRow(r)) : html`<div class="all-good">${ICON.check} Everything is compliant. Nice work.</div>`}
+      ${open.length ? open.slice(0, 8).map((r) => reqRow(r, { home: true })) : html`<div class="all-good">${ICON.check} Everything is compliant. Nice work.</div>`}
       ${when_(open.length, html`<div class="sheet-foot">${plural(open.length, 'open item')} across your businesses and vehicles</div>`)}
     </section>
     ${serviceStrip()}

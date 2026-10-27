@@ -1,4 +1,4 @@
-// The top of Home: a month calendar with your progress beside it. A day with a deadline opens that permit's renewal;
+// The top of Home: a navy band with the greeting and what needs you, then a month calendar with "Up next" beside it. A day with a deadline opens that permit's renewal;
 // an empty day lets you add a to-do of your own (like Google Calendar). Your deadlines and to-dos can also go into
 // Google Calendar, through a private link that stays up to date.
 import { html, openModal, confirmDialog, toast, toastError, fmtDate, plural, todayPH } from '../util.js';
@@ -30,12 +30,7 @@ export function homeCal(first, c) {
   const firstDow = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7; // Monday first
   const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const iso = (d) => `${month}-${String(d).padStart(2, '0')}`;
-  const inMonth = S.data.reqs.filter((r) => r.expires && r.expires_on && ym(r.expires_on) === month);
-  const openInMonth = inMonth.filter((r) => r.status !== 'compliant');
   const todos = tasks().filter((t) => !t.done_at).sort((a, b) => a.due_on.localeCompare(b.due_on));
-  const nextUp = S.data.reqs.filter((r) => r.status !== 'compliant' && r.expires_on).sort((a, b) => a.expires_on.localeCompare(b.expires_on))[0];
-  const pct = c.total ? Math.round((100 * c.compliant) / c.total) : 0;
-  const seg = (n, cls) => (n ? html`<span class="hc-seg ${cls}" style="flex:${n}" title="${n}"></span>` : '');
   const cell = (d) => {
     const day = iso(d);
     const rs = dueOn(day);
@@ -50,21 +45,28 @@ export function homeCal(first, c) {
       ${ts.length ? html`<span class="hc-todo">${ts.length > 1 ? plural(ts.length, 'to-do') : ts[0].title}</span>` : ''}
     </button>`;
   };
-  return html`<section class="card home-cal" aria-labelledby="hc-hello">
-    <div class="hc-head">
-      <div><p class="hc-date">${longDay(today)}</p><h1 id="hc-hello">${greeting()}, ${first}</h1></div>
-      <div class="btn-row">
-        <button class="btn btn-soft btn-sm" data-act="cal-sync">${ICON.calendar} Google Calendar</button>
-        ${canEdit() && has('lgus') ? html`<button class="btn btn-primary btn-sm" data-act="cal-day" data-day="${today}" data-new="1">+ To-do</button>` : ''}
-      </div>
+  const upNext = S.data.reqs.filter((r) => r.status !== 'compliant' && r.expires_on).sort((a, b) => a.expires_on.localeCompare(b.expires_on)).slice(0, 4);
+  const when = (r) => (r.days_left < 0 ? `${plural(-r.days_left, 'day')} late` : r.days_left === 0 ? 'today' : `in ${plural(r.days_left, 'day')}`);
+  // The summary under the greeting: one line per kind of urgency, each with a link to that list.
+  const lines = [
+    c.action_required && html`<p class="hs-line"><span class="hs-ic overdue">${ICON.bell}</span>${plural(c.action_required, 'permit')} ${c.action_required === 1 ? 'is' : 'are'} past due
+      <a href="#/compliance?status=action_required">Review ›</a></p>`,
+    c.renew_soon && html`<p class="hs-line"><span class="hs-ic soon">${ICON.calendar}</span>${c.renew_soon === 1 ? '1 permit renews' : `${c.renew_soon} renew`} in the next 30 days
+      <a href="#/compliance?status=renew_soon">See dates ›</a></p>`,
+  ].filter(Boolean);
+  return html`<section class="home-cal" aria-labelledby="hc-hello">
+    <div class="hs-band">
+      <p class="hc-date">${longDay(today)}</p><h1 id="hc-hello">${greeting()}, ${first}</h1>
+      <div class="hs-sum">${lines.length ? lines : html`<p class="hs-line"><span class="hs-ic ok">${ICON.check}</span>Everything is up to date</p>`}
+        <p class="hs-line hc-note" data-filings-brief hidden></p></div>
     </div>
-    <div class="hc-body">
+    <div class="card hc-body">
       <div class="hc-month">
         <div class="hc-nav">
-          <button type="button" class="hc-arrow" data-act="cal-month" data-n="-1" aria-label="Previous month">‹</button>
           <b aria-live="polite">${MONTHS[m - 1]} ${y}</b>
-          <button type="button" class="hc-arrow" data-act="cal-month" data-n="1" aria-label="Next month">›</button>
           ${month !== ym(today) ? html`<button type="button" class="btn btn-ghost btn-sm" data-act="cal-month" data-n="0">Today</button>` : ''}
+          <button type="button" class="hc-arrow" data-act="cal-month" data-n="-1" aria-label="Previous month">‹</button>
+          <button type="button" class="hc-arrow" data-act="cal-month" data-n="1" aria-label="Next month">›</button>
         </div>
         <div class="hc-grid" role="group" aria-label="${MONTHS[m - 1]} ${y}">
           ${DOW.map((d) => html`<span class="hc-dow" aria-hidden="true">${d}</span>`)}
@@ -72,22 +74,23 @@ export function homeCal(first, c) {
           ${Array.from({ length: days }, (_, i) => cell(i + 1))}
         </div>
         <p class="hc-legend"><span><i class="overdue"></i>Late</span><span><i class="soon"></i>Renew soon</span><span><i class="ok"></i>All good</span>${has('lgus') ? html`<span><i class="task"></i>Your to-do</span>` : ''}
-          <em>${canEdit() && has('lgus') ? 'Tap a deadline to renew it, or an empty day to add a to-do.' : 'Tap a deadline to open it.'}</em></p>
+          <em>${canEdit() && has('lgus') ? 'Tap a deadline to open it, or an empty day to add a to-do.' : 'Tap a deadline to open it.'}</em></p>
       </div>
       <aside class="hc-side">
-        <span class="hc-kick">${MONTHS[m - 1].toUpperCase()}</span>
-        <div class="hc-big"><b>${openInMonth.length}</b><span>${openInMonth.length === 1 ? 'permit to renew' : 'permits to renew'}${inMonth.length > openInMonth.length ? html` · ${inMonth.length - openInMonth.length} done` : ''}</span></div>
-        <div class="hc-progress" role="img" aria-label="${c.compliant} of ${c.total} permits all good">
-          <div class="hc-bar">${seg(c.compliant, 'ok')}${seg(c.renew_soon + c.in_progress, 'soon')}${seg(c.needs_information, 'needinfo')}${seg(c.action_required, 'overdue')}</div>
-          <p><b>${c.compliant} of ${c.total}</b> all good · ${pct}%</p>
-        </div>
-        ${nextUp ? html`<a class="btn btn-primary hc-go" href="#/requirement/${nextUp.id}?renew=1">Start with ${fmtDate(nextUp.expires_on).replace(/, \d{4}$/, '')} · ${shortName(nextUp)}</a>`
+        <span class="hc-kick">Up next</span>
+        ${upNext.length ? html`<div class="hc-upnext">${upNext.map((r) => html`<a class="hc-up" href="#/requirement/${r.id}?renew=1">
+          <span class="hc-up-d">${fmtDate(r.expires_on).replace(/, \d{4}$/, '')}</span>
+          <span class="hc-up-m"><b>${shortName(r)}</b><small>${subjectLabel(r)}</small></span>
+          <em class="${dotCls(r)}">${when(r)}</em></a>`)}</div>`
           : html`<p class="hc-allgood">${ICON.check} Nothing to renew. You're all caught up.</p>`}
         ${has('lgus') && todos.length ? html`<div class="hc-todos"><b>Your to-dos</b>
           ${todos.slice(0, 3).map((t) => html`<label class="hc-todo-row"><input type="checkbox" data-task-done="${t.id}" ${canEdit() ? '' : 'disabled'}>
             <span>${t.title}<small class="${t.due_on < today ? 'late' : ''}">${t.due_on === today ? 'Today' : fmtDate(t.due_on)}</small></span></label>`)}
           ${todos.length > 3 ? html`<small class="muted">+${todos.length - 3} more on the calendar</small>` : ''}</div>` : ''}
-        <p class="hc-note" data-filings-brief hidden></p>
+        <div class="hc-btns">
+          ${canEdit() && has('lgus') ? html`<button class="btn btn-gold" data-act="cal-day" data-day="${today}" data-new="1">+ New to-do</button>` : ''}
+          <button class="btn btn-ghost" data-act="cal-sync">${ICON.calendar} Google Calendar</button>
+        </div>
       </aside>
     </div>
   </section>`;
