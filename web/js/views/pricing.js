@@ -44,15 +44,19 @@ function paintPrice(el) {
     el.innerHTML = String(html`<span class="pp-ribbon">${FREE_MONTHS} months FREE</span>
       <div class="pp-amount"><b>${peso(perMonthYearly(m))}</b><span>/month</span></div>
       <p class="pp-billed"><s aria-label="was ${peso(m * 12)}">${peso(m * 12)}</s> <b>${peso(y)}</b> once a year</p>
-      <p class="pp-save pp-deal">${ICON.check}<span><b>You save ${peso(m * FREE_MONTHS)}</b> · pay ${YEAR_MONTHS} months, get 12</span></p>
-      ${per && unit ? html`<p class="pp-unit">With ${per} ${unit}s: ${under(y / 12 / per)} a ${unit} a month</p>` : ''}`);
+      <div class="pp-savebig"><span>You save </span><b>${peso(m * FREE_MONTHS)}</b><small> every year</small></div>
+      ${per && unit ? perBox(under(y / 12 / per), unit, `with ${per} ${unit}s`) : ''}`);
   } else {
     el.innerHTML = String(html`<div class="pp-amount"><b>${peso(m)}</b><span>/month</span></div>
       <p class="pp-day pp-perday">That's ${under((m * 12) / 365)} a day</p>
-      ${per && unit ? html`<p class="pp-unit">With ${per} ${unit}s: ${under(m / per)} a ${unit}</p>` : ''}
+      ${per && unit ? perBox(under(m / per), unit, `with ${per} ${unit}s`) : ''}
       <button type="button" class="pp-nudge" data-bill-set="yearly">Pay yearly and get ${FREE_MONTHS} months FREE: save ${peso(m * FREE_MONTHS)} →</button>`);
   }
 }
+// What it comes to for each vehicle or site: the figure big, what it assumes underneath.
+const UNIT_ICON = { vehicle: ICON.car, site: ICON.building, client: ICON.briefcase };
+export const perBox = (v, unit, note) => html`<div class="pp-per"><span class="pp-per-ic" aria-hidden="true">${UNIT_ICON[unit] || ICON.grid}</span>
+  <span class="pp-per-t"><b>${v}</b> <em>per ${unit} a month</em><small>${note}</small></span></div>`;
 export const paintPrices = (root = document) => root.querySelectorAll('[data-price]').forEach(paintPrice);
 // A button whose words (and data-billing) follow the switch. attrs is fixed markup from our own code.
 export const billButton = (attrs, m, y, cls = 'btn btn-primary') => html`<button type="button" class="${cls}" ${raw(attrs)} data-bill-swap data-billing="${billing}" data-m="${m}" data-y="${y}">${billing === 'yearly' ? y : m}</button>`;
@@ -131,16 +135,16 @@ export const TIERS = {
     checks: ['Up to 20 files for each business or vehicle', 'Reminders, timelines, checklists and your document vault', 'History of every change',
       'Your own permit page and QR poster', 'Ready letters and forms, filled in for you', 'Everything in Free'] },
   core: { icon: ICON.briefcase, name: 'Core', who: 'For households and small businesses', range: 'Up to 15 businesses and vehicles together', users: 'Up to 3 users (you + 2 staff)', kind: 'business',
-    per: 15, perLine: (v) => `Effective equivalent: ${v} per vehicle/month when all 15 records are vehicles.`,
+    per: 15, perNote: 'when all 15 records are vehicles',
     checks: ['Group by business and branch', 'One dashboard, reminders and renewal tasks for everything', 'Text message reminders', 'Pinoy Permit Plus included', 'Everything in Plus'] },
   multi: { icon: ICON.car, name: 'Multi-Vehicle', who: 'For big households and small fleets', range: '16 to 30 vehicles', users: 'Up to 3 users', kind: 'fleet',
-    per: 30, perLine: (v) => `At 30 vehicles: about ${v} per vehicle/month.`,
+    per: 30, perNote: 'at 30 vehicles',
     checks: ['Up to 20 files for each vehicle', 'Fleet board: who can’t drive today', 'Status and history for every vehicle', 'Includes up to 3 business records', 'Everything in Core'] },
   fleet: { icon: ICON.car, name: 'Fleet', who: 'For companies with many vehicles', range: '31 to 75 vehicles', users: 'Up to 5 users', kind: 'fleet',
-    per: 75, perLine: (v) => `At 75 vehicles: about ${v} per vehicle/month.`,
+    per: 75, perNote: 'at 75 vehicles',
     checks: ['Filter by plate, status, expiry and business', 'Import vehicles from a spreadsheet', 'A renew-this-month list', 'Includes up to 3 business records', 'Everything in Multi-Vehicle'] },
   fleet_pro: { icon: ICON.car, name: 'Fleet Pro', who: 'For large fleets', range: '76 to 150 vehicles', users: 'Up to 10 users', kind: 'fleet',
-    per: 150, perLine: (v) => `At 150 vehicles: about ${v} per vehicle/month.`,
+    per: 150, perNote: 'at 150 vehicles',
     checks: ['Fleet-wide renewal planning', 'Export for your records', 'Includes up to 3 business records', 'Everything in Fleet'] },
   enterprise: { icon: ICON.grid, name: 'Enterprise', who: 'For the biggest fleets', range: '151 or more vehicles', users: 'Users agreed in your quote', kind: 'fleet', quote: true,
     checks: ['A written plan and quote for your fleet', 'We show the cost per vehicle in your quote', 'Tracking and planning software, like every plan'] },
@@ -161,7 +165,7 @@ export function tierCard(id, monthly, cta = '', { current = false } = {}) {
     <p class="pp-range">${t.range} · ${t.users}</p>
     ${t.quote ? html`<div class="pp-price"><div class="pp-amount"><b>Quoted</b></div><p class="pp-day">For your exact fleet size</p></div>`
       : monthly > 0 ? priceSlot(monthly) : html`<div class="pp-price"><p class="pp-day">Loading the price…</p></div>`}
-    ${t.per && monthly > 0 ? html`<p class="pp-pervehicle">${t.perLine(perVehicle(monthly, t.per))}</p>` : ''}
+    ${t.per && monthly > 0 ? perBox(`about ${perVehicle(monthly, t.per)}`, 'vehicle', t.perNote) : ''}
     ${checks(t.checks)}
     <p class="pp-swonly">Tracking and planning software only. Hands-on help costs extra.</p>
     <div class="pp-cta">${cta}</div></section>`;

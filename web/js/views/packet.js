@@ -310,12 +310,12 @@ const PACKET_CSS = `.pk-doc{font-family:Georgia,'Times New Roman',serif;color:#1
 .pk-doc table{border-collapse:collapse;width:100%;font-family:system-ui,sans-serif;font-size:10pt}
 .pk-doc th,.pk-doc td{border:1px solid #bbb;padding:5pt 7pt;text-align:left;vertical-align:top}
 .pk-doc th{background:#f1f1f1;width:42%;font-weight:600}
-.pk-doc td.blank{color:#999}
+.pk-doc td.blank{color:#333}
 .pk-doc .part{background:#e6ebf5;font-weight:700}
 .pk-doc ul.pk-checklist{list-style:none;padding:0;display:block}.pk-doc ul.pk-checklist li{display:block;margin:4pt 0}.pk-doc ul.pk-checklist li::before{content:'\\2610  '}
 .pk-doc .sig{display:flex;justify-content:space-between;gap:24pt;margin-top:32pt}.pk-doc .sig div{border-top:1px solid #111;padding-top:4pt;min-width:42%}
-.pk-doc .note{font-size:9pt;color:#555;font-family:system-ui,sans-serif}
-.pk-doc .foot{font-size:8.5pt;color:#666;margin-top:18pt;font-family:system-ui,sans-serif}`;
+.pk-doc .note{font-size:9pt;color:#111;font-family:system-ui,sans-serif}
+.pk-doc .foot{font-size:8.5pt;color:#111;margin-top:18pt;font-family:system-ui,sans-serif}`;
 
 function packetPages(c) {
   const parts = partsOf(c);
