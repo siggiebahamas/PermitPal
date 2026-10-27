@@ -92,10 +92,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await go('#/compliance'); await page.click('[data-act=clear-filters]').catch(() => {}); await page.waitForSelector('.row');
   check(`${label}: the page title sits on the navy band`, (await page.locator('#main > .pg-band .page-head h1').count()) === 1);
   check(`${label}: Compliance group headers are big and bold, with a big count`, await page.evaluate(() => { const b = document.querySelector('.band'); const n = b?.lastElementChild;
-    return !!b && parseFloat(getComputedStyle(b).fontSize) >= 17 && getComputedStyle(b).fontWeight === '800' && parseFloat(getComputedStyle(n).fontSize) >= 24; }));
+    return !!b && parseFloat(getComputedStyle(b).fontSize) >= 20 && getComputedStyle(b).fontWeight === '800' && parseFloat(getComputedStyle(n).fontSize) >= 28; }));
   await go('#/history'); await page.waitForSelector('main h1');
-  check(`${label}: History days sit on a navy bar, the day and its count the same size`, await page.evaluate(() => { const d = document.querySelector('.hist-day'); if (!d) return true;
-    return getComputedStyle(d).backgroundColor === 'rgb(11, 27, 58)' && getComputedStyle(d.firstElementChild).fontSize === getComputedStyle(d.lastElementChild).fontSize; }));
+  check(`${label}: History: the day in bold over a gold line, its count the same size, an icon on each change`, await page.evaluate(() => { const d = document.querySelector('.hist-day');
+    return !!d && getComputedStyle(d.querySelector('b')).borderBottomColor === 'rgb(233, 185, 73)' && getComputedStyle(d.firstElementChild).fontSize === getComputedStyle(d.lastElementChild).fontSize
+      && document.querySelectorAll('.hist-line .hist-ic').length === document.querySelectorAll('.hist-line').length; }));
   await go('#/compliance'); await page.waitForSelector('.row');
   check(`${label}: Renew buttons are the one green, everywhere`, (await page.locator('.row .btn-renew').count()) >= 1 && (await page.locator('.row [data-act=req-next].btn-primary').count()) === 0
     && await page.evaluate(() => getComputedStyle(document.querySelector('.btn-renew')).backgroundColor === 'rgb(14, 138, 79)'));
@@ -1792,20 +1793,20 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const prop = await page.locator('#pricing [data-plan-card=property]').textContent();
     check(`prices ${label}: the Multi-Site Unlimited card stays short: price, 3 benefits, the full list folded`, /₱9,990/.test(prop) && (await page.locator('#pricing [data-plan-card=property] .pp-wins li').count()) === 3
       && (await page.locator('#pricing [data-plan-card] .pp-why, #pricing [data-plan-card] .pp-preview, #pricing [data-plan-card] .pp-bonus').count()) === 0);
+    check(`prices ${label}: per vehicle is its own block, in whole pesos, with no "at 30 vehicles" line`, /^\s*under ₱50\s*per vehicle a month\s*$/.test(await page.locator('[data-plan-card=multi] .pp-per').textContent()));
     await page.locator('#pricing .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
     const y = await core(page).textContent();
-    check(`prices ${label}: yearly shows 2 months free, the old price crossed out and the saving`, /2 months FREE/i.test(y) && /₱666\s*\/month/.test(y) && /₱9,588\s*₱7,990 once a year/.test(y) && /₱1,598 less than paying month to month/.test(y), y.replace(/\s+/g, ' ').slice(0, 220));
-    check(`prices ${label}: yearly: the saving in one calm sentence, no "pay 10 months" line and no month grid`, (await core(page).locator('.pp-quiet b').textContent()) === '₱1,598 less'
+    check(`prices ${label}: yearly shows 2 months free, the old price crossed out and the saving`, /2 months FREE/i.test(y) && /₱7,990\s*\/year/.test(y) && /Instead of ₱9,588 paying monthly/.test(y) && /You save ₱1,598 a year/.test(y) && !/\/month/.test(y), y.replace(/\s+/g, ' ').slice(0, 220));
+    check(`prices ${label}: yearly: only the total saving, no per-month figures, no month grid`, (await core(page).locator('.pp-quiet b').textContent()) === '₱1,598' && (await core(page).locator('.pp-per').count()) === 0
       && !/pay 10 months/.test(y) && (await page.locator('.year-cal').count()) === 0);
-    check(`prices ${label}: per vehicle is its own block, in whole pesos, with no "at 30 vehicles" line`, /^\s*under ₱50\s*per vehicle a month\s*$/.test(await page.locator('[data-plan-card=multi] .pp-per').textContent()));
     check(`prices ${label}: every switch on the page moved to yearly`, (await page.locator('.bill-toggle input[value=yearly]:checked').count()) === (await page.locator('.bill-toggle').count()));
     check(`prices ${label}: add-ons show the staff price ladder with savings`, /FREE/.test(await page.locator('#lp-staff .ladder').textContent()) && /40% off/.test(await page.locator('#lp-staff').textContent())
       && /60% off/.test(await page.locator('#lp-staff').textContent()) && /save ₱9,200/.test(await page.locator('#lp-staff .staff-ex').textContent()));
-    check(`prices ${label}: Plus yearly is ₱1,490 with ₱298 saved`, /₱1,490 once a year/.test(await page.locator('[data-plan-card=plus]').textContent()) && /₱298 less than paying month to month/.test(await page.locator('[data-plan-card=plus]').textContent()));
+    check(`prices ${label}: Plus yearly is ₱1,490 with ₱298 saved`, /₱1,490\s*\/year/.test(await page.locator('[data-plan-card=plus]').textContent()) && /You save ₱298 a year/.test(await page.locator('[data-plan-card=plus]').textContent()));
     await page.locator('#pricing .pp-compare summary').click(); await page.waitForTimeout(100);
     check(`prices ${label}: everything side by side`, (await page.locator('#pricing .pp-table tbody tr').count()) >= 10 && /Separate service/.test(await page.textContent('#pricing .pp-table')));
     await page.reload(); await page.waitForSelector('#pricing [data-plan-card=core] .pp-amount');
-    check(`prices ${label}: the choice is remembered on this device`, /₱666/.test(await core(page).textContent()));
+    check(`prices ${label}: the choice is remembered on this device`, /₱7,990\s*\/year/.test(await core(page).textContent()));
     const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     check(`prices ${label}: no sideways scroll on the website`, over <= 1, `${over}px`);
     check(`prices ${label}: website: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));

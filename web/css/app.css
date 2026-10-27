@@ -2553,8 +2553,8 @@ a.line:hover, button.line:hover { background-color: #fff; border-color: #C9D2E3;
 .pp-quiet { display: block; margin: 12px 0 8px; padding: 2px 0 2px 12px; border-left: 3px solid #E9B949; color: #0B1B3A; font-size: 15.5px; font-weight: 600; line-height: 1.45; }
 .pp-quiet b { font-weight: 800; }
 /* Section headers people must spot at once: Compliance groups (Overdue, Renew soon…) and Permit check sections */
-.band { align-items: center; padding: 11px 18px; font-size: 17px; font-weight: 800; letter-spacing: .06em; }
-.band > span:last-child { font-size: 24px; letter-spacing: 0; line-height: 1; }
+.band { align-items: center; padding: 13px 18px; font-size: 20px; font-weight: 800; letter-spacing: .05em; }
+.band > span:last-child { font-size: 28px; letter-spacing: 0; line-height: 1; }
 .check-sec .card-head { flex-wrap: nowrap; align-items: center; }
 .check-sec .card-head h2 { font-size: 22px; font-weight: 800; }
 .check-sec .card-head .card-sub { font-size: 15px; }
@@ -2581,10 +2581,14 @@ a.line:hover, button.line:hover { background-color: #fff; border-color: #C9D2E3;
 .pp-range2 span { padding: 10px 12px; border-radius: 12px; background: #EEF1F8; color: #0B1B3A; font-size: 14px; font-weight: 600; line-height: 1.3; }
 .pp-range2 b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
 .pp-promise { font-size: 16px; }
-/* History: each day on a navy bar, the day and its count the same size */
-.hist-card .band.hist-day { background: #0B1B3A; color: #fff; font-size: 19px; letter-spacing: 0; text-transform: none; border-top: 0; }
-.hist-card .band.hist-day > span:last-child { font-size: 19px; color: #E9B949; }
-.hist-line { padding-left: 16px; }
+/* History: a light day bar with the day in bold over a gold line, the count the same size; an icon per change */
+.hist-card .band.hist-day { background: #EEF1F8; color: #0B1B3A; font-size: 20px; letter-spacing: 0; text-transform: none; border-top: 0; padding: 14px 18px 12px; }
+.hist-card .band.hist-day b { font-weight: 800; padding-bottom: 5px; border-bottom: 3px solid #E9B949; }
+.hist-card .band.hist-day > span:last-child { font-size: 20px; color: #0B1B3A; }
+.hist-line { display: flex; align-items: center; gap: 12px; padding-left: 16px; }
+.hist-ic { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; font-weight: 800; line-height: 1; }
+.hist-ic.add { background: #E3F4EA; color: var(--jade); } .hist-ic.edit { background: #EAF0FC; color: #1B4DB5; }
+.hist-ic.up { background: #FFF4D6; color: #8A5E00; } .hist-ic.del { background: #FDECEB; color: #B8403F; }
 .hist-line .line-main > a, .hist-line .line-main > span { font-size: 16.5px; }
 .hist-bar label, .hist-bar .muted { font-size: 16px; }
 /* Load: what it is, in three steps, and what each use gives you */
@@ -2597,3 +2601,15 @@ a.line:hover, button.line:hover { background-color: #fff; border-color: #C9D2E3;
 .load-ticks li { display: flex; gap: 8px; align-items: flex-start; font-size: 15.5px; line-height: 1.4; color: #111827; }
 .load-ticks svg { flex: none; width: 18px; height: 18px; margin-top: 2px; color: var(--jade); stroke-width: 2.6; }
 .ck-partner { font-size: 14px; } /* a partner suggestion stays quieter than the checklist itself */
+/* Plan cards: bigger names, "who it's for" and size, so nothing on the card is easy to miss */
+.pp-plan-head h3 { font-size: 23px; font-weight: 800; }
+.pp-who { font-size: 16.5px; font-weight: 600; color: #111827; }
+.pp-icon { width: 52px; height: 52px; }
+.pp-icon svg { width: 28px; height: 28px; }
+.pp-range2 span { font-size: 15.5px; }
+.pp-range2 b { font-size: 26px; }
+.pp-checks li { font-size: 16.5px; }
+.pp-group-h { font-size: 22px; font-weight: 800; }
+.pp-swonly { font-size: 15px; }
+.pp-amount b { font-size: 40px; }
+.pp-perday { font-size: 16.5px; }

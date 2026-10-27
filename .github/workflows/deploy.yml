@@ -33,6 +33,8 @@ jobs:
         run: sed -i "s/export const APP_VERSION = 'dev';/export const APP_VERSION = '${GITHUB_SHA::7}';/" web/js/config.js
       - run: node scripts/build-city-pages.mjs
       - run: node scripts/build-demo.mjs
+      - name: Make browsers fetch this version's files
+        run: node scripts/stamp-version.mjs "${GITHUB_SHA::7}"
       - run: touch web/.nojekyll
       - uses: peaceiris/actions-gh-pages@v4
         with:

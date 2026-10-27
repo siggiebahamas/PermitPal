@@ -42,10 +42,9 @@ function paintPrice(el) {
   if (billing === 'yearly') {
     const y = yearOf(m);
     el.innerHTML = String(html`<span class="pp-ribbon">${FREE_MONTHS} months FREE</span>
-      <div class="pp-amount"><b>${peso(perMonthYearly(m))}</b><span>/month</span></div>
-      <p class="pp-billed"><s aria-label="was ${peso(m * 12)}">${peso(m * 12)}</s> <b>${peso(y)}</b> once a year</p>
-      <p class="pp-save pp-quiet">That's <b>${peso(m * FREE_MONTHS)} less</b> than paying month to month.</p>
-      ${per && unit ? perBox(perUp(y / 12 / per), unit) : ''}`);
+      <div class="pp-amount"><b>${peso(y)}</b><span>/year</span></div>
+      <p class="pp-billed">Instead of <s aria-label="${peso(m * 12)}">${peso(m * 12)}</s> paying monthly</p>
+      <p class="pp-save pp-quiet">You save <b>${peso(m * FREE_MONTHS)}</b> a year.</p>`);
   } else {
     el.innerHTML = String(html`<div class="pp-amount"><b>${peso(m)}</b><span>/month</span></div>
       <p class="pp-day pp-perday">That's ${under((m * 12) / 365)} a day</p>
@@ -167,8 +166,7 @@ export function tierCard(id, monthly, cta = '', { current = false } = {}) {
     <div class="pp-plan-head"><span class="pp-icon">${t.icon}</span><div><h3>${t.name}</h3><p class="pp-who">${t.who}</p></div></div>
     <div class="pp-range2">${bigLead(t.range)}${bigLead(t.users)}</div>
     ${t.quote ? html`<div class="pp-price"><div class="pp-amount"><b>Quoted</b></div><p class="pp-day">For your exact fleet size</p></div>`
-      : monthly > 0 ? priceSlot(monthly) : html`<div class="pp-price"><p class="pp-day">Loading the price…</p></div>`}
-    ${t.per && monthly > 0 ? perBox(perUp(monthly / t.per), 'vehicle') : ''}
+      : monthly > 0 ? priceSlot(monthly, { per: t.per, unit: 'vehicle' }) : html`<div class="pp-price"><p class="pp-day">Loading the price…</p></div>`}
     ${checks(t.checks)}
     <p class="pp-swonly">Tracking and planning software only. Hands-on help costs extra.</p>
     <div class="pp-cta">${cta}</div></section>`;
