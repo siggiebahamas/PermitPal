@@ -46,7 +46,7 @@ export async function loadPage(el) {
   const open = L.topups.filter((t) => ['due', 'pending_verification'].includes(t.status) && t.valid_until >= todayPH());
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Load</h1>
-      <p class="muted">Top up once. Use it for texts, templates and papers checks. It never expires.</p></div></div>
+      <p class="page-sub">Prepaid credit for our extras. Top up once, use it anytime.</p></div></div>
     ${s.invites?.invited_by?.status === 'pending' ? html`<div class="banner info"><div><b>You joined by invitation.</b>
       Add 3 permits with their dates (${s.invites.invited_by.permits} of 3 so far) and you both get a month of Pinoy Permit Plus, free.</div>
       <a class="btn btn-sm btn-primary" href="#/compliance">Add dates</a></div>` : ''}
@@ -64,7 +64,13 @@ export async function loadPage(el) {
         : html`<p class="muted small">Your workspace owner or an admin can top up and use the load.</p>`}
     </section>
 
-    <h2 class="section-label">Use your load</h2>
+    <section class="card load-how" aria-label="How load works"><h2>How load works</h2>
+      <ol class="load-steps">
+        <li><span class="load-n">1</span><span><b>Top up</b> from ${peso(100)} with GCash, Maya or a bank transfer.</span></li>
+        <li><span class="load-n">2</span><span><b>Use it</b> for text reminders, a papers check or a ready-made letter.</span></li>
+        <li><span class="load-n">3</span><span><b>Keep the rest.</b> Load never expires.</span></li></ol></section>
+
+    <h2 class="section-label">What you can use it on</h2>
     <div class="load-uses">
       ${textsCard(s, admin)}
       ${papersCardUse(admin)}
@@ -96,7 +102,8 @@ function textsCard(s, admin) {
     : !s.phones ? html`Nobody in this workspace has a verified mobile number yet. <a href="#/settings">Add yours in Settings</a> first, so the texts have somewhere to go.` : '';
   return html`<section class="card load-use">
     <div class="load-use-head"><span class="load-ic">${ICON.bell}</span><div><h3>Text reminders</h3><p class="muted small">${packs.length ? `From ${peso(Math.min(...packs.map((p) => Number(p.price_php))))}` : 'Not available right now'}</p></div></div>
-    <p>A text on the days your permits and tax deadlines need you, on top of email. One text uses one credit, and credits never expire. A text that can't be delivered gives its credit back.</p>
+    <ul class="load-ticks"><li>${ICON.check}<span>A text message when a permit or tax deadline is near</span></li><li>${ICON.check}<span>1 text = 1 credit. Credits never expire</span></li>
+      <li>${ICON.check}<span>Not delivered? You get the credit back</span></li></ul>
     ${why ? html`<p class="small muted">${why}</p>` : admin ? html`<div class="btn-row">${packs.map((p) => html`<button class="btn btn-soft" data-act="load-texts" data-pack="${p.code}">${p.texts} texts · ${peso(p.price_php)}</button>`)}</div>
       <p class="muted small">${packs.length > 1 ? `The ${packs[packs.length - 1].texts}-text pack works out to ₱${(Number(packs[packs.length - 1].price_php) / Number(packs[packs.length - 1].texts)).toFixed(2)} a text. ` : ''}Up to 3 texts a person a day, only to verified numbers.</p>` : ''}
   </section>`;
@@ -105,7 +112,8 @@ function papersCardUse(admin) {
   const soon = (S.data.reqs || []).filter((r) => r.expires && ['action_required', 'renew_soon'].includes(r.status)).sort((a, b) => (a.days_left ?? 999) - (b.days_left ?? 999)).slice(0, 3);
   return html`<section class="card load-use">
     <div class="load-use-head"><span class="load-ic">${ICON.check}</span><div><h3>Papers check</h3><p class="muted small">${onSale('papers_check') ? peso(price('papers_check')) + ' a permit' : 'Not available right now'}</p></div></div>
-    <p>Before you queue, our team checks photos of your papers against the permit's checklist and tells you what's missing or needs fixing, usually by 6 pm the next weekday.</p>
+    <ul class="load-ticks"><li>${ICON.check}<span>Send photos of your papers before you go</span></li><li>${ICON.check}<span>We tell you what's missing or needs fixing</span></li>
+      <li>${ICON.check}<span>Answer by 6 pm the next weekday</span></li></ul>
     ${when(admin && onSale('papers_check'), soon.length ? html`<div class="load-picks">${soon.map((r) => html`<a class="btn btn-sm btn-ghost" href="#/requirement/${r.id}?check=1">${r.name} · ${r.subject_name || ''}</a>`)}</div>`
       : html`<p class="muted small">Open any permit and tap "Check my papers".</p>`)}
   </section>`;
@@ -113,7 +121,8 @@ function papersCardUse(admin) {
 function templatesCardUse(s) {
   return html`<section class="card load-use">
     <div class="load-use-head"><span class="load-ic">${ICON.file}</span><div><h3>One template</h3><p class="muted small">${s.has_plus ? 'All included with your Plus' : peso(price('template')) + ' each, yours to keep'}</p></div></div>
-    <p>Authorization letters, a special power of attorney, an affidavit of loss and more, filled in with your business's details. Buy only the one you need.</p>
+    <ul class="load-ticks"><li>${ICON.check}<span>Letters, SPA, affidavit of loss and more</span></li><li>${ICON.check}<span>Filled in with your business's details</span></li>
+      <li>${ICON.check}<span>Buy only the one you need</span></li></ul>
     <a class="btn btn-sm btn-soft" href="#/templates">See the templates</a>
   </section>`;
 }

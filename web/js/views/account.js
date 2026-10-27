@@ -62,7 +62,7 @@ export async function historyPage(el, { keep = false } = {}) {
     days[days.length - 1].items.push(a);
   }
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>History</h1><p class="muted">Who changed what, and when. Kept forever.</p></div></div>
+    <div class="page-head"><div><h1>History</h1><p class="page-sub">Every change anyone made, and when. Nothing is ever erased.</p></div></div>
     <div class="hist-bar">
       <label for="hist-show">Show</label>
       <select id="hist-show" aria-label="Show">${HIST_SHOW.map(([k, label]) => html`<option value="${k}" ${k === histShow ? 'selected' : ''}>${label}</option>`)}</select>
@@ -226,7 +226,7 @@ export async function settings(el, section) {
   const org = S.org;
 
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Settings</h1></div></div>
+    <div class="page-head"><div><h1>Settings</h1><p class="page-sub">Your details, reminders, plan and workspace.</p></div></div>
     ${settingsNav()}
 
     ${when(!section, html`

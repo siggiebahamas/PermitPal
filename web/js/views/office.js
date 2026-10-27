@@ -388,17 +388,6 @@ document.addEventListener('change', (e) => {
   const body = sel.closest('[data-bill-offer]')?.querySelector('[data-bill-body]');
   if (r && body) body.innerHTML = String(billBody(r));
 });
-// For the Done for you page: the same offer, starting on a bill we can pay online if there is one.
-export async function billPayCard() {
-  if (!has('billpay') || !billOpen() || !isOrgAdmin()) return '';
-  if (!SET) SET = await db.appSettings().catch(() => null);
-  await loadLgus();
-  const list = billable();
-  if (!list.length) return '';
-  const first = list.find((x) => billOnline(x).ok && x.type_code === 'mayors_permit') || list.find((x) => billOnline(x).ok) || list[0];
-  return html`<section class="card bills-card dfy-bills" id="bills"><div class="card-head"><div><h2>Got a bill from the city?</h2><p class="card-sub">We pay it online for you, and file the official receipt</p></div></div>
-    ${billOffer(first)}</section>`;
-}
 function billRow(r, b, edit) {
   const [label, cls] = BILL_STATUS[b.status] || ['', 'needinfo'];
   const pp = b.mode === 'permitpal';

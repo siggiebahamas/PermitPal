@@ -44,19 +44,20 @@ function paintPrice(el) {
     el.innerHTML = String(html`<span class="pp-ribbon">${FREE_MONTHS} months FREE</span>
       <div class="pp-amount"><b>${peso(perMonthYearly(m))}</b><span>/month</span></div>
       <p class="pp-billed"><s aria-label="was ${peso(m * 12)}">${peso(m * 12)}</s> <b>${peso(y)}</b> once a year</p>
-      <div class="pp-savebig"><span>You save </span><b>${peso(m * FREE_MONTHS)}</b><small> every year</small></div>
-      ${per && unit ? perBox(under(y / 12 / per), unit, `with ${per} ${unit}s`) : ''}`);
+      <p class="pp-save pp-quiet">That's <b>${peso(m * FREE_MONTHS)} less</b> than paying month to month.</p>
+      ${per && unit ? perBox(perUp(y / 12 / per), unit) : ''}`);
   } else {
     el.innerHTML = String(html`<div class="pp-amount"><b>${peso(m)}</b><span>/month</span></div>
       <p class="pp-day pp-perday">That's ${under((m * 12) / 365)} a day</p>
-      ${per && unit ? perBox(under(m / per), unit, `with ${per} ${unit}s`) : ''}
+      ${per && unit ? perBox(perUp(m / per), unit) : ''}
       <button type="button" class="pp-nudge" data-bill-set="yearly">Pay yearly and get ${FREE_MONTHS} months FREE: save ${peso(m * FREE_MONTHS)} →</button>`);
   }
 }
-// What it comes to for each vehicle or site: the figure big, what it assumes underneath.
+// What it comes to for each vehicle or site, in whole pesos: rounded up to the next ₱5 ("under ₱50" for ₱49.97).
 const UNIT_ICON = { vehicle: ICON.car, site: ICON.building, client: ICON.briefcase };
-export const perBox = (v, unit, note) => html`<div class="pp-per"><span class="pp-per-ic" aria-hidden="true">${UNIT_ICON[unit] || ICON.grid}</span>
-  <span class="pp-per-t"><b>${v}</b> <em>per ${unit} a month</em><small>${note}</small></span></div>`;
+export const perUp = (n) => { const c = Math.ceil(n / 5 - 1e-9) * 5; return c - n < 0.005 ? peso(c) : `under ${peso(c)}`; };
+export const perBox = (v, unit) => html`<div class="pp-per"><span class="pp-per-ic" aria-hidden="true">${UNIT_ICON[unit] || ICON.grid}</span>
+  <span class="pp-per-t"><b>${v}</b> <em>per ${unit} a month</em></span></div>`;
 export const paintPrices = (root = document) => root.querySelectorAll('[data-price]').forEach(paintPrice);
 // A button whose words (and data-billing) follow the switch. attrs is fixed markup from our own code.
 export const billButton = (attrs, m, y, cls = 'btn btn-primary') => html`<button type="button" class="${cls}" ${raw(attrs)} data-bill-swap data-billing="${billing}" data-m="${m}" data-y="${y}">${billing === 'yearly' ? y : m}</button>`;
@@ -109,13 +110,13 @@ export const PLANS = {
     why: { title: 'It pays for itself', lines: ['One unregistered vehicle caught can mean a ₱10,000 LTO fine', 'No surprise renewals: every month starts with a ready list'] },
   },
   property_s: {
-    icon: ICON.building, name: 'Multi-Site', who: 'For landlords, franchisors and groups: up to 20 sites (tenants, franchisees or branches)',
+    icon: ICON.building, name: 'Multi-Site', who: 'For landlords, franchisors and groups with up to 20 sites',
     promise: "Every site's permits, without chasing photocopies", per: 20, unit: 'site', kind: 'property',
     preview: TENANT_PREVIEW, wins: TENANT_WINS, checks: tenantChecks('Up to 20 sites'),
     why: { title: 'Made for owners of many sites', lines: ['Everything the Unlimited plan has, for up to 20 sites', 'Grow past 20? Move up anytime, nothing to set up again'] },
   },
   property: {
-    icon: ICON.grid, name: 'Multi-Site Unlimited', who: 'For malls, franchise networks and big groups: any number of sites',
+    icon: ICON.grid, name: 'Multi-Site Unlimited', who: 'For malls, franchise networks and big groups, any size',
     promise: "Every site's permits, without chasing photocopies", per: 100, unit: 'site', kind: 'property',
     preview: TENANT_PREVIEW, wins: TENANT_WINS, checks: tenantChecks('Any number of sites'),
     why: { title: 'Why it costs more', lines: ['It does the work of a full-time admin who chases permits (₱20,000+ a month)',
@@ -135,16 +136,16 @@ export const TIERS = {
     checks: ['Up to 20 files for each business or vehicle', 'Reminders, timelines, checklists and your document vault', 'History of every change',
       'Your own permit page and QR poster', 'Ready letters and forms, filled in for you', 'Everything in Free'] },
   core: { icon: ICON.briefcase, name: 'Core', who: 'For households and small businesses', range: 'Up to 15 businesses and vehicles together', users: 'Up to 3 users (you + 2 staff)', kind: 'business',
-    per: 15, perNote: 'when all 15 records are vehicles',
+    per: 15,
     checks: ['Group by business and branch', 'One dashboard, reminders and renewal tasks for everything', 'Text message reminders', 'Pinoy Permit Plus included', 'Everything in Plus'] },
   multi: { icon: ICON.car, name: 'Multi-Vehicle', who: 'For big households and small fleets', range: '16 to 30 vehicles', users: 'Up to 3 users', kind: 'fleet',
-    per: 30, perNote: 'at 30 vehicles',
+    per: 30,
     checks: ['Up to 20 files for each vehicle', 'Fleet board: who can’t drive today', 'Status and history for every vehicle', 'Includes up to 3 business records', 'Everything in Core'] },
   fleet: { icon: ICON.car, name: 'Fleet', who: 'For companies with many vehicles', range: '31 to 75 vehicles', users: 'Up to 5 users', kind: 'fleet',
-    per: 75, perNote: 'at 75 vehicles',
+    per: 75,
     checks: ['Filter by plate, status, expiry and business', 'Import vehicles from a spreadsheet', 'A renew-this-month list', 'Includes up to 3 business records', 'Everything in Multi-Vehicle'] },
   fleet_pro: { icon: ICON.car, name: 'Fleet Pro', who: 'For large fleets', range: '76 to 150 vehicles', users: 'Up to 10 users', kind: 'fleet',
-    per: 150, perNote: 'at 150 vehicles',
+    per: 150,
     checks: ['Fleet-wide renewal planning', 'Export for your records', 'Includes up to 3 business records', 'Everything in Fleet'] },
   enterprise: { icon: ICON.grid, name: 'Enterprise', who: 'For the biggest fleets', range: '151 or more vehicles', users: 'Users agreed in your quote', kind: 'fleet', quote: true,
     checks: ['A written plan and quote for your fleet', 'We show the cost per vehicle in your quote', 'Tracking and planning software, like every plan'] },
@@ -157,15 +158,17 @@ export const tierPrice = (plans, id) => (id === 'plus' ? PLUS_MONTHLY : Number(p
 // Plans the database sells now (Plus is an add-on, always there; Enterprise is quoted).
 export const tiersShown = (plans, ids) => (plans?.length ? ids.filter((id) => id === 'plus' || id === 'enterprise' || plans.some((p) => p.id === id && p.available !== false)) : ids);
 
+// "16 to 30 vehicles" → the number part big, the words small, so the size of the plan reads at a glance.
+const bigLead = (txt) => { const m = /^((?:Up to )?\d+(?: to \d+| or more)?)\s+(.*)$/.exec(txt); return m ? html`<span><b>${m[1]}</b> ${m[2]}</span>` : html`<span>${txt}</span>`; };
 export function tierCard(id, monthly, cta = '', { current = false } = {}) {
   const t = TIERS[id];
   if (!t) return '';
   return html`<section class="card pp-plan pp-tier ${current ? 'pp-current' : ''}" data-plan-card="${id}">
     <div class="pp-plan-head"><span class="pp-icon">${t.icon}</span><div><h3>${t.name}</h3><p class="pp-who">${t.who}</p></div></div>
-    <p class="pp-range">${t.range} · ${t.users}</p>
+    <div class="pp-range2">${bigLead(t.range)}${bigLead(t.users)}</div>
     ${t.quote ? html`<div class="pp-price"><div class="pp-amount"><b>Quoted</b></div><p class="pp-day">For your exact fleet size</p></div>`
       : monthly > 0 ? priceSlot(monthly) : html`<div class="pp-price"><p class="pp-day">Loading the price…</p></div>`}
-    ${t.per && monthly > 0 ? perBox(`about ${perVehicle(monthly, t.per)}`, 'vehicle', t.perNote) : ''}
+    ${t.per && monthly > 0 ? perBox(perUp(monthly / t.per), 'vehicle') : ''}
     ${checks(t.checks)}
     <p class="pp-swonly">Tracking and planning software only. Hands-on help costs extra.</p>
     <div class="pp-cta">${cta}</div></section>`;
@@ -185,7 +188,7 @@ export function peaceBand(plans) {
   return html`<section class="pp-peace" aria-labelledby="peace-h">
     <div class="pp-peace-copy"><h3 id="peace-h">A little peace of mind, for less than you might think.</h3>
       <p>Keep registration dates, documents, requirements and renewal tasks organized in one place, so you can plan ahead instead of scrambling at the last minute.</p></div>
-    <div class="pp-peace-num"><span>As low as</span><b>${perVehicle(low.m, low.n)}*</b><small>per vehicle / month</small>
+    <div class="pp-peace-num"><span>As low as</span><b>${perUp(low.m / low.n).replace(/^under /, '')}*</b><small>per vehicle / month</small>
       <em>${TIERS[low.id].name}: ${peso(low.m)} a month for up to ${low.n} vehicles</em></div>
     <p class="pp-peace-note">That is the subscription equivalent when you use the plan's full vehicle capacity. Your plan is billed at the monthly plan price, not as a separate per-car charge.
       <br>*Illustrative effective monthly cost at maximum vehicle capacity: ${foot}. Actual cost per vehicle is higher if fewer vehicles are tracked. Core allows a mix of vehicle and business records, so its per-vehicle figure does not apply when some records are businesses. Enterprise pricing is quoted individually.
@@ -229,7 +232,6 @@ const preview = (pv) => html`<div class="pp-preview" role="img" aria-label="Exam
     <span class="pv-pill pv-${st}" title="${LABEL[st]}">${txt}</span>${btn ? html`<span class="pv-btn">${btn}</span>` : ''}</div>`)}</div>`;
 const wins = (list) => html`<ul class="pp-wins">${list.map(([ic, t, d]) => html`<li><span class="pw-icon">${ic}</span><span><b>${t}</b><small>${d}</small></span></li>`)}</ul>`;
 const everything = (list) => html`<details class="pp-all"><summary><span>Everything included</span> <b>${list.length}</b></summary>${checks(list)}</details>`;
-const bonus = () => html`<div class="pp-bonus"><span>${ICON.check} Pinoy Permit Plus included <s>${peso(PLUS_MONTHLY)}/mo</s></span><span>${ICON.check} Text reminders</span></div>`;
 
 export function freeCard(cta = '') {
   return html`<section class="card pp-plan pp-free">
@@ -248,10 +250,8 @@ export function planCard(id, monthly, cta = '', { current = false, trialLine = t
   return html`<section class="card pp-plan ${current ? 'pp-current' : ''}" data-plan-card="${id}">
     <div class="pp-plan-head"><span class="pp-icon">${p.icon}</span><div><h3>${p.name}</h3><p class="pp-who">${p.who}</p></div></div>
     <p class="pp-promise">${p.promise}</p>
-    ${preview(p.preview)}
     ${monthly > 0 ? priceSlot(monthly, { per: p.per, unit: p.unit }) : html`<div class="pp-price"><p class="pp-day">Loading the price…</p></div>`}
-    ${wins(p.wins)}${bonus()}${everything(p.checks)}
-    <div class="pp-why"><b>${p.why.title}</b>${checks(p.why.lines.map((l) => (typeof l === 'function' ? (monthly > 0 ? l(monthly) : null) : l)).filter(Boolean))}</div>
+    ${wins(p.wins)}${everything(p.checks)}
     <div class="pp-cta">${cta}${trialLine ? html`<p class="pp-trial">30 days free · no card needed</p>` : ''}</div></section>`;
 }
 

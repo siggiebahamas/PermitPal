@@ -223,13 +223,13 @@ function fleetBoard(el, k, acc) {
 function chooser(el) {
   const price = (id) => Number(S.plans.find((p) => p.id === id)?.price_php_monthly || 0);
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Team tools</h1><p class="muted">Looking after permits for clients, vehicles or tenants? See them all on one board. Free for 30 days.</p></div></div>
+    <div class="page-head"><div><h1>Team tools</h1><p class="page-sub">Look after many vehicles or sites from one screen. Free for 30 days.</p></div></div>
     <h2 class="section-label">Pick what fits you</h2>
     ${billToggle('How often to pay for a team plan')}
-    <h3 class="pp-group-h">Fleets: one board for every vehicle</h3>
+    <h3 class="pp-group-h">For fleets: every vehicle on one screen</h3>
     <div class="pp-grid three">${tiersShown(S.plans, ['multi', 'fleet', 'fleet_pro']).map((id) => tierCard(id, tierPrice(S.plans, id),
       isOrgAdmin() ? html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="fleet">Try free for 30 days</button>` : ''))}</div>
-    <h3 class="pp-group-h">Landlords and malls: every tenant's permits</h3>
+    <h3 class="pp-group-h">For landlords, franchisors and groups: every site on one screen</h3>
     <div class="pp-grid">${plansShown(S.plans).map((id) => planCard(id, price(id),
       isOrgAdmin() ? html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${PLANS[id].kind}">Try free for 30 days</button>` : ''))}</div>
     ${compareTable()}

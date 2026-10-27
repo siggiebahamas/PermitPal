@@ -76,7 +76,8 @@ function emptyCheck() {
 
 function section(title, sub, items, sev) {
   if (!items.length) return '';
-  return html`<section class="card check-sec ${sev}"><div class="card-head"><div><h2>${title} <span class="muted small">${items.length}</span></h2><p class="card-sub">${sub}</p></div></div>
+  return html`<section class="card check-sec ${sev}"><div class="card-head"><div><h2>${title}</h2><p class="card-sub">${sub}</p></div>
+    <b class="check-count" aria-label="${plural(items.length, 'item')}">${items.length}</b></div>
     ${items.map(row)}</section>`;
 }
 function where(f) {

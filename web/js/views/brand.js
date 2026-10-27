@@ -122,7 +122,7 @@ export async function brandPage(el, subnav) {
   const logoUrl = db.brandLogoUrl(v.logo_path);
   const dis = admin ? '' : 'disabled';
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Settings</h1></div></div>${subnav}
+    <div class="page-head"><div><h1>Settings</h1><p class="page-sub">Your details, reminders, plan and workspace.</p></div></div>${subnav}
     ${live ? html`<div class="banner ok"><div><b>Your clients see your brand.</b> ${a.trial ? `Free trial until ${fmtDate(a.paid_through)}.` : `White-label is on until ${fmtDate(a.paid_through)}.`}</div></div>`
       : html`<div class="banner info"><div><b>Your clients see this once White-label is on.</b> ₱${BRAND_MONTHLY.toLocaleString()} a month, 14 days free. Set it up first if you like: nothing shows until then.</div>
         <a class="btn btn-sm btn-primary" href="#/settings/billing?brand=1">${brandEligible() ? 'Turn it on' : 'See plans'}</a></div>`}

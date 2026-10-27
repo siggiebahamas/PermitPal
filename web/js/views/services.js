@@ -38,16 +38,16 @@ const CATEGORIES = IN_PERSON ? [
   ['document', 'Online registrations', 'Registered online for you.', 'file'],
   ['advisory', 'Online upkeep', 'Your online gov\'t accounts, kept current.', 'check'],
 ];
-// Short promises shown as badges; the line under each opens on tap.
+// What people can count on, in plain sentences (not badges).
 const PROMISES = [
-  ['Price first', 'You see the exact price before anything starts. No charge until you say yes.'],
-  ['Gov\'t fees at cost', 'Agency fees exactly as charged, with official receipts here.'],
-  ['Track every step', 'Every update, message and receipt in one place.'],
-  ['Saved for you', 'Done? The new permit is saved and your reminders reset.'],
-  ['Money back', 'Can\'t finish it? Our fee back in full. Gov\'t fees lower than quoted? We refund the difference.'],
+  ['peso', 'You see the price first.', 'Nothing starts, and nothing is charged, until you say yes.'],
+  ['file', 'Government fees at cost.', 'Exactly what the office charges, with the official receipt.'],
+  ['list', 'You can follow every step.', 'Updates, messages and receipts are all here.'],
+  ['check', 'Your new permit is saved for you.', 'And your reminders start again for next time.'],
+  ['handshake', "If we can't finish it, you get our fee back.", 'If the government fee is lower than quoted, we refund the difference.'],
 ];
 // How it works, in three steps.
-const STEPS = [['Pick a service', 'From the menu below.'], ['Get your price', 'Within 1 business day.'], ['We do it', 'You watch it move, step by step.']];
+const STEPS = [['Pick a service', 'From the list below.'], ['Get your price', 'Within 1 business day.'], ['We do it', 'You can follow each step here.']];
 const FINE_PRINT = 'Pinoy Permit acts as your authorized representative, only with your written authorization, and follows each office\'s standard process. We never pay anyone to speed things up: that is against the law (RA 11032). Processing times are set by the government office.';
 let settingsCache = null;
 const settings = async () => (settingsCache ||= await db.appSettings().catch(() => ({})));
@@ -89,11 +89,12 @@ export function services(el, params) {
     <div class="page-head"><div><h1>Done for you</h1>
       <p class="page-sub">${IN_PERSON ? 'Busy? We do the paperwork and the lines. You just say yes.' : 'Busy? We do the paperwork online. You just say yes.'}</p></div>
       ${when(many.length > 1, html`<button class="btn btn-primary" data-act="svc-bulk">Renew ${many.length} for me</button>`)}</div>
-    <ol class="dfy-steps">${STEPS.map(([t, d], i) => html`<li><span class="dfy-n">${i + 1}</span><b>${t}</b><span>${d}</span></li>`)}</ol>
+    <section class="card dfy-how"><div class="dfy-how-col"><h2>How it works</h2>
+        <ol class="dfy-steps">${STEPS.map(([t, d], i) => html`<li><span class="dfy-n">${i + 1}</span><b>${t}</b><span>${d}</span></li>`)}</ol></div>
+      <div class="dfy-how-col"><h2>What you can count on</h2>
+        <ul class="dfy-promises">${PROMISES.map(([ic, t, d]) => html`<li><span class="dfy-p-ic" aria-hidden="true">${ICON[ic] || ICON.check}</span><span><b>${t}</b> ${d}</span></li>`)}</ul></div></section>
     ${due.map((i) => html`<div class="banner ${i.due_on < todayPH() ? 'warn' : 'info'}"><div><b>Year-round care bill ${i.number}:</b> ${peso(i.amount_php)}${i.first ? ', coverage starts when it\'s paid' : `, due ${fmtDate(i.due_on)}`}.</div>
       <div class="banner-actions"><a class="btn btn-sm btn-primary" href="#/care?pay=${i.id}">Pay</a></div></div>`)}
-    ${serviceStrip()}
-    <div class="dfy-trust">${PROMISES.map(([t, d]) => html`<details class="dfy-badge"><summary>${ICON.check}<b>${t}</b></summary><p>${d}</p></details>`)}</div>
     ${when(rev && IN_PERSON, careTeaser())}
 
     ${when(requests.length, html`<section class="card">
@@ -106,7 +107,6 @@ export function services(el, params) {
       <div><span class="dfy-kicker">New here? Start with this</span><h2>${setup?.name}</h2><p>Send photos of your permits. We type everything in for you.</p>
         <p class="dfy-ho-meta"><b>${price(setup || {})}</b> · ${setup?.turnaround}</p></div>
       ${when(canEdit(), html`<button class="btn btn-primary" data-act="svc-request" data-code="setup_from_paper">Get a price</button>`)}</section>`)}
-    ${when(has('billpay'), html`<div data-billpay-slot></div>`)}
     <h2 class="dfy-menu-h">What we can do for you</h2>
     ${svc.length <= 8 ? '' : html`<nav class="dfy-jump" aria-label="Jump to a kind of service">${CATEGORIES.filter(([cat]) => svc.some((s) => s.category === cat)).map(([cat, title, , ic]) => html`<a href="#svc-${cat}" data-scroll-to="svc-${cat}">${ICON[ic] || ICON.check}${title}</a>`)}</nav>`}
     ${svc.length <= 8 ? html`<div class="svc-grid">${CATEGORIES.flatMap(([cat, title, , ic]) => svc.filter((s) => s.category === cat).map((s) => serviceCard(s, [title, ic])))}</div>`
@@ -119,9 +119,8 @@ export function services(el, params) {
       <p>${IN_PERSON ? 'Your exact price depends on your city, the permit and how urgent it is.' : 'Our fees are fixed. Government fees are paid at cost.'}
         We only act with your written OK and follow each office's normal process. We never pay "fixers": that's against the law (RA 11032).</p>
       <details><summary>The full rules</summary><p class="small">${FINE_PRINT}</p></details>
-      <a href="terms.html#services" target="_blank" rel="noopener">Done-for-you terms</a></section>`);
-  const slot = el.querySelector('[data-billpay-slot]');
-  if (slot) import('./office.js').then((m) => m.billPayCard()).then((h) => { if (slot.isConnected) slot.innerHTML = String(h || ''); }).catch(() => {});
+      <a href="terms.html#services" target="_blank" rel="noopener">Done-for-you terms</a></section>
+    ${serviceStrip()}`);
   el.querySelectorAll('[data-scroll-to]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); document.getElementById(a.dataset.scrollTo)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
   // Links from a permit page or a notification open the request form straight away.
   const pre = params?.get('req');
@@ -149,10 +148,10 @@ function serviceCard(s, tag) {
     ${tag ? html`<span class="svc-tag">${ICON[tag[1]] || ICON.check}${tag[0]}</span>` : ''}
     <h2>${s.name}</h2>
     <div class="svc-price"><b>${price(s)}</b><small>${s.price_unit}</small></div>
-    <div class="svc-chips">${s.turnaround ? html`<span class="svc-chip">${ICON.calendar}${s.turnaround}</span>` : ''}
-      ${when(has('revenue') && Number(s.rush_fee) > 0, html`<span class="svc-chip rush">Urgent? +${peso(s.rush_fee)} and we file within 1 business day</span>`)}</div>
+    <div class="svc-chips">${s.turnaround ? html`<span class="svc-chip">${ICON.calendar}${s.turnaround}</span>` : ''}</div>
     <details class="svc-more"><summary>What you get</summary><p class="svc-sum">${s.summary}</p>
-      <ul class="svc-inc">${(s.includes || []).map((i) => html`<li>${ICON.check}<span>${i}</span></li>`)}</ul></details>
+      <ul class="svc-inc">${(s.includes || []).map((i) => html`<li>${ICON.check}<span>${i}</span></li>`)}</ul>
+      ${when(has('revenue') && Number(s.rush_fee) > 0, html`<p class="svc-rush"><b>In a hurry?</b> Add ${peso(s.rush_fee)} and we file within 1 business day.</p>`)}</details>
     ${canEdit() ? html`<button class="btn btn-primary btn-block" data-act="svc-request" data-code="${s.code}">Get a price</button>` : ''}
   </section>`;
 }
