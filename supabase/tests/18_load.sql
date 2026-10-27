@@ -2,6 +2,9 @@
 -- papers checks (asking, photos, staff answering, cancelling, refunds, late answers), the renewal season pass,
 -- inviting a business, staff gifts and pay-backs, money views and who can see what. Rolled back at the end.
 begin;
+-- This test checks how load works with the original prices; test 24 checks today's prices.
+update public.load_products set price_php = case code when 'template' then 39 when 'papers_check' then 149 else price_php end;
+update public.doc_templates set price_php = 99 where code = 'authorization_letter';
 create temp table t_res (n serial primary key, step text, ok boolean, info text);
 grant all on t_res to authenticated, anon; grant all on sequence t_res_n_seq to authenticated, anon;
 create function pg_temp.res(s text, ok boolean, info text default '') returns void language sql as
@@ -26,8 +29,8 @@ update private.settings set value = '{}' where key = 'channel_status';
 delete from public.message_outbox;
 
 select pg_temp.res('the feature switch is on', exists (select 1 from private.features where name = 'load'), '');
-select pg_temp.res('prices: 50 texts ₱49, 200 texts ₱179, a template ₱99, a papers check ₱149, the season pass ₱149',
-  (select string_agg(code || '=' || price_php::int, ',' order by sort) from public.load_products) = 'texts_50=49,texts_200=179,template=99,papers_check=149,season_pass=149',
+select pg_temp.res('prices: 50 texts ₱49, 200 texts ₱179, a template ₱39, a papers check ₱149, the season pass ₱149',
+  (select string_agg(code || '=' || price_php::int, ',' order by sort) from public.load_products) = 'texts_50=49,texts_200=179,template=39,papers_check=149,season_pass=149',
   (select string_agg(code || '=' || price_php::int, ',' order by sort) from public.load_products));
 select pg_temp.res('the next business day ends at 6 pm Manila time (Friday afternoon answers Monday)',
   private.next_business_6pm('2026-10-23 15:00+08') = '2026-10-26 18:00+08' and private.next_business_6pm('2026-10-21 23:30+08') = '2026-10-22 18:00+08'

@@ -426,7 +426,7 @@ export async function connectPage(el, token) {
   let inv = null;
   try { inv = await db.linkPreview(token); } catch (e) { toastError(e); }
   if (!inv || inv.status !== 'pending') {
-    el.innerHTML = String(empty('This invitation is no longer open', inv?.status === 'active' ? 'It has already been accepted.' : 'Ask the person who invited you to send a new one.', html`<a class="btn btn-primary" href="#/">Go to your dashboard</a>`));
+    el.innerHTML = String(empty('This invitation is no longer open', inv?.status === 'active' ? 'It has already been accepted.' : 'Ask the person who invited you to send a new one.', html`<a class="btn btn-primary" href="#/">Go Home</a>`));
     return;
   }
   const mine = S.orgs.filter((o) => ['owner', 'admin'].includes(o.role) && o.kind === 'business');

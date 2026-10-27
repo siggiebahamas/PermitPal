@@ -36,7 +36,7 @@ export async function citiesTab() {
       </form>
     </section>
     <section class="card"><div class="card-head"><div><h2>Extensions announced</h2>
-      <p class="card-sub">${live.length ? `${plural(live.length, 'live extension')}.` : 'None live.'} Customers see live ones on their permits and dashboard until they take the new date.</p></div></div>
+      <p class="card-sub">${live.length ? `${plural(live.length, 'live extension')}.` : 'None live.'} Customers see live ones on their permits and Home screen until they take the new date.</p></div></div>
       ${list.length ? list.map((d) => html`<div class="line"><div class="line-main"><b>${d.city_name} ${d.permit_year}: ${fmtDate(d.due_on)}</b>
           <small>from ${fmtDate(d.was_on)} · told ${plural(d.notified, 'workspace')} · ${plural(d.moved, 'permit')} moved · ${fmtDateTime(d.created_at)}${d.note ? ` · ${d.note}` : ''}
             · <a href="${d.source_url}" target="_blank" rel="noopener noreferrer">source</a></small></div>

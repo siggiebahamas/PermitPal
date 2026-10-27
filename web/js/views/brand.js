@@ -191,7 +191,7 @@ export async function brandPage(el, subnav) {
       <p class="mp-foot">${reply || phone ? `Questions? ${reply ? `Email ${reply}` : ''}${reply && phone ? ' or call ' : phone ? 'Call ' : ''}${phone}.` : ''}
         <br>Sent for ${name} · Powered by Pinoy Permit</p>`);
     el.querySelector('[data-side-prev]').innerHTML = String(html`<div class="sp-top">${img ? html`<img src="${img}" alt="">` : ''}<b>${name}</b></div>${poweredBy()}
-      <div class="sp-nav"><span style="background:${brandVars(c)['--accent-soft']};color:${brandVars(c)['--accent-ink']}">Dashboard</span><span>Businesses</span><span>Compliance</span></div>`);
+      <div class="sp-nav"><span style="background:${brandVars(c)['--accent-soft']};color:${brandVars(c)['--accent-ink']}">Home</span><span>Businesses</span><span>Compliance</span></div>`);
   };
   paint();
   form.addEventListener('input', (e) => {

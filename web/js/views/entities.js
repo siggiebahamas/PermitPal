@@ -269,7 +269,7 @@ export function businessDetail(el, id) {
 
 on('biz-delete', async (ds) => {
   const b = business(ds.id);
-  if (!(await confirmDialog(`Delete ${b.name}?`, 'It disappears from your dashboard and reminders stop. Everything is kept and can be restored from Trash.'))) return;
+  if (!(await confirmDialog(`Delete ${b.name}?`, 'It disappears from Home and reminders stop. Everything is kept and can be restored from Trash.'))) return;
   try { await db.softDelete('businesses', b.id); await reload(); go('#/businesses'); toast('Deleted. Restore it from Trash anytime.'); } catch (e) { toastError(e); }
 });
 

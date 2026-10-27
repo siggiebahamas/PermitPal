@@ -29,7 +29,7 @@ export function contactPage(el, { signedIn = !!S.user } = {}) {
     <div class="contact-done" hidden>
       <h2>Message sent</h2>
       <p>Thanks. We reply by email within 1 business day${signedIn ? html`, to <b>${S.user?.email || 'your account email'}</b>` : ''}.</p>
-      ${signedIn ? html`<a class="btn btn-ghost" href="#/">Back to dashboard</a>` : html`<a class="btn btn-ghost" href="#/">Back to Pinoy Permit</a>`}
+      ${signedIn ? html`<a class="btn btn-ghost" href="#/">Back to Home</a>` : html`<a class="btn btn-ghost" href="#/">Back to Pinoy Permit</a>`}
     </div>`;
   el.innerHTML = String(signedIn
     ? html`<div class="page-head"><div><h1>Contact Pinoy Permit</h1><p class="muted">Got a question or a problem? Message us here.</p></div></div>

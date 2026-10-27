@@ -25,7 +25,7 @@ export async function render(el, id) {
   const r = reqById(id);
   if (!r) {
     el.innerHTML = String(empty('Not found', 'This permit was deleted or you no longer have access to it.',
-      html`<a class="btn btn-primary" href="#/">Back to dashboard</a>`));
+      html`<a class="btn btn-primary" href="#/">Back to Home</a>`));
     return;
   }
   if (!detail || detail.id !== id) {

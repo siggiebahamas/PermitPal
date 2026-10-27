@@ -1206,6 +1206,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   const names = await page.locator('main .svc-grid .svc h2').allTextContents();
   check('online only: Done for you lists only online services', names.length >= 4 && names.some((x) => /Set up my account/.test(x)) && names.some((x) => /DTI business name/.test(x))
     && !names.some((x) => /Mayor|Barangay|Fire Safety|Sanitary|LTO|walk-through|New business|branch opening|closure|replacement/i.test(x)), names.join(' | '));
+  check('online only: "Print and deliver (JoyRide)" is on the menu, from ₱350', names.some((x) => /Print and deliver \(JoyRide\)/.test(x)) && /From ₱350/.test(await page.textContent('main .svc:has-text("Print and deliver")')));
   check('online only: no care teaser and no "Renew several"', (await page.locator('main .care-teaser, main [data-act=svc-bulk]').count()) === 0
     && /We do the paperwork online/.test(await page.textContent('main .page-head')));
   check('online only: the demo\'s sample order is the online set-up job', (await page.locator('main .line', { hasText: 'Set up my account for me' }).count()) >= 1);
@@ -1262,6 +1263,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     }));
     check(`website ${label}: the name is Pinoy Permit everywhere on the page and in the tab`, !/PermitPal|Permit ?Pal\b/.test(text) && !/PermitPal/.test(await p.title())
       && (await p.title()) === 'Pinoy Permit' && (await p.getAttribute('.lp-top .brand img', 'alt')) === 'Pinoy Permit');
+    check(`website ${label}: "Try the demo" sits next to Start free at the top, and again at the bottom`, (await p.locator('.lp-hero2 .btn-row a.lp-btn-demo[href="demo/"]').count()) === 1
+      && (await p.locator('.lp-final2 a.lp-btn-demo[href="demo/"]').count()) === 1 && /Try the demo/.test(await p.textContent('.lp-hero2 .btn-row')));
     check(`website ${label}: the example phone shows Sadie's Kitchen`, /Good morning, Sadie/.test(await p.textContent('.lp-screen')) && (await p.textContent('.lp-biz')) === "Sadie's Kitchen");
     check(`website ${label}: "One screen." sits on a line of its own`, await p.evaluate(() => {
       const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
@@ -1860,9 +1863,10 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await go('#/requirement/' + mp); await page.waitForSelector('.papers-card');
   const card = await page.textContent('.papers-card');
   check(`load ${label}: the customer sees the answer, line by line`, /Almost there/.test(card) && /Needs a fix/.test(card) && /Bring the renewed lease/.test(card) && /One fix: the renewed lease/.test(card));
-  // one template at a time (no Plus here)
-  await go('#/templates'); await page.waitForSelector('[data-act=tpl-unlock]');
-  check(`load ${label}: without Plus, each template can be bought on its own`, /₱(99|149|199|249)/.test(await page.locator('[data-act=tpl-unlock]').first().textContent()));
+  // one template at a time (no Plus here); enough load for the dearest one
+  await mock(async () => { (await import('/__mock/mock-data.js')).__load.wallet.paid_php = 3000; });
+  await go('#/'); await go('#/load'); await page.waitForSelector('.load-hero'); await go('#/templates'); await page.waitForSelector('[data-act=tpl-unlock]');
+  check(`load ${label}: without Plus, each template can be bought on its own`, /₱(350|700|1,050|2,100)/.test(await page.locator('[data-act=tpl-unlock]').first().textContent()));
   await page.locator('[data-act=tpl-unlock]').first().click(); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
   check(`load ${label}: bought: it's yours, and it fills in`, (await page.locator('main .chip', { hasText: 'Yours' }).count()) === 1);
   await page.locator('[data-act=tpl-fill]').first().click(); await page.waitForTimeout(500);

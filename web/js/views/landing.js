@@ -24,6 +24,7 @@ const PIC = {
   next: raw('<svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>'),
 };
 // One color per kind of thing: blue business, teal vehicles, green staff, lilac taxes (brown is the team step).
+const PLAY = raw('<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M10 8.5v7l6-3.5z" fill="currentColor" stroke="none"/></svg>');
 const pill = (st, t) => html`<span class="pv-pill pv-${st}">${t}</span>`;
 const tick = html`<span class="lp-done">${ICON.check}</span>`;
 
@@ -42,7 +43,8 @@ const hero = () => html`<section class="lp-hero2">
     <p class="lp-tag">Permits on autopilot</p>
     <h1>Track and manage every permit. <span class="lp-blue">Easily.</span></h1>
     <p class="lp-lead">Add your permits once. Pinoy Permit keeps track of every expiry date${has('filings') ? ' and tax deadline' : ''}${has('library2') ? ', reminds you before each one is due, and shows you how to renew' : ' and reminds you before each one is due'}.</p>
-    <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#tour" data-scroll-to="tour">See how it works</a></div>
+    <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#tour" data-scroll-to="tour">See how it works</a><a class="btn btn-lg lp-btn-demo" href="demo/">${PLAY}Try the demo</a></div>
+    <p class="lp-demo-note">No sign-up needed for the demo. Click around with sample data.</p>
     <ul class="lp-ticks"><li>${ICON.check}Free plan, no card</li><li>${ICON.check}Works on any phone</li></ul>
   </div>
   <div class="lp-hero2-art">
@@ -222,7 +224,7 @@ const receipt = () => {
 const finalCta = () => html`<section class="lp-sec"><div class="lp-final2">
   <div><h2 class="lp-big">Start free. Grow when you're ready.</h2>
     <p class="lp-lead">Track your own business on the free plan. Add ${has('plus') ? 'Plus, more staff or ' : ''}a team plan only when you need it. Team plans start with 30 days free.</p></div>
-  <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#/pricing">See plans and prices</a></div>
+  <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-lg lp-btn-demo" href="demo/">${PLAY}Try the demo first</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#/pricing">See plans and prices</a></div>
 </div></section>`;
 
 export function landing(app) {
@@ -260,7 +262,7 @@ const plusShowcase = () => (has('plus') ? html`<section class="lp-show card" ari
 </section>` : '');
 // What load buys (prices come from the database once they arrive; these are only shown until then).
 const LOAD_FALLBACK = [{ code: 'texts_50', name: '50 text reminders', price_php: 49, active: true }, { code: 'texts_200', name: '200 text reminders', price_php: 179, active: true },
-  { code: 'template', name: 'One template, yours to keep', price_php: 99, active: true }, { code: 'papers_check', name: 'Papers check', price_php: 149, active: true },
+  { code: 'template', name: 'One template, yours to keep', price_php: 350, active: true }, { code: 'papers_check', name: 'Papers check', price_php: 499, active: true },
   { code: 'season_pass', name: 'Renewal season pass', price_php: 149, active: true }];
 const LOAD_WHY = {
   texts_50: 'A text on the days your permits and tax deadlines need you. Credits never expire.',

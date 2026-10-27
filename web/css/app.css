@@ -1873,6 +1873,7 @@ svg.trend .col:focus .hit, svg.trend .col:hover .hit { fill: var(--gray-bg); }
 .lp-receipt { flex: 1 1 460px; min-width: 0; max-width: 560px; margin: 0 auto; position: relative; background: #fff; border-radius: 24px 24px 6px 6px; padding: 30px 30px 38px; box-shadow: 0 40px 70px -40px rgba(11,27,58,.45); transform: rotate(-1deg); }
 .lp-rc-top { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .lp-rc-top img { width: 72px; height: 72px; }
+.lp-rc-top img.brand-wm { width: auto; height: 100px; }
 .lp-rc-name { font-size: 30px; letter-spacing: -.7px; line-height: 1.1; margin-top: 4px; }
 .lp-rc-plan { margin-top: 14px; padding: 6px 14px; border-radius: 999px; background: var(--accent-soft); color: var(--brand); font-weight: 700; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
 .lp-rc-every { margin-top: 8px; font-size: 15px; font-weight: 500; color: var(--muted); }
@@ -2232,3 +2233,8 @@ a.pk-tag:hover { filter: brightness(.96); text-decoration: underline; }
 .svc-tag { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 800; color: var(--brand); background: var(--accent-soft); padding: 3px 10px; border-radius: 999px; }
 .svc-tag svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.2; }
 .dfy-cat .section-label.svc-cat { text-transform: none; letter-spacing: -.2px; }
+/* "Try the demo": the third way in, on the hero and again at the bottom of the home page. */
+.lp-btn-demo { background: var(--s-ok-bg); color: var(--s-ok); border: 2px solid #A9D8BE; gap: 8px; }
+.lp-btn-demo:hover { background: #DDF0E5; }
+.lp-btn-demo svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; }
+.lp-demo-note { margin: 12px 0 0; font-size: 15px; color: var(--text); }

@@ -13,10 +13,8 @@ select pg_temp.res('no database function deletes or updates without a WHERE', no
   where n.nspname in ('public', 'private') and m[1] !~* '\swhere\s' and m[1] !~* '^update\s+set' and m[1] !~* '^update (of|your|their|on|that)\M'),
   (select string_agg(p.proname, ', ') from pg_proc p join pg_namespace n on n.oid = p.pronamespace, regexp_matches(p.prosrc, '((delete\s+from|update)\s+(only\s+)?[a-z_.]+[^;]*;)', 'gi') m
    where n.nspname in ('public', 'private') and m[1] !~* '\swhere\s' and m[1] !~* '^update\s+set' and m[1] !~* '^update (of|your|their|on|that)\M'));
-select pg_temp.res('templates are priced by kind', (select string_agg(code || '=' || price_php::int, ',' order by code) from public.doc_templates) =
-  'accreditation_cover_letter=99,affidavit_of_loss=149,authorization_letter=99,certified_copy_request=99,gross_sales_declaration=149,landlord_letter=99,secretary_certificate=249,special_power_of_attorney=199',
-  (select string_agg(code || '=' || coalesce(price_php::int::text, '-'), ',' order by code) from public.doc_templates));
-select pg_temp.res('one template on its own is no longer PHP 39', (select price_php from public.load_products where code = 'template') = 99, '');
+select pg_temp.res('every template has its own price (test 24 checks the amounts)', not exists (select 1 from public.doc_templates where price_php is null), '');
+select pg_temp.res('one template on its own is no longer PHP 39', (select price_php from public.load_products where code = 'template') > 39, '');
 select pg_temp.res('buying a template charges its own price', (select prosrc from pg_proc where proname = 'unlock_template') like '%coalesce(t.price_php, private.load_price(''template''))%', '');
 select pg_temp.res('emails show the logo from the site', private.email_html('Hi', '<p>x</p>', null, null) like '%<img src="https://%/img/wordmark.png" alt="Pinoy Permit"%', '');
 

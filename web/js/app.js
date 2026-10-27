@@ -41,11 +41,11 @@ let lastLoad = 0;
 let unsubscribe = null;
 
 const T = {
-  en: { dashboard: 'Dashboard', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
+  en: { dashboard: 'Home', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
         filings: 'Taxes & contributions', pros: 'Find a professional', services: 'Done for you', care: 'Year-round care', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
         check: 'Permit check', templates: 'Templates', load: 'Load',
         notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact Pinoy Permit', tools: 'Tools', account: 'Account' },
-  tl: { dashboard: 'Dashboard', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
+  tl: { dashboard: 'Home', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
         filings: 'Buwis at kontribusyon', pros: 'Maghanap ng Propesyonal', services: 'Ipaasikaso sa amin', care: 'Alaga buong taon', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
         check: 'Pagsusuri ng permit', templates: 'Mga template', load: 'Load',
         notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang Pinoy Permit', tools: 'Mga Tool', account: 'Account' },
@@ -299,8 +299,8 @@ async function renderPage() {
     console.error(e);
     reportError(e); // Pinoy Permit staff see this in Admin > Errors
     main.innerHTML = String(html`<div class="empty"><div class="empty-title">Something went wrong on this page</div>
-      <p>${friendlyError(e)}</p><p class="muted small">We've been told about it automatically. Try again, or go back to the dashboard.</p>
-      <div class="btn-row"><button class="btn btn-primary" data-act="reload">Try again</button><a class="btn btn-ghost" href="#/">Dashboard</a></div></div>`);
+      <p>${friendlyError(e)}</p><p class="muted small">We've been told about it automatically. Try again, or go back Home.</p>
+      <div class="btn-row"><button class="btn btn-primary" data-act="reload">Try again</button><a class="btn btn-ghost" href="#/">Home</a></div></div>`);
   }
 }
 
