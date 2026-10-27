@@ -130,7 +130,7 @@ function openTask(t = {}) {
     <label class="field"><span>What do you want to remember?</span><input name="title" maxlength="160" required value="${t.title || ''}" placeholder="e.g. Pick up the cedula at the barangay"></label>
     <label class="field"><span>Date</span><input type="date" name="due_on" required value="${t.due_on || todayPH()}"></label>
     <label class="field"><span>Note <small>(optional)</small></span><textarea name="note" rows="3" maxlength="1000">${t.note || ''}</textarea></label>
-    ${t.id ? html`<p><button type="button" class="btn btn-ghost btn-sm danger-text" data-task-delete="${t.id}">Delete this to-do</button></p>` : ''}`, {
+    ${t.id ? html`<p><button type="button" class="btn btn-ghost danger" data-task-delete="${t.id}">Delete this to-do</button></p>` : ''}`, {
     submitLabel: t.id ? 'Save' : 'Add to my calendar',
     onOpen: (form) => {
       form.querySelector('[name=title]').focus();

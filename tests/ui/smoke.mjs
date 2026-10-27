@@ -80,7 +80,17 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: Next actions: renew-soon rows show "Due in N days" in the pill and no days under the name; Overdue stays`,
     (await page.locator('.home-next .row.soon .chip.soon', { hasText: /^Due in \d+ days?$/ }).count()) >= 1 && (await page.locator('.home-next .row.soon .row-sub .due').count()) === 0
     && (await page.locator('.home-next .row.overdue .chip.overdue', { hasText: 'Overdue' }).count()) >= 1 && (await page.locator('.home-next .row.overdue .row-sub .due').count()) === 0);
-  await go('#/compliance'); await page.waitForSelector('.row');
+  check(`${label}: status tiles have a colored dot beside the label, the number in navy`,
+    await page.evaluate(() => { const l = document.querySelector('.stat.overdue .stat-l'); const n = document.querySelector('.stat.overdue .stat-n');
+      return getComputedStyle(l, '::before').backgroundColor === 'rgb(217, 71, 63)' && getComputedStyle(n).color === 'rgb(11, 27, 58)'; }));
+  check(`${label}: navy top bar with a white search box`, await page.evaluate(() => getComputedStyle(document.querySelector('.topbar')).backgroundColor === 'rgb(11, 27, 58)'
+    && getComputedStyle(document.querySelector('.top-search')).backgroundColor === 'rgb(255, 255, 255)'));
+  await page.fill('#top-q', 'Isuzu'); await page.press('#top-q', 'Enter'); await page.waitForTimeout(500);
+  check(`${label}: searching at the top shows the matching permits`, /#\/compliance/.test(page.url()) && (await page.inputValue('#filters [name=q]')) === 'Isuzu'
+    && (await page.locator('.row').count()) >= 1 && (await page.locator('.row', { hasText: 'Corner' }).count()) === 0);
+  await page.fill('#top-q', '');
+  await go('#/compliance'); await page.click('[data-act=clear-filters]').catch(() => {}); await page.waitForSelector('.row');
+  check(`${label}: the page title sits on the navy band`, (await page.locator('#main > .pg-band .page-head h1').count()) === 1);
   check(`${label}: the Compliance list keeps the days under each name`, (await page.locator('.row .row-sub .due').count()) >= 1);
   await go('#/'); await page.waitForSelector('.home-cal');
   check(`${label}: today is marked on the calendar`, (await page.locator('.hc-day.is-today').count()) === 1);
@@ -92,6 +102,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: the to-do shows on its day and in "Your to-dos"`, (await page.locator('.hc-day.has-task', { hasText: 'Pick up the cedula' }).count()) === 1 && /Pick up the cedula/.test(await page.textContent('.hc-todos')));
   await page.locator('.hc-day.has-task').first().click(); await page.waitForSelector('#modal-root .modal');
   check(`${label}: a day with a to-do lists it, with a Google Calendar link`, /Pick up the cedula/.test(await page.textContent('#modal-root')) && (await page.locator('#modal-root a[href^="https://calendar.google.com/"]').count()) === 1);
+  await page.locator('#modal-root [data-task-edit]').first().click(); await page.waitForTimeout(300);
+  check(`${label}: "Delete this to-do" is the red delete button`, (await page.locator('#modal-root button.btn.danger[data-task-delete]').count()) === 1);
   await page.keyboard.press('Escape');
   await page.locator('.hc-todos [data-task-done]').first().click(); await page.waitForTimeout(400);
   check(`${label}: ticking it off takes it off "Your to-dos"`, (await page.locator('.hc-todos').count()) === 0);

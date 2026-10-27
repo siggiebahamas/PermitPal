@@ -217,20 +217,43 @@ function renderShell() {
         <header class="topbar">
           <button class="icon-btn menu-btn" data-act="menu-open" aria-label="Open menu" aria-controls="side-menu" aria-expanded="false">${ICON.menu}</button>
           <span class="mobile-only" data-brand-slot="top">${S.brand ? sideBrand(S.brand) : ppBrand()}</span>
-          <div class="spacer"></div>
+          <form class="top-search" role="search" data-top-search><label class="sr-only" for="top-q">Search permits, plates, people</label>
+            ${ICON.search}<input id="top-q" type="search" name="q" placeholder="Search permits, plates, people" autocomplete="off"></form>
           <button class="icon-btn bell" data-act="bell-open" aria-label="Notifications" aria-haspopup="dialog">${ICON.bell}<b class="badge" data-badge></b></button>
         </header>
         <div id="banner"></div>
         <main id="main" tabindex="-1"></main>
       </div>
     </div>`);
+  // The search box at the top: Enter shows the matching permits in Compliance.
+  document.querySelector('[data-top-search]')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = String(new FormData(e.target).get('q') || '').trim();
+    location.hash = q ? `#/compliance?q=${encodeURIComponent(q)}` : '#/compliance';
+  });
+  // Each page's title area sits on the navy band under the top bar; the rest of the page stays light.
+  new MutationObserver(() => bandHead(document.getElementById('main'))).observe(document.getElementById('main'), { childList: true });
   document.getElementById('org-switch')?.addEventListener('change', async (e) => {
     try { await db.setCurrentOrg(S.user.id, e.target.value); location.hash = '#/'; location.reload(); } catch (err) { toastError(err); }
   });
   renderPage();
 }
 
-const ppBrand = () => html`<a class="brand" href="#/"><img class="brand-wm" src="img/wordmark.png" alt="Pinoy Permit"></a>`;
+const ppBrand = () => html`<a class="brand pp-mascot" href="#/" aria-label="Pinoy Permit, Home"><span class="pp-mascot-in"><img src="img/logo.png" alt=""></span></a>`;
+// Wrap the page's opening "← back" link and title block in the navy band (once; Home has its own).
+function bandHead(main) {
+  if (!main || main.firstElementChild?.classList.contains('pg-band')) return;
+  const lead = [];
+  for (const el of main.children) {
+    if (el.matches('.back, .page-head') && (!lead.length || lead.at(-1).matches('.back'))) lead.push(el);
+    else break;
+  }
+  if (!lead.length || !lead.some((el) => el.matches('.page-head'))) return;
+  const band = document.createElement('div');
+  band.className = 'pg-band';
+  main.insertBefore(band, lead[0]);
+  lead.forEach((el) => band.appendChild(el));
+}
 // The firm's look switched on or off while the app was open (it comes and goes with the add-on).
 function paintBrand() {
   const set = (slot, v) => { const el = document.querySelector(`[data-brand-slot="${slot}"]`); if (el) el.innerHTML = String(v); };

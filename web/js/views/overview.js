@@ -67,9 +67,9 @@ let moreOpen = false; // "More filters" stays open until the user closes it
 export function compliance(el, params) {
   // Arriving from a number tile: show exactly that list (no leftover search or filters), then take the
   // instruction out of the address so later redraws keep whatever the person changes on the page.
-  if (params.get('status') || params.get('entity') || params.get('who')) {
+  if (params.get('status') || params.get('entity') || params.get('who') || params.get('q')) {
     Object.assign(filters, { status: params.get('status') || 'all', subject: 'all', entity: params.get('entity') || 'all', city: 'all', type: 'all', due: 'all',
-      who: has('assign') ? params.get('who') || 'all' : 'all', q: '' });
+      who: has('assign') ? params.get('who') || 'all' : 'all', q: params.get('q') || '' });
     history.replaceState(null, '', '#/compliance');
   }
   const { reqs, businesses, vehicles, locations } = S.data;
