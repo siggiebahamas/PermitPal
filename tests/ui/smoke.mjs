@@ -83,6 +83,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: status tiles have a colored dot beside the label, the number in navy`,
     await page.evaluate(() => { const l = document.querySelector('.stat.overdue .stat-l'); const n = document.querySelector('.stat.overdue .stat-n');
       return getComputedStyle(l, '::before').backgroundColor === 'rgb(217, 71, 63)' && getComputedStyle(n).color === 'rgb(11, 27, 58)'; }));
+  check(`${label}: a big bell, and a white notification count in the menu`, await page.evaluate(() => { const b = document.querySelector('.topbar .bell'); const n = document.querySelector('.sidebar .nav .badge');
+    return b.getBoundingClientRect().width >= 56 && (!n || getComputedStyle(n).backgroundColor === 'rgb(255, 255, 255)'); }));
   check(`${label}: navy top bar with a white search box`, await page.evaluate(() => getComputedStyle(document.querySelector('.topbar')).backgroundColor === 'rgb(11, 27, 58)'
     && getComputedStyle(document.querySelector('.top-search')).backgroundColor === 'rgb(255, 255, 255)'));
   await page.fill('#top-q', 'Isuzu'); await page.press('#top-q', 'Enter'); await page.waitForTimeout(500);
@@ -94,8 +96,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: Compliance group headers are big and bold, with a big count`, await page.evaluate(() => { const b = document.querySelector('.band'); const n = b?.lastElementChild;
     return !!b && parseFloat(getComputedStyle(b).fontSize) >= 20 && getComputedStyle(b).fontWeight === '800' && parseFloat(getComputedStyle(n).fontSize) >= 28; }));
   await go('#/history'); await page.waitForSelector('main h1');
-  check(`${label}: History: the day in bold over a gold line, its count the same size, an icon on each change`, await page.evaluate(() => { const d = document.querySelector('.hist-day');
-    return !!d && getComputedStyle(d.querySelector('b')).borderBottomColor === 'rgb(233, 185, 73)' && getComputedStyle(d.firstElementChild).fontSize === getComputedStyle(d.lastElementChild).fontSize
+  check(`${label}: History: the day in bold over a gold line, its count in a navy circle, + for an addition and an icon on each change`, await page.evaluate(() => { const d = document.querySelector('.hist-day');
+    return !!d && getComputedStyle(d.querySelector('b')).borderBottomColor === 'rgb(233, 185, 73)' && getComputedStyle(d.querySelector('.hist-n')).backgroundColor === 'rgb(11, 27, 58)'
+      && document.querySelector('.hist-line .hist-ic.add')?.textContent === '+'
       && document.querySelectorAll('.hist-line .hist-ic').length === document.querySelectorAll('.hist-line').length; }));
   await go('#/compliance'); await page.waitForSelector('.row');
   check(`${label}: Renew buttons are the one green, everywhere`, (await page.locator('.row .btn-renew').count()) >= 1 && (await page.locator('.row [data-act=req-next].btn-primary').count()) === 0
@@ -1797,13 +1800,13 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.locator('#pricing .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
     const y = await core(page).textContent();
     check(`prices ${label}: yearly shows 2 months free, the old price crossed out and the saving`, /2 months FREE/i.test(y) && /₱7,990\s*\/year/.test(y) && /Instead of ₱9,588 paying monthly/.test(y) && /You save ₱1,598 a year/.test(y) && !/\/month/.test(y), y.replace(/\s+/g, ' ').slice(0, 220));
-    check(`prices ${label}: yearly: only the total saving, no per-month figures, no month grid`, (await core(page).locator('.pp-quiet b').textContent()) === '₱1,598' && (await core(page).locator('.pp-per').count()) === 0
+    check(`prices ${label}: yearly: only the total saving, no per-month figures, no month grid`, (await core(page).locator('.pp-quiet b').textContent()) === '₱1,598' && await page.evaluate(() => getComputedStyle(document.querySelector('#pricing .pp-quiet b')).color === 'rgb(14, 138, 79)') && (await core(page).locator('.pp-per').count()) === 0
       && !/pay 10 months/.test(y) && (await page.locator('.year-cal').count()) === 0);
     check(`prices ${label}: every switch on the page moved to yearly`, (await page.locator('.bill-toggle input[value=yearly]:checked').count()) === (await page.locator('.bill-toggle').count()));
     check(`prices ${label}: add-ons show the staff price ladder with savings`, /FREE/.test(await page.locator('#lp-staff .ladder').textContent()) && /40% off/.test(await page.locator('#lp-staff').textContent())
       && /60% off/.test(await page.locator('#lp-staff').textContent()) && /save ₱9,200/.test(await page.locator('#lp-staff .staff-ex').textContent()));
     check(`prices ${label}: Plus yearly is ₱1,490 with ₱298 saved`, /₱1,490\s*\/year/.test(await page.locator('[data-plan-card=plus]').textContent()) && /You save ₱298 a year/.test(await page.locator('[data-plan-card=plus]').textContent()));
-    await page.locator('#pricing .pp-compare summary').click(); await page.waitForTimeout(100);
+    check(`prices ${label}: the side-by-side table is open from the start`, (await page.locator('#pricing .pp-compare[open]').count()) === 1);
     check(`prices ${label}: everything side by side`, (await page.locator('#pricing .pp-table tbody tr').count()) >= 10 && /Separate service/.test(await page.textContent('#pricing .pp-table')));
     await page.reload(); await page.waitForSelector('#pricing [data-plan-card=core] .pp-amount');
     check(`prices ${label}: the choice is remembered on this device`, /₱7,990\s*\/year/.test(await core(page).textContent()));

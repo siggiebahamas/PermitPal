@@ -272,7 +272,7 @@ const COMPARE = [
 const cellOf = (c) => (c === true ? html`<span class="pp-yes">${ICON.check}<span class="sr-only">Included</span></span>`
   : c === false ? html`<span class="pp-no"><span aria-hidden="true">–</span><span class="sr-only">Not included</span></span>` : html`<span class="pp-word">${c}</span>`);
 const COLS = ['Free', 'Plus', 'Core', 'Multi-Vehicle', 'Fleet', 'Fleet Pro'];
-export const compareTable = () => html`<details class="card pp-compare"><summary><b>See everything side by side</b></summary>
+export const compareTable = () => html`<details class="card pp-compare" open><summary><b>See everything side by side</b></summary>
   <div class="table-wrap" tabindex="0" role="region" aria-label="Plans side by side"><table class="table pp-table">
     <thead><tr><th scope="col">What you get</th>${COLS.map((c) => html`<th scope="col">${c}</th>`)}</tr></thead>
     <tbody>${COMPARE.map(([t, ...cols]) => html`<tr><th scope="row">${t}</th>${cols.map((c) => html`<td>${cellOf(c)}</td>`)}</tr>`)}</tbody>

@@ -2581,14 +2581,14 @@ a.line:hover, button.line:hover { background-color: #fff; border-color: #C9D2E3;
 .pp-range2 span { padding: 10px 12px; border-radius: 12px; background: #EEF1F8; color: #0B1B3A; font-size: 14px; font-weight: 600; line-height: 1.3; }
 .pp-range2 b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
 .pp-promise { font-size: 16px; }
-/* History: a light day bar with the day in bold over a gold line, the count the same size; an icon per change */
-.hist-card .band.hist-day { background: #EEF1F8; color: #0B1B3A; font-size: 20px; letter-spacing: 0; text-transform: none; border-top: 0; padding: 14px 18px 12px; }
-.hist-card .band.hist-day b { font-weight: 800; padding-bottom: 5px; border-bottom: 3px solid #E9B949; }
-.hist-card .band.hist-day > span:last-child { font-size: 20px; color: #0B1B3A; }
+/* History: each day in bold over a gold line, the count in a navy circle; an icon per change */
+.hist-card .band.hist-day { background: #fff; color: #0B1B3A; font-size: 21px; letter-spacing: 0; text-transform: none; border-top: 1px solid var(--rule); padding: 18px 18px 10px; align-items: flex-end; }
+.hist-card .band.hist-day b { font-weight: 800; padding-bottom: 6px; border-bottom: 3px solid #E9B949; }
+.hist-card .band.hist-day > .hist-n { display: grid; place-items: center; min-width: 38px; height: 38px; padding: 0 8px; border-radius: 999px; background: #0B1B3A; color: #fff; font-size: 19px; }
 .hist-line { display: flex; align-items: center; gap: 12px; padding-left: 16px; }
-.hist-ic { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; font-weight: 800; line-height: 1; }
+.hist-ic { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; font-weight: 800; line-height: 1; }
 .hist-ic.add { background: #E3F4EA; color: var(--jade); } .hist-ic.edit { background: #EAF0FC; color: #1B4DB5; }
-.hist-ic.up { background: #FFF4D6; color: #8A5E00; } .hist-ic.del { background: #FDECEB; color: #B8403F; }
+.hist-ic.up { background: #FFF4D6; color: #8A5E00; } .hist-ic.del { background: #FDECEB; color: #B8403F; } .hist-ic.back { background: #E6F6F4; color: #0E6B67; }
 .hist-line .line-main > a, .hist-line .line-main > span { font-size: 16.5px; }
 .hist-bar label, .hist-bar .muted { font-size: 16px; }
 /* Load: what it is, in three steps, and what each use gives you */
@@ -2613,3 +2613,13 @@ a.line:hover, button.line:hover { background-color: #fff; border-color: #C9D2E3;
 .pp-swonly { font-size: 15px; }
 .pp-amount b { font-size: 40px; }
 .pp-perday { font-size: 16.5px; }
+/* Bell and badges: big enough to see at a glance */
+.topbar .icon-btn.bell { width: 56px; height: 56px; border-radius: 14px; background: rgba(255, 255, 255, .18); }
+.topbar .icon-btn.bell svg { width: 32px; height: 32px; stroke-width: 2.1; }
+.topbar .bell .badge { top: 2px; right: 2px; min-width: 24px; height: 24px; line-height: 24px; padding: 0 6px; font-size: 14px; font-weight: 800; background: #E5484D; color: #fff; }
+.sidebar .nav .badge { min-width: 28px; height: 28px; line-height: 28px; padding: 0 8px; font-size: 15px; font-weight: 800; background: #fff; color: #0B1B3A; }
+/* Plan size boxes: a soft sky blue */
+.pp-range2 span { background: #E6F0FF; box-shadow: inset 0 0 0 1px #C8DBFB; }
+/* The yearly saving: bigger, the amount in green */
+.pp-quiet { font-size: 19px; font-weight: 700; padding: 4px 0 4px 14px; border-left-width: 4px; }
+.pp-quiet b { color: var(--jade); font-size: 24px; font-weight: 800; }

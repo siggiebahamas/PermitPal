@@ -69,7 +69,7 @@ export async function historyPage(el, { keep = false } = {}) {
       <span class="muted">${histItems.length}${histMore ? '+' : ''} ${histItems.length === 1 ? show[3].replace(/s$/, '') : show[3]}</span>
     </div>
     ${histItems.length ? html`<section class="card hist-card">
-      ${days.map((g) => html`<div class="band hist-day"><span><b>${dayLabel(g.day)}</b></span><span>${g.items.length}</span></div>
+      ${days.map((g) => html`<div class="band hist-day"><span><b>${dayLabel(g.day)}</b></span><span class="hist-n" aria-label="${plural(g.items.length, 'change')}">${g.items.length}</span></div>
         ${g.items.map((a) => { const k = histKind(a); return html`<div class="line hist-line"><span class="hist-ic ${k[0]}" aria-label="${k[2]}">${k[1]}</span><span class="line-main">${linkFor(a)}<small>${memberName(a.actor_id)} · ${phTime(a.created_at)}</small></span></div>`; })}`)}
       <div class="sheet-foot">Deleted something by mistake? <a href="#/trash">Restore it from Trash.</a></div>
     </section>
@@ -82,9 +82,10 @@ on('hist-more', async (ds, btn) => {
   try { await loadHistory(true); } catch (e) { toastError(e); }
   historyPage(document.getElementById('main'), { keep: true });
 });
-// Each change gets an icon: green added, blue changed, yellow uploaded, red deleted.
-const histKind = (a) => (a.action === 'delete' ? ['del', '×', 'Deleted'] : a.entity === 'document' && a.action === 'insert' ? ['up', '↑', 'Uploaded']
-  : a.action === 'insert' ? ['add', '+', 'Added'] : ['edit', '✎', 'Changed']);
+// Each change gets an icon: + added, pencil changed, arrow up uploaded, × deleted, ↺ brought back from Trash.
+const histKind = (a) => (['deleted', 'removed'].includes(a.action) ? ['del', '×', 'Deleted'] : a.action === 'restored' ? ['back', '↺', 'Restored']
+  : a.action === 'uploaded' || (a.action === 'created' && /^documents?$/.test(a.entity || '')) ? ['up', '↑', 'Uploaded']
+  : a.action === 'created' ? ['add', '+', 'Added'] : ['edit', '✎', 'Changed']);
 function linkFor(a) {
   const href = a.requirement_id && S.data.reqs.some((r) => r.id === a.requirement_id) ? `#/requirement/${a.requirement_id}`
     : a.business_id && business(a.business_id) ? `#/businesses/${a.business_id}`
