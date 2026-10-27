@@ -2,7 +2,7 @@
 // checkmark list, the monthly price with what it comes to a day (and per client, vehicle or tenant), and
 // the yearly deal (pay for 10 months, get 12) made easy to see. Every price comes from the plans table or
 // prices.js, the same numbers the database charges; nothing here sets a price.
-import { html, raw, peso, todayPH } from '../util.js';
+import { html, raw, peso } from '../util.js';
 import { ICON } from '../components.js';
 import { YEAR_MONTHS, FREE_MONTHS, PLUS_MONTHLY, BRAND_MONTHLY, FREE_PEOPLE, BANDS, staffMonthly } from '../prices.js';
 
@@ -31,16 +31,6 @@ document.addEventListener('click', (e) => { const b = e.target.closest?.('[data-
 const under = (n) => `less than ${peso(Math.floor(n) + 1)}`; // always true: ₱65.42 a day is "less than ₱66"
 const yearOf = (m) => m * YEAR_MONTHS;
 export const perMonthYearly = (m) => Math.round((m * YEAR_MONTHS) / 12);
-// Your next 12 months as little calendar pages, starting this month: the last 2 are free.
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-export function yearCalendar() {
-  const start = Number(todayPH().slice(5, 7)) - 1;
-  const ms = Array.from({ length: 12 }, (_, i) => MONTHS[(start + i) % 12]);
-  const free = ms.slice(YEAR_MONTHS);
-  return html`<div class="year-cal" role="img" aria-label="You pay ${ms[0]} to ${ms[YEAR_MONTHS - 1]}; ${free.join(' and ')} are free">
-    ${ms.map((m, i) => html`<span class="yc ${i >= YEAR_MONTHS ? 'yc-free' : ''}" aria-hidden="true"><i></i><b>${m}</b>${i >= YEAR_MONTHS ? html`<small>FREE</small>` : ''}</span>`)}</div>
-    <p class="pp-strip-cap">You pay ${ms[0]} to ${ms[YEAR_MONTHS - 1]}. ${free.join(' and ')} are on us.</p>`;
-}
 
 // A price slot: <div data-price="1990" data-per="40" data-unit="client">. Painted now and on every switch.
 export const priceSlot = (monthly, { per, unit, kind = '' } = {}) => html`<div class="pp-price" data-price="${monthly}" data-per="${per || ''}" data-unit="${unit || ''}" data-kind="${kind}"></div>`;
@@ -54,12 +44,11 @@ function paintPrice(el) {
     el.innerHTML = String(html`<span class="pp-ribbon">${FREE_MONTHS} months FREE</span>
       <div class="pp-amount"><b>${peso(perMonthYearly(m))}</b><span>/month</span></div>
       <p class="pp-billed"><s aria-label="was ${peso(m * 12)}">${peso(m * 12)}</s> <b>${peso(y)}</b> once a year</p>
-      <p class="pp-save">${ICON.check} You save ${peso(m * FREE_MONTHS)}</p>
-      ${yearCalendar()}
+      <p class="pp-save pp-deal">${ICON.check}<span><b>You save ${peso(m * FREE_MONTHS)}</b> · pay ${YEAR_MONTHS} months, get 12</span></p>
       ${per && unit ? html`<p class="pp-unit">With ${per} ${unit}s: ${under(y / 12 / per)} a ${unit} a month</p>` : ''}`);
   } else {
     el.innerHTML = String(html`<div class="pp-amount"><b>${peso(m)}</b><span>/month</span></div>
-      <p class="pp-day">That's ${under((m * 12) / 365)} a day</p>
+      <p class="pp-day pp-perday">That's ${under((m * 12) / 365)} a day</p>
       ${per && unit ? html`<p class="pp-unit">With ${per} ${unit}s: ${under(m / per)} a ${unit}</p>` : ''}
       <button type="button" class="pp-nudge" data-bill-set="yearly">Pay yearly and get ${FREE_MONTHS} months FREE: save ${peso(m * FREE_MONTHS)} →</button>`);
   }
@@ -86,12 +75,12 @@ const FREE_WINS = [[ICON.bell, 'We remind you', '30, 7 and 1 day before anything
   [ICON.file, 'All in one place', '1 business and 1 vehicle, with their files']];
 const FREE_PREVIEW = { title: 'Your permits', rows: [["Mayor's Permit", 'soon', 'Due in 12 days'], ['Fire safety (FSIC)', 'ok', 'All good'], ['Health card · Ana', 'ok', 'All good']] };
 const PLUS_LINE = `Pinoy Permit Plus included (worth ${peso(PLUS_MONTHLY)} a month)`;
-const TENANT_PREVIEW = { title: 'Your tenants', rows: [['Unit 1 · Bakeshop', 'ok', 'All good'], ['Unit 5 · Salon', 'soon', 'Due in 14 days'], ['Unit 3 · Pharmacy', 'late', '3 days late', 'Remind']] };
-const TENANT_WINS = [[ICON.grid, 'Every tenant, one screen', 'Green is OK. Red is late.'], [ICON.upload, 'Tenants upload their own', 'No more chasing photocopies every January'],
-  [ICON.list, 'You set the rules', 'Pick the permits every tenant must keep']];
-const tenantChecks = (cap) => [cap, "Every tenant's permits on one screen", 'You choose the permits every tenant must keep',
-  'Tenants upload their own permits, free. No more chasing paper', "Download any tenant's shared copies in one click",
-  'Remind every late tenant in one click', 'Text message (SMS) reminders', PLUS_LINE, 'Download a list for audits and city hall', 'Everything in Free'];
+const TENANT_PREVIEW = { title: 'Your sites', rows: [['Unit 1 · Bakeshop', 'ok', 'All good'], ['Unit 5 · Salon', 'soon', 'Due in 14 days'], ['Unit 3 · Pharmacy', 'late', '3 days late', 'Remind']] };
+const TENANT_WINS = [[ICON.grid, 'Every site, one screen', 'Green is OK. Red is late.'], [ICON.upload, 'They upload their own', 'No more chasing photocopies every January'],
+  [ICON.list, 'You set the rules', 'Pick the permits every site must keep']];
+const tenantChecks = (cap) => [cap, 'Tenants, franchisees or branches: every one\'s permits on one screen', 'You choose the permits every site must keep',
+  'They upload their own permits, free. No more chasing paper', "Download any site's shared copies in one click",
+  'Remind every late site in one click', 'Text message (SMS) reminders', PLUS_LINE, 'Download a list for audits and city hall', 'Everything in Free'];
 export const PLANS = {
   firm: {
     icon: ICON.briefcase, name: 'Accounting firm', who: 'For accountants and bookkeepers with many clients',
@@ -116,21 +105,21 @@ export const PLANS = {
     why: { title: 'It pays for itself', lines: ['One unregistered vehicle caught can mean a ₱10,000 LTO fine', 'No surprise renewals: every month starts with a ready list'] },
   },
   property_s: {
-    icon: ICON.building, name: 'Small property', who: 'For landlords and small buildings: up to 20 tenants',
-    promise: "Every tenant's permits, without chasing photocopies", per: 20, unit: 'tenant', kind: 'property',
-    preview: TENANT_PREVIEW, wins: TENANT_WINS, checks: tenantChecks('Up to 20 tenants'),
-    why: { title: 'Made for landlords', lines: ['Everything the big plan has, for up to 20 tenants', 'Grow past 20? Move up anytime, nothing to set up again'] },
+    icon: ICON.building, name: 'Multi-Site', who: 'For landlords, franchisors and groups: up to 20 sites (tenants, franchisees or branches)',
+    promise: "Every site's permits, without chasing photocopies", per: 20, unit: 'site', kind: 'property',
+    preview: TENANT_PREVIEW, wins: TENANT_WINS, checks: tenantChecks('Up to 20 sites'),
+    why: { title: 'Made for owners of many sites', lines: ['Everything the Unlimited plan has, for up to 20 sites', 'Grow past 20? Move up anytime, nothing to set up again'] },
   },
   property: {
-    icon: ICON.grid, name: 'Mall & property', who: 'For malls and big buildings: any number of tenants',
-    promise: "Every tenant's permits, without chasing photocopies", per: 100, unit: 'tenant', kind: 'property',
-    preview: TENANT_PREVIEW, wins: TENANT_WINS, checks: tenantChecks('Any number of tenants'),
+    icon: ICON.grid, name: 'Multi-Site Unlimited', who: 'For malls, franchise networks and big groups: any number of sites',
+    promise: "Every site's permits, without chasing photocopies", per: 100, unit: 'site', kind: 'property',
+    preview: TENANT_PREVIEW, wins: TENANT_WINS, checks: tenantChecks('Any number of sites'),
     why: { title: 'Why it costs more', lines: ['It does the work of a full-time admin who chases permits (₱20,000+ a month)',
-      'Made for big buildings: 100 tenants × 4 permits = 400 deadlines a year', 'One shop closed for a missing fire permit costs you more in lost rent'] },
+      'Made for big networks: 100 sites × 4 permits = 400 deadlines a year', 'One site closed for a missing fire permit costs you more than a year of this plan'] },
   },
 };
 export const PLAN_ORDER = ['property_s', 'property'];
-// The plans this database sells (Small property only once its file has run). Before the prices load: all.
+// The plans this database sells (Multi-Site only once its file has run). Before the prices load: all.
 export const plansShown = (plans) => (plans?.length ? PLAN_ORDER.filter((id) => plans.some((p) => p.id === id)) : PLAN_ORDER);
 
 // ---------------------------------------------------------------- software plans by size (the November lineup)
@@ -285,7 +274,7 @@ export const compareTable = () => html`<details class="card pp-compare"><summary
   <div class="table-wrap" tabindex="0" role="region" aria-label="Plans side by side"><table class="table pp-table">
     <thead><tr><th scope="col">What you get</th>${COLS.map((c) => html`<th scope="col">${c}</th>`)}</tr></thead>
     <tbody>${COMPARE.map(([t, ...cols]) => html`<tr><th scope="row">${t}</th>${cols.map((c) => html`<td>${cellOf(c)}</td>`)}</tr>`)}</tbody>
-  </table></div><p class="fineprint">Every plan is tracking and planning software only. Small property and Mall &amp; property are priced by tenants; Enterprise is quoted.</p></details>`;
+  </table></div><p class="fineprint">Every plan is tracking and planning software only. Multi-Site and Multi-Site Unlimited are priced by sites; Enterprise is quoted.</p></details>`;
 
 // ---------------------------------------------------------------- add-ons
 export const PLUS_CHECKS = [

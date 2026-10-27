@@ -133,7 +133,7 @@ function page(r) {
         <div>${r.open_request_id ? html`Pinoy Permit is handling this.${has('services') ? html` <a href="#/services/orders/${r.open_request_id}">Follow the request</a>.` : ''}` : 'You marked this renewal as started.'}
         ${r.is_overdue ? ' It is past its expiry date, so finish it soon.' : ''} When you have the new permit, record it here.</div>
         ${when(edit, html`<div class="banner-actions">
-          <button class="btn btn-sm btn-primary" data-act="req-renew" data-id="${r.id}">Record renewal</button>
+          <button class="btn btn-sm btn-renew" data-act="req-renew" data-id="${r.id}">Record renewal</button>
           ${when(!r.open_request_id, html`<button class="btn btn-sm btn-ghost" data-act="req-stop-renewal" data-id="${r.id}">Not renewing yet</button>`)}
         </div>`)}
       </div>`)}
@@ -147,7 +147,7 @@ function page(r) {
         ${when(edit, html`<div class="btn-row">
           <button class="btn btn-sm btn-soft" data-act="req-edit" data-id="${r.id}">${current ? 'Edit details' : 'Add details'}</button>
           <button class="btn btn-sm btn-soft" data-act="req-upload" data-id="${r.id}">${ICON.upload} Upload</button>
-          ${when(r.expires && current, html`<button class="btn btn-sm btn-primary" data-act="req-renew" data-id="${r.id}">Renew</button>`)}
+          ${when(r.expires && current, html`<button class="btn btn-sm btn-renew" data-act="req-renew" data-id="${r.id}">Renew</button>`)}
         </div>`)}
       </div>
       ${current ? recordBody(current, r) : html`<p class="muted">Nothing recorded yet. Add the reference number${r.expires ? ', expiry date' : ''} and upload a copy of the document.</p>`}

@@ -111,9 +111,12 @@ function timeline(subject, list) {
   };
   return html`<section class="card lanes-card">
     <div class="card-head"><div><h2>${subject === 'business' ? 'Business permits' : subject === 'person' ? 'Staff licenses' : 'Vehicle renewals'} · month by month</h2>
-      <p class="card-sub">Every permit in the month it's due. Tap one to open it${cols.length > 7 ? ' · scroll sideways for later months' : ''}.</p></div>
+      <p class="card-sub">Every permit in the month it's due. Tap one to open it.</p></div>
       <div class="chips">${Object.values(STATUS).map((st) => html`<span class="chip ${st.cls}">${st.label}</span>`)}</div></div>
-    <div class="lanes-wrap"><div class="lanes">
+    <div class="lanes-bar"><span>${ICON.chevron} Scroll sideways for later months</span>
+      <span class="btn-row"><button type="button" class="lanes-btn" data-act="lanes-scroll" data-dir="-1" aria-label="Earlier months">‹</button>
+      <button type="button" class="lanes-btn" data-act="lanes-scroll" data-dir="1" aria-label="Later months">›</button></span></div>
+    <div class="lanes-wrap" tabindex="0" role="region" aria-label="Month by month (scrolls sideways)"><div class="lanes">
       <div class="lrow lhead"><div class="lwho"></div>${cols.map((col) => html`<div class="${col.now ? 'now' : ''} ${col.key === 'late' ? 'late' : ''}">${col.label}</div>`)}</div>
       ${list.map(row)}
     </div></div>
@@ -640,4 +643,10 @@ on('person-delete', async (ds) => {
   const p = person(ds.id);
   if (!(await confirmDialog(`Remove ${p.full_name}?`, 'Reminders for their licenses stop. Everything is kept and can be restored from Trash.'))) return;
   try { await db.softDelete('people', p.id); await reload(); go('#/people'); toast('Removed. Restore from Trash anytime.'); } catch (e) { toastError(e); }
+});
+
+// The month-by-month arrows: move about three months at a time.
+on('lanes-scroll', (ds, btn) => {
+  const wrap = btn.closest('.lanes-card')?.querySelector('.lanes-wrap');
+  if (wrap) wrap.scrollBy({ left: Number(ds.dir) * 3 * 150, behavior: 'smooth' });
 });

@@ -91,6 +91,15 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.fill('#top-q', '');
   await go('#/compliance'); await page.click('[data-act=clear-filters]').catch(() => {}); await page.waitForSelector('.row');
   check(`${label}: the page title sits on the navy band`, (await page.locator('#main > .pg-band .page-head h1').count()) === 1);
+  check(`${label}: Renew buttons are the one green, everywhere`, (await page.locator('.row .btn-renew').count()) >= 1 && (await page.locator('.row [data-act=req-next].btn-primary').count()) === 0
+    && await page.evaluate(() => getComputedStyle(document.querySelector('.btn-renew')).backgroundColor === 'rgb(16, 168, 98)'));
+  check(`${label}: pages use the wide screen (up to 1480px)`, await page.evaluate(() => getComputedStyle(document.getElementById('main')).maxWidth === '1480px'));
+  await go('#/businesses'); await page.waitForSelector('.lanes-wrap');
+  check(`${label}: month by month: roomy months, arrows and a scroll bar you can see`, (await page.locator('.lanes-bar .lanes-btn').count()) === 2
+    && await page.evaluate(() => document.querySelector('.lcell').getBoundingClientRect().width >= 150));
+  await page.click('.lanes-btn[data-dir="1"]'); await page.waitForTimeout(700);
+  check(`${label}: the › arrow moves to later months`, await page.evaluate(() => document.querySelector('.lanes-wrap').scrollLeft > 100));
+  await go('#/compliance'); await page.waitForSelector('.row');
   check(`${label}: the Compliance list keeps the days under each name`, (await page.locator('.row .row-sub .due').count()) >= 1);
   await go('#/'); await page.waitForSelector('.home-cal');
   check(`${label}: today is marked on the calendar`, (await page.locator('.hc-day.is-today').count()) === 1);
@@ -1764,18 +1773,15 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`prices ${label}: Full-Service says it's coming, with no button to buy it`, (await page.locator('#pricing .pp-help-soon .btn').count()) === 0 && /building a team of trusted, verified runners/.test(await page.textContent('#pricing .pp-help-soon')));
     check(`prices ${label}: monthly shows the price, a day, and offers yearly with the saving`, /less than ₱27 a day/.test(c) && /Pay yearly and get 2 months FREE: save ₱1,598/.test(c));
     const small = await page.locator('#pricing [data-plan-card=property_s]').textContent();
-    check(`prices ${label}: a Small property plan for up to 20 tenants at ₱2,990`, /₱2,990/.test(small) && /up to 20 tenants/i.test(small) && /less than ₱150 a tenant/.test(small), small.replace(/\s+/g, ' ').slice(0, 160));
+    check(`prices ${label}: a Multi-Site plan for up to 20 sites at ₱2,990, for landlords, franchisors and groups`, /Multi-Site/.test(small) && /₱2,990/.test(small) && /up to 20 sites/i.test(small) && /franchisors/.test(small) && /less than ₱150 a site/.test(small), small.replace(/\s+/g, ' ').slice(0, 160));
     const prop = await page.locator('#pricing [data-plan-card=property]').textContent();
     check(`prices ${label}: the property plan says why it costs more`, /Why it costs more/.test(prop) && /full-time admin/.test(prop) && /₱9,990/.test(prop));
     await page.locator('#pricing .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
     const y = await core(page).textContent();
     check(`prices ${label}: yearly shows 2 months free, the old price crossed out and the saving`, /2 months FREE/i.test(y) && /₱666\s*\/month/.test(y) && /₱9,588\s*₱7,990 once a year/.test(y) && /You save ₱1,598/.test(y), y.replace(/\s+/g, ' ').slice(0, 220));
-    const cal = core(page).locator('.year-cal');
-    check(`prices ${label}: the next 12 months as calendar pages, the last 2 free`, (await cal.locator('.yc').count()) === 12 && (await cal.locator('.yc-free').count()) === 2
-      && /FREE/.test(await cal.locator('.yc-free').first().textContent()) && /You pay \w{3} to \w{3}\. \w{3} and \w{3} are on us\./.test(await core(page).textContent()));
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const thisMonth = months[Number(new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(5, 7)) - 1];
-    check(`prices ${label}: the calendar starts this month`, (await cal.locator('.yc b').first().textContent()) === thisMonth);
+    check(`prices ${label}: yearly is one clear line: the saving and "pay 10 months, get 12", no month grid`, (await core(page).locator('.pp-deal').count()) === 1
+      && /You save ₱1,598 · pay 10 months, get 12/.test(await core(page).locator('.pp-deal').textContent()) && (await page.locator('.year-cal').count()) === 0);
+    check(`prices ${label}: what it comes to per vehicle stands out`, await page.evaluate(() => { const e = document.querySelector('#pricing .pp-pervehicle'); return !!e && getComputedStyle(e).fontWeight === '800'; }));
     check(`prices ${label}: every switch on the page moved to yearly`, (await page.locator('.bill-toggle input[value=yearly]:checked').count()) === (await page.locator('.bill-toggle').count()));
     check(`prices ${label}: add-ons show the staff price ladder with savings`, /FREE/.test(await page.locator('#lp-staff .ladder').textContent()) && /40% off/.test(await page.locator('#lp-staff').textContent())
       && /60% off/.test(await page.locator('#lp-staff').textContent()) && /save ₱9,200/.test(await page.locator('#lp-staff .staff-ex').textContent()));
@@ -1841,7 +1847,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.evaluate(async () => { await (await import('/__mock/mock-data.js')).setOrgProfile('o1', { kind: 'property' }); const c = await import('/js/core.js'); await c.reload(); c.S.profile.is_platform_admin = false; });
     await go('#/settings'); await go('#/settings/billing'); await page.waitForSelector('.pay-choice');
     const pay = await page.textContent('main section.card');
-    check('prices property: in the trial, pay for Small property or Mall & property', (await page.locator('.plan-pay').count()) === 2 && /Small property/.test(pay) && /₱2,990/.test(pay) && /₱9,990/.test(pay) && /₱29,900/.test(pay));
+    check('prices property: in the trial, pay for Multi-Site or Multi-Site Unlimited', (await page.locator('.plan-pay').count()) === 2 && /Multi-Site/.test(pay) && /Multi-Site Unlimited/.test(pay) && /₱2,990/.test(pay) && /₱9,990/.test(pay) && /₱29,900/.test(pay));
     check('prices property: both property cards say they are in the trial', (await page.locator('[data-plan-card=property_s] .chip, [data-plan-card=property] .chip', { hasText: 'In your free trial' }).count()) === 2);
     await page.evaluate(async () => { (await import('/js/core.js')).S.profile.is_platform_admin = true; });
     await go('#/pros'); await page.waitForTimeout(300);
@@ -1962,6 +1968,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   const mp = await mock(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b1').id);
   await go('#/requirement/' + mp); await page.waitForSelector('.papers-card');
   check(`load ${label}: a permit offers a papers check${season ? ', free with the pass' : ' for ₱499'}`, new RegExp(season ? 'free with your season pass' : '₱499').test(await page.textContent('.papers-card')));
+  check(`load ${label}: our paid service buttons are the lighter green`, await page.evaluate(() => getComputedStyle(document.querySelector('[data-act=papers-open]')).backgroundColor === 'rgb(142, 221, 179)'));
   await page.click('[data-act=papers-open]'); await page.waitForSelector('#modal-root .modal');
   check(`load ${label}: the form lists the permit's checklist and the deadline`, (await page.locator('#modal-root .pc-list li').count()) >= 3 && /answers by/.test(await page.textContent('#modal-root')));
   await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(200);

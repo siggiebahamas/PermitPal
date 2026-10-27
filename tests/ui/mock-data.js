@@ -21,8 +21,8 @@ const plans = [
   { id: 'fleet', name: 'Fleet', available: true, paid_channels: true, price_php_monthly: 1490, features: ['Fleet board: every vehicle\'s registration, CTPL, emission and inspection', 'Import vehicles from a spreadsheet', 'Export for your records', 'Everything in Free'] },
   { id: 'firm', name: 'Accounting firm', available: true, price_php_monthly: 1990, features: ['Client board: every client\'s permits on one screen', 'One-click reminders to clients', 'Everything in Free'] },
   { id: 'head_office', name: 'Head office', available: true, price_php_monthly: 4990, features: ['Branch board: every branch and franchisee on one screen', 'One-click reminders to branches', 'Everything in Free'] },
-  { id: 'property_s', name: 'Small property', available: true, price_php_monthly: 2990, paid_channels: true, features: ['Up to 20 tenants'] },
-  { id: 'property', name: 'Property', available: true, price_php_monthly: 9990, features: ['Tenant board: every tenant\'s permits on one screen', 'Download tenants\' shared copies', 'Everything in Free'] },
+  { id: 'property_s', name: 'Multi-Site', available: true, price_php_monthly: 2990, paid_channels: true, features: ['Up to 20 tenants'] },
+  { id: 'property', name: 'Multi-Site Unlimited', available: true, price_php_monthly: 9990, features: ['Tenant board: every tenant\'s permits on one screen', 'Download tenants\' shared copies', 'Everything in Free'] },
 ];
 // A database before the Small property file doesn't sell that plan.
 if (globalThis.PP_FEATURES === 'none' || (Array.isArray(globalThis.PP_FEATURES) && !globalThis.PP_FEATURES.includes('property_s'))) plans.splice(plans.findIndex((p) => p.id === 'property_s'), 1);

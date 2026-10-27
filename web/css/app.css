@@ -126,7 +126,7 @@ input[type=file] { padding: 8px; font-size: 15px; }
 .brand { display: flex; align-items: center; gap: 8px; color: inherit; }
 .brand img { width: 30px; }
 .brand .wordmark { font-size: 19px; }
-#main { padding: 16px 16px 96px; max-width: 1080px; margin: 0 auto; outline: none; }
+#main { padding: 16px 16px 96px; max-width: 1480px; margin: 0 auto; outline: none; }
 .badge { background: #3461BD; color: #fff; border-radius: 999px; font-size: 10px; padding: 1px 5px; min-width: 16px; text-align: center; line-height: 14px; }
 .bell .badge { position: absolute; top: 0; right: 4px; }
 
@@ -271,20 +271,20 @@ a.stat:hover { transform: translateY(-3px); box-shadow: var(--lift); }
 /* ---------- month-by-month lanes (Businesses / Vehicles) ---------- */
 .lanes-card .card-head .chips { margin: 6px 0 0; }
 .lanes-wrap { overflow-x: auto; margin: 0 -18px -18px; }
-.lanes { min-width: 1380px; }
-.lrow { display: grid; grid-template-columns: 200px repeat(13, minmax(90px, 1fr)); border-top: 1px solid var(--rule); }
+.lanes { min-width: 2210px; }
+.lrow { display: grid; grid-template-columns: 260px repeat(13, minmax(150px, 1fr)); border-top: 1px solid var(--rule); }
 .lhead { border-top: 0; }
-.lhead > div { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: center; padding: 9px 2px; }
+.lhead > div { font-size: 13px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: center; padding: 9px 2px; }
 .lhead > div.now { color: var(--heading); background: #EFEBE3; }
 .lhead > div.late { color: var(--s-over); }
 .lwho { padding: 12px 14px; border-right: 1px solid var(--rule); position: sticky; left: 0; background: var(--paper); z-index: 1; }
 .lwho b { display: block; color: var(--heading); font-size: 15.5px; }
 .lwho span { font-size: 14px; color: var(--muted); }
 .lundated { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.lcell { border-right: 1px dashed var(--rule); padding: 8px 5px; display: flex; flex-direction: column; gap: 5px; justify-content: center; }
+.lcell { border-right: 1px dashed var(--rule); padding: 10px 10px; display: flex; flex-direction: column; gap: 5px; justify-content: center; }
 .lcell:last-child { border-right: 0; }
 .lcell.now { background: #F7F4EE; }
-.tpin { display: block; font-size: 13px; font-weight: 700; border-radius: 8px; padding: 5px 7px; line-height: 1.2; text-align: center; background: var(--s-info-bg); color: var(--s-info); transition: transform .12s; }
+.tpin { display: block; font-size: 14px; font-weight: 700; border-radius: 10px; padding: 8px 10px; line-height: 1.2; text-align: center; background: var(--s-info-bg); color: var(--s-info); transition: transform .12s; }
 .tpin small { display: block; font-weight: 600; font-size: 12px; }
 .tpin:hover { transform: translateY(-1px); }
 .tpin.overdue { background: var(--s-over-bg); color: var(--s-over); } .tpin.soon { background: var(--s-soon-bg); color: var(--s-soon-on); }
@@ -2348,8 +2348,6 @@ a.hc-dayrow:hover { border-color: var(--brand); background: var(--accent-soft); 
 .btn-gold:hover { background: #F0C860; box-shadow: var(--lift); }
 .hc-note { color: #fff; }
 .hc-note a { color: #fff; text-decoration: none; } .hc-note .due.overdue { color: #FF9A8F; }
-.home-next .row-side .btn-primary { background: #0E3B2E; color: #fff; }
-.home-next .row-side .btn-primary:hover { background: #12503E; }
 .home-next .card-head { border-bottom: 2px solid var(--heading); }
 @media (max-width: 560px) {
   .hc-day { min-height: 46px; padding: 4px 3px; }
@@ -2495,3 +2493,31 @@ a.hc-dayrow:hover { border-color: var(--brand); background: var(--accent-soft); 
 .row-title { font-weight: 700; font-size: 15.5px; }
 @media print { .pg-band { color: #000; --heading: #000; --text: #000; } .pg-band::before { display: none; } }
 @media (min-width: 900px) { .hs-band { margin-top: -26px; } }
+
+/* Month by month: a scroll bar you can see and grab, plus arrows; the months have room to breathe. */
+.lanes-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 -18px; padding: 10px 18px; background: #F1F3F7; border-top: 1px solid var(--rule);
+  font-size: 14px; font-weight: 700; color: #0B1B3A; }
+.lanes-bar > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.lanes-bar svg { width: 16px; height: 16px; color: #C9961F; }
+.lanes-btn { width: 40px; height: 40px; border-radius: 12px; border: 0; background: #0B1B3A; color: #fff; font: 700 22px/1 var(--font); cursor: pointer; }
+.lanes-btn:hover { background: #1B3166; }
+.lanes-wrap { scrollbar-width: auto; scrollbar-color: #0B1B3A #E3E6EC; padding-bottom: 2px; }
+.lanes-wrap::-webkit-scrollbar { height: 16px; }
+.lanes-wrap::-webkit-scrollbar-track { background: #E3E6EC; border-radius: 999px; margin: 0 12px; }
+.lanes-wrap::-webkit-scrollbar-thumb { background: #0B1B3A; border-radius: 999px; border: 3px solid #E3E6EC; }
+.lanes-wrap::-webkit-scrollbar-thumb:hover { background: #1B3166; }
+.lanes-wrap:focus-visible { outline: 3px solid #E9B949; outline-offset: -3px; }
+.lhead > div.now { background: #FFF4D6; color: #0B1B3A; } .lcell.now { background: #FFFBEF; }
+/* Renew: one green everywhere, bright enough to stand out on navy and on white */
+.btn-renew, .home-next .row-side .btn-renew { background: #10A862; color: #fff; }
+.btn-renew:hover { background: #0C914F; box-shadow: var(--lift); }
+/* Our paid services (papers check, Done for you, season pass, templates, bill pay): a lighter green */
+.btn:is([data-act="papers-open"], [data-act="svc-request"], [data-act="svc-bulk"], [data-act="svc-for-req"], [data-act="load-season"], [data-act="load-pay"],
+  [data-act="tpl-unlock"], [data-act="bill-pay"], [data-act="care-pay"], [data-act="quote-accept"]) { background: #8EDDB3; color: #0B3D25; border-color: transparent; }
+.btn:is([data-act="papers-open"], [data-act="svc-request"], [data-act="svc-bulk"], [data-act="svc-for-req"], [data-act="load-season"], [data-act="load-pay"],
+  [data-act="tpl-unlock"], [data-act="bill-pay"], [data-act="care-pay"], [data-act="quote-accept"]):hover { background: #74D3A1; }
+/* Prices: what it comes to a day stands out; the yearly deal in one line */
+.pp-perday, .pp-pervehicle { display: inline-block; margin: 6px 0 2px; padding: 6px 12px; border-radius: 10px; background: #FFF4D6; box-shadow: inset 3px 0 0 #E9B949;
+  color: #0B1B3A; font-size: 15px; font-weight: 800; }
+.pp-deal { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0 6px; padding: 9px 12px; border-radius: 12px; background: #E3F7EC; color: #0B3D25; font-weight: 600; }
+.pp-deal b { font-weight: 800; }

@@ -132,7 +132,7 @@ function orgBoard(el, k, acc) {
         <button class="btn btn-ghost btn-sm" data-act="nb-export">Export</button>
         <button class="btn btn-primary" data-act="nb-add">+ Add ${k.one}</button></div>`)}</div>
     ${trialNote(acc)}
-    ${kind === 'property' && acc.why === 'plan' && S.org.plan_id === 'property_s' ? html`<div class="banner info"><div><b>${all.length} of 20 tenants</b> on Small property.${all.length >= 18 ? ' Need more? Move to Mall & property, nothing to set up again.' : ''}</div>
+    ${kind === 'property' && acc.why === 'plan' && S.org.plan_id === 'property_s' ? html`<div class="banner info"><div><b>${all.length} of 20 tenants</b> on Multi-Site.${all.length >= 18 ? ' Need more? Move to Multi-Site Unlimited, nothing to set up again.' : ''}</div>
       <a class="btn btn-sm btn-soft" href="#/settings/billing">Plans</a></div>` : ''}
     <div class="stats nb-stats">
       <a class="stat" href="#/network" data-act="nb-filter" data-f="all"><div class="stat-n">${live.length}</div><div class="stat-l">${k.many[0].toUpperCase() + k.many.slice(1)}</div></a>

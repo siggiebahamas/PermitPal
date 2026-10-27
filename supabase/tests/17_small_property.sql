@@ -36,12 +36,12 @@ insert into public.org_links (owner_org, relation, invited_email, status, create
 select set_config('request.jwt.claims', '{"sub":"a7000000-0000-4000-8000-0000000000a1","role":"authenticated"}', true);
 set local role authenticated;
 select pg_temp.res('the 21st tenant needs Mall & property',
-  pg_temp.err(format('select public.link_invite(%L, %L, %L)', org, 'tenant', 'new@small.ph')) like 'Your Small property plan covers 20 tenants.%', '') from t_ids;
+  pg_temp.err(format('select public.link_invite(%L, %L, %L)', org, 'tenant', 'new@small.ph')) like 'Your Multi-Site plan covers 20 tenants.%', '') from t_ids;
 select pg_temp.res('...but sending a waiting invitation again is fine', pg_temp.err(format('select public.link_invite(%L, %L, %L)', org, 'tenant', 'tenant3@small.ph')) = 'allowed', '') from t_ids;
 select pg_temp.res('Mall & property has no limit', pg_temp.err(format('select public.link_invite(%L, %L, %L)', big, 'tenant', 'new@mall.ph')) = 'allowed', '') from t_ids;
 select pg_temp.res('a year of Small property: ₱29,900 (2 months free)', (public.billing_start(org, 'property_s', 12) ->> 'amount_php')::numeric = 29900, '') from t_ids;
 select pg_temp.res('with more than 20 tenants, Small property can''t be chosen',
-  pg_temp.err(format('select public.billing_start(%L, %L, 1)', big, 'property_s')) like 'You have 26 tenants. Small property covers up to 20%', pg_temp.err(format('select public.billing_start(%L, %L, 1)', big, 'property_s'))) from t_ids;
+  pg_temp.err(format('select public.billing_start(%L, %L, 1)', big, 'property_s')) like 'You have 26 tenants. Multi-Site covers up to 20%', pg_temp.err(format('select public.billing_start(%L, %L, 1)', big, 'property_s'))) from t_ids;
 select pg_temp.res('...by transfer either', pg_temp.err(format('select public.request_plan(%L, %L)', big, 'property_s')) like 'You have 26 tenants.%', '') from t_ids;
 select pg_temp.res('Plus can''t be bought on top of Small property', pg_temp.err(format('select public.addon_preview(%L, %L, null, %L)', org, 'plus', 'monthly')) = 'Plus is already included in your team plan.', '') from t_ids;
 reset role; do $$ begin perform set_config('request.jwt.claims', '{}', true); end $$;

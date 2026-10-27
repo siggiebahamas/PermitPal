@@ -1,4 +1,4 @@
-# Supabase: every step, in order (as of database file 16)
+# Supabase: every step, in order (as of database file 17)
 
 Do these on a computer, in your Pinoy Permit project (`zeaiwvgktakbwnqpchbo`). Never the Nifti project.
 About 10 minutes. The website and the phone app update by themselves when code is pushed; these steps are only the
@@ -12,16 +12,20 @@ database and the calendar link, which have to be done in Supabase.
    ```sql
    select name from private.features order by name;
    ```
-3. Look at the list that appears under the editor:
-   - You see **lgus** → the database is already up to date. Go to Part B.
-   - You see **prices2** but no **lgus** → go to step 4.
-   - You don't see **prices2** → do step 4 with the file `2026-11-01-prices-and-delivery.sql` first, then do step 4 again
-     with `2026-11-02-brief.sql`.
-4. Open https://github.com/siggiebahamas/PermitPal/blob/main/supabase/manual/2026-11-02-brief.sql
-   and click the **Copy raw file** button (two small squares, top right of the code).
+3. Look at the list that appears under the editor, and start at the first file that's missing:
+   | If the list does NOT have | run this file |
+   |---|---|
+   | `prices2` | `2026-11-01-prices-and-delivery.sql` (file 15) |
+   | `lgus` | `2026-11-02-brief.sql` (file 16) |
+   | `sites` | `2026-11-03-site-plans.sql` (file 17) |
+
+   Everything there already → go to Part B.
+4. To run a file: open it on GitHub at https://github.com/siggiebahamas/PermitPal/tree/main/supabase/manual ,
+   click its name, then click the **Copy raw file** button (two small squares, top right of the code).
 5. Back in the SQL Editor: click **New query** (or select everything in the editor and delete it), paste, click **Run**.
-6. Wait until it says **Success. No rows returned**. If it shows a message starting with "Run …" or "This file was
-   already run", nothing was changed; do what it says.
+6. Wait until it says **Success. No rows returned**. Then do the next missing file the same way (always in the order
+   of the table). If it shows a message starting with "Run …" or "This file was already run", nothing was changed;
+   do what it says.
 
 ## Part B: the one-tap Google Calendar button (5 minutes)
 
