@@ -209,6 +209,7 @@ export async function taskDelete(id) { canWriteTasks(); const i = __tasks.findIn
 let feedToken = null;
 export async function calendarFeedToken(orgId, fresh = false) { canWriteTasks(); if (!feedToken || fresh) feedToken = Math.random().toString(36).slice(2).padEnd(40, 'x'); return feedToken; }
 export const calendarFeedUrl = (token) => `https://example.supabase.co/functions/v1/calendar-feed?t=${token}`;
+export const calendarFeedLive = async () => !globalThis.PP_NO_FEED;
 export const setCurrentOrg = async () => {};
 export const unreadCount = async () => db.notifications.filter((n) => !n.read_at).length;
 export const onNewNotification = () => () => {};

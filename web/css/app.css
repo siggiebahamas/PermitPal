@@ -2398,3 +2398,10 @@ a.hc-dayrow:hover { border-color: var(--brand); background: var(--accent-soft); 
 /* In the three-across lineup, Free is one card like Plus and Core (stacked, not full width) */
 .pp-grid.three > .pp-free { grid-column: auto; display: flex; flex-direction: column; gap: 10px; }
 .pp-grid.three > .pp-free .pp-preview { display: none; }
+.checklist.is-arrived { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 4px var(--brand); scroll-margin-top: 16px; }
+.hc-sync-lead { font-size: 15.5px; color: var(--heading); }
+.hc-sync-btns { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 6px 0 4px; }
+.hc-sync-main { display: inline-flex; gap: 8px; align-items: center; }
+.hc-sync-main svg { width: 20px; height: 20px; }
+.hc-sync-more { margin-top: 10px; }
+.hc-sync-more summary { cursor: pointer; font-weight: 700; color: var(--brand); }

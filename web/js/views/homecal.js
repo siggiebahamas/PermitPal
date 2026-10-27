@@ -109,7 +109,7 @@ on('cal-day', (ds) => {
 function openDay(day, rs, ts) {
   openModal(longDay(day), html`
     ${rs.length ? html`<h3 class="section-label">Due this day</h3><div class="hc-daylist">${rs.map((r) => html`<a class="hc-dayrow" href="#/requirement/${r.id}?renew=1" >
-      <span class="hc-chip ${dotCls(r)}">${STATUS[r.status]?.label || ''}</span><span><b>${r.name}</b><small>${subjectLabel(r)}</small></span><em>Renew ›</em></a>`)}</div>` : ''}
+      <span class="hc-chip ${dotCls(r)}">${STATUS[r.status]?.label || ''}</span><span><b>${r.name}</b><small>${subjectLabel(r)}</small></span><em>Open ›</em></a>`)}</div>` : ''}
     ${ts.length ? html`<h3 class="section-label">Your to-dos</h3><div class="hc-daylist">${ts.map((t) => html`<div class="hc-dayrow">
       <label class="hc-todo-row"><input type="checkbox" data-task-done="${t.id}" ${t.done_at ? 'checked' : ''} ${canEdit() ? '' : 'disabled'}><span><b>${t.title}</b>${t.note ? html`<small>${t.note}</small>` : ''}</span></label>
       <span class="btn-row">${googleLink(t)}${canEdit() ? html`<button type="button" class="btn btn-ghost btn-sm" data-task-edit="${t.id}">Edit</button>` : ''}</span></div>`)}</div>` : ''}`, {
@@ -162,34 +162,46 @@ function googleLink(t) {
   return html`<a class="btn btn-ghost btn-sm" href="${href}" target="_blank" rel="noopener">${ICON.calendar} Google<span class="sr-only"> Calendar (opens in a new tab)</span></a>`;
 }
 
-// Google Calendar: a private link that keeps every deadline and to-do in sync, or a one-time file.
-on('cal-sync', async () => {
-  const live = has('calfeed') && canEdit();
-  let url = '';
-  if (live) { try { url = db.calendarFeedUrl(await db.calendarFeedToken(S.org.id)); } catch (e) { toastError(e); return; } }
-  openModal('Put your deadlines in Google Calendar', live ? html`
-    <p><b>Stays up to date by itself.</b> Every permit deadline${has('lgus') ? ' and to-do' : ''} shows up in your Google Calendar, with reminders 30 and 7 days before.</p>
-    <ol class="hc-steps"><li>Copy your private link below.</li>
-      <li>Open <a href="https://calendar.google.com/calendar/u/0/r/settings/addbyurl" target="_blank" rel="noopener">Google Calendar → Add calendar → From URL<span class="sr-only"> (opens in a new tab)</span></a>.</li>
-      <li>Paste the link and tap <b>Add calendar</b>. Done.</li></ol>
-    <div class="invite-row"><input class="hc-feed" readonly value="${url}" aria-label="Your private calendar link"><button type="button" class="btn btn-soft" data-feed-copy>Copy link</button></div>
-    <p class="muted small">Google checks for changes every few hours. Anyone with this link can see your dates, so keep it private.
-      <button type="button" class="linklike" data-feed-new>Make a new link</button> (the old one stops working).</p>
-    <p class="muted small">Using Apple Calendar or Outlook? The same link works there too. Or <button type="button" class="linklike" data-act="calendar-export">download a one-time file</button>.</p>`
-    : html`<p>Download your deadlines as a calendar file, then open it to add them to Google Calendar, Apple Calendar or Outlook. Each one comes with reminders 30 and 7 days before.</p>
-      <p class="muted small">In Google Calendar on a computer: Settings → Import & export → Import, and pick the file.</p>
-      <p><button type="button" class="btn btn-primary" data-act="calendar-export">${ICON.calendar} Download my deadlines</button></p>`, {
-    cancelLabel: 'Close',
-    onOpen: (form) => {
-      const input = form.querySelector('.hc-feed');
-      form.querySelector('[data-feed-copy]')?.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(input.value); toast('Copied. Paste it into Google Calendar.'); } catch { input.select(); toast('Press Ctrl+C (or long-press) to copy.'); }
-      });
-      form.querySelector('[data-feed-new]')?.addEventListener('click', async () => {
-        if (!(await confirmDialog('Make a new link?', 'The old link stops working. Calendars that use it stop updating until you add the new one.', { confirmLabel: 'Make a new link' }))) return;
-        try { input.value = db.calendarFeedUrl(await db.calendarFeedToken(S.org.id, true)); toast('New link ready. Add it to your calendar again.'); } catch (e) { toastError(e); }
-      });
-    },
-  });
+// Google Calendar: one button. It opens Google Calendar with "Add this calendar?" already asked; the private link keeps
+// every deadline and to-do in sync from then on. iPhone and Outlook get the same link. Until the feed is switched on
+// (the calendar-feed function is deployed), a one-time file instead.
+const googleAdd = (url) => `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(url.replace(/^https:/, 'webcal:'))}`;
+let feedLive = null; // checked once per visit
+on('cal-sync', async (ds, btn) => {
+  if (btn) btn.disabled = true;
+  try {
+    if (feedLive === null) feedLive = has('lgus') ? await db.calendarFeedLive().catch(() => false) : false;
+    const live = feedLive && canEdit();
+    let url = '';
+    if (live) { try { url = db.calendarFeedUrl(await db.calendarFeedToken(S.org.id)); } catch (e) { toastError(e); return; } }
+    openModal('Add your deadlines to your phone calendar', live ? html`
+      <p class="hc-sync-lead">One tap. Every permit deadline${has('lgus') ? ' and to-do' : ''} shows up in your calendar, with reminders 30 and 7 days before, and it keeps itself up to date.</p>
+      <div class="hc-sync-btns">
+        <a class="btn btn-primary btn-lg hc-sync-main" href="${googleAdd(url)}" target="_blank" rel="noopener">${ICON.calendar} Add to Google Calendar<span class="sr-only"> (opens in a new tab)</span></a>
+        <a class="btn btn-soft" href="${url.replace(/^https:/, 'webcal:')}">iPhone or Mac (Apple Calendar)</a>
+      </div>
+      <p class="muted small">Google asks "Add this calendar?": tap <b>Add</b>. That's it.</p>
+      <details class="hc-sync-more"><summary>Outlook or another calendar</summary>
+        <p class="small">Copy this private link and add it as a calendar "from the internet" or "from URL".</p>
+        <div class="invite-row"><input class="hc-feed" id="hc-feed" readonly value="${url}" aria-label="Your private calendar link"><button type="button" class="btn btn-soft" data-feed-copy>Copy</button></div>
+        <p class="muted small">Anyone with this link can see your dates, so keep it private. <button type="button" class="linklike" data-feed-new>Make a new link</button> (the old one stops working).</p>
+      </details>`
+      : html`<p>Download your deadlines as a calendar file, then open it to add them to Google Calendar, Apple Calendar or Outlook. Each one comes with reminders 30 and 7 days before.</p>
+        <p class="muted small">In Google Calendar on a computer: Settings → Import &amp; export → Import, and pick the file.</p>
+        <p><button type="button" class="btn btn-primary" data-act="calendar-export">${ICON.calendar} Download my deadlines</button></p>
+        ${S.profile?.is_platform_admin ? html`<p class="muted small">Staff: the one-tap Google Calendar button turns on by itself once the calendar-feed function is deployed (docs/GOOGLE-CALENDAR.md).</p>` : ''}`, {
+      cancelLabel: 'Close',
+      onOpen: (form) => {
+        const input = form.querySelector('.hc-feed');
+        form.querySelector('[data-feed-copy]')?.addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(input.value); toast('Copied.'); } catch { input.select(); toast('Press Ctrl+C (or long-press) to copy.'); }
+        });
+        form.querySelector('[data-feed-new]')?.addEventListener('click', async () => {
+          if (!(await confirmDialog('Make a new link?', 'The old link stops working. Calendars that use it stop updating until you add the new one.', { confirmLabel: 'Make a new link' }))) return;
+          try { input.value = db.calendarFeedUrl(await db.calendarFeedToken(S.org.id, true)); toast('New link ready. Add it to your calendar again.'); } catch (e) { toastError(e); }
+        });
+      },
+    });
+  } finally { if (btn) btn.disabled = false; }
 });
 

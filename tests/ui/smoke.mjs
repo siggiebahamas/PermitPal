@@ -89,11 +89,14 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   const dueDay = page.locator('.hc-day.has-due').first();
   if (await dueDay.count()) {
     await dueDay.click(); await page.waitForTimeout(700);
-    check(`${label}: a deadline on the calendar opens that permit with its renewal started`, /#\/requirement\//.test(page.url()) && (await page.locator('#modal-root .modal').count()) === 1);
+    check(`${label}: a deadline on the calendar opens that permit's renewal section, without starting a renewal`, /#\/requirement\//.test(page.url()) && (await page.locator('#modal-root .modal').count()) === 0
+      && (await page.locator('details.checklist[open].is-arrived').count()) === Math.min(1, await page.locator('details.checklist').count()));
     await page.keyboard.press('Escape'); await go('#/'); await page.waitForSelector('.home-cal');
   }
   await page.click('[data-act=cal-sync]'); await page.waitForSelector('#modal-root .modal');
-  check(`${label}: "Google Calendar" explains how to add the deadlines`, /Google Calendar/.test(await page.textContent('#modal-root')) && (await page.locator('#modal-root [data-act=calendar-export]').count()) >= 1);
+  const gHref = await page.getAttribute('#modal-root .hc-sync-main', 'href');
+  check(`${label}: "Google Calendar" is one button that opens Google Calendar ready to add the private link`, /^https:\/\/calendar\.google\.com\/calendar\/render\?cid=webcal%3A%2F%2F/.test(gHref || '')
+    && (await page.locator('#modal-root a[href^="webcal://"]').count()) === 1, gHref);
   await page.keyboard.press('Escape');
   await page.click('[data-act=cal-month][data-n="1"]'); await page.waitForTimeout(200);
   check(`${label}: the arrows move the month, and "Today" comes back`, (await page.locator('[data-act=cal-month][data-n="0"]').count()) === 1);

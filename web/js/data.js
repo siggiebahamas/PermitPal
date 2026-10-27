@@ -90,6 +90,11 @@ export const taskDone = async (id, done) => ok(await sb.rpc('task_done', { p_id:
 export const taskDelete = async (id) => ok(await sb.rpc('task_delete', { p_id: id }));
 export const calendarFeedToken = async (orgId, fresh = false) => ok(await sb.rpc('calendar_feed_token', { p_org: orgId, p_new: !!fresh }));
 export const calendarFeedUrl = (token) => `${SUPABASE_URL}/functions/v1/calendar-feed?t=${encodeURIComponent(token)}`;
+// Is the calendar-feed function deployed (with sign-in checks off, so calendar apps can read it)?
+export async function calendarFeedLive() {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/calendar-feed?ping=1`, { cache: 'no-store' });
+  return r.ok && (await r.text()).trim() === 'ok';
+}
 
 // The team, with each teammate's profile (org_members points at auth.users, so profiles come separately).
 export async function loadMembers(orgId) {
