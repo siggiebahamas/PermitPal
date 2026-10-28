@@ -1998,7 +1998,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   const season = await mock(async () => (await (await import('/__mock/mock-data.js')).loadSummary()).season_on_sale);
   if (season) {
     check(`load ${label}: the season pass has a blue header, its price and what it's worth`, (await page.locator('.pass-card .pass-head').count()) === 1 && /₱600/.test(await page.textContent('.pass-card .pass-price')) && /Worth up to/.test(await page.textContent('.pass-card .pass-price')));
-    check(`load ${label}: ...and lists all four benefits, template included`, (await page.locator('.pass-card .pass-perks li').count()) === 4 && /One ready-to-sign letter or form/.test(await page.textContent('.pass-card')));
+    check(`load ${label}: ...and lists all four benefits, template included`, (await page.locator('.pass-card .pass-perks > li').count()) === 4 && /A ready-to-sign letter/.test(await page.textContent('.pass-card')));
     await mock(async () => { (await import('/__mock/mock-data.js')).__load.wallet.paid_php = 1000; });
     await go('#/'); await go('#/load'); await page.waitForSelector('.load-hero');
     await page.click('[data-act=load-season]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);

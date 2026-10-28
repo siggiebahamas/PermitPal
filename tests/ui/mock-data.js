@@ -1,5 +1,6 @@
 // In-memory stand-in for web/js/data.js, used only by the browser smoke test.
 // It mimics the database's status rules closely enough to drive every screen.
+import { TEMPLATES } from './templates-data.js';
 import { SERVICES } from './mock-services.js';
 import { addonPrice, addonLabel, FREE_PEOPLE } from '../js/prices.js';
 
@@ -1734,16 +1735,7 @@ export const reopenFinding = async (id) => { plusDb.findings.find((x) => x.id ==
 export const saveDocumentReading = async () => {};
 export const unreadPhotos = async () => [];
 
-// templates
-const TEMPLATES = [
-  { code: 'authorization_letter', title: 'Authorization letter', category: 'Letters', summary: 'Lets someone file, pay for and claim a permit for your business.', use_when: 'When an employee goes to the city hall or barangay for you.', notarize: false, sort: 10, version: 1,
-    fields: [{ key: 'date', label: 'Date', source: 'today' }, { key: 'office', label: 'Office', required: true, hint: 'e.g. Business Permits and Licensing Office' }, { key: 'owner_name', label: 'Your name', source: 'me_name', required: true },
-      { key: 'business_name', label: 'Business name', source: 'business_name', required: true }, { key: 'rep_name', label: 'Person you authorize', required: true }, { key: 'permit_name', label: 'Permit', source: 'permit_name', required: true }],
-    body: '{{date}}\n\n{{office}}\n\nTo whom it may concern:\n\nI, {{owner_name}}, of {{business_name}}, authorize {{rep_name}} to process, pay for and claim the {{permit_name}} of {{business_name}} on our behalf.\n\nRespectfully,\n\n\n_____________________________\n{{owner_name}}' },
-  { code: 'affidavit_of_loss', title: 'Affidavit of Loss', category: 'Sworn and notarized', summary: 'For a lost permit, certificate, official receipt or registration paper.', use_when: 'When you need a replacement of a lost document.', notarize: true, sort: 40, version: 1,
-    fields: [{ key: 'owner_name', label: 'Your full name', source: 'me_name', required: true }, { key: 'business_name', label: 'Business name', source: 'business_name', required: true }, { key: 'lost_document', label: 'Document lost', source: 'permit_name', required: true }, { key: 'lost_no', label: 'Its number', source: 'permit_no' }],
-    body: 'AFFIDAVIT OF LOSS\n\nI, {{owner_name}}, of legal age, Filipino, state that:\n\n1. {{business_name}} was issued a {{lost_document}}, No. {{lost_no}};\n\n2. The document is now lost.\n\n_____________________________\n{{owner_name}}\nAffiant' },
-];
+// templates: all of them, as in the database
 const TEMPLATE_PRICE = { authorization_letter: 150, certified_copy_request: 150, landlord_letter: 150, accreditation_cover_letter: 150, affidavit_of_loss: 250, gross_sales_declaration: 250, special_power_of_attorney: 350, secretary_certificate: 500 };
 export const templatePrices = async () => TEMPLATES.map((t) => ({ code: t.code, price_php: TEMPLATE_PRICE[t.code] ?? null }));
 export const listTemplates = async () => TEMPLATES.map((t) => ({ code: t.code, title: t.title, category: t.category, summary: t.summary, use_when: t.use_when, notarize: t.notarize, sort: t.sort, version: t.version,

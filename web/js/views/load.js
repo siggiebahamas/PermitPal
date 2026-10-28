@@ -138,10 +138,10 @@ function templatesCardUse(s) {
 }
 // The renewal season pass: a blue header with the price and what it's worth, then every benefit with its value.
 export const passPerks = (s, priceOf) => [
-  ...(!s?.plan_texts && s?.sms_ready !== false ? [[ICON.bell, 'Up to 100 text reminders', 'A text before each deadline this season, without using your wallet', 2 * priceOf('texts_50')]] : []),
-  [ICON.check, 'We check your papers before you go', 'Send photos of the documents for one renewal. We tell you what\'s missing, so you\'re not turned away at the counter.', priceOf('papers_check')],
-  [ICON.file, 'One ready-to-sign letter or form', 'Pick one: authorization letter, special power of attorney, affidavit of loss or Secretary\'s Certificate. Filled in with your details.', 500],
-  [ICON.calendar, 'Your January checklist, by email', 'Everything you must renew in January, in order. Sent now, then again on December 1 and January 5.', 0],
+  ...(!s?.plan_texts && s?.sms_ready !== false ? [[ICON.bell, 'Up to 100 text reminders', ['A text before each deadline this season', "Doesn't touch your wallet"], 2 * priceOf('texts_50')]] : []),
+  [ICON.check, 'We check your papers', ['Send photos of one renewal\'s documents', "We tell you what's missing", 'No wasted trip to the counter'], priceOf('papers_check')],
+  [ICON.file, 'A ready-to-sign letter', ['Authorization letter, SPA, affidavit of loss or Secretary\'s Certificate', 'Filled in with your details'], 500],
+  [ICON.calendar, 'Your January checklist', ['Everything due in January, in order', 'Emailed now, on Dec 1 and on Jan 5'], 0],
 ];
 export function passHeader(priceNow, perks, sub = '') {
   const worth = perks.reduce((t, x) => t + Number(x[3] || 0), 0);
@@ -150,7 +150,7 @@ export function passHeader(priceNow, perks, sub = '') {
     <div class="pass-price">${worth > priceNow ? html`<s>Worth up to ${peso(worth)}</s>` : ''}<b>${peso(priceNow)}</b><span>once, September to February</span></div></div>`;
 }
 export const passList = (perks, used = {}) => html`<ul class="pass-perks">${perks.map(([ic, t, d, v], i) => html`<li class="${used[i] ? 'is-used' : ''}"><span class="pass-ic">${ic}</span>
-  <span><b>${t}</b><small>${d}</small></span><em>${used[i] ? used[i] : v ? `worth ${peso(v)}` : 'included'}</em></li>`)}</ul>`;
+  <span><b>${t}</b>${Array.isArray(d) ? html`<ul class="pass-bullets">${d.map((x) => html`<li>${x}</li>`)}</ul>` : html`<small>${d}</small>`}</span><em>${used[i] ? used[i] : v ? `worth ${peso(v)}` : 'included'}</em></li>`)}</ul>`;
 function seasonCard(s, admin) {
   const p = s.pass;
   const perks = passPerks(s, price);
@@ -159,7 +159,7 @@ function seasonCard(s, admin) {
     perks.forEach(([, t], i) => {
       if (/text/.test(t)) used[i] = s.plan_texts ? 'in your plan' : `${p.texts_used} of ${p.texts_cap} used`;
       if (/papers/.test(t)) used[i] = p.check_used ? 'used' : 'ready';
-      if (/letter or form/.test(t)) used[i] = p.template_used ? 'used' : 'ready';
+      if (/letter/.test(t)) used[i] = p.template_used ? 'used' : 'ready';
       if (/checklist/.test(t)) used[i] = 'on';
     });
     return html`<section class="card load-use pass-card is-on">${passHeader(Number(p.price_php || price('season_pass')), perks, `You have the ${p.season} pass, good until ${fmtDate(p.ends_on)}`)}

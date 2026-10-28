@@ -2,7 +2,7 @@
 // shareable proof-of-compliance links, the inspection pack (.zip) and calendar export (.ics).
 import { html, fmtDate, fmtDateTime, peso, toast, toastError, when, plural, timeAgo, openModal, formObject, normalizePhone, todayPH, download, confirmDialog } from '../util.js';
 import { S, on, go, reload, canEdit, business, vehicle, person, reqsOf, empty, has, hasPlus } from '../core.js';
-import { STATUS, byPriority, subjectLabel, dueShort, duePill, ICON, counts } from '../components.js';
+import { STATUS, byPriority, subjectLabel, duePill, ICON, counts } from '../components.js';
 import * as db from 'pp/data';
 import { makeZip } from '../zip.js';
 import { trustSection } from './trust.js';
@@ -74,9 +74,9 @@ export async function partners(el, params = new URLSearchParams()) {
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Find a professional</h1><p class="page-sub">Licensed firms who handle permits for you. Ask for a quote, free.</p></div></div>
     <section class="card promises pro-promises">
-      <div class="promise">${ICON.briefcase}<div><b>Independent firms</b><span>Each one vouches for its own registration and licenses. Pinoy Permit doesn't check their papers, so ask to see them.</span></div></div>
-      <div class="promise">${ICON.share}<div><b>Straight to them</b><span>Your request goes to the firm. Replies within 1 business day.</span></div></div>
-      <div class="promise">${ICON.check}<div><b>No obligation</b><span>Compare quotes. Hire only who you trust.</span></div></div>
+      <div class="promise p-blue">${ICON.briefcase}<div><b>Independent firms</b><span>Each one vouches for its own registration and licenses.</span><em class="pro-note">Pinoy Permit doesn't check their papers, so ask to see them.</em></div></div>
+      <div class="promise p-jade">${ICON.share}<div><b>Straight to them</b><span>Your request goes to the firm. Replies within 1 business day.</span></div></div>
+      <div class="promise p-gold">${ICON.check}<div><b>No obligation</b><span>Compare quotes. Hire only who you trust.</span></div></div>
     </section>
     ${list.length ? html`<div class="filters pro-filters">
         <select data-pro-cat aria-label="Service"><option value="all">All services</option>${cats.map((c) => html`<option value="${c}" ${proCat === c ? 'selected' : ''}>${PARTNER_CATEGORIES[c]}</option>`)}</select>
@@ -196,7 +196,7 @@ export async function costs(el) {
     ${rows.length ? html`<section class="card">
       <div class="card-head"><div><h2>Coming up</h2><p class="card-sub">Estimates use the amount you entered for each permit's current record</p></div></div>
       ${rows.map((m) => html`<div class="band month ${m.key === 'late' ? 'overdue' : ''}"><span>${m.label}</span><span>${peso(known(m.items))}</span></div>
-        ${m.items.sort(byPriority).map((r) => html`<a class="line cost-line ${STATUS[r.status]?.cls || ''}" href="#/requirement/${r.id}"><span class="line-main"><b>${r.name}</b><small>${subjectLabel(r)} · <b class="due ${STATUS[r.status]?.cls || ''}">${dueShort(r)}</b></small></span>
+        ${m.items.sort(byPriority).map((r) => html`<a class="line cost-line ${STATUS[r.status]?.cls || ''}" href="#/requirement/${r.id}"><span class="line-main"><b>${r.name}</b><small>${subjectLabel(r)}</small></span>
           <span class="cost-side">${duePill(r)}${r.amount_paid != null ? html`<b class="cost-amt">${peso(r.amount_paid)}</b>` : html`<span class="cost-amt none">Add amount</span>`}</span></a>`)}`)}
       <div class="sheet-foot">Add "Amount paid" when you record or renew a permit to make this more accurate.</div>
     </section>` : empty('No dated renewals yet', 'Add expiry dates to your permits and this page fills in by itself.')}`);

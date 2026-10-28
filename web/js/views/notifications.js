@@ -45,9 +45,8 @@ function groups(list) {
     if (!map.has(e.key)) map.set(e.key, { ...e, items: [] });
     map.get(e.key).items.push({ n, e });
   }
-  // Groups with something new first, then the most recent.
-  return [...map.values()].sort((a, b) => (b.items.some((x) => !x.n.read_at) - a.items.some((x) => !x.n.read_at))
-    || (b.items[0].n.created_at > a.items[0].n.created_at ? 1 : -1));
+  // Most recent first. Ticking one off never moves anything: the list stays where you're looking.
+  return [...map.values()].sort((a, b) => (b.items[0].n.created_at > a.items[0].n.created_at ? 1 : b.items[0].n.created_at < a.items[0].n.created_at ? -1 : 0));
 }
 
 export async function notifications(el) {
