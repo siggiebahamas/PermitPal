@@ -291,6 +291,7 @@ export const listNotifications = async (limit = 100) =>
 export const unreadCount = async () =>
   (await sb.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null)).count || 0;
 export const markRead = async (ids) => ok(await sb.from('notifications').update({ read_at: new Date().toISOString() }).in('id', ids));
+export const markUnread = async (ids) => ok(await sb.from('notifications').update({ read_at: null }).in('id', ids));
 export const markAllRead = async () => ok(await sb.from('notifications').update({ read_at: new Date().toISOString() }).is('read_at', null));
 export const deleteNotification = async (id) => ok(await sb.from('notifications').delete().eq('id', id));
 export const clearNotifications = async (userId) => ok(await sb.from('notifications').delete().eq('user_id', userId));

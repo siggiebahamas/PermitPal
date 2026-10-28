@@ -332,6 +332,7 @@ export const allCycles = async () => db.cycles;
 export const cancelHelpRequest = async (id) => { const a = db.requests.find((x) => x.id === id); a.status = 'cancelled'; event(a, 'cancelled', 'You cancelled this request.'); };
 export const listNotifications = async (limit = 100) => [...db.notifications].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, limit);
 export const markRead = async (ids) => ids.forEach((id) => { const n = db.notifications.find((x) => x.id === id); if (n) n.read_at = 'now'; });
+export const markUnread = async (ids) => ids.forEach((id) => { const n = db.notifications.find((x) => x.id === id); if (n) n.read_at = null; });
 export const markAllRead = async () => db.notifications.forEach((n) => { n.read_at = 'now'; });
 export const deleteNotification = async (id) => { db.notifications = db.notifications.filter((n) => n.id !== id); };
 export const clearNotifications = async () => { db.notifications = []; };

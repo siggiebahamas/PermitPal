@@ -3,7 +3,7 @@ import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError }
 import { S, on, hooks, canEdit, empty, has, memberName, careOf, service, IN_PERSON } from '../core.js';
 import { assignable, bulk, bulkBar } from './assign.js';
 import { filingsBrief } from './filings.js';
-import { STATUS, reqRow, statTiles, counts, byPriority, subjectLabel, dueText, ICON } from '../components.js';
+import { STATUS, reqRow, statTiles, counts, byPriority, subjectLabel, dueShort, duePill, ICON } from '../components.js';
 import { accountantCard } from './brand.js';
 import { cityDashBanner } from './citydates.js';
 import { homeCal } from './homecal.js';
@@ -200,10 +200,10 @@ export async function documents(el) {
         const older = docsCache.filter((d) => d.requirement_id === r.id && d.cycle_id !== r.cycle_id).length;
         return html`<div class="doc-row ${STATUS[r.status].cls}">
           <div class="row-main"><a class="row-title" href="#/requirement/${r.id}">${r.name}</a>
-            <div class="row-sub">${r.location_id && !r.location_is_main ? r.location_name + ' · ' : ''}${dueText(r)}${older ? ` · ${plural(older, 'older file')}` : ''}</div>
+            <div class="row-sub">${r.location_id && !r.location_is_main ? html`<span>${r.location_name}</span><span class="sep"> · </span>` : ''}<b class="due ${STATUS[r.status].cls}">${dueShort(r)}</b>${older ? html`<span class="sep"> · </span><span>${plural(older, 'older file')}</span>` : ''}</div>
             ${files.map((d) => html`<div class="doc-file">${ICON.file}<button class="linklike" data-act="doc-view" data-path="${d.storage_path}" data-name="${d.file_name}" data-type="${d.mime_type || ''}">${d.file_name}</button><span class="muted small">${fileSize(d.size_bytes)}</span></div>`)}
           </div>
-          <div class="row-side">${files.length ? '' : canEdit() ? html`<button class="btn btn-sm btn-soft" data-act="req-upload" data-id="${r.id}">Upload</button>` : html`<span class="muted small">Missing</span>`}</div>
+          <div class="row-side">${duePill(r)}${files.length ? html`<span class="doc-onfile">${ICON.check} On file</span>` : canEdit() ? html`<button class="btn btn-sm btn-soft" data-act="req-upload" data-id="${r.id}">Upload</button>` : html`<span class="doc-onfile missing">No file yet</span>`}</div>
         </div>`;
       })}
     </details>`;

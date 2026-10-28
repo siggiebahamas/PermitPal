@@ -111,6 +111,11 @@ export function dateTile(r) {
   return html`<div class="dtile ${s.cls}" title="${fmtDate(r.expires_on)}"><small>${MON[m - 1]}${thisYear ? '' : " '" + String(y).slice(2)}</small><b>${d}</b></div>`;
 }
 
+// The status pill used on Home, Documents and Costs: renew-soon says how many days are left.
+export function duePill(r) {
+  if (r.status === 'renew_soon' && r.days_left != null) return html`<span class="chip soon">${r.days_left === 0 ? 'Due today' : `Due in ${plural(r.days_left, 'day')}`}</span>`;
+  return statusChip(r.status);
+}
 // On Home, overdue and renew-soon rows say it in the pill; other states keep their hint ("Add the details").
 const homeDays = (r) => ['action_required', 'renew_soon'].includes(r.status) && r.expires_on;
 // One requirement as a row. Clicking the row opens its page; the button does the next step.
@@ -130,7 +135,7 @@ export function reqRow(r, { showSubject = true, home = false } = {}) {
         <div class="row-sub">${home && homeDays(r) ? html`<span>${subjectLabel(r)}</span>`
           : html`${showSubject ? html`<span>${subjectLabel(r)}</span><span class="sep"> · </span>` : ''}<b class="due ${s.cls}">${dueShort(r)}</b>`}${whoPill(r)}</div>
       </div>
-      <div class="row-side">${home && r.status === 'renew_soon' && r.days_left != null ? html`<span class="chip soon">${r.days_left === 0 ? 'Due today' : `Due in ${plural(r.days_left, 'day')}`}</span>` : statusChip(r.status)}${btn}</div>
+      <div class="row-side">${home ? duePill(r) : statusChip(r.status)}${btn}</div>
     </div>`;
 }
 

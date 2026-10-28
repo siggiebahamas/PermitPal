@@ -138,10 +138,10 @@ function templatesCardUse(s) {
 }
 // The renewal season pass: a blue header with the price and what it's worth, then every benefit with its value.
 export const passPerks = (s, priceOf) => [
-  ...(!s?.plan_texts && s?.sms_ready !== false ? [[ICON.bell, 'Up to 100 text reminders', 'A text before each deadline, without using your credits', 2 * priceOf('texts_50')]] : []),
-  [ICON.check, 'One papers check', 'We check photos of your papers before you queue, so you file once', priceOf('papers_check')],
-  [ICON.file, 'One template of your choice', 'An authorization letter, SPA, affidavit or Secretary\'s Certificate, filled in for you', 500],
-  [ICON.calendar, 'Your January renewal plan', 'By email now, on December 1 and January 5: everything due, in order', 0],
+  ...(!s?.plan_texts && s?.sms_ready !== false ? [[ICON.bell, 'Up to 100 text reminders', 'A text before each deadline this season, without using your wallet', 2 * priceOf('texts_50')]] : []),
+  [ICON.check, 'We check your papers before you go', 'Send photos of the documents for one renewal. We tell you what\'s missing, so you\'re not turned away at the counter.', priceOf('papers_check')],
+  [ICON.file, 'One ready-to-sign letter or form', 'Pick one: authorization letter, special power of attorney, affidavit of loss or Secretary\'s Certificate. Filled in with your details.', 500],
+  [ICON.calendar, 'Your January checklist, by email', 'Everything you must renew in January, in order. Sent now, then again on December 1 and January 5.', 0],
 ];
 export function passHeader(priceNow, perks, sub = '') {
   const worth = perks.reduce((t, x) => t + Number(x[3] || 0), 0);
@@ -158,9 +158,9 @@ function seasonCard(s, admin) {
     const used = {};
     perks.forEach(([, t], i) => {
       if (/text/.test(t)) used[i] = s.plan_texts ? 'in your plan' : `${p.texts_used} of ${p.texts_cap} used`;
-      if (/papers check/.test(t)) used[i] = p.check_used ? 'used' : 'ready';
-      if (/template/.test(t)) used[i] = p.template_used ? 'used' : 'ready';
-      if (/plan/.test(t) && !/text/.test(t)) used[i] = 'on';
+      if (/papers/.test(t)) used[i] = p.check_used ? 'used' : 'ready';
+      if (/letter or form/.test(t)) used[i] = p.template_used ? 'used' : 'ready';
+      if (/checklist/.test(t)) used[i] = 'on';
     });
     return html`<section class="card load-use pass-card is-on">${passHeader(Number(p.price_php || price('season_pass')), perks, `You have the ${p.season} pass, good until ${fmtDate(p.ends_on)}`)}
       ${passList(perks, used)}

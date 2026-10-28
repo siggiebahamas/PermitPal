@@ -1,6 +1,6 @@
 // Notifications: a full page grouped by business, vehicle or person, where each item is a task
 // with its button, and the bell drop-down at the top right for a quick look from any page.
-import { html, timeAgo, toastError, confirmDialog, when } from '../util.js';
+import { html, timeAgo, toast, toastError, confirmDialog, when } from '../util.js';
 import { S, on, hooks, canEdit, reqById, business, vehicle, person } from '../core.js';
 import { ICON, NEXT_ACTION } from '../components.js';
 import * as db from 'pp/data';
@@ -65,7 +65,7 @@ export async function notifications(el) {
         <div class="ng-head"><span class="ng-ic">${g.icon}</span>${g.href ? html`<a href="${g.href}">${g.name}</a>` : html`<span>${g.name}</span>`}
           <span class="ng-count ${fresh ? '' : 'none'}">${fresh ? `${fresh} new` : 'all done'}</span></div>
         ${g.items.map(({ n, e }) => html`<div class="ng-row ${n.read_at ? 'done' : 'new'}">
-          ${n.read_at ? html`<span class="ng-check on" title="Done">${ICON.check}</span>`
+          ${n.read_at ? html`<button class="ng-check on" data-act="notif-undo" data-id="${n.id}" title="Done. Tap to undo" aria-label="Done. Tap to mark as not done">${ICON.check}</button>`
             : html`<button class="ng-check" data-act="notif-done" data-id="${n.id}" title="Mark as done" aria-label="Mark as done"></button>`}
           <a class="ng-main" href="${n.link || '#/notifications'}" data-act="notif-open" data-id="${n.id}">
             <b>${n.title}</b><small>${n.body && n.body !== g.name ? n.body + ' · ' : ''}${timeAgo(n.created_at)}</small></a>
@@ -83,6 +83,11 @@ async function markRead(id) {
 }
 on('notif-open', (ds) => { markRead(ds.id); closeBell(); });
 on('notif-done', async (ds) => { await markRead(ds.id); if (location.hash.startsWith('#/notifications')) notifications(document.getElementById('main')); });
+// Ticked by mistake? Tap the tick again: it's back on the to-do list.
+on('notif-undo', async (ds) => {
+  try { await db.markUnread([ds.id]); S.unread += 1; hooks.paintBadges?.(); toast('Back on your to-do list.'); } catch (e) { toastError(e); return; }
+  if (location.hash.startsWith('#/notifications')) notifications(document.getElementById('main'));
+});
 on('notif-delete', async (ds) => {
   try { await db.deleteNotification(ds.id); S.unread = await db.unreadCount().catch(() => S.unread); hooks.paintBadges?.(); notifications(document.getElementById('main')); } catch (e) { toastError(e); }
 });
