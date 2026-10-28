@@ -3064,3 +3064,12 @@ i.r { background: #E5484D; } i.y { background: #E9B949; } i.g { background: #34B
 .lp-screen-app .lp-notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, .2); z-index: 1; }
 .lp-screen-app .lp-app-band { margin: 0 -15px 12px; padding-top: 38px; }
 .lp-screen-app .lp-caps { margin: 2px 0 4px; }
+.lp-guide > span, .lp-app-t, .lp-row-t { min-width: 0; overflow-wrap: anywhere; }
+.lp-scr .lp-fake-btn { white-space: normal; text-align: center; }
+@media (max-width: 380px) {
+  .lp-app-tile span { white-space: normal; font-size: 7px; }
+  .lp-board .lp-app-renew { display: none; }
+  .lp-app-renew, .lp-screen .pv-pill { font-size: 9.5px; padding: 3px 7px; }
+}
+/* The website never scrolls sideways, whatever fonts the phone has */
+.landing { overflow-x: clip; }
