@@ -286,7 +286,7 @@ const FAQ = [
   ['How does yearly work?', 'You pay for 10 months and get 12. That is 2 months free, every year.'],
   ['Can I stop anytime?', 'Yes. Your plan runs to the end of what you paid. Your data is never locked or deleted, and you can download it anytime.'],
 ];
-const faq = () => [...FAQ, ...(has('load') ? [['What is Pinoy Permit load?', "Prepaid credit for the small extras: text reminders, one template at a time, a papers check, the renewal season pass. Top up from ₱100. It never expires, and unused paid load can be paid back to you if you ask."]] : [])];
+const faq = () => [...FAQ, ...(has('load') ? [['What is the Pinoy Permit wallet?', "Prepaid credit for the small extras: text reminders, one template at a time, a papers check, the renewal season pass. Top up from ₱100. It never expires, and unused paid load can be paid back to you if you ask."]] : [])];
 // The plans: software by size (small, then fleets), the per-vehicle band, landlords, then the separate services.
 const TIER_CTA = { plus: ['#/signup', 'Try free for 14 days'], core: ['#/signup', 'Start with Core'], multi: ['#/signup?type=fleet', 'Try free for 30 days'],
   fleet: ['#/signup?type=fleet', 'Try free for 30 days'], fleet_pro: ['#/signup?type=fleet', 'Try free for 30 days'], enterprise: ['#/signup?type=fleet', 'Start a trial, then ask for a quote'] };
@@ -329,7 +329,7 @@ export async function pricingPage(app) {
         <div data-plans>${pricingCards([])}</div>
         ${addons()}
       </section>
-      ${has('load') ? html`<section class="lp-load" aria-labelledby="load-h"><h2 class="lp-h3" id="load-h">Pay as you go, with Pinoy Permit load</h2>
+      ${has('load') ? html`<section class="lp-load" aria-labelledby="load-h"><h2 class="lp-h3" id="load-h">Pay as you go, with your Pinoy Permit wallet</h2>
         <p class="lp-sub">Top up from ₱100 by GCash, Maya or bank. Use it only on what you need. It never expires.</p>
         <div class="lp-load-grid" data-load-products>${loadCards(LOAD_FALLBACK)}</div></section>` : ''}
       ${plusShowcase()}

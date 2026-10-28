@@ -2762,3 +2762,48 @@ a.line:hover, button.line:hover { background-color: #fff; border-color: #C9D2E3;
 .invite-card .load-hist .line { background: #fff; }
 .inv-fine { margin: 12px 0 0; font-size: 14.5px; color: #fff; opacity: .9; }
 .lh-bal { align-self: center; justify-content: flex-start; } .load-hero .load-texts { margin: 4px 0 8px; }
+/* People: "Not cleared to work" and "Licenses to check" can't be missed: a warm amber header, not alarm red */
+.attn-card { border: 1.5px solid #F2C14E; }
+.card.attn-card > .card-head, .card.attn-card:has(> .line) > .card-head { background: linear-gradient(90deg, #FFE7A8, #FFF4D6); border-bottom: 2px solid #E0A40B; }
+.attn-card > .card-head h2 { display: flex; align-items: center; gap: 10px; color: #5A3E00; font-size: 21px; font-weight: 800; }
+.attn-card > .card-head h2 svg { width: 24px; height: 24px; padding: 5px; box-sizing: content-box; border-radius: 10px; background: #0B1B3A; color: #E9B949; stroke-width: 2.2; }
+.attn-card > .card-head .card-sub { color: #3D2A00; font-weight: 600; }
+/* Status tiles everywhere (Home, Documents, Costs, business and vehicle pages): one size, all caps */
+.stat-l { font-size: 16px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; line-height: 1.25; }
+.stats.four .stat-l, .nb-stats .stat-l { font-size: 16px; }
+/* Wallet: the season pass as one wide, simple card: the offer on the left, four benefits as tiles on the right */
+.load-uses .pass-card { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .load-uses .pass-card { grid-template-columns: 320px minmax(0, 1fr); } .load-uses .pass-card > .btn-row, .load-uses .pass-card > p { grid-column: 2; } }
+.load-uses .pass-card .pass-head { flex-direction: column; align-items: flex-start; justify-content: center; gap: 14px; padding: 24px; }
+.load-uses .pass-card .pass-title { font-size: 24px; line-height: 1.2; }
+.load-uses .pass-card .pass-price b { font-size: 40px; }
+.load-uses .pass-card .pass-perks { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; padding: 20px; align-content: center; }
+.load-uses .pass-card .pass-perks li { grid-template-columns: 1fr; justify-items: start; gap: 8px; padding: 14px; border: 0; border-radius: 14px; background: #F7F8FB; }
+.load-uses .pass-card .pass-perks small { display: none; }
+.load-uses .pass-card .pass-perks b { font-size: 16.5px; }
+.load-uses .pass-card .pass-perks em { font-size: 14px; background: #FFF4D6; color: #6B4A00; }
+.load-uses .pass-card > .btn-row { padding: 0 20px 20px; }
+.load-uses .pass-card > p { padding: 0 20px 18px; }
+/* Invite: light and inviting */
+.invite-card { color: #0B1B3A; border: 1.5px solid #F2D27A; background: radial-gradient(520px 240px at 100% 0, #FFF1C9, transparent 70%), linear-gradient(180deg, #FFFDF6, #FFFFFF); }
+.inv-kick { color: #8A5E00; }
+.invite-card h2 { color: #0B1B3A; font-size: 28px; }
+.inv-top p { color: #111827; }
+.inv-steps li { background: #fff; color: #0B1B3A; border: 1px solid #F2E3B8; box-shadow: 0 6px 16px -14px rgba(11, 27, 58, .5); }
+.inv-steps span { background: #0B1B3A; color: #E9B949; }
+.invite-card .invite-link { background: #F5F6F9; border: 1.5px solid #E3E6EC; font-family: var(--font); font-size: 16px; font-weight: 600; }
+.invite-card .invite-link code { font-family: var(--font); font-size: 16px; font-weight: 600; background: none; padding: 0; }
+.inv-share { color: #0B1B3A; }
+.inv-app:not(.viber):not(.wa):not(.fb) { background: #EEF1F8; color: #0B1B3A; }
+.inv-done, .inv-fine { color: #111827; }
+.invite-card .load-hist .line { background: #fff; }
+/* Sidebar: the role in gold, a short centered gold divider, and a sign-out pill */
+.sidebar .me .muted, .sidebar .me .small:not(.linklike) { color: #E9B949; font-weight: 700; }
+.sidebar .nav-secondary { position: relative; border-top: 0; }
+.sidebar .nav-secondary::before { content: ''; position: absolute; top: 0; left: 7.5%; width: 85%; height: 2px; border-radius: 2px; background: #E9B949; }
+.sidebar .me { border-top: 0; position: relative; }
+.sidebar .me::before { content: ''; position: absolute; top: 0; left: 7.5%; width: 85%; height: 1px; background: rgba(255, 255, 255, .18); }
+.sidebar .me .linklike { display: inline-flex; align-items: center; margin-top: 8px; padding: 7px 16px; border-radius: 999px; border: 1.5px solid #9ED8FF;
+  background: rgba(158, 216, 255, .12); color: #CFEAFF; text-decoration: none; font-weight: 800; font-size: 15px; }
+.sidebar .me .linklike:hover { background: rgba(158, 216, 255, .22); color: #fff; }
+.load-hero .load-texts { flex: none; }

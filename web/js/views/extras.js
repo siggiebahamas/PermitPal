@@ -188,10 +188,10 @@ export async function costs(el) {
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Costs & budget</h1><p class="muted">How much your permits cost, and what's coming next.</p></div></div>
     <div class="stats four">
-      <div class="stat ok"><div class="stat-n">${peso(spentTotal)}</div><div class="stat-l">Paid in the last 12 months</div></div>
-      <div class="stat soon"><div class="stat-n">${peso(known(all))}</div><div class="stat-l">Expected in the next 12 months</div></div>
+      <div class="stat ok"><div class="stat-n">${peso(spentTotal)}</div><div class="stat-l" title="Paid in the last 12 months">Paid, last 12 mos</div></div>
+      <div class="stat soon"><div class="stat-n">${peso(known(all))}</div><div class="stat-l" title="Expected in the next 12 months">Due, next 12 mos</div></div>
       <div class="stat progress"><div class="stat-n">${busiest && known(busiest.items) ? busiest.label.split(' ')[0] : '—'}</div><div class="stat-l">Biggest month</div></div>
-      <div class="stat needinfo"><div class="stat-n">${unknown(all)}</div><div class="stat-l">Renewals with no amount yet</div></div>
+      <div class="stat needinfo"><div class="stat-n">${unknown(all)}</div><div class="stat-l" title="Renewals with no amount yet">No amount yet</div></div>
     </div>
     ${rows.length ? html`<section class="card">
       <div class="card-head"><div><h2>Coming up</h2><p class="card-sub">Estimates use the amount you entered for each permit's current record</p></div></div>

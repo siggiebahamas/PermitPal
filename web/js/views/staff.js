@@ -21,13 +21,13 @@ export function staffTop() {
   const byPerson = new Map();
   for (const r of lapsed) { if (!byPerson.has(r.person_id)) byPerson.set(r.person_id, []); byPerson.get(r.person_id).push(r); }
   return html`${seatLine()}
-    ${when(subs.length && canEdit(), html`<section class="card worker-subs"><div class="card-head"><div><h2>Licenses to check</h2>
+    ${when(subs.length && canEdit(), html`<section class="card worker-subs attn-card"><div class="card-head"><div><h2>${ICON.bell} Licenses to check</h2>
         <p class="card-sub">Sent by your people from their own link. They count once you approve them.</p></div></div>
       ${subs.map((s) => { const p = person(s.person_id); const r = S.data.reqs.find((x) => x.id === s.requirement_id);
         return html`<div class="line"><div class="line-main"><b>${p?.full_name || 'Someone'}: ${r?.name || 'license'}</b>
           <small>Sent ${fmtDate(s.created_at.slice(0, 10))}${s.expires_on ? ` · new expiry ${fmtDate(s.expires_on)}` : ''}${s.note ? ` · “${s.note}”` : ''}</small></div>
           <button class="btn btn-sm btn-primary" data-act="wsub-open" data-id="${s.id}">Check it</button></div>`; })}</section>`)}
-    ${when(byPerson.size, html`<section class="card not-cleared"><div class="card-head"><div><h2>Not cleared to work</h2>
+    ${when(byPerson.size, html`<section class="card not-cleared attn-card"><div class="card-head"><div><h2>${ICON.person} Not cleared to work</h2>
         <p class="card-sub">A license they need has expired. Check before giving them work that needs it.</p></div></div>
       ${[...byPerson].map(([pid, rs]) => html`<a class="line" href="#/people/${pid}"><span class="line-main"><b>${person(pid)?.full_name}</b>
         <small>${rs.map((r) => `${r.name}: expired ${fmtDate(r.expires_on)}`).join(' · ')}</small></span>${ICON.chevron || ''}</a>`)}</section>`)}

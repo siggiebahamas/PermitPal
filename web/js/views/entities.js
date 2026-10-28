@@ -533,8 +533,9 @@ export function personList(el, params) {
     <div class="page-head"><div><h1>People</h1><p class="muted">Your staff's licenses, health cards and clearances, all tracked.</p></div>
       ${when(canEdit(), html`<div class="btn-row"><button class="btn btn-ghost" data-act="imp-open" data-kind="staff">${ICON.upload} Import from spreadsheet</button>
         <button class="btn btn-primary" data-act="person-add">+ Add person</button></div>`)}</div>
+    ${list.length ? timeline('person', list) : ''}
     ${staffTop()}
-    ${list.length ? html`${timeline('person', list)}<h3 class="section-label">Your people</h3><div class="cards">${byUrgency('person', list).map(entityCard('person'))}</div>`
+    ${list.length ? html`<h3 class="section-label">Your people</h3><div class="cards">${byUrgency('person', list).map(entityCard('person'))}</div>`
       : empty('No people yet', 'Add drivers, cooks, pharmacists and other staff whose licenses must stay valid.',
         when(canEdit(), html`<div class="btn-row"><button class="btn btn-primary" data-act="person-add">Add a person</button><button class="btn btn-ghost" data-act="imp-open" data-kind="staff">Import from spreadsheet</button></div>`))}`);
   if (params.get('add') && canEdit()) { history.replaceState(null, '', '#/people'); addPerson(); }

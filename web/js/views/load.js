@@ -39,14 +39,14 @@ const AMOUNTS = [100, 200, 500, 1000];
 // ---------------------------------------------------------------- the page
 export async function loadPage(el) {
   if (!has('load')) { go('#/'); return; }
-  el.innerHTML = String(html`<div class="page-head"><div><h1>Load</h1></div></div><div class="loading">Loading…</div>`);
+  el.innerHTML = String(html`<div class="page-head"><div><h1>Wallet</h1></div></div><div class="loading">Loading…</div>`);
   try { await fetchLoad(); } catch (e) { toastError(e); return; }
   const s = L.summary;
   const admin = s.can_spend;
   const open = L.topups.filter((t) => ['due', 'pending_verification'].includes(t.status) && t.valid_until >= todayPH());
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Load</h1>
-      <p class="page-sub">Prepaid credit for our extras. Top up once, use it anytime.</p></div></div>
+    <div class="page-head"><div><h1>Wallet</h1>
+      <p class="page-sub">Your Pinoy Permit wallet: prepaid credit for text reminders, papers checks and letters. Top up once, use it anytime.</p></div></div>
     ${s.invites?.invited_by?.status === 'pending' ? html`<div class="banner info"><div><b>You joined by invitation.</b>
       Add 3 permits with their dates (${s.invites.invited_by.permits} of 3 so far) and you both get a month of Pinoy Permit Plus, free.</div>
       <a class="btn btn-sm btn-primary" href="#/compliance">Add dates</a></div>` : ''}
@@ -56,12 +56,12 @@ export async function loadPage(el) {
       ${when(t.status === 'due' && admin, html`<div class="banner-actions"><button class="btn btn-sm btn-primary" data-act="load-pay" data-id="${t.id}">Pay</button>
         <button class="btn btn-sm btn-ghost" data-act="load-topup-cancel" data-id="${t.id}" aria-label="Cancel top-up ${t.number}">Cancel</button></div>`)}</div>`)}
 
-    <section class="card load-hero" aria-label="Your load">
-      <div class="lh-bal"><span class="lh-kick">Your load</span><b class="load-amt">${peso(s.total)}</b>
+    <section class="card load-hero" aria-label="Your wallet">
+      <div class="lh-bal"><span class="lh-kick">Your wallet</span><b class="load-amt">${peso(s.total)}</b>
         ${when(Number(s.bonus) > 0, html`<span class="lh-bonus">${peso(s.paid)} paid · ${peso(s.bonus)} bonus (used first)</span>`)}
         <div class="load-texts">${ICON.bell}<span>${textsLine(s)}</span></div>
         ${admin ? html`<button class="btn btn-gold btn-lg" data-act="load-topup">Top up</button>`
-          : html`<p class="lh-note">Your workspace owner or an admin can top up and use the load.</p>`}</div>
+          : html`<p class="lh-note">Your workspace owner or an admin can top up and use the wallet.</p>`}</div>
       <div class="lh-pitch"><h2>One balance for every extra</h2>
         <p>Top up once. Use it for reminders by text, a check of your papers, or a ready-to-sign letter. Whatever you don't use stays.</p>
         <div class="lh-chips">
@@ -70,11 +70,11 @@ export async function loadPage(el) {
           <span>${ICON.file} Letters &amp; forms <b>from ${peso(price('template'))}</b></span></div></div>
     </section>
 
-    <section class="card load-how" aria-label="How load works">
+    <section class="card load-how" aria-label="How the wallet works">
       <ol class="load-steps">
         <li><span class="ls-ic">₱</span><b>Top up</b><span>From ${peso(100)} by GCash, Maya or bank</span></li>
         <li><span class="ls-ic">${ICON.check}</span><b>Use it</b><span>On any extra, any time</span></li>
-        <li><span class="ls-ic">${ICON.calendar}</span><b>Keep the rest</b><span>Load never expires</span></li></ol></section>
+        <li><span class="ls-ic">${ICON.calendar}</span><b>Keep the rest</b><span>Your balance never expires</span></li></ol></section>
 
     <h2 class="section-label">What you can use it on</h2>
     <div class="load-uses">
@@ -91,7 +91,7 @@ export async function loadPage(el) {
       : html`<p class="muted">Nothing yet. Top up to start: from ${peso(100)}.</p>`}</section>
     ${when(L.topups.length, html`<details class="card bills-all"><summary><b>Top-ups</b> <span class="muted small">${plural(L.topups.length, 'top-up')}</span></summary>
       ${L.topups.map(topupRow)}</details>`)}
-    <p class="fineprint">Load is prepaid credit for Pinoy Permit's own services in this workspace. It never expires and can't be sent to anyone. Paid load that's still unused can be paid back to you: ask us from <a href="#/contact">Contact Pinoy Permit</a>. Bonus load (from invitations or gifts) is used first and can't be paid out. Prices include everything. <a href="terms.html#load" target="_blank" rel="noopener">Terms for load</a>.</p>`);
+    <p class="fineprint">Your wallet holds prepaid credit for Pinoy Permit's own services in this workspace. It never expires and can't be sent to anyone. Paid credit that's still unused can be paid back to you: ask us from <a href="#/contact">Contact Pinoy Permit</a>. Bonus credit (from invitations or gifts) is used first and can't be paid out. Prices include everything. <a href="terms.html#load" target="_blank" rel="noopener">Wallet terms</a>.</p>`);
   wireLoad(el);
 }
 
@@ -169,7 +169,7 @@ function seasonCard(s, admin) {
   if (!s.season_on_sale) {
     return html`<section class="card load-use pass-card">${passHeader(price('season_pass'), perks, 'On sale again from September 1')}${passList(perks)}</section>`;
   }
-  return html`<section class="card load-use pass-card">${passHeader(price('season_pass'), perks, `Good until ${fmtDate(s.season_ends)}. Most cities want renewals by January 20.`)}
+  return html`<section class="card load-use pass-card">${passHeader(price('season_pass'), perks, `Good until ${fmtDate(s.season_ends)}`)}
     ${passList(perks)}
     ${when(admin, html`<div class="btn-row"><button class="btn btn-primary" data-act="load-season">Get the ${s.season_on_sale} pass · ${peso(price('season_pass'))}</button></div>`)}</section>`;
 }
@@ -179,7 +179,7 @@ function inviteSection(s) {
   return html`<section class="card invite-card" id="invite" aria-labelledby="invite-h">
     <div class="inv-top"><span class="inv-kick">Invite a business</span>
       <h2 id="invite-h">Give a month of Plus. Get a month free.</h2>
-      <p>Know someone who juggles permits? Send them your link. When they add 3 permits, you both get a month of Pinoy Permit Plus, free.${s.has_plus ? html` You already have Plus, so yours comes as ${peso(PLUS_MONTHLY)} of load.` : ''}</p></div>
+      <p>Know someone who juggles permits? Send them your link. When they add 3 permits, you both get a month of Pinoy Permit Plus, free.${s.has_plus ? html` You already have Plus, so yours comes as ${peso(PLUS_MONTHLY)} in your wallet.` : ''}</p></div>
     <ol class="inv-steps"><li><span>1</span>Send your link</li><li><span>2</span>They add 3 permits</li><li><span>3</span>You both get a free month</li></ol>
     <div class="invite-row"><div class="invite-link" data-invite-link><span>Getting your link…</span></div>
       <button class="btn btn-gold" data-act="invite-copy" disabled>Copy link</button></div>
@@ -190,7 +190,7 @@ function inviteSection(s) {
       ${when(typeof navigator !== 'undefined' && navigator.share, html`<button class="inv-app" data-act="invite-share" disabled>More…</button>`)}</div>
     ${when(n.joined, html`<p class="inv-done"><b>${plural(n.joined, 'business has', 'businesses have')} joined with your link.</b> ${n.rewarded} set up${n.pending ? `, ${n.pending} still adding permits` : ''}.</p>
       <div class="load-hist">${L.invites.map((i) => html`<div class="line"><div class="line-main"><b>A business joined ${fmtDate(i.joined_on)}</b>
-        <small>${i.status === 'rewarded' ? (i.my_reward === 'capped' ? "Set up. You've had this year's 6 free months." : i.my_reward === 'bonus_load' ? `Set up: ${peso(PLUS_MONTHLY)} bonus load added` : 'Set up: your free month of Plus was added')
+        <small>${i.status === 'rewarded' ? (i.my_reward === 'capped' ? "Set up. You've had this year's 6 free months." : i.my_reward === 'bonus_load' ? `Set up: ${peso(PLUS_MONTHLY)} bonus added to your wallet` : 'Set up: your free month of Plus was added')
           : i.status === 'void' ? "Didn't add permits within 90 days" : `${i.permits_with_dates} of 3 permits with dates so far`}</small></div>
         <span class="chip ${i.status === 'rewarded' ? 'ok' : i.status === 'void' ? 'needinfo' : 'progress'}">${i.status === 'rewarded' ? 'Thanked' : i.status === 'void' ? 'Closed' : 'Waiting'}</span></div>`)}</div>`)}
     <p class="inv-fine">Up to 6 free months a year. For new workspaces only.</p>
@@ -241,13 +241,13 @@ function topupRow(t) {
 export function openTopup(suggest = 0) {
   if (!isOrgAdmin()) return toast('Ask your workspace owner or an admin to top up.', 'error');
   const pick = AMOUNTS.find((a) => a >= suggest) || 1000;
-  openModal('Top up your load', html`
+  openModal('Top up your wallet', html`
     ${when(suggest, html`<p class="small">You need ${peso(suggest)} more for that.</p>`)}
     <fieldset class="chips-pick"><legend>How much?</legend>
       ${AMOUNTS.map((a) => html`<label class="pick-chip"><input type="radio" name="amount" value="${a}" ${a === pick ? 'checked' : ''}><span>${peso(a)}</span></label>`)}
       <label class="pick-chip"><input type="radio" name="amount" value="other"><span>Other</span></label></fieldset>
     <label class="field" data-other hidden><span>Amount <small>(₱100 to ₱5,000, in steps of ₱50)</small></span><input type="number" name="other" min="100" max="5000" step="50" inputmode="numeric" placeholder="e.g. 300"></label>
-    <p class="muted small">Pay by GCash, Maya or bank transfer. It never expires, and unused paid load can be paid back to you.</p>`, {
+    <p class="muted small">Pay by GCash, Maya or bank transfer. It never expires, and unused paid credit can be paid back to you.</p>`, {
     submitLabel: 'Continue',
     onOpen: (form) => form.addEventListener('change', () => { form.querySelector('[data-other]').hidden = form.amount.value !== 'other'; }),
     onSubmit: async (fd) => {
@@ -262,7 +262,7 @@ export function openTopup(suggest = 0) {
 async function openPayTopup(t) {
   const st = await paySettings();
   openModal(`Pay top-up ${t.number}`, html`
-    <div class="quote-hint"><b>${peso(t.amount_php)}</b> <span class="muted">Pinoy Permit load, good to pay until ${fmtDate(t.valid_until)}</span></div>
+    <div class="quote-hint"><b>${peso(t.amount_php)}</b> <span class="muted">Pinoy Permit wallet, good to pay until ${fmtDate(t.valid_until)}</span></div>
     ${payDetails(st)}
     <div class="grid2">
       <label class="field"><span>Paid with</span><select name="method"><option value="gcash">GCash</option><option value="maya">Maya</option><option value="bank_transfer">Bank transfer</option><option value="other">Other</option></select></label>
@@ -297,7 +297,7 @@ async function spend({ title, what, amount, run, done }) {
     });
     return false;
   }
-  const yes = await confirmDialog(title, amount ? html`${what} for <b>${peso(amount)}</b> from your load. You'll have ${peso(have - amount)} left.` : html`${what}. Nothing comes out of your load.`, { confirmLabel: amount ? `Yes, use ${peso(amount)}` : 'Yes', danger: false, cancelLabel: 'Not now' });
+  const yes = await confirmDialog(title, amount ? html`${what} for <b>${peso(amount)}</b> from your wallet. You'll have ${peso(have - amount)} left.` : html`${what}. Nothing comes out of your wallet.`, { confirmLabel: amount ? `Yes, use ${peso(amount)}` : 'Yes', danger: false, cancelLabel: 'Not now' });
   if (!yes) return false;
   try { await run(); await fetchLoad(); toast(done); rerender(); return true; }
   catch (e) {
@@ -379,7 +379,7 @@ export async function openPapersCheck(r, docsCount = 0) {
       <input type="file" name="files" accept="image/*,.pdf" multiple ${docsCount ? '' : 'required'}></label>
     ${when(docsCount, html`<p class="muted small">We'll also look at the ${plural(docsCount, 'file')} already on this permit.</p>`)}
     <label class="field"><span>Anything we should know? <small>(optional)</small></span><textarea name="note" maxlength="1000" rows="2" placeholder="e.g. We moved to a new unit in March."></textarea></label>
-    <div class="calc-lines"><div class="calc-total"><span>${pass ? 'Your season pass covers this one' : 'From your load'}</span><b>${pass ? 'Free' : peso(cost)}</b></div></div>
+    <div class="calc-lines"><div class="calc-total"><span>${pass ? 'Your season pass covers this one' : 'From your wallet'}</span><b>${pass ? 'Free' : peso(cost)}</b></div></div>
     ${when(!pass && cost > have, html`<p class="small"><b>You have ${peso(have)}.</b> Top up first, then come back.</p>`)}
     <p class="muted small">Only Pinoy Permit staff see these photos, and each time they open one it's listed under Settings. Photos sent here never count as the permit's own document.</p>`, {
     submitLabel: !pass && cost > have ? 'Top up' : pass ? 'Send for checking' : `Send for checking · ${peso(cost)}`,
@@ -427,7 +427,7 @@ on('papers-cancel', async (ds) => {
     await fetchLoad().catch(() => {});
     const r = (S.data.reqs || []).find((x) => location.hash.includes(x.id));
     if (r) papersChanged(r.id);
-    toast('Cancelled. It\'s back in your load.');
+    toast('Cancelled. It\'s back in your wallet.');
   } catch (e) { toastError(e); }
 });
 
@@ -436,7 +436,7 @@ export async function loadSettingsCard() {
   if (!has('load')) return '';
   let s;
   try { s = (await loadState(true)).summary; } catch { return ''; }
-  return html`<section class="card load-mini"><div class="card-head"><h2>Pinoy Permit load</h2><a class="btn btn-sm btn-soft" href="#/load">Open</a></div>
+  return html`<section class="card load-mini"><div class="card-head"><h2>Pinoy Permit wallet</h2><a class="btn btn-sm btn-soft" href="#/load">Open</a></div>
     <p><b class="load-amt-sm">${peso(s.total)}</b> <span class="muted">· ${s.plan_texts ? 'texts included in your plan' : plural(s.texts, 'text reminder') + ' left'}${s.pass ? ` · season pass until ${fmtDate(s.pass.ends_on)}` : ''}</span></p>
     <p class="muted small">Prepaid credit for text reminders, single templates, papers checks and the renewal season pass. It never expires.</p></section>`;
 }

@@ -86,6 +86,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: the menu's words are pure white: workspace name, every tab and your name`, await page.evaluate(() => {
     const els = [...document.querySelectorAll('.sidebar .org-name, .sidebar .nav, .sidebar .me-name')];
     return els.length > 3 && els.every((e) => getComputedStyle(e).color === 'rgb(255, 255, 255)'); }));
+  check(`${label}: status tiles are all caps; the menu has the role in gold, a gold divider and a sign-out pill that isn't white`, await page.evaluate(() => {
+    const l = document.querySelector('.stat-l'); const role = document.querySelector('.sidebar .me .muted'); const out = document.querySelector('.sidebar .me .linklike');
+    return getComputedStyle(l).textTransform === 'uppercase' && getComputedStyle(role).color === 'rgb(233, 185, 73)' && getComputedStyle(out).color !== 'rgb(255, 255, 255)'
+      && getComputedStyle(document.querySelector('.sidebar .nav-secondary'), '::before').backgroundColor === 'rgb(233, 185, 73)'; }));
+  check(`${label}: the menu calls it Wallet`, (await page.locator('.sidebar a[data-nav=load]', { hasText: 'Wallet' }).count()) <= 1 && (await page.locator('.sidebar a[data-nav=load]', { hasText: /^\s*Load\s*$/ }).count()) === 0);
   check(`${label}: a big bell, and a white notification count in the menu`, await page.evaluate(() => { const b = document.querySelector('.topbar .bell'); const n = document.querySelector('.sidebar .nav .badge');
     return b.getBoundingClientRect().width >= 56 && (!n || getComputedStyle(n).backgroundColor === 'rgb(255, 255, 255)'); }));
   check(`${label}: navy top bar with a white search box`, await page.evaluate(() => getComputedStyle(document.querySelector('.topbar')).backgroundColor === 'rgb(11, 27, 58)'
@@ -1516,6 +1521,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`plus ${label}: if the check fails, the page says so and offers Check again`, /didn't finish/.test(await mainText(page)) && (await page.locator('main [data-act=check-run]').count()) === 1);
     // people: the worker's photo, the not-cleared list, the link, roles
     await go('#/people');
+    check(`plus ${label}: People: the month-by-month table comes first, and "Not cleared to work" has a strong amber header`, await page.evaluate(() => {
+      const lanes = document.querySelector('main .lanes-card'); const nc = document.querySelector('main .not-cleared');
+      return !!lanes && !!nc && (lanes.compareDocumentPosition(nc) & Node.DOCUMENT_POSITION_FOLLOWING) && getComputedStyle(nc.querySelector('.card-head')).backgroundImage.includes('gradient'); }));
     check(`plus ${label}: a lapsed license shows under Not cleared to work`, /Not cleared to work/.test(await mainText(page)) && /Jun Reyes/.test(await page.textContent('.not-cleared')));
     await page.click('[data-act=wsub-open]'); await page.waitForSelector('#modal-root .modal');
     check(`plus ${label}: the photo and its dates are shown to check`, (await page.locator('#modal-root .wsub-img').count()) === 1 && (await page.inputValue('#modal-root [name=reference_no]')) === 'HC-3310');
@@ -2041,7 +2049,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.click('[data-act=load-texts][data-pack=texts_200]'); await page.waitForSelector('#modal-root .modal');
   check(`load ${label}: not enough load offers a top-up for the difference`, /Not enough load/.test(await page.textContent('#modal-root h3')));
   await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(300);
-  check(`load ${label}: ...with the amount picked`, /Top up your load/.test(await page.textContent('#modal-root h3')) && (await page.locator('#modal-root input[name=amount][value="200"]').isChecked()));
+  check(`load ${label}: ...with the amount picked`, /Top up your wallet/.test(await page.textContent('#modal-root h3')) && (await page.locator('#modal-root input[name=amount][value="200"]').isChecked()));
   await page.keyboard.press('Escape');
   // invitations
   check(`load ${label}: an invitation link to share`, /#\/signup\?ref=[A-Z0-9]{8}/.test(await page.textContent('[data-invite-link]')) && await page.locator('[data-act=invite-copy]').isEnabled());

@@ -52,7 +52,7 @@ on('tpl-preview', (ds) => {
   const t = (listCache || []).find((x) => x.code === ds.code);
   if (!t) return;
   openModal(t.title, html`<div class="tpl-preview"><pre class="tpl-doc">${t.preview}</pre><div class="tpl-fade" aria-hidden="true"></div></div>
-    <p class="muted small">The rest is filled in with your business's details${has('plus') ? ' when you have Pinoy Permit Plus' : ''}${has('load') && isOrgAdmin() ? ', or when you get just this one with your load' : ''}.</p>`, {
+    <p class="muted small">The rest is filled in with your business's details${has('plus') ? ' when you have Pinoy Permit Plus' : ''}${has('load') && isOrgAdmin() ? ', or when you get just this one with your wallet' : ''}.</p>`, {
     submitLabel: has('load') && isOrgAdmin() ? 'Get just this one' : 'See Plus',
     onSubmit: () => { setTimeout(() => (has('load') && isOrgAdmin() ? unlockOne(t) : openUpsell('Templates')), 30); },
   });
