@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/unit.test.mjs",
+    "test": "node --experimental-strip-types --no-warnings --test tests/unit.test.mjs",
     "test:ui": "node tests/ui/smoke.mjs",
     "serve": "npx --yes http-server web -p 8080 -c-1",
     "build:demo": "node scripts/build-demo.mjs",

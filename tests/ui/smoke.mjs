@@ -97,6 +97,13 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     return b.getBoundingClientRect().width >= 56 && (!n || getComputedStyle(n).backgroundColor === 'rgb(255, 255, 255)'); }));
   check(`${label}: navy top bar with a white search box`, await page.evaluate(() => getComputedStyle(document.querySelector('.topbar')).backgroundColor === 'rgb(11, 27, 58)'
     && getComputedStyle(document.querySelector('.top-search')).backgroundColor === 'rgb(255, 255, 255)'));
+  await page.click('#top-q'); await page.waitForTimeout(150);
+  check(`${label}: tapping search shows shortcuts: status filters with counts, your lists and every tool`, await page.locator('.sx').isVisible() && (await page.locator('.sx .sx-chip.overdue').count()) === 1
+    && (await page.locator('.sx .sx-chip.plain', { hasText: 'Vehicles' }).count()) === 1 && (await page.locator('.sx-links a', { hasText: 'Done for you' }).count()) === 1);
+  await page.fill('#top-q', 'isuzu'); await page.waitForTimeout(150);
+  check(`${label}: typing shows matching permits and vehicles right away`, (await page.locator('.sx .sx-row', { hasText: 'Isuzu' }).count()) >= 1 && (await page.locator('.sx .sx-all').count()) === 1);
+  await page.fill('#top-q', ''); await page.click('.sx .sx-chip.overdue'); await page.waitForTimeout(500);
+  check(`${label}: a status shortcut opens Compliance filtered to it, and the menu closes`, /#\/compliance/.test(page.url()) && (await page.locator('[data-act=filter-status][data-v=action_required][aria-pressed=true]').count()) === 1 && await page.locator('.sx').isHidden());
   await page.fill('#top-q', 'Isuzu'); await page.press('#top-q', 'Enter'); await page.waitForTimeout(500);
   check(`${label}: searching at the top shows the matching permits`, /#\/compliance/.test(page.url()) && (await page.inputValue('#filters [name=q]')) === 'Isuzu'
     && (await page.locator('.row').count()) >= 1 && (await page.locator('.row', { hasText: 'Corner' }).count()) === 0);
@@ -588,7 +595,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('done for you page: how it works in 3 steps, 5 plain promises (no badges), no city-bill section, and a menu grouped by kind', (await page.locator('main .dfy-steps li').count()) === 3
     && (await page.locator('main .dfy-promises li').count()) === 5 && (await page.locator('main .dfy-badge, main #bills').count()) === 0 && ((await page.locator('main .dfy-jump a').count()) >= 3 || (await page.locator('main .svc .svc-tag').count()) === (await page.locator('main .svc').count())) && (await page.locator('main .svc details.svc-more').count()) === (await page.locator('main .svc').count()));
   check('done for you page: leads with peace of mind: on your own vs with us, 4 each, then a calm call to look', /off your mind/.test(await page.textContent('main .dfy-calm h2'))
-    && (await page.locator('main .dfy-calm .is-alone li').count()) === 4 && (await page.locator('main .dfy-calm .is-us li').count()) === 4 && /Nothing is charged until you say yes/.test(await page.textContent('main .dfy-calm-foot'))
+    && (await page.locator('main .dfy-calm .is-alone li').count()) === 4 && (await page.locator('main .dfy-calm .is-us li').count()) === 4 && /You approve the price before we start/.test(await page.textContent('main .dfy-calm-foot'))
     && !/guarantee/i.test(await page.textContent('main .dfy-calm')));
   check('done for you page: the no-fixers rule and the terms link stay on the page', /RA 11032/.test(await page.textContent('main .dfy-rules')) && (await page.locator('main .dfy-rules a[href="terms.html#services"]').count()) === 1);
   check('done for you: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
@@ -1093,6 +1100,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   const view = async (v) => { await page.click(`[data-act=money-view][data-v=${v}]`); await page.waitForTimeout(350); };
   await page.goto('http://localhost:4173/');
   await page.waitForSelector('main h1');
+  check('demo: the permit check finds just 3 things to fix', (await page.evaluate(async () => (await import('/__mock/mock-data.js')).runPermitCheck())).fix === 3);
   await go('#/admin');
   check('money: Home shows the four big numbers in plain words', (await page.locator('main .mh-card').count()) === 4 && /You earned this month/.test(await page.textContent('main'))
     && /Owed to you/.test(await page.textContent('main .mh-cards')) && /Comes in every month/.test(await page.textContent('main')) && /Not your money/.test(await page.textContent('main')));
@@ -1349,7 +1357,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   inPerson = true;
 }
 
-// The website as customers see it (online only): "Track and manage every permit. Easily.", everything on one screen, the
+// The website as customers see it (online only): "Keep every permit you have current. Easily.", everything on one screen, the
 // worries it takes away, the 5-step tour and the free plan as a receipt; prices on their own page.
 {
   inPerson = false;
@@ -1362,8 +1370,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     p.on('pageerror', (x) => e.push(x.message));
     await p.goto('http://localhost:4173/'); await p.waitForSelector('.lp-home h1');
     const text = await p.textContent('.landing');
-    check(`website ${label}: the home page leads with "Track and manage every permit. Easily." under "Permits on autopilot"`, /^Track and manage every permit\. Easily\.$/.test(await p.textContent('.lp-home h1'))
-      && (await p.textContent('.lp-hero2 .lp-tag')) === 'Permits on autopilot' && /^Add your permits once\./.test(await p.textContent('.lp-hero2 .lp-lead')));
+    check(`website ${label}: the home page leads with the permits you already have: "Keep every permit you have current. Easily."`, /^Keep every permit you have current\. Easily\.$/.test(await p.textContent('.lp-home h1'))
+      && (await p.textContent('.lp-hero2 .lp-tag')) === 'Permits on autopilot' && /^Add the permits you already have, once\./.test(await p.textContent('.lp-hero2 .lp-lead'))
+      && (await p.locator('.lp-hero2 .lp-ticks').count()) === 0);
+    check(`website ${label}: the phone and the list look like the app: navy greeting, status tiles, date tiles and green Renew`, (await p.locator('.lp-hero2 .lp-app-band').count()) === 1
+      && (await p.locator('.lp-hero2 .lp-app-tile').count()) === 3 && (await p.locator('.lp-board .lp-app-date').count()) >= 4 && (await p.locator('.lp-board .lp-app-renew').count()) >= 3);
     check(`website ${label}: the sticker logo is sharp, uncropped and big enough to read`, await p.evaluate(async () => {
       const i = document.querySelector('.lp-top .brand img.brand-wm'), r = i.getBoundingClientRect();
       await i.decode();
@@ -1377,7 +1388,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
       && (await p.title()) === 'Pinoy Permit' && (await p.getAttribute('.lp-top .brand img', 'alt')) === 'Pinoy Permit');
     check(`website ${label}: "Try the demo" sits next to Start free at the top, and again at the bottom`, (await p.locator('.lp-hero2 .btn-row a.lp-btn-demo[href="demo/"]').count()) === 1
       && (await p.locator('.lp-final2 a.lp-btn-demo[href="demo/"]').count()) === 1 && /Try the demo/.test(await p.textContent('.lp-hero2 .btn-row')));
-    check(`website ${label}: the example phone shows Sadie's Kitchen`, /Good morning, Sadie/.test(await p.textContent('.lp-screen')) && (await p.textContent('.lp-biz')) === "Sadie's Kitchen");
+    check(`website ${label}: the example phone shows Sadie's day, with the Mayor's Permit to renew first`, /Good morning, Sadie/.test(await p.textContent('.lp-screen')) && /Mayor's Permit/.test(await p.textContent('.lp-screen .lp-app-row')));
     check(`website ${label}: "One screen." sits on a line of its own`, await p.evaluate(() => {
       const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
       return b.textContent === 'One screen.' && b.getClientRects().length === 1 && b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 2;
@@ -1420,7 +1431,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`website ${label}: what load buys, with prices, only once its database part is on`, (await p.locator('.lp-load-card').count()) === (label === 'live' ? 0 : 4) && (await p.locator('.lp-pass .pass-head').count()) === (label === 'live' ? 0 : 1));
     check(`website ${label}: prices page: no sideways scroll`, (await over(p)) <= 1, `${await over(p)}px`);
     await p.click('.lp-top .brand'); await p.waitForSelector('.lp-home h1');
-    check(`website ${label}: the logo goes back home`, /Track and manage every permit/.test(await p.textContent('main h1')));
+    check(`website ${label}: the logo goes back home`, /Keep every permit you have current/.test(await p.textContent('main h1')));
     check(`website ${label}: no JavaScript errors`, e.length === 0, e.slice(0, 3).join(' | '));
     await p.close();
   }
@@ -1523,8 +1534,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
       return !!line && getComputedStyle(sec).borderLeftWidth === '4px' && getComputedStyle(line).borderTopLeftRadius === '14px' && getComputedStyle(line).backgroundImage === 'none'; }));
     check(`plus ${label}: "Fix these" is a big bold title with the count big on the right`, await page.evaluate(() => { const h = document.querySelector('.check-sec.fix h2'); const n = document.querySelector('.check-sec.fix .check-count');
       return !!n && parseFloat(getComputedStyle(h).fontSize) >= 22 && parseFloat(getComputedStyle(n).fontSize) >= 44 && n.getBoundingClientRect().left > h.getBoundingClientRect().right; }));
-    check(`plus ${label}: each section shows 3 items, the rest behind "Show more"`, await page.evaluate(() => [...document.querySelectorAll('.check-sec')].every((sec) => {
-      const n = Number(sec.querySelector('.check-count').textContent); return sec.querySelectorAll(':scope > .line').length === Math.min(3, n) && (n <= 3 || /Show \d+ more/.test(sec.querySelector('.check-more summary').textContent)); })));
+    check(`plus ${label}: "Fix these" lists every item; only "Coming up" shows 3 and folds the rest`, await page.evaluate(() => [...document.querySelectorAll('.check-sec')].every((sec) => {
+      const n = Number(sec.querySelector('.check-count').textContent), soon = sec.classList.contains('soon');
+      return sec.querySelectorAll(':scope > .line').length === (soon ? Math.min(3, n) : n) && (!soon || n <= 3 || /Show \d+ more/.test(sec.querySelector('.check-more summary').textContent)) && (soon || !sec.querySelector('.check-more')); })));
     await page.click('[data-act=finding-dismiss]'); await page.waitForSelector('#modal-root .modal');
     await page.fill('#modal-root [name=note]', 'The building has one'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(700);
     check(`plus ${label}: "Doesn't apply" moves it to your answers, with Undo`, /You answered/.test(await mainText(page)) && (await page.locator('[data-act=finding-reopen]').count()) === 1);
@@ -1905,7 +1917,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.evaluate(async () => { (await import('/js/core.js')).S.profile.is_platform_admin = true; });
     await go('#/pros'); await page.waitForTimeout(300);
     const pros = await page.textContent('main');
-    check('pros: no "checked" badge; customers are told firms vouch for themselves', !/Checked when listed/i.test(pros) && /Independent firms/.test(pros) && /doesn't check their papers/.test(pros));
+    check('pros: no "checked" badge; customers are told firms vouch for themselves', !/Checked when listed/i.test(pros) && /Independent firms/.test(pros) && (await page.locator('main .pro-hero .pro-hero-list li').count()) === 3 && /you can trust/.test(await page.textContent('main .pro-hero h2')) && /doesn't check their papers/.test(pros));
     check('prices property/pros: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -1914,6 +1926,10 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const { page, errs } = await newPage({ PP_TEAM: true }, { width: 390, height: 844 });
     await page.goto('http://localhost:4173/#/network'); await page.waitForSelector('main [data-plan-card]');
     check('prices team tools: the fleet and property plans, with a trial button each', (await page.locator('main [data-plan-card]').count()) === 5 && (await page.locator('main [data-act=nb-set-kind]').count()) === 5);
+    check('prices team tools: calm promise (3 steps) beside the yearly saving, then one short plan menu', (await page.locator('main .tt-hero .tt-steps li').count()) === 3
+      && /Save up to ₱19,980/.test(await page.textContent('main .tt-save')) && (await page.locator('main .tt-row').count()) === 5 && /per vehicle/.test(await page.textContent('main .tt-row')));
+    await page.click('main .tt-save-btn'); await page.waitForTimeout(150);
+    check('prices team tools: "See yearly prices" switches every row to the yearly price and its saving', /₱14,990\/yr/.test(await page.textContent('main [data-plan-card=multi]')) && /you save ₱2,998/.test(await page.textContent('main [data-plan-card=multi]')));
     check('prices team tools: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -2545,6 +2561,39 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await home.goto('http://localhost:4173/'); await home.waitForSelector('.lp-foot');
   check('guides: the home page footer links to the guides', (await home.locator('.lp-foot a[href="renew/"]').count()) === 1);
   await home.close();
+}
+
+// Vehicles by fuel and use (database file 18), the nine new templates, and the encrypted-files note.
+{
+  const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
+  const go = async (hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await page.waitForTimeout(400); };
+  const codes = (id) => page.evaluate(async (v) => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.filter((r) => r.vehicle_id === v).map((r) => r.type_code).sort().join(','), id);
+  await go('#/vehicles'); await page.click('main [data-act=veh-add]'); await page.waitForSelector('.modal [name=fuel]');
+  check('vehicles: adding one asks what it runs on, what it is used for, and if it is still in the seller\'s name',
+    (await page.locator('.modal [name=usage] option').count()) === 4 && (await page.locator('.modal [name=transfer_pending]').count()) === 1);
+  await page.fill('.modal [name=make_model]', 'BYD e6'); await page.fill('.modal [name=plate_no]', 'EVT 2027');
+  await page.selectOption('.modal [name=fuel]', 'electric'); await page.selectOption('.modal [name=usage]', 'for_hire_people'); await page.check('.modal [name=transfer_pending]');
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(700);
+  const ev = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).vehicles.find((v) => v.plate_no === 'EVT 2027')?.id);
+  const c1 = await codes(ev);
+  check('vehicles: an electric TNVS car still in the seller\'s name: franchise, passenger insurance and transfer added, no emission test',
+    /ltfrb_franchise/.test(c1) && /pa_insurance/.test(c1) && /transfer_ownership/.test(c1) && !/emission_test/.test(c1), c1);
+  await go('#/vehicles/' + ev);
+  check('vehicles: its page says why, in plain words', /no emission test needed/.test(await page.textContent('main .veh-rules')) && /LTFRB franchise/.test(await page.textContent('main .veh-rules')));
+  await page.click('[data-act=tab][data-tab=details]'); await page.waitForTimeout(250);
+  await page.selectOption('main [name=usage]', 'private'); await page.click('main form .btn-primary'); await page.waitForTimeout(500);
+  const c2 = await codes(ev);
+  check('vehicles: back to private use: the for-hire papers go (nothing was recorded for them)', !/ltfrb_franchise|pa_insurance/.test(c2) && /transfer_ownership/.test(c2), c2);
+  await go('#/templates'); await page.waitForSelector('main .tpl-card');
+  check('templates: 17 in all, with the deed of sale and the owner\'s consent', (await page.locator('main .tpl-card').count()) === 17
+    && /Deed of Absolute Sale/.test(await page.textContent('main')) && /Property owner's consent/.test(await page.textContent('main')));
+  await go('#/settings');
+  check('settings: no "files are locked" claim until the vault is switched on', (await page.locator('main .vault-note').count()) === 0);
+  check('vehicles and templates: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await page.close();
 }
 
 await browser.close();

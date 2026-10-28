@@ -75,6 +75,15 @@ async function main() {
 
   app.querySelectorAll('.tp-files [data-path]').forEach((b) => b.addEventListener('click', async () => {
     b.disabled = true;
+    // Through the document vault (files are stored encrypted); files from before the vault have a plain link.
+    try {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/doc-vault?op=get&path=${encodeURIComponent(b.dataset.path)}`, { headers: { apikey: SUPABASE_KEY }, cache: 'no-store' });
+      if (r.ok) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(await r.blob()); a.download = b.dataset.name || 'copy'; document.body.appendChild(a); a.click(); a.remove();
+        b.disabled = false; return;
+      }
+    } catch { /* fall back to the plain link */ }
     const { data: d, error: e } = await sb.storage.from('documents').createSignedUrl(b.dataset.path, 120, { download: b.dataset.name });
     b.disabled = false;
     if (e || !d?.signedUrl) return toast("That copy isn't available any more. The business may have turned downloads off.");

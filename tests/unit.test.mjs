@@ -474,3 +474,57 @@ test('The processing clock sets the legal days per permit, so nobody picks', asy
     assert.ok(p.usual >= 1 && p.usual <= p.days);                   // "usually ready" never later than the law
   }
 });
+
+test('Document vault: files are stored sealed, open only for who storage allows, and only at their own path', async () => {
+  const { handle, seal, unseal, vaultKey, isSealed } = await import('../supabase/functions/doc-vault/index.ts');
+  const key = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64');
+  const org = '11111111-1111-4111-8111-111111111111', other = '22222222-2222-4222-8222-222222222222';
+  const store = new Map();   // path -> { bytes, type }
+  const canRead = { 'Bearer eyMEMBER': [org], 'Bearer eyOUTSIDER': [other] };
+  let staffOpens = 0;
+  const fake = async (url, init = {}) => {
+    const u = new URL(url); const auth = init.headers?.Authorization || '';
+    if (u.pathname.endsWith('/rpc/staff_open_file')) { const ok = auth === 'Bearer eySTAFF'; if (ok) staffOpens++; return new Response(ok ? '"x.pdf"' : '{}', { status: ok ? 200 : 403 }); }
+    const m = /\/storage\/v1\/object\/(authenticated\/)?documents\/(.+)$/.exec(u.pathname); const path = decodeURIComponent(m[2]);
+    const mayRead = auth === 'Bearer SERVICE' || (canRead[auth] || []).some((o) => path.startsWith(o + '/'));
+    if (init.method === 'POST') {
+      if (!(canRead[auth] || []).some((o) => path.startsWith(o + '/'))) return new Response('{}', { status: 400 });
+      store.set(path, { bytes: new Uint8Array(init.body), type: init.headers['Content-Type'] }); return new Response('{}');
+    }
+    const f = store.get(path);
+    return f && mayRead ? new Response(f.bytes, { headers: { 'content-type': f.type } }) : new Response('{}', { status: 400 });
+  };
+  const env = { url: 'https://x.supabase.co', anon: 'ANON', service: 'SERVICE', key };
+  const call = (op, path, auth, body, type) => handle(new Request(`https://f/doc-vault?op=${op}&path=${encodeURIComponent(path)}`,
+    { method: body ? 'POST' : 'GET', headers: { ...(auth ? { Authorization: auth } : {}), ...(type ? { 'x-file-type': type } : {}) }, body }), env, fake);
+  const pdf = new TextEncoder().encode('%PDF-1.7 mayors permit MP-2027-0001');
+  const path = `${org}/req1/abc-permit.pdf`;
+
+  assert.equal((await call('put', path, 'Bearer eyMEMBER', pdf, 'application/pdf')).status, 200);
+  const stored = store.get(path);
+  assert.ok(isSealed(stored.bytes) && !Buffer.from(stored.bytes).includes(Buffer.from('MP-2027-0001')));   // storage never sees the text
+  assert.equal(stored.type, 'application/pdf');
+  const back = await call('get', path, 'Bearer eyMEMBER');
+  assert.equal(back.status, 200);
+  assert.equal(new TextDecoder().decode(await back.arrayBuffer()), '%PDF-1.7 mayors permit MP-2027-0001');
+  assert.equal((await call('get', path, 'Bearer eyOUTSIDER')).status, 404);                               // another workspace: no
+  assert.equal((await call('put', `${other}/r/x.pdf`, 'Bearer eyMEMBER', pdf)).status, 403);               // can't write elsewhere
+  assert.equal((await call('get', path, 'Bearer eySTAFF')).status, 200);                                   // staff: through the logged check
+  assert.equal(staffOpens, 1);
+  // a sealed file copied to another workspace's folder can't be opened there
+  store.set(`${other}/stolen.pdf`, stored);
+  assert.equal((await call('get', `${other}/stolen.pdf`, 'Bearer eyOUTSIDER')).status, 422);
+  // one changed byte is caught
+  const bad = stored.bytes.slice(); bad[bad.length - 1] ^= 1; store.set(`${org}/req1/bad.pdf`, { bytes: bad, type: 'application/pdf' });
+  assert.equal((await call('get', `${org}/req1/bad.pdf`, 'Bearer eyMEMBER')).status, 422);
+  // files from before the vault come back as they are
+  store.set(`${org}/req1/old.pdf`, { bytes: pdf, type: 'application/pdf' });
+  assert.equal(new TextDecoder().decode(await (await call('get', `${org}/req1/old.pdf`, 'Bearer eyMEMBER')).arrayBuffer()).slice(0, 8), '%PDF-1.7');
+  // paths that try to escape are refused; without a key nothing is stored
+  assert.equal((await call('get', `${org}/../x`, 'Bearer eyMEMBER')).status, 400);
+  assert.equal((await handle(new Request(`https://f/?op=put&path=${encodeURIComponent(path)}`, { method: 'POST', body: pdf }), { ...env, key: '' }, fake)).status, 503);
+  // a key change keeps old files readable
+  const k1 = await vaultKey(key, 1), k2 = await vaultKey(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'), 2);
+  const s1 = await seal(pdf, path, k1);
+  assert.equal(new TextDecoder().decode(await unseal(s1, path, new Map([[2, k2.key], [1, k1.key]]))).slice(0, 8), '%PDF-1.7');
+});

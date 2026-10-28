@@ -381,6 +381,7 @@ export async function settings(el, section) {
 
     <section class="card"><h2>Your data</h2>
       <p class="muted small">Download everything you track as a spreadsheet, anytime. Pinoy Permit backs up the database and every uploaded file every night, encrypted, and keeps past permit periods forever.</p>
+      ${when(has('vault'), html`<p class="vault-note"><b>Your files are locked.</b> Every file is encrypted with its own key (AES-256) before it's stored, and opens only for your team and the people you share it with.</p>`)}
       <button class="btn btn-soft" data-act="export-csv">Download CSV</button>
     </section>
 

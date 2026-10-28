@@ -89,7 +89,9 @@ export const service = (code) => S.data?.services?.find((x) => x.code === code);
 // Year-round care, rush fees on them and "renew several" stay in the code: set IN_PERSON to bring
 // them back. The tests switch it on to keep checking them.
 export const IN_PERSON = !!globalThis.PP_IN_PERSON;
-const ONLINE_SERVICES = new Set(['setup_from_paper', 'renew_dti_business_name', 'renew_philgeps', 'adv_philgeps', 'apply_dole_registration', 'delivery_print']);
+// Only work our team can finish online, end to end: no counters, no queues, no site visits.
+const ONLINE_SERVICES = new Set(['setup_from_paper', 'renew_dti_business_name', 'renew_philgeps', 'adv_philgeps', 'apply_dole_registration', 'delivery_print',
+  'adv_employer_registration', 'filing_sec_gis']);
 export const offered = (s) => !!s && (IN_PERSON || ONLINE_SERVICES.has(s.code));
 // The done-for-you service that handles a given permit type, if we offer one.
 export const serviceFor = (r) => {

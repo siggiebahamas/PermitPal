@@ -232,7 +232,7 @@ select pg_temp.res('paid late: the month starts today, everyone wakes up', i.per
 select pg_temp.as_user('d1000000-0000-4000-8000-0000000000a1');
 set local role authenticated;
 select pg_temp.res('every workspace sees the templates list, without the full text',
-  (select count(*) from public.list_templates()) = 8 and not exists (select 1 from public.list_templates() where preview like '%{{%'), '');
+  (select count(*) from public.list_templates()) = 17 and not exists (select 1 from public.list_templates() where preview like '%{{%'), '');
 do $$ begin perform public.get_template((select org from t_ids), 'affidavit_of_loss');
   perform pg_temp.res('the full template is Plus only', false, 'was allowed');
 exception when others then perform pg_temp.res('the full template is Plus only', sqlerrm like 'Ready-to-use templates come with Pinoy Permit Plus%', sqlerrm); end $$;

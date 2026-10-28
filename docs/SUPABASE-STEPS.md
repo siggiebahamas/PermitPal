@@ -1,4 +1,4 @@
-# Going live: every step, in order (as of database file 17)
+# Going live: every step, in order (as of database file 19)
 
 Do these on a computer, in your Pinoy Permit project (`zeaiwvgktakbwnqpchbo`). Never the Nifti project.
 The website and the phone app update by themselves when code is pushed (about 10 minutes). Everything below has to be
@@ -18,7 +18,9 @@ done by you, once, in Supabase, Resend or GitHub. Parts A–E are needed before 
    | `prices2` | `2026-11-01-prices-and-delivery.sql` (file 15) |
    | `lgus` | `2026-11-02-brief.sql` (file 16) |
    | `sites` | `2026-11-03-site-plans.sql` (file 17) |
+   | `vehicles2` | `2026-11-04-vehicles-templates.sql` (file 18) |
 
+   File 19 (`vault`) comes later, in Part B2: it needs the encryption function first.
    Everything there already → go to Part B.
 4. To run a file: open it on GitHub at https://github.com/siggiebahamas/PermitPal/tree/main/supabase/manual ,
    click its name, then click the **Copy raw file** button (two small squares, top right of the code).
@@ -44,6 +46,34 @@ done by you, once, in Supabase, Resend or GitHub. Parts A–E are needed before 
 
 15. Reload Pinoy Permit (on a phone: close the app and open it again). On Home, tap **Google Calendar**: it should say
     **Add to Google Calendar**.
+
+## Part B2: lock every file with encryption (10 minutes) — do this before real customers upload anything
+
+Files are already private. This adds a second lock: each file is encrypted (AES-256) before it is stored, with a key
+that lives only in one function's settings. A copy of the storage or a backup is unreadable without that key.
+
+1. Make your key. In the SQL Editor (as in Part A), paste this and click **Run**:
+   ```sql
+   select encode(extensions.gen_random_bytes(32), 'base64') as your_vault_key;
+   ```
+   Copy the long text it shows. **Save it in your password manager now.** Without it, encrypted files can never be
+   opened again, not even by us, and backups can't be restored. Never paste it in a chat, an email or GitHub.
+2. Supabase → https://supabase.com/dashboard/project/zeaiwvgktakbwnqpchbo/functions/secrets → **Add new secret**:
+   name `DOC_VAULT_KEY`, value = the text from step 1. Save.
+3. Open https://github.com/siggiebahamas/PermitPal/blob/main/supabase/functions/doc-vault/index.ts and click **Copy raw file**.
+4. Supabase → **Edge Functions** → **Deploy a new function** → **Via Editor**. Delete the sample code, paste, name it
+   exactly `doc-vault`, click **Deploy function**.
+5. Its **Details** tab: turn **Enforce JWT verification** OFF, **Save changes**. (Storage's own rules still check every
+   file; the public permit page and workers' upload links have no login.)
+6. Check it: open https://zeaiwvgktakbwnqpchbo.supabase.co/functions/v1/doc-vault?ping=1
+   - `{"ok":true,"vault":true}` → good.
+   - `"vault":false` → the secret in step 2 is missing or misnamed.
+7. Now run database file 19 the same way as in Part A: `2026-11-05-vault-on.sql`. From then on every new file is
+   encrypted; files uploaded before keep opening as before. Settings → **Your data** then says **Your files are locked**.
+
+If you ever need a new key (for example, you think it leaked): keep the old one, add a secret `DOC_VAULT_OLD_KEYS` with
+the value `1:<old key>`, set `DOC_VAULT_KEY` to the new one and `DOC_VAULT_KEY_ID` to `2`. Old files still open; new
+ones use the new key.
 
 ## Part C: email, so reminders and sign-up emails actually go out (20 minutes, free)
 
@@ -90,6 +120,8 @@ To take admin away from someone: `update public.profiles set is_platform_admin =
     - `SUPABASE_SERVICE_ROLE_KEY`: Supabase → **Project Settings** → **API Keys** → the secret key
     - `BACKUP_PASSPHRASE`: any long phrase you make up. Keep it in a password manager: backups can't be opened without it.
 26. GitHub → **Actions** → **Nightly backup** → **Run workflow**. It should finish green.
+    Backups hold files the way storage holds them: encrypted, once Part B2 is done. To restore files from a backup you
+    also need your vault key from Part B2, so keep both the passphrase and the key in your password manager.
 
 ## Part F (optional, costs money): WhatsApp reminders
 

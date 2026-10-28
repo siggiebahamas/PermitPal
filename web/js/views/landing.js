@@ -1,4 +1,4 @@
-// What a visitor sees before signing in. The home page sells the product: "Track and manage every permit. Easily."
+// What a visitor sees before signing in. The home page sells the product: "Keep every permit you have current. Easily."
 // (with "Permits on autopilot" as its label), everything
 // to keep current on one screen, the headaches it takes away, a 5-step tour and the free plan as a receipt.
 // Prices have their own page (#/pricing): the free plan, the team plans (prices read live from the plans
@@ -43,25 +43,25 @@ const wireScroll = (app) => app.querySelectorAll('[data-scroll-to]').forEach((a)
 const hero = () => html`<section class="lp-hero2">
   <div class="lp-hero2-copy">
     <p class="lp-tag">Permits on autopilot</p>
-    <h1>Track and manage every permit. <span class="lp-blue">Easily.</span></h1>
-    <p class="lp-lead">Add your permits once. Pinoy Permit keeps track of every expiry date${has('filings') ? ' and tax deadline' : ''}${has('library2') ? ', reminds you before each one is due, and shows you how to renew' : ' and reminds you before each one is due'}.</p>
+    <h1>Keep every permit you have current. <span class="lp-blue">Easily.</span></h1>
+    <p class="lp-lead">Add the permits you already have, once. Pinoy Permit tracks every expiry date${has('filings') ? ' and tax deadline' : ''}${has('library2') ? ', reminds you before each one is due, and walks you through each renewal, step by step' : ' and reminds you before each one is due'}.</p>
     <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#tour" data-scroll-to="tour">See how it works</a><a class="btn btn-lg lp-btn-demo" href="demo/">${PLAY}Try the demo</a></div>
     <p class="lp-demo-note">No sign-up needed for the demo. Click around with sample data.</p>
-    <ul class="lp-ticks"><li>${ICON.check}Free plan, no card</li><li>${ICON.check}Works on any phone</li></ul>
   </div>
   <div class="lp-hero2-art">
     <div class="lp-blob" aria-hidden="true"></div>
-    <div class="lp-phone" role="img" aria-label="Pinoy Permit on a phone: 11 of 12 permits current, with what is due next">
-      <div class="lp-screen" aria-hidden="true"><div class="lp-notch"></div>
-        <div><small>Good morning, Sadie</small><b class="lp-biz">Sadie's Kitchen</b></div>
-        <div class="lp-ring"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="32"/><circle cx="40" cy="40" r="32" class="on"/></svg><div><b>11 of 12</b><small>permits current</small></div></div>
-        <div class="lp-caps">WHAT NEEDS YOU</div>
-        ${[['Health card · Ana', 'late', '3 days late'], ...(has('filings') ? [['BIR 2551Q', 'soon', 'Due in 5 days']] : []), ["Mayor's Permit", 'soon', 'Due in 12 days'], ['Fire safety (FSIC)', 'ok', 'All good']]
-          .map(([n, st, t]) => html`<div class="lp-mini"><b>${n}</b>${pill(st, t)}</div>`)}
+    <div class="lp-phone" role="img" aria-label="Pinoy Permit on a phone: 1 overdue, 2 to renew soon, 9 compliant, with what is due next">
+      <div class="lp-screen lp-screen-app" aria-hidden="true"><div class="lp-notch"></div>
+        <div class="lp-app-band"><small>THURSDAY, OCTOBER 29</small><b>Good morning, Sadie</b><span class="lp-app-alert"><i class="r"></i>1 permit is past due</span></div>
+        <div class="lp-app-tiles">${[['r', 'Overdue', 1], ['y', 'Renew soon', 2], ['g', 'Compliant', 9]].map(([c, t, n]) => html`<div class="lp-app-tile"><span><i class="${c}"></i>${t}</span><b>${n}</b></div>`)}</div>
+        <div class="lp-caps">UP NEXT</div>
+        ${[['OCT', 24, 'r', "Mayor's Permit", 'Sadie\'s Kitchen', 'renew'], ...(has('filings') ? [['NOV', 3, 'y', 'BIR 2551Q', 'Taxes · Quarterly', 'Due in 5 days']] : []), ['NOV', 10, 'y', 'Health card', 'Staff · Ana Cruz', 'Due in 12 days'], ['NOV', 18, 'y', 'CTPL insurance', 'Vehicle · ABC 1234', 'Due in 20 days'], ['MAY', 16, 'g', 'Fire safety (FSIC)', 'All papers on file', 'ok']]
+          .map(([m, d, c, n, sub, act]) => html`<div class="lp-app-row"><span class="lp-app-date ${c}"><small>${m}</small><b>${d}</b></span><span class="lp-app-t"><b>${n}</b><small>${sub}</small></span>
+            ${act === 'renew' ? html`<span class="lp-app-renew">Renew</span>` : act === 'ok' ? pill('ok', 'All good') : pill('soon', act)}</div>`)}
       </div>
     </div>
     <div class="lp-float lp-f1" aria-hidden="true"><span class="lp-fi t-solid-blue">${ICON.bell}</span><span><b>Mayor's Permit</b>Due in 30 days.${has('library2') ? " Here's what to bring." : ''}</span></div>
-    <div class="lp-float lp-f2" aria-hidden="true"><span class="lp-fi t-solid-green">${ICON.check}</span><span><b>FSIC renewed</b>Saved to your files</span></div>
+    <div class="lp-float lp-f2" aria-hidden="true"><span class="lp-fi t-solid-green">${ICON.check}</span><span><b>FSIC renewed</b>${has('vault') ? 'Saved and encrypted' : 'Saved to your files'}</span></div>
   </div>
 </section>`;
 
@@ -69,9 +69,9 @@ const hero = () => html`<section class="lp-hero2">
 const forYou = () => {
   const kinds = [[PIC.bag, 't-blue', 'Your business permits', 'Every branch, every permit'], [PIC.truck, 't-teal', 'Your vehicles', 'If you have any'],
     [PIC.team, 't-green', "Your staff's licenses", 'Health cards, NBI and more'], ...(has('filings') ? [[ICON.calendar, 't-lilac', 'Your tax dates', 'BIR, SSS, PhilHealth, Pag-IBIG']] : [])];
-  const rows = [[PIC.team, 't-green', 'Health card', 'Staff · Ana Cruz', 'late', '3 days late'], ...(has('filings') ? [[ICON.calendar, 't-lilac', 'BIR 2551Q', 'Taxes · Quarterly', 'soon', 'Due in 5 days']] : []),
-    [PIC.bag, 't-blue', 'Sanitary permit', 'Business · Main store', 'soon', 'Due in 12 days'], [PIC.truck, 't-teal', 'CTPL insurance', 'Vehicle · ABC 1234', 'soon', 'Due in 20 days'],
-    [PIC.bag, 't-blue', 'Fire safety (FSIC)', 'Business · Main store', 'ok', 'All good']];
+  const rows = [['OCT', 26, 'r', 'Health card', 'Staff · Ana Cruz', 'late', '3 days late'], ...(has('filings') ? [['NOV', 3, 'y', 'BIR 2551Q', 'Taxes · Quarterly', 'soon', 'Due in 5 days']] : []),
+    ['NOV', 10, 'y', 'Sanitary permit', 'Business · Main store', 'soon', 'Due in 12 days'], ['NOV', 18, 'y', 'CTPL insurance', 'Vehicle · ABC 1234', 'soon', 'Due in 20 days'],
+    ['MAY', 16, 'g', 'Fire safety (FSIC)', 'Business · Main store', 'ok', 'All good']];
   return html`<section id="for-you" class="lp-sec" aria-labelledby="for-you-h">
     <h2 class="lp-big" id="for-you-h"><span class="lp-line">Everything you have to keep current.</span><span class="lp-line lp-blue">One screen.</span></h2>
     <p class="lp-lead">Whatever you run, it all lands in one list, sorted by what's due first.</p>
@@ -79,8 +79,9 @@ const forYou = () => {
       <ul class="lp-kinds">${kinds.map(([ic, t, b, s]) => html`<li><span class="lp-sq ${t}">${ic}</span><span><b>${b}</b>${s}</span></li>`)}</ul>
       <div class="lp-split-art">
         <div class="lp-board" role="img" aria-label="One list mixing business permits, vehicles, staff licenses${has('filings') ? ' and tax dates' : ''}, most urgent first">
-          <div class="lp-board-head" aria-hidden="true"><b>What needs you</b>${pill('ok', '9 of 12 current')}</div>
-          ${rows.map(([ic, t, n, s, st, txt]) => html`<div class="lp-row" aria-hidden="true"><span class="lp-sq ${t}">${ic}</span><span class="lp-row-t"><b>${n}</b><small>${s}</small></span>${pill(st, txt)}</div>`)}
+          <div class="lp-board-head" aria-hidden="true"><b>Next actions</b><small>Most urgent first</small></div>
+          ${rows.map(([m, d, c, n, sub, st, txt]) => html`<div class="lp-row" aria-hidden="true"><span class="lp-app-date ${c}"><small>${m}</small><b>${d}</b></span><span class="lp-row-t"><b>${n}</b><small>${sub}</small></span>
+            ${pill(st, txt)}${st === 'ok' ? '' : html`<span class="lp-app-renew">Renew</span>`}</div>`)}
         </div>
         <p class="lp-note">Looking after permits for clients, tenants or a fleet? <a href="#/pricing">See team plans.</a></p>
       </div>
@@ -98,7 +99,7 @@ const worries = () => {
     ...(has('plus') ? [[PIC.team, 't-green', 'Chasing staff', 'They upload. You tap Approve.']] : has('assign') ? [[PIC.team, 't-green', 'Chasing your team', 'Hand it over. You hear if it slips.']] : []),
     [ICON.upload, 't-blue', 'Setting it all up', has('services') ? 'Import a spreadsheet, or let us do it.' : 'Import it all from a spreadsheet.'],
     [PIC.pin, 't-teal', 'Long queues', 'Ask a firm near you for a quote.'],
-    [PIC.lock, 't-lilac', 'Prying eyes', has('mfa') ? 'Private by default, with two-step login.' : 'Private by default. Only your team sees it.'],
+    [PIC.lock, 't-lilac', 'Prying eyes', has('vault') ? 'Every file encrypted, with two-step login.' : has('mfa') ? 'Private by default, with two-step login.' : 'Private by default. Only your team sees it.'],
   ];
   return html`<section id="worry" class="lp-band" aria-labelledby="worry-h"><div class="lp-wrap">
     <h2 class="lp-big lp-narrow" id="worry-h">Things you'll never worry about again.</h2>
@@ -141,12 +142,11 @@ const SCREENS = [
     <div class="lp-msg"><b>Pinoy Permit</b>Still to do: Mayor's Permit, due in <b>7 days</b>.</div>
     <div class="lp-msg"><b>Pinoy Permit</b>Mayor's Permit is due <b>tomorrow</b>.</div>
     <div class="lp-msg lp-msg-sum"><b>Your Monday summary</b>2 things this week. The rest is current.</div></div>`,
-  () => (has('library2') ? html`<div class="lp-scr" role="img" aria-label="A renewal checklist for the Mayor's Permit with three of five steps done">
-    <b class="lp-scr-h">Renew Mayor's Permit</b>
-    <div class="lp-bar"><i></i></div><small class="lp-scr-sub">3 of 5 ready</small>
-    ${['Barangay clearance', 'Fire safety (FSIC)', "Last year's permit"].map((t) => html`<div class="lp-ck">${tick}${t}</div>`)}
-    <div class="lp-ck"><span class="lp-todo"></span>Sanitary permit</div>
-    <div class="lp-fake-btn">Open the city's online portal</div></div>`
+  () => (has('library2') ? html`<div class="lp-scr" role="img" aria-label="How to renew the Mayor's Permit, step by step: do this first, get the papers ready, where to file, how to pay">
+    <b class="lp-scr-h">How to renew: step by step</b>
+    ${[['Do this first', 'Barangay clearance ✓'], ['Get these papers ready', '3 of 5 ready'], ['Where to file', "City hall's BPLO, or online"], ['How to pay', 'Cashier or online. Keep the receipt.']]
+      .map(([t, d], i) => html`<div class="lp-guide"><span class="lp-guide-n ${i ? '' : 'first'}">${i + 1}</span><span><b>${t}</b><small>${d}</small></span></div>`)}
+    <div class="lp-fake-btn">Need help? We can do it online</div></div>`
     : html`<div class="lp-scr" role="img" aria-label="The Mayor's Permit, renewed, with next year's date set">
     <b class="lp-scr-h">Mayor's Permit</b>
     <div class="lp-ck">${tick}Renewal recorded</div><div class="lp-ck">${tick}Receipt saved</div>
@@ -280,6 +280,7 @@ const loadCards = (list) => {
 };
 const FAQ = [
   ['Is the free plan really free?', 'Yes. One business and one vehicle, with reminders and checklists, cost nothing, with no time limit and no card. Track more with Plus (up to 5), Core (up to 15) or a fleet plan.'],
+  ['Do you register new businesses or get new permits?', "Pinoy Permit is built for the permits you already have: it tracks them, reminds you and walks you through each renewal. Starting a business from zero takes many offices and often months; for that, Find a professional connects you with licensed liaisons and accountants, and our team takes on the parts that can be done fully online, like a DTI business name."],
   ['Does a plan include someone renewing for me?', 'No. Every plan is tracking and planning software only. Renewal Assistance (₱499, a review of your papers and a written plan) is a separate service. Full-Service Vehicle Renewal (from ₱1,000) is coming soon. Government and third-party fees are always separate.'],
   ['What happens if I reach my plan\'s limit?', 'Everything you already track stays, and you can still edit it. You just can\'t add another business or vehicle until you move up. If a paid plan ends, nothing is deleted either.'],
   ['What happens after the 30-day trial?', 'You choose to pay monthly or yearly. Nothing is charged by itself: we send a bill, you pay by GCash, Maya or bank transfer.'],

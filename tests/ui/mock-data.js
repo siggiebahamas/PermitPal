@@ -2,6 +2,7 @@
 // It mimics the database's status rules closely enough to drive every screen.
 import { TEMPLATES } from './templates-data.js';
 import { SERVICES } from './mock-services.js';
+import { vehicleRule, RULED } from '../js/vehicle-rules.js';
 import { addonPrice, addonLabel, FREE_PEOPLE } from '../js/prices.js';
 
 const today = () => new Date().toLocaleString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 10);
@@ -55,6 +56,10 @@ const types = [
   { code: 'drivers_license', name: "Driver's License", subject: 'person', agency: 'LTO', expires: true, due_rule: 'manual', per_location: false, auto_add: false },
   { code: 'health_certificate', name: 'Health Certificate', subject: 'person', agency: 'City or municipal health office', expires: true, due_rule: 'annual', per_location: false, auto_add: false },
   { code: 'nbi_clearance', name: 'NBI Clearance', subject: 'person', agency: 'NBI', expires: true, due_rule: 'annual', per_location: false, auto_add: false },
+  { code: 'ltfrb_franchise', name: 'LTFRB Franchise (CPC)', subject: 'vehicle', agency: 'LTFRB', expires: true, due_rule: 'manual', per_location: false, auto_add: false },
+  { code: 'pa_insurance', name: 'Passenger Accident Insurance', subject: 'vehicle', expires: true, due_rule: 'lto_plate', per_location: false, auto_add: false },
+  { code: 'tricycle_franchise', name: 'Tricycle Franchise (MTOP)', subject: 'vehicle', expires: true, due_rule: 'annual', per_location: false, auto_add: false },
+  { code: 'transfer_ownership', name: 'LTO Transfer of Ownership', subject: 'vehicle', agency: 'LTO', expires: false, due_rule: 'manual', per_location: false, auto_add: false },
 ];
 const db = { people: [], events: [], shares: [], referrals: [], partners: [], businesses: [], locations: [], vehicles: [], requirements: [], cycles: [], documents: [], requests: [], notifications: [], audit: [] };
 db.members = [{ user_id: 'u1', role: 'owner', profile: { first_name: 'Sadie', last_name: 'Luna', email: 'sadie@test.ph' } }];
@@ -236,13 +241,24 @@ export const updateLocation = async (id, patch) => Object.assign(db.locations.fi
 export async function createVehicle(orgId, f) {
   checkRoom('vehicle');
   const id = uid();
-  db.vehicles.push({ id, org_id: orgId, make_model: f.make_model, plate_no: (f.plate_no || '').toUpperCase(), vehicle_type: f.vehicle_type, cr_no: f.cr_no || '', mv_file_no: '', business_id: null, deleted_at: null });
+  db.vehicles.push({ id, org_id: orgId, make_model: f.make_model, plate_no: (f.plate_no || '').toUpperCase(), vehicle_type: f.vehicle_type, cr_no: f.cr_no || '', mv_file_no: '', business_id: null, deleted_at: null,
+    fuel: f.fuel || 'gas', usage: f.usage || 'private', transfer_pending: !!f.transfer_pending });
   const reg = addReq('vehicle', id, null, types[3], f.registration_expires ? { reference_no: f.or_no, expires_on: f.registration_expires } : null);
   const ctpl = addReq('vehicle', id, null, types[4], f.ctpl_expires ? { reference_no: f.ctpl_policy_no, issuer: f.ctpl_provider, expires_on: f.ctpl_expires } : null);
+  syncVehicle(db.vehicles.find((x) => x.id === id));
   log(`Added vehicle ${f.make_model}${f.plate_no ? ' (' + String(f.plate_no).toUpperCase() + ')' : ''}`, { entity: 'vehicles', vehicle_id: id });
   return { vehicle_id: id, registration: { requirement_id: reg.id, cycle_id: db.cycles.find((c) => c.requirement_id === reg.id)?.id || null }, ctpl: { requirement_id: ctpl.id, cycle_id: db.cycles.find((c) => c.requirement_id === ctpl.id)?.id || null } };
 }
-export const updateVehicle = async (id, patch) => { const v = Object.assign(db.vehicles.find((x) => x.id === id), patch); log(`Updated details for vehicle ${v.make_model}`, { entity: 'vehicles', action: 'updated', vehicle_id: id }); return v; };
+export const updateVehicle = async (id, patch) => { const v = Object.assign(db.vehicles.find((x) => x.id === id), patch); syncVehicle(v); log(`Updated details for vehicle ${v.make_model}`, { entity: 'vehicles', action: 'updated', vehicle_id: id }); return v; };
+// Same rules as the database trigger (private.sync_vehicle_requirements): add what applies, drop what doesn't if nothing is recorded.
+function syncVehicle(v) {
+  for (const code of RULED) {
+    const need = vehicleRule(code, v);
+    const r = db.requirements.find((x) => x.vehicle_id === v.id && x.type_code === code && !x.deleted_at);
+    if (need && !r) addReq('vehicle', v.id, null, types.find((t) => t.code === code)).confidence = 'confirmed';
+    if (need === false && r && !db.cycles.some((c) => c.requirement_id === r.id) && !db.documents.some((d) => d.requirement_id === r.id && !d.deleted_at)) r.deleted_at = new Date().toISOString();
+  }
+}
 const tableOf = { people: 'people', businesses: 'businesses', business_locations: 'locations', vehicles: 'vehicles', requirements: 'requirements', requirement_cycles: 'cycles', documents: 'documents' };
 function describe(t, x) {
   if (t === 'businesses') return [`business "${x.name}"`, { business_id: x.id }];
@@ -819,7 +835,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus', 'vehicles2'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 
@@ -1713,6 +1729,11 @@ export async function runPermitCheck() {
     else if (!r.document_count && !(r.expires && !r.expires_on)) found.push({ key: 'nocopy:' + r.id, kind: 'no_copy', severity: 'fix', title: `No copy uploaded: ${r.name}`, detail: `${who(r)}. Upload a photo or scan, so it's ready when an inspector or client asks.`, action: 'upload', requirement_id: r.id });
     if (r.expires && r.expires_on && r.days_left >= 0 && r.days_left <= 60 && r.status !== 'in_progress') found.push({ key: 'soon:' + r.id, kind: 'due_soon', severity: 'soon', title: `${r.name} expires ${fd(r.expires_on)} (in ${r.days_left} days)`, detail: `${who(r)}. Start the renewal early: offices get busy near deadlines.`, action: 'renew', requirement_id: r.id });
   }
+  // The demo keeps "Fix these" short: the 3 most urgent (expired first), so it reads like a real, tidy workspace.
+  if (globalThis.PP_DEMO) {
+    const fix = found.filter((f) => f.severity === 'fix').sort((a, b) => (a.kind === 'expired' ? 0 : 1) - (b.kind === 'expired' ? 0 : 1));
+    for (const f of fix.slice(3)) found.splice(found.indexOf(f), 1);
+  }
   if (globalThis.PP_DEMO || globalThis.PP_TEAM) {
     found.push({ key: 'common:b1:l1:sanitary_permit', kind: 'missing_common', severity: 'confirm', title: 'Do you need a Sanitary Permit?', detail: "Most restaurants and food businesses need one, and it isn't on Corner <Bakery> & Co's list. Add it, or tell us it doesn't apply.", action: 'add_permit', business_id: 'b1', location_id: 'l1', type_code: 'sanitary_permit' });
   }
@@ -1733,10 +1754,14 @@ export const findings = async () => (hasPlusMock() ? plusDb.findings.filter((f) 
 export async function dismissFinding(id, note) { const f = plusDb.findings.find((x) => x.id === id); if (f.severity === 'fix') throw new Error("This one closes by itself once it's fixed."); f.status = 'dismissed'; f.note = note || null; }
 export const reopenFinding = async (id) => { plusDb.findings.find((x) => x.id === id).status = 'open'; };
 export const saveDocumentReading = async () => {};
+// The document vault (encryption happens in the doc-vault function; the mock keeps files as they are).
+export const useVault = () => {};
+export const vaultPing = async () => false;
 export const unreadPhotos = async () => [];
 
 // templates: all of them, as in the database
-const TEMPLATE_PRICE = { authorization_letter: 150, certified_copy_request: 150, landlord_letter: 150, accreditation_cover_letter: 150, affidavit_of_loss: 250, gross_sales_declaration: 250, special_power_of_attorney: 350, secretary_certificate: 500 };
+const TEMPLATE_PRICE = { authorization_letter: 150, certified_copy_request: 150, landlord_letter: 150, accreditation_cover_letter: 150, affidavit_of_loss: 250, gross_sales_declaration: 250, special_power_of_attorney: 350, secretary_certificate: 500,
+  owner_consent: 250, closure_letter: 150, closure_affidavit: 250, penalty_relief_request: 150, affidavit_of_undertaking: 250, fsic_inspection_request: 150, vehicle_deed_of_sale: 350, change_notice: 150, capital_declaration: 250 };
 export const templatePrices = async () => TEMPLATES.map((t) => ({ code: t.code, price_php: TEMPLATE_PRICE[t.code] ?? null }));
 export const listTemplates = async () => TEMPLATES.map((t) => ({ code: t.code, title: t.title, category: t.category, summary: t.summary, use_when: t.use_when, notarize: t.notarize, sort: t.sort, version: t.version,
   preview: t.body.replace(/\{\{[a-z0-9_]+\}\}/g, '______').split('\n').slice(0, 7).join('\n') }));

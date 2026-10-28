@@ -2,6 +2,7 @@
 import { html, toast, toastError, fmtDate, closeModal, friendlyError } from './util.js';
 import { S, actions, hooks, on, isStaff, has, IN_PERSON } from './core.js';
 import { ICON } from './components.js';
+import { wireSearch } from './search.js';
 import { initErrorReporting, reportError } from './errors.js';
 import * as db from 'pp/data';
 import { authPage, invitePage, onboarding, sessionStorageTake, sessionStorageSet } from './views/auth.js';
@@ -61,7 +62,7 @@ function route() {
 // ---------------------------------------------------------------- start / sign-in state
 // Newer features switch on only when the database has them (see app_features in the migrations).
 let featuresLoaded = null;
-const loadFeatures = () => (featuresLoaded ||= db.features().catch(() => ({})).then((f) => { S.features = f || {}; }));
+const loadFeatures = () => (featuresLoaded ||= db.features().catch(() => ({})).then((f) => { S.features = f || {}; db.useVault?.(S.features.vault); }));
 
 async function start() {
   await loadFeatures();
@@ -218,7 +219,7 @@ function renderShell() {
           <button class="icon-btn menu-btn" data-act="menu-open" aria-label="Open menu" aria-controls="side-menu" aria-expanded="false">${ICON.menu}</button>
           <span class="mobile-only" data-brand-slot="top">${S.brand ? sideBrand(S.brand) : ppBrand()}</span>
           <form class="top-search" role="search" data-top-search><label class="sr-only" for="top-q">Search permits, plates, people</label>
-            ${ICON.search}<input id="top-q" type="search" name="q" placeholder="Search permits, plates, people" autocomplete="off"></form>
+            ${ICON.search}<input id="top-q" type="search" name="q" placeholder="Search, or tap for shortcuts" autocomplete="off"></form>
           <button class="icon-btn bell" data-act="bell-open" aria-label="Notifications" aria-haspopup="dialog">${ICON.bell}<b class="badge" data-badge></b></button>
         </header>
         <div id="banner"></div>
@@ -231,6 +232,7 @@ function renderShell() {
     const q = String(new FormData(e.target).get('q') || '').trim();
     location.hash = q ? `#/compliance?q=${encodeURIComponent(q)}` : '#/compliance';
   });
+  wireSearch(document.querySelector('[data-top-search]'), [...NAV.filter(([p]) => p), ...TOOLS, ...ACCOUNT].map(([p, k]) => [`#/${p}`, t(k)]));
   // Each page's title area sits on the navy band under the top bar; the rest of the page stays light.
   new MutationObserver(() => bandHead(document.getElementById('main'))).observe(document.getElementById('main'), { childList: true });
   document.getElementById('org-switch')?.addEventListener('change', async (e) => {

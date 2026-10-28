@@ -23,9 +23,9 @@ update public.profiles set is_platform_admin = true where id = 'ed000000-0000-40
 -- ---------------------------------------------------------------- prices
 select pg_temp.res('the feature switch is on', exists (select 1 from private.features where name = 'lgus'), '');
 select pg_temp.res('templates priced against doing it yourself: letters 150, sworn statements 250, SPA 350, Secretary''s Certificate 500',
-  (select string_agg(code || '=' || price_php::int, ',' order by code) from public.doc_templates) =
+  (select string_agg(code || '=' || price_php::int, ',' order by code) from public.doc_templates where sort <= 80) =
   'accreditation_cover_letter=150,affidavit_of_loss=250,authorization_letter=150,certified_copy_request=150,gross_sales_declaration=250,landlord_letter=150,secretary_certificate=500,special_power_of_attorney=350',
-  (select string_agg(code || '=' || price_php::int, ',' order by code) from public.doc_templates));
+  (select string_agg(code || '=' || price_php::int, ',' order by code) from public.doc_templates where sort <= 80));
 select pg_temp.res('one template on its own is PHP 150; the season pass PHP 600', (select price_php from public.load_products where code = 'template') = 150
   and (select price_php from public.load_products where code = 'season_pass') = 600, '');
 select pg_temp.res('Plus is PHP 149 a month or PHP 1,490 a year', private.addon_price('plus', null, 'monthly') = 149 and private.addon_price('plus', null, 'yearly') = 1490, '');

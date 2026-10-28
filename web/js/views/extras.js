@@ -73,10 +73,14 @@ export async function partners(el, params = new URLSearchParams()) {
   const shown = list.filter((p) => (proCat === 'all' || p.category === proCat) && (proCity === 'all' || !p.cities?.length || p.cities.includes(proCity)));
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Find a professional</h1><p class="page-sub">Licensed firms who handle permits for you. Ask for a quote, free.</p></div></div>
-    <section class="card promises pro-promises">
-      <div class="promise p-blue">${ICON.briefcase}<div><b>Independent firms</b><span>Each one vouches for its own registration and licenses.</span><em class="pro-note">Pinoy Permit doesn't check their papers, so ask to see them.</em></div></div>
-      <div class="promise p-jade">${ICON.share}<div><b>Straight to them</b><span>Your request goes to the firm. Replies within 1 business day.</span></div></div>
-      <div class="promise p-gold">${ICON.check}<div><b>No obligation</b><span>Compare quotes. Hire only who you trust.</span></div></div>
+    <section class="card pro-hero">
+      <div class="pro-hero-l"><h2>Find a firm<br>you can trust</h2><p>Free quotes from licensed liaisons, accountants and fire-safety firms.</p></div>
+      <ul class="pro-hero-list">
+        <li><span class="pro-tick" aria-hidden="true">${ICON.check}</span><span><b>Independent firms:</b> Each one vouches for its own registration and licenses.</span></li>
+        <li><span class="pro-tick" aria-hidden="true">${ICON.check}</span><span><b>Straight to them:</b> Your request goes to the firm. Replies within 1 business day.</span></li>
+        <li><span class="pro-tick" aria-hidden="true">${ICON.check}</span><span><b>No obligation:</b> Compare quotes. Hire only who you trust.</span></li>
+      </ul>
+      <em class="pro-note">Pinoy Permit doesn't check their papers, so ask to see them.</em>
     </section>
     ${list.length ? html`<div class="filters pro-filters">
         <select data-pro-cat aria-label="Service"><option value="all">All services</option>${cats.map((c) => html`<option value="${c}" ${proCat === c ? 'selected' : ''}>${PARTNER_CATEGORIES[c]}</option>`)}</select>

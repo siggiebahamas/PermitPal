@@ -18,7 +18,7 @@ select pg_temp.res('one template on its own is no longer PHP 39', (select price_
 select pg_temp.res('buying a template charges its own price', (select prosrc from pg_proc where proname = 'unlock_template') like '%coalesce(t.price_php, private.load_price(''template''))%', '');
 select pg_temp.res('emails show the logo from the site', private.email_html('Hi', '<p>x</p>', null, null) like '%<img src="https://%/img/wordmark.png" alt="Pinoy Permit"%', '');
 
-select pg_temp.res('the app can read each template''s price', (select count(*) from public.template_prices() where price_php is not null) = 8, '');
+select pg_temp.res('the app can read each template''s price', (select count(*) from public.template_prices() where price_php is not null) = (select count(*) from public.doc_templates), '');
 -- Run the permit check for a real workspace (it uses the scratch table that used to be emptied without WHERE).
 insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, email_confirmed_at) values
  ('ed000000-0000-4000-8000-0000000000a1','00000000-0000-0000-0000-000000000000','authenticated','authenticated','owner@check.ph','{"first_name":"Lito"}', now());

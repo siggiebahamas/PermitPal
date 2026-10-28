@@ -4,10 +4,11 @@
 //   property     tenants who connect their workspace (and may share copies of their permits)
 //   fleet        every vehicle's registration, CTPL, emission test and inspection
 // Single businesses stay free; these tools come with a 30-day trial, then a paid plan.
-import { html, fmtDate, toast, toastError, when, plural, timeAgo, openModal, formObject, confirmDialog, download, toCsv, todayPH } from '../util.js';
+import { html, peso, fmtDate, toast, toastError, when, plural, timeAgo, openModal, formObject, confirmDialog, download, toCsv, todayPH } from '../util.js';
 import { S, on, go, reload, canEdit, isOrgAdmin, empty } from '../core.js';
 import { STATUS, ICON } from '../components.js';
-import { billToggle, planCard, compareTable, paintPrices, plansShown, PLANS, tierCard, tierPrice, tiersShown } from './pricing.js';
+import { billToggle, compareTable, paintPrices, plansShown, PLANS, tierPrice, tiersShown, TIERS, perUp, perMonthYearly, getBilling } from './pricing.js';
+import { YEAR_MONTHS, FREE_MONTHS } from '../prices.js';
 import * as db from 'pp/data';
 
 export const KINDS = {
@@ -221,17 +222,37 @@ function fleetBoard(el, k, acc) {
 
 // ---------------------------------------------------------------- chooser & locked states
 function chooser(el) {
-  const price = (id) => Number(S.plans.find((p) => p.id === id)?.price_php_monthly || 0);
+  const ids = [...tiersShown(S.plans, ['multi', 'fleet', 'fleet_pro']), ...plansShown(S.plans)];
+  const rows = ids.map((id) => {
+    const t = TIERS[id], p = PLANS[id];
+    const m = t ? tierPrice(S.plans, id) : Number(S.plans.find((x) => x.id === id)?.price_php_monthly || 0);
+    const unit = t ? 'vehicle' : 'site', per = t ? t.per : p.per;
+    return { id, m, unit, per, name: (t || p).name, range: t ? t.range : id === 'property_s' ? 'Up to 20 sites' : 'Any number of sites', kind: t ? 'fleet' : p.kind };
+  }).filter((r) => r.m > 0);
+  const most = Math.max(0, ...rows.map((r) => r.m * FREE_MONTHS));
+  const row = (r) => html`<div class="tt-row" data-plan-card="${r.id}">
+    <div class="tt-name"><b>${r.name}</b><span>${r.range}</span></div>
+    <div class="tt-per"><b data-bill-swap data-m="${perUp(r.m / r.per)} per ${r.unit}" data-y="${perUp(perMonthYearly(r.m) / r.per)} per ${r.unit}">${getBilling() === 'yearly' ? perUp(perMonthYearly(r.m) / r.per) : perUp(r.m / r.per)} per ${r.unit}</b><span>a month</span></div>
+    <div class="tt-price"><b data-bill-swap data-m="${peso(r.m)}/mo" data-y="${peso(r.m * YEAR_MONTHS)}/yr">${getBilling() === 'yearly' ? `${peso(r.m * YEAR_MONTHS)}/yr` : `${peso(r.m)}/mo`}</b>
+      <span data-bill-swap data-m="or save ${peso(r.m * FREE_MONTHS)} yearly" data-y="you save ${peso(r.m * FREE_MONTHS)}">${getBilling() === 'yearly' ? `you save ${peso(r.m * FREE_MONTHS)}` : `or save ${peso(r.m * FREE_MONTHS)} yearly`}</span></div>
+    ${when(isOrgAdmin(), html`<button class="btn btn-primary btn-sm" data-act="nb-set-kind" data-kind="${r.kind}">Try free</button>`)}</div>`;
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Team tools</h1><p class="page-sub">Look after many vehicles or sites from one screen. Free for 30 days.</p></div></div>
-    <h2 class="section-label">Pick what fits you</h2>
+    <section class="tt-hero" aria-labelledby="tt-hero-h">
+      <div class="tt-hero-l"><h2 id="tt-hero-h">Sleep well. Every plate and every site is watched.</h2>
+        <ol class="tt-steps">${['We remind your team before anything expires', 'They upload the new papers from their phone', 'You see green across the board, and proof is one tap away']
+          .map((t, i) => html`<li><span aria-hidden="true">${i + 1}</span>${t}</li>`)}</ol></div>
+      <div class="tt-save"><span class="tt-save-k">Pay yearly</span><b>Save up to ${peso(most)}</b>
+        <p>${FREE_MONTHS} months free on any team plan. Every vehicle or site on one screen, no missed renewals.</p>
+        <button type="button" class="btn tt-save-btn" data-bill-set="yearly">See yearly prices</button></div>
+    </section>
     ${billToggle('How often to pay for a team plan')}
-    <h3 class="pp-group-h">For fleets: every vehicle on one screen</h3>
-    <div class="pp-grid three">${tiersShown(S.plans, ['multi', 'fleet', 'fleet_pro']).map((id) => tierCard(id, tierPrice(S.plans, id),
-      isOrgAdmin() ? html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="fleet">Try free for 30 days</button>` : ''))}</div>
-    <h3 class="pp-group-h">For landlords, franchisors and groups: every site on one screen</h3>
-    <div class="pp-grid">${plansShown(S.plans).map((id) => planCard(id, price(id),
-      isOrgAdmin() ? html`<button class="btn btn-primary btn-block" data-act="nb-set-kind" data-kind="${PLANS[id].kind}">Try free for 30 days</button>` : ''))}</div>
+    <section class="card tt-menu">
+      ${when(rows.some((r) => r.unit === 'vehicle'), html`<h3 class="tt-group">For fleets</h3>${rows.filter((r) => r.unit === 'vehicle').map(row)}`)}
+      ${when(rows.some((r) => r.unit === 'site'), html`<h3 class="tt-group">For landlords, franchisors and groups</h3>${rows.filter((r) => r.unit === 'site').map(row)}`)}
+      <p class="tt-foot">Every plan: reminders 30, 7 and 1 day before, your team on one screen, 30 days free with no card. Tracking software only:
+        <a href="#/services">our team can also do online renewals for you</a>, always with a price first.</p>
+    </section>
     ${compareTable()}
     ${when(!isOrgAdmin(), html`<p class="muted">Ask your workspace owner to switch this on.</p>`)}
     <p class="fineprint">Your own businesses, vehicles and documents stay exactly as they are. You can switch back anytime in Settings → Workspace.</p>`);

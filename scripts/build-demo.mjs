@@ -12,7 +12,7 @@ const res = await build({
     setup(b) {
       b.onResolve({ filter: /^pp\/data$/ }, () => ({ path: new URL('../tests/ui/mock-data.js', import.meta.url).pathname }));
       // the stand-in data layer imports the app's prices by its URL in the browser (/__mock/ → /js/)
-      b.onResolve({ filter: /^\.\.\/js\/prices\.js$/ }, () => ({ path: new URL('../web/js/prices.js', import.meta.url).pathname }));
+      b.onResolve({ filter: /^\.\.\/js\/(prices|vehicle-rules)\.js$/ }, (a) => ({ path: new URL(`../web/js/${a.path.slice(6)}`, import.meta.url).pathname }));
     },
   }],
 });
@@ -26,9 +26,16 @@ const fonts = '<link rel="preconnect" href="https://fonts.googleapis.com"><link 
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Pinoy Permit — demo</title>${fonts}<style>${css}
-.demo-flag{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:300;background:#1B2130;color:#fff;font-size:12px;font-weight:700;padding:4px 12px;border-radius:999px;opacity:.85;pointer-events:none;white-space:nowrap}
-@media (max-width:899px){.demo-flag{position:static;transform:none;display:block;border-radius:0;opacity:1;text-align:center;padding:5px 12px}}
-</style></head><body><div class="demo-flag">DEMO — sample data, nothing is saved</div>
+.demo-bar{position:relative;z-index:300;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px 14px;padding:8px 16px;background:#E9B949;color:#0B1B3A;font:600 14.5px/1.3 'Plus Jakarta Sans',sans-serif}
+.demo-bar b{font-weight:800}
+.demo-bar a{color:#0B1B3A;font-weight:800;text-decoration:none;white-space:nowrap}
+.demo-bar .demo-back{text-decoration:underline;text-underline-offset:3px}
+.demo-bar .demo-signup{background:#0B1B3A;color:#fff;border-radius:999px;padding:7px 16px}
+.demo-bar .demo-signup:hover{background:#16306A}
+@media (max-width:600px){.demo-bar{font-size:13.5px;gap:6px 10px}.demo-bar .demo-say{flex-basis:100%;text-align:center}}
+</style></head><body><div class="demo-bar" role="region" aria-label="Demo"><span class="demo-say"><b>You're in the demo.</b> Sample data, nothing is saved.</span>
+<a class="demo-back" href="../" data-site>← Back to the website</a><a class="demo-signup" href="../#/signup" data-site="#/signup">Sign up free: create your real account</a></div>
+<script>/* /PermitPal/demo/ and the older /PermitPal/demo.html both point at the real site */document.querySelectorAll('[data-site]').forEach(function(a){a.href=(location.pathname.endsWith('/demo/')?'../':'./')+(a.dataset.site||'');});</script>
 <div id="app"><div class="boot">Loading Pinoy Permit…<span class="boot-slow">Taking too long? <a href="./">Reload the page</a>. If it keeps happening, update your browser or open this link in Chrome or Safari.</span></div></div><div id="modal-root"></div><div id="toast" class="toast" role="status"></div>
 <script>window.PP_DEMO=true;</script><script>${js.replace(/<\/script/g, '<\\/script').replaceAll('img/logo.png', logo).replaceAll('img/wordmark.png', wordmark).replaceAll('src="img/badge-email.png"', `src="${badge}"`)}</script></body></html>`;
 // Published at /PermitPal/demo/ (and the older /PermitPal/demo.html link keeps working).

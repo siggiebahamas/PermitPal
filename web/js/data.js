@@ -129,11 +129,18 @@ export const addLocation = async (businessId, f) => ok(await sb.rpc('add_locatio
 }));
 export const updateLocation = async (id, patch) => ok(await sb.from('business_locations').update(patch).eq('id', id));
 
-export const createVehicle = async (orgId, f) => ok(await sb.rpc('create_vehicle', {
-  p_org: orgId, p_make_model: f.make_model, p_plate_no: f.plate_no, p_vehicle_type: f.vehicle_type, p_cr_no: f.cr_no || '',
-  p_business: f.business_id || null, p_or_no: f.or_no || null, p_registration_expires: f.registration_expires || null,
-  p_ctpl_provider: f.ctpl_provider || null, p_ctpl_policy_no: f.ctpl_policy_no || null, p_ctpl_expires: f.ctpl_expires || null,
-}));
+export async function createVehicle(orgId, f) {
+  const res = ok(await sb.rpc('create_vehicle', {
+    p_org: orgId, p_make_model: f.make_model, p_plate_no: f.plate_no, p_vehicle_type: f.vehicle_type, p_cr_no: f.cr_no || '',
+    p_business: f.business_id || null, p_or_no: f.or_no || null, p_registration_expires: f.registration_expires || null,
+    p_ctpl_provider: f.ctpl_provider || null, p_ctpl_policy_no: f.ctpl_policy_no || null, p_ctpl_expires: f.ctpl_expires || null,
+  }));
+  // Fuel, use and "still in the seller's name" (database file 18): the database then adds or removes the permits they decide.
+  if ((f.fuel && f.fuel !== 'gas') || (f.usage && f.usage !== 'private') || f.transfer_pending) {
+    ok(await sb.from('vehicles').update({ fuel: f.fuel || 'gas', usage: f.usage || 'private', transfer_pending: !!f.transfer_pending }).eq('id', res.vehicle_id));
+  }
+  return res;
+}
 export const updateVehicle = async (id, patch) => ok(await sb.from('vehicles').update(patch).eq('id', id));
 
 export const createPerson = async (orgId, f) => ok(await sb.rpc('create_person', {
@@ -188,13 +195,38 @@ export function checkFile(file) {
   return null;
 }
 
+// ---------------------------------------------------------------- the document vault
+// Once the database has the vault switched on, every file is sent to the doc-vault function, which encrypts it
+// (its own key per file, AES-256-GCM) before it reaches storage, and decrypts it only for someone storage's rules
+// let read it. Before that, files go to private storage directly, as they always have.
+let vaultOn = false;
+export const useVault = (on) => { vaultOn = !!on; };
+const VAULT = `${SUPABASE_URL}/functions/v1/doc-vault`;
+async function vaultHeaders() {
+  const token = (await sb.auth.getSession()).data?.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}`, apikey: SUPABASE_KEY } : { apikey: SUPABASE_KEY };
+}
+async function vaultError(r) {
+  let msg = '';
+  try { msg = (await r.json()).error; } catch { /* not JSON */ }
+  return new Error(msg || (r.status === 404 ? "That file isn't available." : 'Secure file storage is not responding. Please try again.'));
+}
+async function putFile(path, file, contentType) {
+  if (!vaultOn) { ok(await sb.storage.from('documents').upload(path, file, { contentType, upsert: false })); return; }
+  let r;
+  try { r = await fetch(`${VAULT}?op=put&path=${encodeURIComponent(path)}`, { method: 'POST', headers: { ...(await vaultHeaders()), 'x-file-type': contentType }, body: file }); }
+  catch { throw new Error('Secure file storage is not responding. Check your connection and try again.'); }
+  if (!r.ok) throw await vaultError(r);
+}
+export const vaultPing = async () => { try { return !!(await (await fetch(`${VAULT}?ping=1`, { cache: 'no-store' })).json()).vault; } catch { return false; } };
+
 export async function uploadDocument({ orgId, requirementId, cycleId, file }) {
   const problem = checkFile(file);
   if (problem) throw new Error(problem);
   const safe = file.name.normalize('NFKD').replace(/[^\w.\-]+/g, '_').slice(-100) || 'file';
   const path = `${orgId}/${requirementId}/${globalThis.crypto?.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}-${safe}`;
   const contentType = file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg');
-  ok(await sb.storage.from('documents').upload(path, file, { contentType, upsert: false }));
+  await putFile(path, file, contentType);
   return ok(await sb.from('documents').insert({
     org_id: orgId, requirement_id: requirementId, cycle_id: cycleId, storage_path: path,
     file_name: file.name.slice(0, 255), mime_type: contentType, size_bytes: file.size,
@@ -203,11 +235,18 @@ export async function uploadDocument({ orgId, requirementId, cycleId, file }) {
 
 // A file's contents (for the .zip packs and reading photos), straight from private storage.
 export async function fileBlob(path) {
+  if (vaultOn) {
+    const r = await fetch(`${VAULT}?op=get&path=${encodeURIComponent(path)}`, { headers: await vaultHeaders(), cache: 'no-store' });
+    if (!r.ok) throw await vaultError(r);
+    return r.blob();
+  }
   const { data, error } = await sb.storage.from('documents').download(path);
   if (error) throw error;
   return data;
 }
+// A link to view or save a file. With the vault, the file is decrypted here and the link only works in this tab.
 export async function fileUrl(path, downloadName) {
+  if (vaultOn) return URL.createObjectURL(await fileBlob(path));
   const { data, error } = await sb.storage.from('documents').createSignedUrl(path, 300, downloadName ? { download: downloadName } : undefined);
   if (error) throw error;
   return data.signedUrl;
@@ -249,7 +288,7 @@ export async function uploadRequestFile(orgId, reqId, file) {
   if (problem) throw new Error(problem);
   const path = `${orgId}/requests/${reqId}/${rand()}-${safeName(file.name)}`;
   const contentType = file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg');
-  ok(await sb.storage.from('documents').upload(path, file, { contentType, upsert: false }));
+  await putFile(path, file, contentType);
   return { path, name: file.name.slice(0, 255), type: contentType, size: file.size };
 }
 export async function submitPayment(a, { method, ref, file }) {
@@ -372,7 +411,7 @@ export async function adminRecordRenewal(a, f, file) {
     if (problem) throw new Error(problem);
     const path = `${a.org_id}/${a.requirement_id}/${rand()}-${safeName(file.name)}`;
     const type = file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg');
-    ok(await sb.storage.from('documents').upload(path, file, { contentType: type, upsert: false }));
+    await putFile(path, file, type);
     up = { path, name: file.name.slice(0, 255), type, size: file.size };
   }
   return ok(await sb.rpc('admin_record_renewal', {
@@ -398,6 +437,7 @@ export const adminRefund = async (reqId, f) => ok(await sb.rpc('admin_refund_ord
 export const adminTestEmail = async () => ok(await sb.rpc('admin_test_email'));
 // Staff open customer files through the staff-file function, which logs every open.
 export async function staffFileUrl(path, download) {
+  if (vaultOn) return fileUrl(path, download);
   const { data, error } = await sb.functions.invoke('staff-file', { body: { path, download: download || null } });
   if (error) {
     let msg = error.message;
@@ -502,7 +542,7 @@ async function uploadCareFile(orgId, folder, file) {
   if (problem) throw new Error(problem);
   const path = `${orgId}/care/${folder}/${rand()}-${safeName(file.name)}`;
   const contentType = file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg');
-  ok(await sb.storage.from('documents').upload(path, file, { contentType, upsert: false }));
+  await putFile(path, file, contentType);
   return { path, name: file.name.slice(0, 255) };
 }
 export const careTiers = async () => ok(await sb.from('care_tiers').select('*').eq('active', true).order('sort'));
@@ -599,7 +639,7 @@ export async function addonReportPayment(inv, { method, ref, file }) {
     const problem = checkFile(file);
     if (problem) throw new Error(problem);
     proof = { path: `${inv.org_id}/billing/${inv.id}/${rand()}-${safeName(file.name)}`, name: file.name.slice(0, 255) };
-    ok(await sb.storage.from('documents').upload(proof.path, file, { contentType: file.type || 'image/jpeg', upsert: false }));
+    await putFile(proof.path, file, file.type || 'image/jpeg');
   }
   return ok(await sb.rpc('addon_report_payment', { p_invoice: inv.id, p_method: method, p_ref: ref || null, p_proof_path: proof?.path || null, p_proof_name: proof?.name || null }));
 }
@@ -620,7 +660,7 @@ export async function workerSend(page, token, { file, expires_on, issued_on, ref
   if (problem) throw new Error(problem);
   const path = `${page.folder}/${rand()}-${safeName(file.name)}`;
   const contentType = file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg');
-  ok(await sb.storage.from('documents').upload(path, file, { contentType, upsert: false }));
+  await putFile(path, file, contentType);
   return ok(await sb.rpc('worker_submit', {
     p_token: token, p_path: path, p_file_name: file.name.slice(0, 255), p_mime: contentType, p_size: file.size,
     p_expires: expires_on || null, p_issued: issued_on || null, p_ref: reference_no || null, p_note: note || null,
@@ -703,7 +743,7 @@ export async function topupReport(t, { method, ref, file }) {
     const problem = checkFile(file);
     if (problem) throw new Error(problem);
     proof = { path: `${t.org_id}/load/${t.id}/${rand()}-${safeName(file.name)}`, name: file.name.slice(0, 255) };
-    ok(await sb.storage.from('documents').upload(proof.path, file, { contentType: file.type || 'image/jpeg', upsert: false }));
+    await putFile(proof.path, file, file.type || 'image/jpeg');
   }
   return ok(await sb.rpc('load_topup_report', { p_topup: t.id, p_method: method, p_ref: ref || null, p_proof_path: proof?.path || null, p_proof_name: proof?.name || null }));
 }
@@ -720,7 +760,7 @@ export async function addPapersCheckFile(c, file) {
   const problem = checkFile(file);
   if (problem) throw new Error(problem);
   const path = `${c.org_id}/papers/${c.id}/${rand()}-${safeName(file.name)}`;
-  ok(await sb.storage.from('documents').upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false }));
+  await putFile(path, file, file.type || 'image/jpeg');
   return ok(await sb.rpc('add_papers_check_file', { p_check: c.id, p_path: path, p_name: file.name.slice(0, 255), p_mime: file.type || null }));
 }
 export const cancelPapersCheck = async (id) => ok(await sb.rpc('cancel_papers_check', { p_check: id }));
@@ -763,7 +803,7 @@ async function uploadBillFile(orgId, folder, file) {
   const problem = checkFile(file);
   if (problem) throw new Error(problem);
   const path = `${orgId}/bills/${folder}/${rand()}-${safeName(file.name)}`;
-  ok(await sb.storage.from('documents').upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false }));
+  await putFile(path, file, file.type || 'image/jpeg');
   return { path, name: file.name.slice(0, 255) };
 }
 export async function billAdd(orgId, reqId, f, file) {

@@ -9,6 +9,7 @@ import { plateSchedule, suggestDue } from '../rules.js';
 import { roomLine, guardRoom } from '../limits.js';
 import { serviceStrip } from './pricing.js';
 import * as db from 'pp/data';
+import { FUELS, USES, ruleNote } from '../vehicle-rules.js';
 import { scanBox, wireScan } from './scan.js';
 import { careLine } from './care.js';
 import { staffTop, personBanner, askCard, contactFields, saveContact, roleTypes, canAddPerson, blockedAddPerson } from './staff.js';
@@ -369,6 +370,13 @@ export function vehicleList(el, params) {
   if (params.get('add') && canEdit()) { history.replaceState(null, '', '#/vehicles'); guardRoom('vehicle', addVehicle); }
 }
 
+// What it runs on, what it's used for, and whether it's still in the seller's name: these decide its permits.
+function vehicleKindFields(v = {}) {
+  return html`<label class="field"><span>Runs on</span><select name="fuel">${optionList(FUELS, v.fuel || 'gas')}</select></label>
+    <label class="field"><span>Used for</span><select name="usage">${optionList(USES, v.usage || 'private')}</select></label>
+    <label class="check veh-transfer"><input type="checkbox" name="transfer_pending" ${v.transfer_pending ? 'checked' : ''}><span>Bought second-hand and <b>still in the seller's name</b></span></label>`;
+}
+
 function addVehicle() {
   openModal('Add a vehicle', html`
     ${scanBox()}
@@ -378,6 +386,7 @@ function addVehicle() {
       <label class="field"><span>Type</span><select name="vehicle_type">${optionList(VEHICLE_TYPES.map((t) => [t, t]), 'Sedan')}</select></label>
       <label class="field"><span>CR number <small>(does not expire)</small></span><input name="cr_no" maxlength="40"></label>
       <label class="field"><span>Used by <small>(optional)</small></span><select name="business_id"><option value="">—</option>${S.data.businesses.map((b) => html`<option value="${b.id}">${b.name}</option>`)}</select></label>
+      ${when(has('vehicles2'), vehicleKindFields())}
     </div>
     <h4>LTO registration</h4>
     <div class="grid2">
@@ -445,7 +454,8 @@ export function vehicleDetail(el, id) {
     <a class="back" href="#/vehicles">← Vehicles</a>
     <div class="page-head"><div><h1>${v.make_model}</h1>
       <p class="muted">${v.plate_no || 'No plate'} · ${v.vehicle_type}${v.cr_no ? ' · CR ' + v.cr_no : ''}${v.business_id && business(v.business_id) ? ' · ' + business(v.business_id).name : ''}</p>
-      ${when(s, html`<p class="small">LTO renewal window for this plate: <b>${s?.label}</b></p>`)}</div>
+      ${when(s, html`<p class="small">LTO renewal window for this plate: <b>${s?.label}</b></p>`)}
+      ${when(has('vehicles2') && ruleNote(v).length, html`<p class="small veh-rules">${ruleNote(v).join(' ')}</p>`)}</div>
       <div class="btn-row">${when(canEdit(), html`<button class="btn btn-soft" data-act="req-add" data-subject="vehicle" data-id="${id}">+ Add permit</button>`)}
         <button class="btn btn-ghost" data-act="share-open" data-scope="vehicle" data-id="${id}">${ICON.share} Share proof</button>
         <a class="btn btn-ghost" href="#/pros">${ICON.briefcase} Find a professional</a></div></div>
@@ -474,7 +484,10 @@ export function vehicleDetail(el, id) {
           <label class="field"><span>CR number</span><input name="cr_no" maxlength="40" value="${v.cr_no}"></label>
           <label class="field"><span>MV file number</span><input name="mv_file_no" maxlength="40" value="${v.mv_file_no}"></label>
           <label class="field"><span>Used by</span><select name="business_id"><option value="">—</option>${S.data.businesses.map((b) => html`<option value="${b.id}" ${b.id === v.business_id ? 'selected' : ''}>${b.name}</option>`)}</select></label>
-        </div><button class="btn btn-primary">Save changes</button></form>`
+          ${when(has('vehicles2'), vehicleKindFields(v))}
+        </div>
+        ${when(has('vehicles2'), html`<p class="muted small veh-rule-hint">Changing these updates the permits this vehicle needs. Permits you already recorded are never removed.</p>`)}
+        <button class="btn btn-primary">Save changes</button></form>`
         : html`<dl class="kv"><dt>Plate</dt><dd>${v.plate_no}</dd><dt>CR no.</dt><dd>${v.cr_no || '—'}</dd></dl>`}</section>
       ${when(isOrgAdmin(), html`<div class="danger-zone"><button class="btn btn-ghost danger" data-act="veh-delete" data-id="${id}">Delete this vehicle</button>
         <span class="muted small">Sold or retired? Its records are kept and can be restored from Trash.</span></div>`)}`);
@@ -484,7 +497,8 @@ export function vehicleDetail(el, id) {
       const f = formObject(new FormData(form));
       if (!f.make_model) return toast('Make and model cannot be empty.', 'error');
       try {
-        await db.updateVehicle(id, { make_model: f.make_model, plate_no: f.plate_no.toUpperCase(), vehicle_type: f.vehicle_type, cr_no: f.cr_no, mv_file_no: f.mv_file_no, business_id: f.business_id || null });
+        await db.updateVehicle(id, { make_model: f.make_model, plate_no: f.plate_no.toUpperCase(), vehicle_type: f.vehicle_type, cr_no: f.cr_no, mv_file_no: f.mv_file_no, business_id: f.business_id || null,
+          ...(has('vehicles2') ? { fuel: f.fuel, usage: f.usage, transfer_pending: !!f.transfer_pending } : {}) });
         await reload(); toast('Saved.');
       } catch (err) { toastError(err); }
     });

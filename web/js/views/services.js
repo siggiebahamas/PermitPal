@@ -41,14 +41,14 @@ const CATEGORIES = IN_PERSON ? [
 // What people can count on, in plain sentences (not badges).
 const PROMISES = [
   ['peso', 'You see the price first.', 'Nothing starts, and nothing is charged, until you say yes.'],
-  ['file', 'Government fees at cost.', 'Exactly what the office charges, with the official receipt.'],
+  ['file', 'Government fees at cost.', 'Exactly what the office charges, with the official receipt. If it ends up lower, we refund the difference.'],
   ['list', 'You can follow every step.', 'Updates, messages and receipts are all here.'],
   ['check', 'Your new permit is saved for you.', 'And your reminders start again for next time.'],
-  ['handshake', "If we can't finish it, you get our fee back.", 'If the government fee is lower than quoted, we refund the difference.'],
+  ['handshake', "If we can't file it, you get our fee back.", "Once it's filed, the office sets the pace. We follow up and tell you each step."],
 ];
 // The weight we take off: the same four chores, on your own and with us.
 const CALM = [
-  ['Find the right forms and rules for your city', 'Say yes to one fixed price'],
+  ['Find the right forms and rules for your city', 'Approve one fixed price'],
   ['Fill in the same details, again', 'Send photos of what you already have'],
   ['Chase the office for updates', 'See every update here, as it happens'],
   ["Remember next year's deadline", 'Your new permit is saved, and next year is already on your calendar'],
@@ -105,7 +105,7 @@ export function services(el, params) {
         <div class="dfy-calm-col is-us"><h3>With Pinoy Permit</h3><ul>${CALM.map(([, b]) => html`<li>${b}</li>`)}</ul></div>
       </div>
       <div class="dfy-calm-foot"><a class="btn btn-primary" href="#svc-menu" data-scroll-to="svc-menu">See what we can do</a>
-        <span>Price first. Nothing is charged until you say yes.</span></div>
+        <span>You approve the price before we start. Online work only, so nothing waits on a queue.</span></div>
     </section>
     <section class="card dfy-how"><div class="dfy-how-col"><h2>How it works</h2>
         <ol class="dfy-steps">${STEPS.map(([t, d], i) => html`<li><span class="dfy-n">${i + 1}</span><b>${t}</b><span>${d}</span></li>`)}</ol></div>
@@ -425,7 +425,7 @@ function quoteBox(a) {
       <span>Pinoy Permit may join ${S.org.name} as a team member to set it up. Access ends automatically when the job is done, and I can remove it anytime under Team.</span></label>`)}
     ${when(canEdit(), html`<div class="btn-row qbtns"><button class="btn btn-primary" data-act="quote-accept" data-id="${a.id}">Accept quote</button>
       <button class="btn btn-ghost" data-act="order-cancel" data-id="${a.id}">No thanks</button></div>`)}
-    <div class="sheet-foot">If the government fees end up lower, we refund the difference. If they are higher, we ask you before paying. If we can't deliver, the service fee is refunded in full.</div>
+    <div class="sheet-foot">If the government fees end up lower, we refund the difference. If they are higher, we ask you before paying. If we can't file it, the service fee is refunded in full. Once filed, the office decides how long it takes.</div>
   </section>`;
 }
 
