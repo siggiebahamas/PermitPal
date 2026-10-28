@@ -5,7 +5,7 @@
 import { html, raw, openModal, confirmDialog, toast, toastError, when, plural, fmtDate, timeAgo, todayPH, download, esc } from '../util.js';
 import { S, on, has, hasPlus, canEdit, business, vehicle } from '../core.js';
 import { ICON, STATUS, byPriority, subjectLabel } from '../components.js';
-import { openUpsell, PLUS_PERKS } from './plus.js';
+import { openUpsell } from './plus.js';
 import { makeZip } from '../zip.js';
 import { qrSvg, qrPng } from '../qr.js';
 import { printSheet } from '../print.js';
@@ -31,26 +31,26 @@ export async function trustSection(el) {
   if (!state.pages.find((p) => p.id === state.pageId)) { state.pageId = state.pages[0]?.id || null; state.recipients = null; state.views = null; }
   paint();
 }
-const teaser = () => html`<section class="card trust-teaser"><div class="card-head"><div><h2>Your public permit page</h2>
-    <p class="card-sub">A page that shows each of your permits and when it expires, kept up to date by itself. Put the QR poster on your wall, the badge in your emails and website, and send it to clients who ask.</p></div></div>
-  <ul class="plus-perks">${PLUS_PERKS.slice(0, 2).map(([t, d]) => html`<li><b>${t}.</b> ${d}</li>`)}</ul>
+const teaser = () => html`<section class="card trust-teaser"><div class="card-head"><div><h2>Your permit page, always on</h2>
+    <p class="card-sub">One page that always shows your permits are current. Put its QR code on your wall, its badge in your emails.</p></div></div>
   <button class="btn btn-primary" data-act="plus-upsell" data-what="Your public permit page">See Plus</button></section>`;
 
 function paint() {
   if (!box) return;
   const page = state.pages.find((p) => p.id === state.pageId);
   if (!page) { box.innerHTML = String(createCard()); return; }
-  const tab = (k, label) => html`<button class="tab ${state.tab === k ? 'active' : ''}" data-act="trust-tab" data-tab="${k}">${label}</button>`;
+  const more = (k, label) => html`<button type="button" class="trust-more-btn ${state.tab === k ? 'on' : ''}" data-act="trust-tab" data-tab="${k}">${label}</button>`;
   const others = S.data.businesses.filter((b) => !state.pages.some((p) => p.business_id === b.id));
   box.innerHTML = String(html`<section class="card trust-card">
-    <div class="card-head"><div><h2>Your public permit page</h2>
-      <p class="card-sub">${page.live ? html`<span class="chip ok">Live</span>` : html`<span class="chip needinfo">Turned off</span>`} <b>${page.title}</b> · <a href="${pageUrl(page.code)}" target="_blank" rel="noopener">${pageUrl(page.code).replace(/^https?:\/\//, '')}</a></p></div>
+    <div class="card-head"><div><h2>Your permit page ${page.live ? html`<span class="chip ok">Live</span>` : html`<span class="chip needinfo">Turned off</span>`}</h2>
+      <p class="card-sub">Always up to date. Anyone with the link sees your permits are current: <a href="${pageUrl(page.code)}" target="_blank" rel="noopener">${pageUrl(page.code).replace(/^https?:\/\//, '')}</a></p></div>
       <div class="btn-row"><button class="btn btn-sm btn-primary" data-act="trust-copy" data-src="link">Copy link</button>
         <a class="btn btn-sm btn-soft" href="${pageUrl(page.code)}" target="_blank" rel="noopener">Open</a></div></div>
     ${when(state.pages.length > 1 || (others.length && canEdit()), html`<div class="proof-pick trust-pick"><select id="trust-page" aria-label="Which page">${state.pages.map((p) => html`<option value="${p.id}" ${p.id === page.id ? 'selected' : ''}>${p.title}</option>`)}</select>
       ${when(others.length && canEdit(), html`<button class="btn btn-sm btn-ghost" data-act="trust-new">+ Page for another business</button>`)}</div>`)}
-    <div class="tabs">${tab('share', 'Share it')}${tab('people', 'Updates by email')}${tab('views', 'Who looked')}${tab('pack', 'Accreditation pack')}${when(canEdit(), tab('settings', 'Settings'))}</div>
-    <div id="trust-body">${body(page)}</div></section>`);
+    ${state.tab === 'share' ? '' : html`<button type="button" class="linklike trust-back" data-act="trust-tab" data-tab="share">← Back to sharing</button>`}
+    <div id="trust-body">${body(page)}</div>
+    <div class="trust-more"><span>More:</span>${more('people', 'Email updates to clients')}${more('views', 'Who looked')}${more('pack', 'Accreditation pack')}${when(canEdit(), more('settings', 'Settings'))}</div></section>`);
   box.querySelector('#trust-page')?.addEventListener('change', (e) => { state.pageId = e.target.value; state.recipients = null; state.views = null; paint(); });
   if (state.tab === 'people' && !state.recipients) loadRecipients(page);
   if (state.tab === 'views' && !state.views) loadViews(page);
@@ -106,16 +106,16 @@ function body(page) {
 function shareTab(page) {
   return html`<div class="trust-share">
     <div class="share-way"><div class="qr-mini">${raw(qrSvg(pageUrl(page.code, 'qr'), { label: `QR code for ${page.title}'s permit page` }))}</div>
-      <div><h3>QR poster for your wall</h3><p class="muted small">Customers and inspectors scan it and see your permits, live. Print it on A4 and put it by the door or the counter.</p>
+      <div><h3>Put it on your wall</h3><p>Customers and inspectors scan it and see your permits, live.</p>
         <div class="btn-row"><button class="btn btn-sm btn-primary" data-act="trust-poster">${ICON.file} Print the poster</button>
           <button class="btn btn-sm btn-ghost" data-act="trust-qr-png">${ICON.download} QR image</button></div></div></div>
     <div class="share-way"><img class="badge-preview" src="img/badge-email.png" width="220" height="44" alt="Badge: Our permits, live on Pinoy Permit">
-      <div><h3>Email signature</h3><p class="muted small">A small badge under your name. Clients click it to see your permits.</p>
+      <div><h3>Add it to your emails</h3><p>A small badge under your name. Clients click it to see your permits.</p>
         <div class="btn-row"><button class="btn btn-sm btn-primary" data-act="trust-sign">Copy for Gmail or Outlook</button></div></div></div>
     <div class="share-way">${badgePreview(page)}
-      <div><h3>Website badge</h3><p class="muted small">Shows your permit status live on your website or online store. Paste the code where you want it.</p>
+      <div><h3>Add it to your website</h3><p>Shows your permit status live on your site or online store.</p>
         <div class="btn-row"><button class="btn btn-sm btn-primary" data-act="trust-web">Copy the website code</button></div></div></div>
-    <p class="fineprint">The page shows your own records, checked automatically by Pinoy Permit every morning. It never says the government checked anything. Turn it off or change its address anytime under Settings.</p></div>`;
+    <p class="fineprint">Shows your own records, checked by Pinoy Permit every morning. It never says the government checked anything.</p></div>`;
 }
 // What the website badge shows right now (the real one on their site reads the page live).
 function badgePreview(page) {

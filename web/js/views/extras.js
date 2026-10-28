@@ -195,7 +195,7 @@ export async function costs(el) {
     </div>
     ${rows.length ? html`<section class="card">
       <div class="card-head"><div><h2>Coming up</h2><p class="card-sub">Estimates use the amount you entered for each permit's current record</p></div></div>
-      ${rows.map((m) => html`<div class="band month ${m.key === 'late' ? 'overdue' : ''}"><span>${m.label}</span><span>${peso(known(m.items))}${unknown(m.items) ? ` + ${unknown(m.items)} unknown` : ''}</span></div>
+      ${rows.map((m) => html`<div class="band month ${m.key === 'late' ? 'overdue' : ''}"><span>${m.label}</span><span>${peso(known(m.items))}</span></div>
         ${m.items.sort(byPriority).map((r) => html`<a class="line" href="#/requirement/${r.id}"><span class="line-main"><b>${r.name}</b><small>${subjectLabel(r)} · ${dueShort(r)}</small></span>
           ${r.amount_paid != null ? html`<b>${peso(r.amount_paid)}</b>` : html`<span class="chip needinfo">Add amount</span>`}</a>`)}`)}
       <div class="sheet-foot">Add "Amount paid" when you record or renew a permit to make this more accurate.</div>
@@ -246,7 +246,6 @@ function showLink(token) {
   });
 }
 
-const USES = ['Mall or landlord', 'Bank or loan', 'Franchisor', 'Corporate client accreditation', 'Government bidding', 'Insurer', 'Business partner'];
 export async function shares(el) {
   el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   let list = [];
@@ -265,25 +264,10 @@ export async function shares(el) {
         ${when(canEdit(), html`<button class="btn btn-sm btn-ghost danger" data-act="share-revoke" data-id="${x.id}">Turn off</button>`)}</span>` : html`<span class="chip needinfo">Off</span>`}</div>`;
   };
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Share proof</h1><p class="muted">Someone asking for your permits? Send one link. No more photocopies.</p></div></div>
-    ${when(has('plus'), html`<div id="trust-root"></div>${when(hasPlus(), html`<h3 class="section-label">Or a link that expires</h3>`)}`)}
-
-    <section class="card proof-how">
-      <div class="card-head"><div><h2>How it works</h2><p class="card-sub">No account needed on their side</p></div></div>
-      <ol class="proof-steps">
-        <li><span>1</span><div><b>Pick what to share</b><p>Everything, or just one business, vehicle or staff member.</p></div></li>
-        <li><span>2</span><div><b>Copy the link</b><p>Send it by Viber, Messenger or email. It works for 7 days up to a year.</p></div></li>
-        <li><span>3</span><div><b>They see a live summary</b><p>Each permit, whether it's valid, and its expiry date, always up to date. Turn it off anytime.</p></div></li>
-      </ol>
-      <div class="proof-see">
-        <div class="yes"><b>${ICON.check} What they see</b><p>Permit names, status (valid, renew soon, overdue), expiry dates, and reference numbers if you allow it.</p></div>
-        <div class="no"><b>✕ What they never see</b><p>Your files, notes, costs, team, contact details, or anything you didn't pick.</p></div>
-      </div>
-      <p class="proof-uses"><span class="muted small">Often asked for by:</span> ${USES.map((u) => html`<span class="tag">${u}</span>`)}</p>
-    </section>
+    <div class="page-head"><div><h1>Share proof</h1><p class="page-sub">Show anyone your permits are valid. Send a link, or put a QR code on your wall.</p></div></div>
 
     ${when(canEdit(), html`<section class="card proof-make">
-      <div class="card-head"><div><h2>Create a link</h2></div></div>
+      <div class="card-head"><div><h2>Send proof to someone</h2><p class="card-sub">For a mall, landlord, bank or client. They see each permit and when it expires. Never your files or costs.</p></div></div>
       <div class="proof-pick"><select id="proof-what" aria-label="What to share">
         <option value="org:">Everything in ${S.org.name}</option>
         ${when(businesses.length, html`<optgroup label="One business">${businesses.map((b) => html`<option value="business:${b.id}">${b.name}</option>`)}</optgroup>`)}
@@ -292,9 +276,10 @@ export async function shares(el) {
       </select><button class="btn btn-primary" data-act="share-pick">${ICON.share} Create link</button></div>
     </section>`)}
 
-    <section class="card"><div class="card-head"><div><h2>Your links</h2><p class="card-sub">${plural(active.length, 'link')} working now</p></div></div>
-      ${list.length ? html`${active.map(row)}${old.map(row)}` : html`<p class="muted">No links yet. Create one above.</p>`}
-    </section>`);
+    ${when(list.length, html`<section class="card"><div class="card-head"><div><h2>Links you've sent</h2><p class="card-sub">${plural(active.length, 'link')} working now</p></div></div>
+      ${active.map(row)}${old.map(row)}</section>`)}
+
+    ${when(has('plus'), html`<div id="trust-root"></div>`)}`);
   const tr = el.querySelector('#trust-root');
   if (tr) trustSection(tr);
 }

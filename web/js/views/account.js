@@ -1,6 +1,6 @@
 // Notifications, History, Trash, Team, Settings (profile, reminders, workspace, billing, data).
 import {
-  html, fmtDate, fmtDateTime, timeAgo, peso, plural, toast, toastError, confirmDialog, openModal, formObject, when,
+  html, raw, fmtDate, fmtDateTime, timeAgo, peso, plural, toast, toastError, confirmDialog, openModal, formObject, when,
   normalizePhone, todayPH,
 } from '../util.js';
 import {
@@ -49,43 +49,98 @@ async function loadHistory(append = false) {
   histItems = append ? [...histItems, ...rows] : rows;
   histMore = rows.length === HIST_PAGE;
 }
+// Smart filters on what's loaded: words, kind of change, which business or vehicle, who, and when.
+const histF = { q: '', action: '', subject: '', who: '', when: '' };
+const HIST_ACTIONS = [['', 'Any change'], ['add', 'Added'], ['edit', 'Changed'], ['up', 'Uploaded'], ['del', 'Deleted'], ['back', 'Restored']];
+const HIST_WHEN = [['', 'Any time'], ['today', 'Today'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['month', 'This month']];
+function histFiltered() {
+  const today = todayPH();
+  const since = (n) => { const d = new Date(today + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
+  const q = histF.q.trim().toLowerCase();
+  return histItems.filter((a) => {
+    const day = phDay(a.created_at);
+    if (histF.action && histKind(a)[0] !== histF.action) return false;
+    if (histF.subject && `${a.business_id ? 'b:' + a.business_id : ''}|${a.vehicle_id ? 'v:' + a.vehicle_id : ''}`.split('|').indexOf(histF.subject) < 0) return false;
+    if (histF.who && a.actor_id !== histF.who) return false;
+    if (histF.when === 'today' && day !== today) return false;
+    if ((histF.when === '7' || histF.when === '30') && day < since(Number(histF.when))) return false;
+    if (histF.when === 'month' && day.slice(0, 7) !== today.slice(0, 7)) return false;
+    if (q && !`${a.summary} ${memberName(a.actor_id)}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+const histOn = () => Object.values(histF).some(Boolean);
+function histList() {
+  const list = histFiltered();
+  if (!list.length) return html`<section class="card">${empty(histOn() ? 'Nothing matches' : histShow ? 'Nothing here yet' : 'No history yet',
+    histOn() ? 'Try fewer filters, or load older changes.' : 'Changes will show up here.')}</section>`;
+  const days = [];
+  for (const a of list) {
+    const d = phDay(a.created_at);
+    if (!days.length || days[days.length - 1].day !== d) days.push({ day: d, items: [] });
+    days[days.length - 1].items.push(a);
+  }
+  let month = '';
+  return html`<section class="card hist-card">
+    ${days.map((g) => {
+      const m = g.day.slice(0, 7);
+      const head = m !== month ? html`<div class="hist-month">${new Date(g.day + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</div>` : '';
+      month = m;
+      return html`${head}<div class="band hist-day"><span><b>${dayLabel(g.day)}</b></span></div>
+        <div class="hist-items">${g.items.map((a) => { const k = histKind(a); return html`<div class="line hist-line"><span class="hist-ic ${k[0]}" role="img" aria-label="${k[2]}">${HIST_ICON[k[0]]}</span><span class="line-main">${linkFor(a)}<small>${memberName(a.actor_id)} · ${phTime(a.created_at)}</small></span></div>`; })}</div>`;
+    })}
+    <div class="sheet-foot">Deleted something by mistake? <a href="#/trash">Restore it from Trash.</a></div>
+  </section>`;
+}
 export async function historyPage(el, { keep = false } = {}) {
   if (!keep) {
     el.innerHTML = String(html`<div class="loading">Loading…</div>`);
     try { await loadHistory(); } catch (e) { toastError(e); histItems = []; histMore = false; }
   }
-  const show = HIST_SHOW.find(([k]) => k === histShow) || HIST_SHOW[0];
-  const days = [];
-  for (const a of histItems) {
-    const d = phDay(a.created_at);
-    if (!days.length || days[days.length - 1].day !== d) days.push({ day: d, items: [] });
-    days[days.length - 1].items.push(a);
-  }
+  const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
+  const people = [...new Set(histItems.map((a) => a.actor_id).filter(Boolean))];
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>History</h1><p class="page-sub">Every change anyone made, and when. Nothing is ever erased.</p></div></div>
-    <div class="hist-bar">
-      <label for="hist-show">Show</label>
-      <select id="hist-show" aria-label="Show">${HIST_SHOW.map(([k, label]) => html`<option value="${k}" ${k === histShow ? 'selected' : ''}>${label}</option>`)}</select>
-      <span class="muted">${histItems.length}${histMore ? '+' : ''} ${histItems.length === 1 ? show[3].replace(/s$/, '') : show[3]}</span>
-    </div>
-    ${histItems.length ? html`<section class="card hist-card">
-      ${days.map((g) => html`<div class="band hist-day"><span><b>${dayLabel(g.day)}</b></span><span class="hist-n" aria-label="${plural(g.items.length, 'change')}">${g.items.length}</span></div>
-        ${g.items.map((a) => { const k = histKind(a); return html`<div class="line hist-line"><span class="hist-ic ${k[0]}" aria-label="${k[2]}">${k[1]}</span><span class="line-main">${linkFor(a)}<small>${memberName(a.actor_id)} · ${phTime(a.created_at)}</small></span></div>`; })}`)}
-      <div class="sheet-foot">Deleted something by mistake? <a href="#/trash">Restore it from Trash.</a></div>
+    <section class="card hist-filters" aria-label="Find a change">
+      <input type="search" name="q" placeholder="Search: a permit, a plate, a name…" value="${histF.q}" aria-label="Search history">
+      <div class="hist-selects">
+        <select id="hist-show" aria-label="Kind of record">${HIST_SHOW.map(([k, label]) => opt(k, label, histShow))}</select>
+        <select name="action" aria-label="Kind of change">${HIST_ACTIONS.map(([k, label]) => opt(k, label, histF.action))}</select>
+        <select name="subject" aria-label="Business or vehicle">${opt('', 'Any business or vehicle', histF.subject)}
+          ${S.data.businesses.map((b) => opt('b:' + b.id, b.name, histF.subject))}
+          ${S.data.vehicles.map((v) => opt('v:' + v.id, `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`, histF.subject))}</select>
+        <select name="who" aria-label="Who made the change">${opt('', 'Anyone', histF.who)}${people.map((id) => opt(id, memberName(id), histF.who))}</select>
+        <select name="when" aria-label="When">${HIST_WHEN.map(([k, label]) => opt(k, label, histF.when))}</select>
+      </div>
+      <p class="hist-count"><span data-hist-count></span> ${when(histOn(), html`<button type="button" class="linklike" data-act="hist-clear">Clear filters</button>`)}</p>
     </section>
-    ${when(histMore, html`<button class="btn btn-ghost" data-act="hist-more">Show older changes</button>`)}`
-      : html`<section class="card">${empty(histShow ? `No ${show[3]} yet` : 'No history yet', histShow ? 'Pick "Everything" to see all changes.' : 'Changes will show up here.')}</section>`}`);
+    <div id="hist-list">${histList()}</div>
+    ${when(histMore, html`<button class="btn btn-ghost" data-act="hist-more">Show older changes</button>`)}`);
+  const count = () => { const n = histFiltered().length; el.querySelector('[data-hist-count]').textContent = `${n}${histMore && !histOn() ? '+' : ''} ${n === 1 ? 'change' : 'changes'}`; };
+  const redraw = () => { el.querySelector('#hist-list').innerHTML = String(histList()); count(); };
+  count();
   el.querySelector('#hist-show').addEventListener('change', (e) => { histShow = e.target.value; historyPage(el); });
+  el.querySelector('.hist-filters').addEventListener('change', (e) => { if (e.target.name && e.target.name !== 'q') { histF[e.target.name] = e.target.value; historyPage(el, { keep: true }); } });
+  el.querySelector('.hist-filters [name=q]').addEventListener('input', (e) => { histF.q = e.target.value; redraw(); });
 }
+on('hist-clear', () => { Object.keys(histF).forEach((k) => { histF[k] = ''; }); historyPage(document.getElementById('main'), { keep: true }); });
 on('hist-more', async (ds, btn) => {
   btn.disabled = true; btn.textContent = 'Loading…';
   try { await loadHistory(true); } catch (e) { toastError(e); }
   historyPage(document.getElementById('main'), { keep: true });
 });
-// Each change gets an icon: + added, pencil changed, arrow up uploaded, × deleted, ↺ brought back from Trash.
-const histKind = (a) => (['deleted', 'removed'].includes(a.action) ? ['del', '×', 'Deleted'] : a.action === 'restored' ? ['back', '↺', 'Restored']
-  : a.action === 'uploaded' || (a.action === 'created' && /^documents?$/.test(a.entity || '')) ? ['up', '↑', 'Uploaded']
-  : a.action === 'created' ? ['add', '+', 'Added'] : ['edit', '✎', 'Changed']);
+// Each change gets an icon: plus added, pencil changed, upload uploaded, bin deleted, arrow brought back from Trash.
+const histKind = (a) => (['deleted', 'removed'].includes(a.action) ? ['del', '', 'Deleted'] : a.action === 'restored' ? ['back', '', 'Restored']
+  : a.action === 'uploaded' || (a.action === 'created' && /^documents?$/.test(a.entity || '')) ? ['up', '', 'Uploaded']
+  : a.action === 'created' ? ['add', '', 'Added'] : ['edit', '', 'Changed']);
+const svg = (d) => raw(`<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`);
+const HIST_ICON = {
+  add: svg('<path d="M12 5v14M5 12h14"/>'),
+  edit: svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>'),
+  up: svg('<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/>'),
+  del: svg('<path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7"/><path d="M10.5 11v5M13.5 11v5"/>'),
+  back: svg('<path d="M4 10a8 8 0 1 1 2.3 5.7"/><path d="M4 4v6h6"/>'),
+};
 function linkFor(a) {
   const href = a.requirement_id && S.data.reqs.some((r) => r.id === a.requirement_id) ? `#/requirement/${a.requirement_id}`
     : a.business_id && business(a.business_id) ? `#/businesses/${a.business_id}`

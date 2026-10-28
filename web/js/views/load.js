@@ -57,18 +57,24 @@ export async function loadPage(el) {
         <button class="btn btn-sm btn-ghost" data-act="load-topup-cancel" data-id="${t.id}" aria-label="Cancel top-up ${t.number}">Cancel</button></div>`)}</div>`)}
 
     <section class="card load-hero" aria-label="Your load">
-      <div class="load-bal"><span class="muted small">Your load</span><b class="load-amt">${peso(s.total)}</b>
-        ${when(Number(s.bonus) > 0, html`<span class="small">${peso(s.paid)} paid · ${peso(s.bonus)} bonus <span class="muted">(bonus is used first)</span></span>`)}</div>
-      <div class="load-texts">${ICON.bell}<span>${textsLine(s)}</span></div>
-      ${admin ? html`<button class="btn btn-primary" data-act="load-topup">Top up</button>`
-        : html`<p class="muted small">Your workspace owner or an admin can top up and use the load.</p>`}
+      <div class="lh-bal"><span class="lh-kick">Your load</span><b class="load-amt">${peso(s.total)}</b>
+        ${when(Number(s.bonus) > 0, html`<span class="lh-bonus">${peso(s.paid)} paid · ${peso(s.bonus)} bonus (used first)</span>`)}
+        <div class="load-texts">${ICON.bell}<span>${textsLine(s)}</span></div>
+        ${admin ? html`<button class="btn btn-gold btn-lg" data-act="load-topup">Top up</button>`
+          : html`<p class="lh-note">Your workspace owner or an admin can top up and use the load.</p>`}</div>
+      <div class="lh-pitch"><h2>One balance for every extra</h2>
+        <p>Top up once. Use it for reminders by text, a check of your papers, or a ready-to-sign letter. Whatever you don't use stays.</p>
+        <div class="lh-chips">
+          <span>${ICON.bell} Text reminders <b>from ${peso(minPrice('texts_'))}</b></span>
+          <span>${ICON.check} Papers check <b>${peso(price('papers_check'))}</b></span>
+          <span>${ICON.file} Letters &amp; forms <b>from ${peso(price('template'))}</b></span></div></div>
     </section>
 
-    <section class="card load-how" aria-label="How load works"><h2>How load works</h2>
+    <section class="card load-how" aria-label="How load works">
       <ol class="load-steps">
-        <li><span class="load-n">1</span><span><b>Top up</b> from ${peso(100)} with GCash, Maya or a bank transfer.</span></li>
-        <li><span class="load-n">2</span><span><b>Use it</b> for text reminders, a papers check or a ready-made letter.</span></li>
-        <li><span class="load-n">3</span><span><b>Keep the rest.</b> Load never expires.</span></li></ol></section>
+        <li><span class="ls-ic">₱</span><b>Top up</b><span>From ${peso(100)} by GCash, Maya or bank</span></li>
+        <li><span class="ls-ic">${ICON.check}</span><b>Use it</b><span>On any extra, any time</span></li>
+        <li><span class="ls-ic">${ICON.calendar}</span><b>Keep the rest</b><span>Load never expires</span></li></ol></section>
 
     <h2 class="section-label">What you can use it on</h2>
     <div class="load-uses">
@@ -89,6 +95,7 @@ export async function loadPage(el) {
   wireLoad(el);
 }
 
+const minPrice = (prefix) => { const ps = (L.products || []).filter((p) => p.code.startsWith(prefix) && p.active).map((p) => Number(p.price_php)); return ps.length ? Math.min(...ps) : 0; };
 function textsLine(s) {
   if (s.plan_texts) return html`<b>Text reminders are included in your plan.</b>`;
   const pass = s.pass && s.pass.starts_on <= todayPH() && s.text_source === 'season';
@@ -101,6 +108,7 @@ function textsCard(s, admin) {
     : s.plan_texts ? 'Your plan already pays for texts.'
     : !s.phones ? html`Nobody in this workspace has a verified mobile number yet. <a href="#/settings">Add yours in Settings</a> first, so the texts have somewhere to go.` : '';
   return html`<section class="card load-use">
+    <div class="lu-vis lu-sms" aria-hidden="true"><span class="lu-from">Pinoy Permit</span><span class="lu-bubble">Your Mayor's Permit is due in 7 days. Open your checklist: pinoypermit.app</span></div>
     <div class="load-use-head"><span class="load-ic">${ICON.bell}</span><div><h3>Text reminders</h3><p class="muted small">${packs.length ? `From ${peso(Math.min(...packs.map((p) => Number(p.price_php))))}` : 'Not available right now'}</p></div></div>
     <ul class="load-ticks"><li>${ICON.check}<span>A text message when a permit or tax deadline is near</span></li><li>${ICON.check}<span>1 text = 1 credit. Credits never expire</span></li>
       <li>${ICON.check}<span>Not delivered? You get the credit back</span></li></ul>
@@ -111,6 +119,7 @@ function textsCard(s, admin) {
 function papersCardUse(admin) {
   const soon = (S.data.reqs || []).filter((r) => r.expires && ['action_required', 'renew_soon'].includes(r.status)).sort((a, b) => (a.days_left ?? 999) - (b.days_left ?? 999)).slice(0, 3);
   return html`<section class="card load-use">
+    <div class="lu-vis lu-check" aria-hidden="true"><span class="ok">✓ Barangay clearance</span><span class="ok">✓ Lease contract</span><span class="no">✗ Fire safety certificate</span><b>2 of 3 ready</b></div>
     <div class="load-use-head"><span class="load-ic">${ICON.check}</span><div><h3>Papers check</h3><p class="muted small">${onSale('papers_check') ? peso(price('papers_check')) + ' a permit' : 'Not available right now'}</p></div></div>
     <ul class="load-ticks"><li>${ICON.check}<span>Send photos of your papers before you go</span></li><li>${ICON.check}<span>We tell you what's missing or needs fixing</span></li>
       <li>${ICON.check}<span>Answer by 6 pm the next weekday</span></li></ul>
@@ -120,7 +129,8 @@ function papersCardUse(admin) {
 }
 function templatesCardUse(s) {
   return html`<section class="card load-use">
-    <div class="load-use-head"><span class="load-ic">${ICON.file}</span><div><h3>One template</h3><p class="muted small">${s.has_plus ? 'All included with your Plus' : peso(price('template')) + ' each, yours to keep'}</p></div></div>
+    <div class="lu-vis lu-doc" aria-hidden="true"><b>AUTHORIZATION LETTER</b><i></i><i></i><i class="short"></i><span>Signed: ____________</span></div>
+    <div class="load-use-head"><span class="load-ic">${ICON.file}</span><div><h3>Letters &amp; forms</h3><p class="muted small">${s.has_plus ? 'All included with your Plus' : peso(price('template')) + ' each, yours to keep'}</p></div></div>
     <ul class="load-ticks"><li>${ICON.check}<span>Letters, SPA, affidavit of loss and more</span></li><li>${ICON.check}<span>Filled in with your business's details</span></li>
       <li>${ICON.check}<span>Buy only the one you need</span></li></ul>
     <a class="btn btn-sm btn-soft" href="#/templates">See the templates</a>
@@ -166,18 +176,24 @@ function seasonCard(s, admin) {
 
 function inviteSection(s) {
   const n = s.invites;
-  return html`<h2 class="section-label" id="invite">Invite a business</h2>
-  <section class="card invite-card">
-    <p><b>Know another business owner who juggles permits?</b> Send them your link. When they've added 3 permits with their dates, you both get a month of Pinoy Permit Plus, free${s.has_plus ? ' (you already have Plus, so yours comes as ${peso(PLUS_MONTHLY)} bonus load)' : ''}.</p>
-    <div class="invite-row"><div class="invite-link" data-invite-link><span class="muted small">Getting your link…</span></div>
-      <button class="btn btn-soft" data-act="invite-copy" disabled>Copy link</button>
-      ${when(typeof navigator !== 'undefined' && navigator.share, html`<button class="btn btn-ghost" data-act="invite-share" disabled>Share</button>`)}</div>
-    ${when(n.joined, html`<p class="small"><b>${plural(n.joined, 'business has', 'businesses have')} joined with your link.</b> ${n.rewarded} set up${n.pending ? `, ${n.pending} still adding permits` : ''}.</p>
+  return html`<section class="card invite-card" id="invite" aria-labelledby="invite-h">
+    <div class="inv-top"><span class="inv-kick">Invite a business</span>
+      <h2 id="invite-h">Give a month of Plus. Get a month free.</h2>
+      <p>Know someone who juggles permits? Send them your link. When they add 3 permits, you both get a month of Pinoy Permit Plus, free.${s.has_plus ? html` You already have Plus, so yours comes as ${peso(PLUS_MONTHLY)} of load.` : ''}</p></div>
+    <ol class="inv-steps"><li><span>1</span>Send your link</li><li><span>2</span>They add 3 permits</li><li><span>3</span>You both get a free month</li></ol>
+    <div class="invite-row"><div class="invite-link" data-invite-link><span>Getting your link…</span></div>
+      <button class="btn btn-gold" data-act="invite-copy" disabled>Copy link</button></div>
+    <div class="inv-share" data-invite-share hidden><span>Or send it by</span>
+      <a class="inv-app viber" data-share="viber" target="_blank" rel="noopener">Viber</a>
+      <a class="inv-app wa" data-share="wa" target="_blank" rel="noopener">WhatsApp</a>
+      <a class="inv-app fb" data-share="fb" target="_blank" rel="noopener">Facebook</a>
+      ${when(typeof navigator !== 'undefined' && navigator.share, html`<button class="inv-app" data-act="invite-share" disabled>More…</button>`)}</div>
+    ${when(n.joined, html`<p class="inv-done"><b>${plural(n.joined, 'business has', 'businesses have')} joined with your link.</b> ${n.rewarded} set up${n.pending ? `, ${n.pending} still adding permits` : ''}.</p>
       <div class="load-hist">${L.invites.map((i) => html`<div class="line"><div class="line-main"><b>A business joined ${fmtDate(i.joined_on)}</b>
-        <small>${i.status === 'rewarded' ? (i.my_reward === 'capped' ? "Set up. You've had this year's 6 thank-you months." : i.my_reward === 'bonus_load' ? `Set up: ${peso(PLUS_MONTHLY)} bonus load added` : 'Set up: your free month of Plus was added')
+        <small>${i.status === 'rewarded' ? (i.my_reward === 'capped' ? "Set up. You've had this year's 6 free months." : i.my_reward === 'bonus_load' ? `Set up: ${peso(PLUS_MONTHLY)} bonus load added` : 'Set up: your free month of Plus was added')
           : i.status === 'void' ? "Didn't add permits within 90 days" : `${i.permits_with_dates} of 3 permits with dates so far`}</small></div>
         <span class="chip ${i.status === 'rewarded' ? 'ok' : i.status === 'void' ? 'needinfo' : 'progress'}">${i.status === 'rewarded' ? 'Thanked' : i.status === 'void' ? 'Closed' : 'Waiting'}</span></div>`)}</div>`)}
-    <p class="muted small">Up to 6 thank-you months a year. Your link only works for new workspaces, and you can't invite yourself.</p>
+    <p class="inv-fine">Up to 6 free months a year. For new workspaces only.</p>
   </section>`;
 }
 const inviteUrl = (code) => new URL(`#/signup?ref=${code}`, location.href.split('#')[0]).href;
@@ -187,8 +203,13 @@ export async function wireLoad(el) {
   if (!box) return;
   try {
     const code = await db.inviteCode(S.org.id);
-    box.innerHTML = String(html`<code>${inviteUrl(code)}</code>`);
-    box.dataset.url = inviteUrl(code);
+    const url = inviteUrl(code);
+    box.innerHTML = String(html`<code>${url}</code>`);
+    box.dataset.url = url;
+    const msg = `I use Pinoy Permit to keep track of my business permits and renewals. Join with my link and we both get a free month: ${url}`;
+    const links = { viber: `viber://forward?text=${encodeURIComponent(msg)}`, wa: `https://wa.me/?text=${encodeURIComponent(msg)}`, fb: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` };
+    el.querySelectorAll('[data-share]').forEach((a) => { a.href = links[a.dataset.share]; });
+    const share = el.querySelector('[data-invite-share]'); if (share) share.hidden = false;
     el.querySelectorAll('[data-act="invite-copy"], [data-act="invite-share"]').forEach((b) => { b.disabled = false; });
   } catch (e) { box.innerHTML = String(html`<span class="muted small">Couldn't get your link. Try again later.</span>`); }
 }

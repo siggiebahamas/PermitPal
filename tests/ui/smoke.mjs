@@ -99,10 +99,15 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: Compliance group headers are big and bold, with a big count`, await page.evaluate(() => { const b = document.querySelector('.band'); const n = b?.lastElementChild;
     return !!b && parseFloat(getComputedStyle(b).fontSize) >= 20 && getComputedStyle(b).fontWeight === '800' && parseFloat(getComputedStyle(n).fontSize) >= 28; }));
   await go('#/history'); await page.waitForSelector('main h1');
-  check(`${label}: History: the day in bold over a gold line, its count in a navy circle, + for an addition and an icon on each change`, await page.evaluate(() => { const d = document.querySelector('.hist-day');
-    return !!d && getComputedStyle(d.querySelector('b')).borderBottomColor === 'rgb(233, 185, 73)' && getComputedStyle(d.querySelector('.hist-n')).backgroundColor === 'rgb(11, 27, 58)'
-      && document.querySelector('.hist-line .hist-ic.add')?.textContent === '+'
-      && document.querySelectorAll('.hist-line .hist-ic').length === document.querySelectorAll('.hist-line').length; }));
+  check(`${label}: History: a navy month bar, the day in bold over a gold line (no count), a centered icon on every change`, await page.evaluate(() => { const d = document.querySelector('.hist-day');
+    return !!d && !!document.querySelector('.hist-month') && getComputedStyle(d.querySelector('b')).borderBottomColor === 'rgb(233, 185, 73)' && !d.querySelector('.hist-n')
+      && !!document.querySelector('.hist-line .hist-ic.add svg') && document.querySelectorAll('.hist-line .hist-ic svg').length === document.querySelectorAll('.hist-line').length; }));
+  await page.fill('.hist-filters [name=q]', 'zzz-nothing'); await page.waitForTimeout(150);
+  check(`${label}: History search narrows the list as you type`, (await page.locator('.hist-line').count()) === 0 && /0 changes/.test(await page.textContent('[data-hist-count]')));
+  await page.fill('.hist-filters [name=q]', ''); await page.waitForTimeout(150);
+  await page.selectOption('.hist-filters [name=action]', 'del'); await page.waitForTimeout(250);
+  check(`${label}: History can show only one kind of change`, await page.evaluate(() => [...document.querySelectorAll('.hist-line .hist-ic')].every((i) => i.classList.contains('del'))));
+  await page.click('[data-act=hist-clear]'); await page.waitForTimeout(250);
   await go('#/compliance'); await page.waitForSelector('.row');
   check(`${label}: Renew buttons are the one green, everywhere`, (await page.locator('.row .btn-renew').count()) >= 1 && (await page.locator('.row [data-act=req-next].btn-primary').count()) === 0
     && await page.evaluate(() => getComputedStyle(document.querySelector('.btn-renew')).backgroundColor === 'rgb(14, 138, 79)'));
