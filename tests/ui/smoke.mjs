@@ -49,8 +49,12 @@ const results = [];
 const openMore = async (page) => { await page.waitForSelector('main .more-tools'); if (await page.locator('main .more-tools:not([open])').count()) await page.click('main .more-tools > summary'); };
 const check = (name, cond, extra = '') => { results.push([cond ? 'PASS' : 'FAIL', name, extra]); };
 // A step that throws (a missing button, a timeout) stops the run: show every check so far, then the error.
+// On GitHub, failures are also posted as annotations, so they show on the run's summary page.
+const annotate = (msg) => { if (process.env.GITHUB_ACTIONS) console.log(`::error title=Smoke test::${String(msg).replace(/\r?\n/g, ' ').slice(0, 900)}`); };
 process.on('uncaughtException', (e) => {
   for (const [s, n, x] of results) if (s === 'FAIL' || process.env.SMOKE_ALL) console.log(`${s} ${n}${s === 'FAIL' && x ? ' -> ' + x : ''}`);
+  for (const [s, n, x] of results) if (s === 'FAIL') annotate(`FAIL ${n}${x ? ' -> ' + x : ''}`);
+  annotate(`Stopped after ${results.length} checks: ${e?.message || e}`);
   console.log(`\nStopped after ${results.length} checks (${results.filter((r) => r[0] === 'FAIL').length} failed):`, e);
   process.exit(1);
 });
@@ -2599,6 +2603,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
 await browser.close();
 server.close();
 for (const [s, n, e] of results) console.log(`${s} ${n}${s === 'FAIL' && e ? ' -> ' + e : ''}`);
+for (const [s, n, e] of results) if (s === 'FAIL') annotate(`FAIL ${n}${e ? ' -> ' + e : ''}`);
 const failed = results.filter((r) => r[0] === 'FAIL').length;
 console.log(`\n${results.length - failed}/${results.length} passed`);
 process.exit(failed ? 1 : 0);
