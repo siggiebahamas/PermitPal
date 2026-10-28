@@ -61,22 +61,35 @@ Without this, nobody gets reminder emails and new customers can't confirm their 
 20. Supabase → **Authentication** → **Emails** → **SMTP Settings** → turn on **Custom SMTP** and fill in:
     host `smtp.resend.com`, port `465`, username `resend`, password = the key from step 18,
     sender email `hello@YOURDOMAIN.com`, sender name `Pinoy Permit`. Save.
-21. In Pinoy Permit: **Admin** → **Messages** → **Send me a test email**. It should arrive within a minute.
+21. After Part D (you need to be admin): in Pinoy Permit, **Admin** → **Messages** → **Send me a test email**. It should arrive within a minute.
 
 ## Part D: logins (2 minutes)
 
 22. Supabase → **Authentication** → **URL Configuration**. Set **Site URL** to `https://siggiebahamas.github.io/PermitPal/`
     (or your own domain once Claude has pointed it), and add the same address under **Redirect URLs**. Save.
-23. Sign up in Pinoy Permit with your own admin email and confirm it. That account becomes staff automatically.
+23. Make your email the only admin email. In the SQL Editor (as in Part A), paste this with your own email, then **Run**:
+    ```sql
+    update private.settings set value = 'YOUR@EMAIL.com' where key = 'admin_notify_emails';
+    ```
+24. Sign up in Pinoy Permit with that same email and confirm it. That account becomes admin (staff) automatically.
+    Nobody else can: customers can't give themselves admin, and only an email on that one list gets it.
+
+**Check who has admin access (anytime):** paste this in the SQL Editor and click **Run**:
+```sql
+select u.email, u.created_at from public.profiles p join auth.users u on u.id = p.id where p.is_platform_admin;
+select value as admin_emails from private.settings where key = 'admin_notify_emails';
+```
+The first list should show only you; the second only your email.
+To take admin away from someone: `update public.profiles set is_platform_admin = false where id = (select id from auth.users where email = 'THEIR@EMAIL.com');`
 
 ## Part E: nightly backups (5 minutes)
 
-24. GitHub → https://github.com/siggiebahamas/PermitPal/settings/secrets/actions → **New repository secret**, four times:
+25. GitHub → https://github.com/siggiebahamas/PermitPal/settings/secrets/actions → **New repository secret**, four times:
     - `SUPABASE_DB_URL`: Supabase → **Connect** → **Session pooler** string, with your database password in it
     - `SUPABASE_URL`: `https://zeaiwvgktakbwnqpchbo.supabase.co`
     - `SUPABASE_SERVICE_ROLE_KEY`: Supabase → **Project Settings** → **API Keys** → the secret key
     - `BACKUP_PASSPHRASE`: any long phrase you make up. Keep it in a password manager: backups can't be opened without it.
-25. GitHub → **Actions** → **Nightly backup** → **Run workflow**. It should finish green.
+26. GitHub → **Actions** → **Nightly backup** → **Run workflow**. It should finish green.
 
 ## Part F (optional, costs money): WhatsApp reminders
 
@@ -84,11 +97,11 @@ WhatsApp reminders are already built; they switch on when these are added. They 
 reminder (rates by country at https://developers.facebook.com/docs/whatsapp/pricing) and needs your business verified.
 Viber is not built: it costs at least about €100 a month before any messages.
 
-26. Make a Meta Business account and verify your business (DTI/SEC papers), then set up WhatsApp at
+27. Make a Meta Business account and verify your business (DTI/SEC papers), then set up WhatsApp at
     https://developers.facebook.com/apps → **Create app** → **Business** → add **WhatsApp**.
-27. Create a message template named `permit_reminder` (category **Utility**, language **English**) with this text, and
+28. Create a message template named `permit_reminder` (category **Utility**, language **English**) with this text, and
     submit it for approval:
     `Hi {{1}}, you have {{2}} permit deadline(s) coming up, starting with {{3}}. See them here: {{4}}`
-28. Supabase → Edge Functions → Secrets → add `WHATSAPP_TOKEN` (a permanent access token) and `WHATSAPP_PHONE_ID`
+29. Supabase → Edge Functions → Secrets → add `WHATSAPP_TOKEN` (a permanent access token) and `WHATSAPP_PHONE_ID`
     (from WhatsApp → API Setup).
-29. Tell Claude it's on, so the "WhatsApp reminders" switch can be shown in Settings.
+30. Tell Claude it's on, so the "WhatsApp reminders" switch can be shown in Settings.

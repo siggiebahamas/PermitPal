@@ -2623,3 +2623,8 @@ a.line:hover, button.line:hover { background-color: #fff; border-color: #C9D2E3;
 /* The yearly saving: bigger, the amount in green */
 .pp-quiet { font-size: 19px; font-weight: 700; padding: 4px 0 4px 14px; border-left-width: 4px; }
 .pp-quiet b { color: var(--jade); font-size: 24px; font-weight: 800; }
+/* Sidebar: every word pure white (Tools / Account stay gold, underlined) */
+.sidebar .org-name, .sidebar .org-switch, .sidebar .nav, .sidebar .nav.active, .sidebar .nav svg, .sidebar .me, .sidebar .me-name,
+.sidebar .me .muted, .sidebar .me .small, .sidebar .powered-by, .sidebar .cb-name { color: #FFFFFF; }
+.sidebar .org-name { font-weight: 800; font-size: 16px; }
+.sidebar .me .linklike { color: #FFFFFF; text-decoration: underline; text-underline-offset: 3px; }

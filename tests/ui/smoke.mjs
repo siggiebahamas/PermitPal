@@ -83,6 +83,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check(`${label}: status tiles have a colored dot beside the label, the number in navy`,
     await page.evaluate(() => { const l = document.querySelector('.stat.overdue .stat-l'); const n = document.querySelector('.stat.overdue .stat-n');
       return getComputedStyle(l, '::before').backgroundColor === 'rgb(217, 71, 63)' && getComputedStyle(n).color === 'rgb(11, 27, 58)'; }));
+  check(`${label}: the menu's words are pure white: workspace name, every tab and your name`, await page.evaluate(() => {
+    const els = [...document.querySelectorAll('.sidebar .org-name, .sidebar .nav, .sidebar .me-name')];
+    return els.length > 3 && els.every((e) => getComputedStyle(e).color === 'rgb(255, 255, 255)'); }));
   check(`${label}: a big bell, and a white notification count in the menu`, await page.evaluate(() => { const b = document.querySelector('.topbar .bell'); const n = document.querySelector('.sidebar .nav .badge');
     return b.getBoundingClientRect().width >= 56 && (!n || getComputedStyle(n).backgroundColor === 'rgb(255, 255, 255)'); }));
   check(`${label}: navy top bar with a white search box`, await page.evaluate(() => getComputedStyle(document.querySelector('.topbar')).backgroundColor === 'rgb(11, 27, 58)'
