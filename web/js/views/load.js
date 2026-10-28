@@ -332,6 +332,16 @@ const VERDICT = { ready: ['Ready to file', 'ok', 'Your papers look complete.'], 
 const ITEM_STATE = { ok: ['Looks right', 'ok'], fix: ['Needs a fix', 'soon'], missing: ['Missing', 'overdue'], na: ['Not needed / couldn\'t tell', 'needinfo'] };
 const dueWhen = (iso) => new Date(iso).toLocaleString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' });
 
+// One line for the permit's "Need help?" step: the papers check, when nothing is being checked yet.
+export function papersLine(r, checks = [], docsCount = 0) {
+  if (!has('load') || !r || !isOrgAdmin() || checks.some((c) => ['waiting', 'answered'].includes(c.status))) return '';
+  const p = L?.products?.find((x) => x.code === 'papers_check');
+  const pass = L?.summary?.pass && !L.summary.pass.check_used && L.summary.pass.starts_on <= todayPH() ? L.summary.pass : null;
+  if (!p?.active && !pass) return '';
+  return html`<div class="offer-inline compact papers-line"><div class="offer-body">${ICON.check}<div><b>Not sure you have everything?</b>
+    <span class="muted">Send us photos of your papers. We tell you what's missing by 6 pm the next weekday.</span></div></div>
+    <button class="btn btn-primary btn-sm" data-act="papers-open" data-id="${r.id}" data-docs="${docsCount}">Check my papers · ${pass ? 'free with your pass' : peso(p?.price_php ?? 149)}</button></div>`;
+}
 export function papersCard(r, checks = [], docsCount = 0) {
   if (!has('load') || !r) return '';
   const last = checks.find((c) => ['waiting', 'answered'].includes(c.status));

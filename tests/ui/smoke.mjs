@@ -45,6 +45,8 @@ browser.newPage = async (opts) => {
   return p;
 };
 const results = [];
+// The permit page folds the packet, clock and bills under "More tools" until they need you: open it.
+const openMore = async (page) => { await page.waitForSelector('main .more-tools'); if (await page.locator('main .more-tools:not([open])').count()) await page.click('main .more-tools > summary'); };
 const check = (name, cond, extra = '') => { results.push([cond ? 'PASS' : 'FAIL', name, extra]); };
 // A step that throws (a missing button, a timeout) stops the run: show every check so far, then the error.
 process.on('uncaughtException', (e) => {
@@ -486,6 +488,13 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   const mpId = await page.evaluate(async () => (await import('/__mock/mock-data.js')).loadOrgData().then((d) => d.reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b1').id));
   await go('#/requirement/' + mpId);
   check('checklist: open on an overdue permit, with where to file', await page.locator('details.checklist[open]').count() === 1 && /BPLO/.test(await page.textContent('.checklist .ck-facts')));
+  check('permit page: one numbered guide: do this first, papers, where to file, how to pay, help', await page.evaluate(() => [...document.querySelectorAll('.checklist .st-body > h3')].map((h) => h.textContent).join('|'))
+    === 'Do this first|Get these papers ready|Where to file|How to pay|Need help?');
+  check('permit page: the guide comes before the record, and the packet, clock and history wait under a closed "More tools"', await page.evaluate(() => {
+    const ck = document.querySelector('main .checklist'), rec = document.querySelector('main .record-card'), more = document.querySelector('main .more-tools');
+    return !!ck && !!rec && !!more && !more.open && (ck.compareDocumentPosition(rec) & 4) && (rec.compareDocumentPosition(more) & 4) && !!more.querySelector('[data-packet]') && /Activity/.test(more.textContent); }));
+  check('permit page: "How to pay" says where, and to keep the official receipt; "Need help?" links the official site and a professional', /official receipt/.test(await page.textContent('.st:nth-child(4)'))
+    && (await page.locator('.st-help a.ext-link').count()) >= 1 && (await page.locator('.st-help a[href="#/pros"]').count()) === 1);
   check('checklist: "do these first" offers to add the missing barangay clearance', (await page.locator('.ck-dep.missing', { hasText: 'Barangay Business Clearance' }).locator('[data-act=req-add]').count()) === 1);
   check('checklist: a step tracked elsewhere shows its live status', /In Pinoy Permit: Compliant until/.test(await page.textContent('.ck-list')));
   check('checklist: starts at 0 ready', (await page.textContent('.ck-count')).includes('0 of 6'));
@@ -578,6 +587,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   check('done for you page: every service has a "Get a price" button', (await page.locator('.svc-grid .svc').count()) === (await page.locator('.svc-grid [data-act=svc-request]').count()));
   check('done for you page: how it works in 3 steps, 5 plain promises (no badges), no city-bill section, and a menu grouped by kind', (await page.locator('main .dfy-steps li').count()) === 3
     && (await page.locator('main .dfy-promises li').count()) === 5 && (await page.locator('main .dfy-badge, main #bills').count()) === 0 && ((await page.locator('main .dfy-jump a').count()) >= 3 || (await page.locator('main .svc .svc-tag').count()) === (await page.locator('main .svc').count())) && (await page.locator('main .svc details.svc-more').count()) === (await page.locator('main .svc').count()));
+  check('done for you page: leads with peace of mind: on your own vs with us, 4 each, then a calm call to look', /off your mind/.test(await page.textContent('main .dfy-calm h2'))
+    && (await page.locator('main .dfy-calm .is-alone li').count()) === 4 && (await page.locator('main .dfy-calm .is-us li').count()) === 4 && /Nothing is charged until you say yes/.test(await page.textContent('main .dfy-calm-foot'))
+    && !/guarantee/i.test(await page.textContent('main .dfy-calm')));
   check('done for you page: the no-fixers rule and the terms link stay on the page', /RA 11032/.test(await page.textContent('main .dfy-rules')) && (await page.locator('main .dfy-rules a[href="terms.html#services"]').count()) === 1);
   check('done for you: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
@@ -1511,6 +1523,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
       return !!line && getComputedStyle(sec).borderLeftWidth === '4px' && getComputedStyle(line).borderTopLeftRadius === '14px' && getComputedStyle(line).backgroundImage === 'none'; }));
     check(`plus ${label}: "Fix these" is a big bold title with the count big on the right`, await page.evaluate(() => { const h = document.querySelector('.check-sec.fix h2'); const n = document.querySelector('.check-sec.fix .check-count');
       return !!n && parseFloat(getComputedStyle(h).fontSize) >= 22 && parseFloat(getComputedStyle(n).fontSize) >= 44 && n.getBoundingClientRect().left > h.getBoundingClientRect().right; }));
+    check(`plus ${label}: each section shows 3 items, the rest behind "Show more"`, await page.evaluate(() => [...document.querySelectorAll('.check-sec')].every((sec) => {
+      const n = Number(sec.querySelector('.check-count').textContent); return sec.querySelectorAll(':scope > .line').length === Math.min(3, n) && (n <= 3 || /Show \d+ more/.test(sec.querySelector('.check-more summary').textContent)); })));
     await page.click('[data-act=finding-dismiss]'); await page.waitForSelector('#modal-root .modal');
     await page.fill('#modal-root [name=note]', 'The building has one'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(700);
     check(`plus ${label}: "Doesn't apply" moves it to your answers, with Undo`, /You answered/.test(await mainText(page)) && (await page.locator('[data-act=finding-reopen]').count()) === 1);
@@ -2006,8 +2020,8 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   }
   // a papers check, from the permit's page
   const mp = await mock(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.type_code === 'mayors_permit' && r.business_id === 'b1').id);
-  await go('#/requirement/' + mp); await page.waitForSelector('.papers-card');
-  check(`load ${label}: a permit offers a papers check${season ? ', free with the pass' : ' for ₱499'}`, new RegExp(season ? 'free with your season pass' : '₱499').test(await page.textContent('.papers-card')));
+  await go('#/requirement/' + mp); await page.waitForSelector('.papers-line');
+  check(`load ${label}: a permit offers a papers check in its "Need help?" step${season ? ', free with the pass' : ' for ₱499'}`, new RegExp(season ? 'free with your pass' : '₱499').test(await page.textContent('.st-help-step .papers-line')));
   check(`load ${label}: our paid service buttons are the same green as Renew`, await page.evaluate(() => getComputedStyle(document.querySelector('[data-act=papers-open]')).backgroundColor === 'rgb(14, 138, 79)'));
   await page.click('[data-act=papers-open]'); await page.waitForSelector('#modal-root .modal');
   check(`load ${label}: the form lists the permit's checklist and the deadline`, (await page.locator('#modal-root .pc-list li').count()) >= 3 && /answers by/.test(await page.textContent('#modal-root')));
@@ -2019,7 +2033,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   check(`load ${label}: sent: the permit says it's being checked, by when`, /We're checking your papers/.test(await page.textContent('.papers-card')) && /\d{1,2}:\d{2}/.test(await page.textContent('.papers-card')));
   check(`load ${label}: both photos arrived`, (await mock(async () => (await import('/__mock/mock-data.js')).__load.files.length)) === 2);
   await page.click('[data-act=papers-cancel]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(600);
-  check(`load ${label}: cancelling gives it back`, /Check my papers/.test(await page.textContent('.papers-card')));
+  check(`load ${label}: cancelling gives it back`, /Check my papers/.test(await page.textContent('.papers-line')) && (await page.locator('.papers-card').count()) === 0);
   await page.click('[data-act=papers-open]'); await page.setInputFiles('#modal-root input[name=files]', [{ name: 'lease.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('fake') }]);
   await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(700);
   // staff answer it
@@ -2087,7 +2101,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   check('load off: #/load goes back to the dashboard', !/Prepaid credit/.test(await off.textContent('main')));
   const mp = await off.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.type_code === 'mayors_permit').id);
   await off.evaluate((id) => { location.hash = '#/requirement/' + id; }, mp); await off.waitForTimeout(600);
-  check('load off: permits offer no papers check', (await off.locator('.papers-card').count()) === 0);
+  check('load off: permits offer no papers check', (await off.locator('.papers-card, .papers-line').count()) === 0);
   check('load off: no JavaScript errors', oerrs.length === 0, oerrs.slice(0, 3).join(' | '));
   await off.close();
   // invited: the sign-up page says so
@@ -2111,17 +2125,16 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   const submit = async (wait = 500) => { await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(wait); };
   await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
   const req = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.type_code === 'mayors_permit' && r.status !== 'compliant'));
-  await go('#/requirement/' + req.id); await page.waitForSelector('#clock');
+  await go('#/requirement/' + req.id); await openMore(page); await page.waitForSelector('#clock');
   check(`clock ${label}: a permit being renewed offers to start the clock`, /Waiting on the office/.test(await page.textContent('#clock')));
   await page.click('[data-act=clock-start]'); await page.waitForSelector('.modal');
   check(`clock ${label}: the office's name is guessed from the permit and the city`, /Business Permits and Licensing Office/.test(await page.inputValue('.modal [name=office]')));
-  check(`clock ${label}: it shows the legal deadline as you fill it in`, /By law, the office has until/.test(await page.textContent('.modal .clock-preview')));
-  await page.check('.modal input[name=kind][value=charter]'); await submit(200);
-  check(`clock ${label}: a Citizen's Charter time needs its days`, /Citizen's Charter/.test(await page.textContent('#modal-root .modal-error')));
-  await page.check('.modal input[name=kind][value=simple]');
+  check(`clock ${label}: the days come from the law, nothing to pick: usually ready and the legal last day`, (await page.locator('.modal input[type=radio][name=kind]').count()) === 0
+    && (await page.inputValue('.modal [name=kind]')) === 'simple' && /Usually ready/.test(await page.textContent('.modal .cp-usual'))
+    && /By law, no later than/.test(await page.textContent('.modal .cp-law')) && /3 working days/.test(await page.textContent('.modal .cp-law')) && /RA 11032/.test(await page.textContent('.modal .cp-law')));
   await page.fill('.modal [name=reference_no]', 'BPLO-2027-555');
   await submit();
-  check(`clock ${label}: started: 3 working days left, with the deadline`, /3 working days left/.test(await page.textContent('#clock .chip')) && /By law, it has until/.test(await page.textContent('#clock')));
+  check(`clock ${label}: started: 3 working days left, with the deadline`, /3 working days left/.test(await page.textContent('#clock .chip')) && /By law, no later than/.test(await page.textContent('#clock')) && /Usually ready/.test(await page.textContent('#clock .cf-usual')));
   await page.click('#clock [data-act=clock-edit]'); await page.waitForSelector('.modal [name=filed_on]');
   const twoWeeks = await page.evaluate(() => { const d = new Date(Date.now() + 8 * 3600e3); d.setUTCDate(d.getUTCDate() - 14); return d.toISOString().slice(0, 10); });
   await page.fill('.modal [name=filed_on]', twoWeeks);
@@ -2157,7 +2170,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   // once Makati's online payment is confirmed (staff mark it in the city register), Pinoy Permit can pay it
   await page.evaluate(async () => { (await import('/__mock/mock-data.js')).__lgus.find((g) => g.city_key === 'makati').online_payment = 'yes'; });
   await page.evaluate(async () => { location.hash = '#/'; }); await page.waitForTimeout(200);
-  await go('#/requirement/' + req.id); await page.waitForSelector('#bills');
+  await go('#/requirement/' + req.id); await openMore(page); await page.waitForSelector('#bills');
   // the offer: Pinoy Permit pays it, flat fee, up front
   check(`bills ${label}: the card offers "Let Pinoy Permit pay it" at ₱499 flat, with why`, /Let Pinoy Permit pay it: ₱499 flat/.test(await page.textContent('#bills'))
     && (await page.locator('#bills .bill-offer-list li').count()) === 3 && !/guarantee|we pay the surcharge|we cover/i.test(await page.textContent('#bills')));
@@ -2203,7 +2216,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   check(`bills ${label}: paying needs the official receipt`, /Please fill in/.test(await page.textContent('#modal-root .modal-error')));
   await page.fill('.modal [name=or_no]', 'OR-7731905'); await page.setInputFiles('.modal input[type=file]', { name: 'or.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('x') });
   await submit(700);
-  await go('#/requirement/' + req.id); await page.waitForSelector('#bills');
+  await go('#/requirement/' + req.id); await openMore(page); await page.waitForSelector('#bills');
   check(`bills ${label}: the customer sees it paid, with the receipt on the permit`, /Pinoy Permit paid it: official receipt OR-7731905/.test(await page.textContent('#bills')) && /Official receipt OR-7731905/.test(await page.textContent('main')));
   check(`bills ${label}: no sideways scroll`, (await over()) <= 0);
   await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'member'; });
@@ -2225,7 +2238,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   const submit = async (wait = 600) => { await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(wait); };
   await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
   const mp = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.business_id === 'b1' && r.type_code === 'mayors_permit').id);
-  await go('#/requirement/' + mp); await page.waitForSelector('#clock');
+  await go('#/requirement/' + mp); await openMore(page); await page.waitForSelector('#clock');
   check('clock demo: an office past its deadline, with the letters ready', /Late by/.test(await page.textContent('#clock .chip')) && (await page.locator('#clock [data-act=clock-letter]').count()) === 2);
   check('bills demo: a bill Pinoy Permit is paying, and when', /We're paying it/.test(await page.textContent('#bills')) && /by .*(AM|PM)/i.test(await page.textContent('#bills')));
   await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=office]'); await page.waitForTimeout(700);
@@ -2233,7 +2246,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.click('[data-act=adm-bill-refund]'); await page.waitForSelector('.modal'); await submit(200);
   check("admin: sending a bill back needs the reason the customer will read", /Please fill in/.test(await page.textContent('#modal-root .modal-error')));
   await page.fill('.modal [name=note]', 'Makati only takes this payment at its own window.'); await page.fill('.modal [name=ref]', 'GC-1'); await submit(700);
-  await go('#/requirement/' + mp); await page.waitForSelector('#bills');
+  await go('#/requirement/' + mp); await openMore(page); await page.waitForSelector('#bills');
   check('bills demo: sent back: the customer sees why', /Sent back to you/.test(await page.textContent('#bills')) && /own window/.test(await page.textContent('#bills')));
   await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=office]'); await page.waitForTimeout(700);
   await page.click('[data-act=adm-holiday-add]'); await page.waitForSelector('.modal');
@@ -2242,7 +2255,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.click('.hol-more summary'); await page.click('[data-act=adm-holiday-remove][data-day="2027-06-24"]'); await page.waitForTimeout(700);
   check('admin: ...and removed', (await page.locator('.hol-row', { hasText: 'Araw ng Maynila' }).count()) === 0);
   await page.fill('.adm-bill-settings [name=fee]', '120'); await page.click('[data-act=adm-bill-settings]'); await page.waitForTimeout(600);
-  await go('#/requirement/' + mp); await page.waitForSelector('#bills');
+  await go('#/requirement/' + mp); await openMore(page); await page.waitForSelector('#bills');
   await page.click('#bills [data-act=bill-add]'); await page.waitForSelector('.modal');
   check('admin: a new fee shows to customers at once', /₱120/.test(await page.textContent('.modal')));
   await page.click('.modal [data-modal-close]');
@@ -2252,7 +2265,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.click('[data-act=adm-clock-start]'); await page.waitForSelector('.modal');
   await page.fill('.modal [name=office]', 'BFP Mandaue'); await page.fill('.modal [name=reference_no]', 'FSIC-88'); await submit(700);
   const fsicId = await page.evaluate(async () => (await import('/__mock/mock-data.js')).__office.filings.find((f) => f.request_id === 'ord1')?.requirement_id);
-  await go('#/requirement/' + fsicId); await page.waitForSelector('#clock');
+  await go('#/requirement/' + fsicId); await openMore(page); await page.waitForSelector('#clock');
   check('clock: on an order we filed, the customer sees the clock and that we follow up', /BFP Mandaue/.test(await page.textContent('#clock')) && /Pinoy Permit filed this for you/.test(await page.textContent('#clock'))
     && (await page.locator('#clock [data-act=clock-edit]').count()) === 0);
   check('clock+bills demo: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
@@ -2292,7 +2305,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
 
   // ---- city deadline: the permit's banner, "Keep" hides it here; the dashboard gathers it, one tap moves the date
   if (ext) {
-    await go('#/requirement/' + mp.id); await page.waitForSelector('[data-packet]');
+    await go('#/requirement/' + mp.id); await openMore(page); await page.waitForSelector('[data-packet]');
     check(`city ${label}: the permit says the city extended its deadline, with the source`, /extended the \d{4} business permit deadline/.test(await page.textContent('[data-city-banner]'))
       && (await page.locator('[data-city-banner] a[target=_blank]').count()) === 1);
     await go('#/');
@@ -2316,7 +2329,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
     && (await page.locator('[data-city-banner]').count()) === 0, qcNow.expires_on);
 
   // ---- the packet: only what's missing, a question at a time
-  await go('#/requirement/' + mp.id); await page.waitForSelector('[data-packet]');
+  await go('#/requirement/' + mp.id); await openMore(page); await page.waitForSelector('[data-packet]');
   check(`packet ${label}: the card says how much is already filled in and what's left`, /already has \d+ of \d+ details/.test(await page.textContent('[data-packet]'))
     && /4 questions left/.test(await page.textContent('[data-packet]')));
   await page.click('[data-act=packet-start]'); await page.waitForSelector('.modal [name=sales]');
@@ -2426,7 +2439,7 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1');
   check('packet demo: the dashboard shows the sample extension, marked as a sample', /A sample/.test(await page.textContent('[data-city-banner]').catch(() => '')) || (await page.locator('[data-city-banner]').count()) === 0);
   const id = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.location_id === 'l3' && r.type_code === 'mayors_permit').id);
-  await page.evaluate((h) => { location.hash = h; }, '#/requirement/' + id); await page.waitForSelector('[data-packet]');
+  await page.evaluate((h) => { location.hash = h; }, '#/requirement/' + id); await openMore(page); await page.waitForSelector('[data-packet]');
   check('packet demo: a ready packet, with last year\'s answers carried over', /Ready/.test(await page.textContent('[data-packet]')) && /₱7,348,250\.75/.test(await page.textContent('[data-packet]')));
   check('packet demo: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();

@@ -11,7 +11,7 @@ import { ICON } from '../components.js';
 import { payDetails } from './services.js';
 import { printSheet } from '../print.js';
 import { readBill } from '../ocrparse.js';
-import { addWorkdays, workdaysBetween, filingDays, LEGAL_DAYS } from '../workdays.js';
+import { addWorkdays, workdaysBetween, filingDays, processFor } from '../workdays.js';
 import * as db from 'pp/data';
 
 // ---------------------------------------------------------------- what the page needs
@@ -77,8 +77,8 @@ export function clockCard(r, filings = []) {
   if (!open) {
     if (!edit || (r.status === 'compliant' && !last)) return last ? html`<p class="muted small clock-last">${lastLine(last)}</p>` : '';
     return html`<section class="card clock-card" id="clock"><div class="card-head"><h2>Waiting on the office?</h2></div>
-      <p>Tell us the day you handed in your papers. Pinoy Permit counts the office's legal processing time (3 working days for most permits, by law)
-        and tells you the day it runs late, with a letter ready to send.</p>
+      <p>Tell us the day you handed in your papers. We work out when it should be ready (${plural(processFor(r.type_code).usual, 'working day')} usually,
+        ${processFor(r.type_code).days} at most by law) and tell you if the office runs late, with a letter ready to send.</p>
       <div class="btn-row"><button class="btn btn-soft btn-sm" data-act="clock-start" data-id="${r.id}">${ICON.calendar} I filed it: start the clock</button></div>
       ${last ? html`<p class="muted small">${lastLine(last)}</p>` : ''}</section>`;
   }
@@ -94,7 +94,8 @@ export function clockCard(r, filings = []) {
     <div class="clock-meter" aria-hidden="true"><span style="width:${Math.round((late ? 1 : used / total) * 100)}%"></span></div>
     <dl class="clock-facts">
       <div><dt>Filed</dt><dd>${dayDate(open.filed_on)}</dd></div>
-      <div><dt>By law, it has until</dt><dd><b>${dayDate(open.due_on)}</b></dd></div>
+      <div class="cf-usual"><dt>Usually ready</dt><dd><b>${dayDate(addWorkdays(open.filed_on, Math.min(processFor(r.type_code).usual, total), hol()))}</b></dd></div>
+      <div><dt>By law, no later than</dt><dd><b>${dayDate(open.due_on)}</b></dd></div>
       <div><dt>Fees</dt><dd>${open.fees === 'paid' ? `Paid ${fmtDate(open.fees_paid_on)}` : FEES[open.fees]}</dd></div>
     </dl>
     ${late ? html`<div class="banner warn clock-late"><div><b>${open.office} is past its deadline.</b>
@@ -123,6 +124,8 @@ function lastLine(f) {
 async function openFiling(r, f = null) {
   if (!HOL) await loadHolidays();
   const t = todayPH();
+  // The law sets the days per permit (see PROCESS in workdays.js), so there's nothing to pick.
+  const law = processFor(r.type_code);
   openModal(f ? 'Edit the filing' : `I filed it: ${r.name}`, html`
     <p class="muted small">The day you file doesn't count, and neither do weekends and national holidays. We tell you the morning after the deadline if the office hasn't acted.</p>
     <label class="field"><span>Office you filed with</span><input name="office" maxlength="160" required value="${f?.office || officeOf(r)}" autocomplete="off"></label>
@@ -130,12 +133,7 @@ async function openFiling(r, f = null) {
       <label class="field"><span>Day you handed in complete papers</span><input type="date" name="filed_on" required max="${t}" value="${f?.filed_on || t}"></label>
       <label class="field"><span>Reference or claim stub no. <small>(optional)</small></span><input name="reference_no" maxlength="120" value="${f?.reference_no || ''}" placeholder="e.g. 2027-BPLO-01234"></label>
     </div>
-    <fieldset class="clock-kinds"><legend>How long the office has, by law</legend>
-      ${[['simple', '3 working days', 'Most permits and renewals'], ['complex', '7 working days', 'Needs an inspection or several offices'], ['technical', '20 working days', 'Highly technical, like health or environmental reviews']]
-        .map(([k, a, b]) => html`<label class="check"><input type="radio" name="kind" value="${k}" ${(f?.kind || 'simple') === k ? 'checked' : ''}><span><b>${a}</b> <small class="muted">${b}</small></span></label>`)}
-      <label class="check"><input type="radio" name="kind" value="charter" ${f?.kind === 'charter' ? 'checked' : ''}><span><b>What the office's Citizen's Charter says</b> <small class="muted">Often shorter: it's posted at the office and on its website</small></span></label>
-      <label class="field" data-charter ${f?.kind === 'charter' ? '' : 'hidden'}><span>Working days in the Citizen's Charter</span><input type="number" name="days" min="1" max="60" step="1" inputmode="numeric" value="${f?.kind === 'charter' ? f.days : ''}"></label>
-    </fieldset>
+    <input type="hidden" name="kind" value="${f?.kind || law.kind}"><input type="hidden" name="days" value="${f?.days || law.days}">
     <div class="grid2">
       <label class="field"><span>Fees</span><select name="fees">${Object.entries(FEES).map(([k, v]) => html`<option value="${k}" ${(f?.fees || 'not_assessed') === k ? 'selected' : ''}>${v}</option>`)}</select></label>
       <label class="field" data-paid ${f?.fees === 'paid' ? '' : 'hidden'}><span>Day you paid</span><input type="date" name="fees_paid_on" max="${t}" value="${f?.fees_paid_on || ''}"></label>
@@ -149,23 +147,22 @@ async function openFiling(r, f = null) {
     onOpen: (form) => {
       const paint = () => {
         const kind = form.kind.value;
-        form.querySelector('[data-charter]').hidden = kind !== 'charter';
         form.querySelector('[data-paid]').hidden = form.fees.value !== 'paid';
         const ext = form.querySelector('[data-ext]'); if (ext) ext.hidden = !form.extended.checked;
         const n = filingDays(kind, form.days.value, !!form.extended?.checked, form.closed_days?.value);
         const from = form.filed_on.value;
-        form.querySelector('.clock-preview').innerHTML = from && n > 0 && (kind !== 'charter' || Number(form.days.value) > 0)
-          ? String(html`By law, the office has until <b>${dayDate(addWorkdays(from, n, hol()))}</b> (${plural(n, 'working day')}).`) : '';
+        form.querySelector('.clock-preview').innerHTML = from && n > 0 ? String(html`
+          <span class="cp-row cp-usual"><small>Usually ready</small><b>${dayDate(addWorkdays(from, law.usual, hol()))}</b><span>${law.why}</span></span>
+          <span class="cp-row cp-law"><small>By law, no later than</small><b>${dayDate(addWorkdays(from, n, hol()))}</b><span>${plural(n, 'working day')}, set by the Ease of Doing Business law (RA 11032)</span></span>`) : '';
       };
       form.addEventListener('input', paint); form.addEventListener('change', paint); paint();
     },
     onSubmit: async (fd) => {
       const v = Object.fromEntries(fd);
-      if (v.kind === 'charter' && !(Number(v.days) >= 1 && Number(v.days) <= 60)) throw new Error("Enter the working days in the office's Citizen's Charter (1 to 60).");
       if (v.fees === 'paid' && !v.fees_paid_on) throw new Error('Enter the day you paid the fees.');
       if (v.extended && !String(v.extension_note || '').trim()) throw new Error('Say what the office wrote about needing more time.');
       await db.filingSave({ id: f?.id, requirement_id: r.id, office: v.office.trim(), reference_no: v.reference_no?.trim(), filed_on: v.filed_on, kind: v.kind,
-        days: v.kind === 'charter' ? v.days : LEGAL_DAYS[v.kind], fees: v.fees, fees_paid_on: v.fees === 'paid' ? v.fees_paid_on : null,
+        days: Number(v.days) || law.days, fees: v.fees, fees_paid_on: v.fees === 'paid' ? v.fees_paid_on : null,
         extended: !!v.extended, extension_note: v.extension_note?.trim(), closed_days: v.closed_days || 0 });
       changed(r.id);
       toast(f ? 'Saved.' : "Clock started. We'll tell you if the office runs late.");

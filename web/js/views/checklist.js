@@ -4,7 +4,7 @@
 // Everything is written as general guidance: the city or agency has the final say.
 import { html, fmtDate, toast, toastError, when, plural, peso } from '../util.js';
 import { S, canEdit, has, typeOf, memberName, reqById, coverOf, tierOf, offered } from '../core.js';
-import { STATUS, statusChip } from '../components.js';
+import { STATUS, statusChip, ICON } from '../components.js';
 import { placementFor, placementLine } from './extras.js';
 import { lguFor } from './office.js';
 import * as db from 'pp/data';
@@ -68,31 +68,26 @@ export function checklistCard(r, ticks = [], { offer = '' } = {}) {
   const done = new Map(ticks.filter((x) => x.round === now).map((x) => [x.item, x]));
   const doneCount = items.filter((i) => done.has(i.k)).length;
   const edit = canEdit();
-  const urgent = ['action_required', 'renew_soon', 'in_progress', 'needs_information'].includes(r.status);
   const city = r.location_city || '';
   const cityLink = !t.online_url && t.category === 'local' && city
     ? `https://www.google.com/search?q=${encodeURIComponent(`${city} ${t.name.replace(/\s*\/.*$/, '')} renewal online`)}` : null;
 
-  return html`<details class="card checklist" ${urgent ? 'open' : ''} data-req="${r.id}">
-    <summary><span class="ck-title">${heading(r)}</span>
+  const g = r.subject === 'business' ? lguFor(r.location_city) : null;
+  const official = t.online_url || g?.source_url || t.source_url || null;
+  const step = (n, title, body, cls = '') => html`<li class="st ${cls}"><span class="st-n" aria-hidden="true">${n}</span><div class="st-body"><h3>${title}</h3>${body}</div></li>`;
+  let n = 0;
+  return html`<details class="card checklist steps" open data-req="${r.id}">
+    <summary><span class="ck-title">${heading(r)}: step by step</span>
       ${when(items.length, html`<span class="ck-count" aria-live="polite"><b data-ck-done>${doneCount}</b> of ${items.length} ready</span>`)}</summary>
-    <p class="muted small">A general guide. Your ${r.subject === 'business' ? 'city, barangay or agency' : 'agency'} may ask for more or less, so check with them before you go.</p>
-    ${sourceLine(t)}
-    ${items.some((i) => i.agency && i.agency.startsWith('original')) ? html`<p class="ck-orig"><b class="ck-orig-ic" aria-hidden="true">!</b><span>A scan or photo you send us is only for checking. It doesn't replace an original the office asks for. Never mail an original to anyone you haven't verified.</span></p>` : ''}
-    <dl class="ck-facts">
-      ${when(t.where_to_file, html`<dt>Where</dt><dd>${t.where_to_file}</dd>`)}
-      ${when(t.online_url, html`<dt>Online</dt><dd>${external(t.online_url, t.online_label || 'Official website')}</dd>`)}
-      ${when(cityLink, html`<dt>Online</dt><dd>${external(cityLink, `Find ${city}'s online renewal`)} <small class="muted">(a web search; use the city's own .gov.ph site)</small></dd>`)}
-      ${when(t.validity_note, html`<dt>Valid for</dt><dd>${t.validity_note}</dd>`)}
-    </dl>
-    ${cityEntry(r)}
-    ${when(deps.length, html`<div class="ck-deps"><b>Do these first</b>
+    <ol class="st-list">
+    ${when(deps.length, step(++n, 'Do this first', html`<div class="ck-deps">
       ${deps.map((d) => d.req
         ? html`<a class="ck-dep" href="#/requirement/${d.req.id}"><span>${d.req.name}</span>${statusChip(d.req.status)}</a>`
         : html`<div class="ck-dep missing"><span>${d.type.name} <small class="muted">· not tracked here yet</small></span>
             ${when(edit, html`<button class="btn btn-sm btn-soft" data-act="req-add" data-subject="${r.subject}" data-id="${r.business_id || r.vehicle_id || r.person_id}"
-              data-type="${d.code}" ${r.location_id ? html`data-loc="${r.location_id}"` : ''}>Add it</button>`)}</div>`)}</div>`)}
-    ${when(items.length, html`<div class="ck-progress" aria-hidden="true"><span style="width:${Math.round((doneCount / items.length) * 100)}%"></span></div>
+              data-type="${d.code}" ${r.location_id ? html`data-loc="${r.location_id}"` : ''}>Add it</button>`)}</div>`)}</div>`, 'st-first'))}
+    ${when(items.length, step(++n, 'Get these papers ready', html`<p class="st-sub">Tick each one when you have it.</p>
+      <div class="ck-progress" aria-hidden="true"><span style="width:${Math.round((doneCount / items.length) * 100)}%"></span></div>
       <ul class="ck-list">${items.map((i) => {
         const tick = done.get(i.k);
         const dep = i.dep ? sibling(r, i.dep) : null;
@@ -107,15 +102,44 @@ export function checklistCard(r, ticks = [], { offer = '' } = {}) {
           ${when(i.u, html`<span class="ck-link">${external(i.u, 'Open')}</span>`)}
           ${i.k === 'inspect' ? walkthroughLine(r) : ''}
           ${(() => { const p = placementFor(r, i.k); return p ? placementLine(p, r) : ''; })()}</li>`;
-      })}</ul>`)}
+      })}</ul>
+      ${items.some((i) => i.agency && i.agency.startsWith('original')) ? html`<p class="ck-orig"><b class="ck-orig-ic" aria-hidden="true">!</b><span>Bring the originals the office asks for. A scan or photo you send us is only for checking. It doesn't replace an original the office asks for.</span></p>` : ''}
+      ${when(edit && r.expires && !['in_progress', 'compliant'].includes(r.status), html`<p class="ck-hint" data-ck-hint ${doneCount ? '' : 'hidden'}>
+        Filed it already? Tap <b>I've started the renewal</b>, so your team isn't alerted that it hasn't started.</p>`)}`))}
+    ${when(t.where_to_file || t.online_url || cityLink || t.validity_note, step(++n, 'Where to file', html`<dl class="ck-facts">
+      ${when(t.where_to_file, html`<dt>Where</dt><dd>${t.where_to_file}</dd>`)}
+      ${when(t.online_url, html`<dt>Online</dt><dd>${external(t.online_url, t.online_label || 'Official website')}</dd>`)}
+      ${when(cityLink, html`<dt>Online</dt><dd>${external(cityLink, `Find ${city}'s online renewal`)} <small class="muted">(a web search; use the city's own .gov.ph site)</small></dd>`)}
+      ${when(g?.portal_url, html`<dt>City portal</dt><dd>${external(g?.portal_url, `${g?.name} online portal`)}</dd>`)}
+      ${when(t.validity_note, html`<dt>Valid for</dt><dd>${t.validity_note}</dd>`)}
+    </dl>`))}
+    ${step(++n, 'How to pay', payBody(r, t, g, edit))}
+    ${step(++n, 'Need help?', html`<ul class="st-help">
+      ${when(official, html`<li>${external(official, 'Official website')} <small>for the latest rules and forms</small></li>`)}
+      ${when(g?.source_url && g.source_url !== official, html`<li>${external(g?.source_url, `${g?.name} official site`)}</li>`)}
+      <li><a href="#/pros">Ask a professional</a> <small>accountants and liaison firms near you</small></li></ul>
+      ${offer}`, 'st-help-step')}
+    </ol>
+    <details class="st-about"><summary>Where this guide comes from</summary>
+      <p class="muted small">A general guide. Your ${r.subject === 'business' ? 'city, barangay or agency' : 'agency'} may ask for more or less, so check with them before you go.</p>
+      ${sourceLine(t)}
+      ${cityEntry(r)}
+    </details>
     ${(() => { const p = placementFor(r, null); return p ? placementLine(p, r) : ''; })()}
-    ${when(edit && r.expires && !['in_progress', 'compliant'].includes(r.status), html`<p class="ck-hint" data-ck-hint ${doneCount ? '' : 'hidden'}>
-      Filed it already? Tap <b>I've started the renewal</b> above, so your team isn't alerted that it hasn't started.</p>`)}
     ${when(!edit, html`<p class="muted small">You can view this checklist. Only people who can edit can tick items.</p>`)}
-    ${offer}
   </details>`;
 }
 
+// Step "How to pay": in plain words, from what we know about the office.
+function payBody(r, t, g, edit) {
+  const where = r.subject === 'vehicle' ? "Pay at the LTO cashier, or online through the LTO portal when it offers it."
+    : g?.online_payment === 'yes' ? html`Pay online through ${g.portal_url ? external(g.portal_url, `${g.name}'s portal`) : `${g.name}'s official portal`}, or at the city hall cashier.`
+    : t.category === 'local' ? "After the office checks your papers, it gives you a bill (an order of payment or tax bill). Pay it at the city hall cashier (the Treasurer's Office)."
+    : 'Pay the fees at the office cashier or on its official website.';
+  return html`<p>${where}</p>
+    <p class="st-sub">Keep the official receipt. Pay government fees only through the office's own cashier or website.</p>
+    ${when(edit && has('billpay'), html`<div class="btn-row"><button class="btn btn-soft btn-sm" data-act="bill-add" data-id="${r.id}">${ICON.camera} Got the bill? Add it</button></div>`)}`;
+}
 // Our own walk-through, on the "inspection" step: one line, and free when the care plan includes it.
 function walkthroughLine(r) {
   if (!has('revenue') || !canEdit() || r.open_request_id) return '';

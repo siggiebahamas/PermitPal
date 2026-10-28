@@ -23,3 +23,33 @@ export const LEGAL_DAYS = { simple: 3, complex: 7, technical: 20 };
 export function filingDays(kind, days, extended = false, closed = 0) {
   return (LEGAL_DAYS[kind] || Number(days) || 3) * (extended ? 2 : 1) + (Number(closed) || 0);
 }
+
+// How long each office has, by law, so nobody has to pick. kind: the RA 11032 class (Sec. 9: simple 3, complex 7,
+// highly technical 20 working days, counted from a complete application; Sec. 10: no action by then = approved).
+// usual: working days most offices actually take (business permits: DTI-DILG-DICT JMC 2016-01 and ARTA JMC 2021-01
+// set 1 day for renewals, 2 for new; BFP Citizen's Charter: FSIC renewal 1 day with a valid FSIC, up to 3 without).
+export const PROCESS = {
+  mayors_permit: ['simple', 2, 'Renewals: 1 day, new: 2 days (business permit rules)'],
+  barangay_clearance: ['simple', 1, 'Usually released the same or next day'],
+  fsic: ['simple', 3, 'Fire Protection: 1 day with a valid FSIC, up to 3 without'],
+  sanitary_permit: ['complex', 3, 'May need a sanitary inspection first'],
+  bir_cor: ['simple', 1, 'Usually released within a day'],
+  dti_business_name: ['simple', 1, 'Usually released online the same day'],
+  sec_registration: ['simple', 1, 'Usually released online within a day'],
+  cda_registration: ['complex', 7, 'Reviewed by more than one office'],
+  lto_registration: ['simple', 1, 'Usually released the same day'],
+  ctpl: ['simple', 1, 'Usually released the same day'],
+  emission_test: ['simple', 1, 'Usually released the same day'],
+  mvir: ['simple', 1, 'Usually released the same day'],
+  drivers_license: ['simple', 1, 'Usually released the same day'],
+  health_certificate: ['simple', 1, 'Usually released within a day, after the tests'],
+  nbi_clearance: ['simple', 1, 'Usually released the same day, unless there is a "hit"'],
+  doh_lto: ['technical', 20, 'A highly technical health review'],
+  ecc: ['technical', 20, 'A highly technical environmental review'],
+  pcab_license: ['technical', 20, 'A highly technical review'],
+  school_permit: ['technical', 20, 'A highly technical review'],
+};
+export function processFor(code) {
+  const [kind, usual, why] = PROCESS[code] || ['simple', 3, 'Most permits and renewals'];
+  return { kind, days: LEGAL_DAYS[kind], usual: Math.min(usual, LEGAL_DAYS[kind]), why };
+}

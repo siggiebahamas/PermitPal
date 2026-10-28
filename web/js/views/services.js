@@ -46,6 +46,13 @@ const PROMISES = [
   ['check', 'Your new permit is saved for you.', 'And your reminders start again for next time.'],
   ['handshake', "If we can't finish it, you get our fee back.", 'If the government fee is lower than quoted, we refund the difference.'],
 ];
+// The weight we take off: the same four chores, on your own and with us.
+const CALM = [
+  ['Find the right forms and rules for your city', 'Say yes to one fixed price'],
+  ['Fill in the same details, again', 'Send photos of what you already have'],
+  ['Chase the office for updates', 'See every update here, as it happens'],
+  ["Remember next year's deadline", 'Your new permit is saved, and next year is already on your calendar'],
+];
 // How it works, in three steps.
 const STEPS = [['Pick a service', 'From the list below.'], ['Get your price', 'Within 1 business day.'], ['We do it', 'You can follow each step here.']];
 const FINE_PRINT = 'Pinoy Permit acts as your authorized representative, only with your written authorization, and follows each office\'s standard process. We never pay anyone to speed things up: that is against the law (RA 11032). Processing times are set by the government office.';
@@ -89,6 +96,17 @@ export function services(el, params) {
     <div class="page-head"><div><h1>Done for you</h1>
       <p class="page-sub">${IN_PERSON ? 'Busy? We do the paperwork and the lines. You just say yes.' : 'Busy? We do the paperwork online. You just say yes.'}</p></div>
       ${when(many.length > 1, html`<button class="btn btn-primary" data-act="svc-bulk">Renew ${many.length} for me</button>`)}</div>
+    <section class="dfy-calm" aria-labelledby="dfy-calm-h">
+      <div class="dfy-calm-top"><span class="dfy-calm-kicker">Peace of mind, handled</span>
+        <h2 id="dfy-calm-h">Your permits, off your mind.</h2>
+        <p>Hand us the paperwork. We file it online, follow it up, and save the new permit to your account. You just say yes.</p></div>
+      <div class="dfy-calm-cols">
+        <div class="dfy-calm-col is-alone"><h3>On your own</h3><ul>${CALM.map(([a]) => html`<li>${a}</li>`)}</ul></div>
+        <div class="dfy-calm-col is-us"><h3>With Pinoy Permit</h3><ul>${CALM.map(([, b]) => html`<li>${b}</li>`)}</ul></div>
+      </div>
+      <div class="dfy-calm-foot"><a class="btn btn-primary" href="#svc-menu" data-scroll-to="svc-menu">See what we can do</a>
+        <span>Price first. Nothing is charged until you say yes.</span></div>
+    </section>
     <section class="card dfy-how"><div class="dfy-how-col"><h2>How it works</h2>
         <ol class="dfy-steps">${STEPS.map(([t, d], i) => html`<li><span class="dfy-n">${i + 1}</span><b>${t}</b><span>${d}</span></li>`)}</ol></div>
       <div class="dfy-how-col"><h2>What you can count on</h2>
@@ -107,7 +125,7 @@ export function services(el, params) {
       <div><span class="dfy-kicker">New here? Start with this</span><h2>${setup?.name}</h2><p>Send photos of your permits. We type everything in for you.</p>
         <p class="dfy-ho-meta"><b>${price(setup || {})}</b> · ${setup?.turnaround}</p></div>
       ${when(canEdit(), html`<button class="btn btn-primary" data-act="svc-request" data-code="setup_from_paper">Get a price</button>`)}</section>`)}
-    <h2 class="dfy-menu-h">What we can do for you</h2>
+    <h2 class="dfy-menu-h" id="svc-menu">What we can do for you</h2>
     ${svc.length <= 8 ? '' : html`<nav class="dfy-jump" aria-label="Jump to a kind of service">${CATEGORIES.filter(([cat]) => svc.some((s) => s.category === cat)).map(([cat, title, , ic]) => html`<a href="#svc-${cat}" data-scroll-to="svc-${cat}">${ICON[ic] || ICON.check}${title}</a>`)}</nav>`}
     ${svc.length <= 8 ? html`<div class="svc-grid">${CATEGORIES.flatMap(([cat, title, , ic]) => svc.filter((s) => s.category === cat).map((s) => serviceCard(s, [title, ic])))}</div>`
       : CATEGORIES.map(([cat, title, sub, ic]) => {

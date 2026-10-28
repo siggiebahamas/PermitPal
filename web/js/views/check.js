@@ -78,7 +78,8 @@ function section(title, sub, items, sev) {
   if (!items.length) return '';
   return html`<section class="card check-sec ${sev}"><div class="card-head"><div><h2>${title}</h2><p class="card-sub">${sub}</p></div>
     <b class="check-count" aria-label="${plural(items.length, 'item')}">${items.length}</b></div>
-    ${items.map(row)}</section>`;
+    ${items.slice(0, 3).map(row)}
+    ${when(items.length > 3, html`<details class="check-more"><summary>Show ${plural(items.length - 3, 'more item')}</summary>${items.slice(3).map(row)}</details>`)}</section>`;
 }
 function where(f) {
   if (f.person_id) return person(f.person_id)?.full_name;

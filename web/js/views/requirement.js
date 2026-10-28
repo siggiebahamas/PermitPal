@@ -10,7 +10,7 @@ import { handledByLine } from './assign.js';
 import { checklistCard, watchChecklist } from './checklist.js';
 import { serviceOffer } from './services.js';
 import { scanBox, wireScan } from './scan.js';
-import { papersCard, openPapersCheck, loadState, watchPapers } from './load.js';
+import { papersCard, papersLine, openPapersCheck, loadState, watchPapers } from './load.js';
 import { officeData, clockCard, billsCard, watchOffice } from './office.js';
 import { packetCard, loadPackets, watchPacket } from './packet.js';
 import { cityBanner, cityOf, cityRule, cityExtensions } from './citydates.js';
@@ -18,6 +18,7 @@ import * as db from 'pp/data';
 
 let detail = null;       // { id, cycles, documents, activity }
 let loadingId = null;
+let moreOpen = false;   // "More tools" stays open once you open it
 let navs = 0;            // page changes, so a papers check answered meanwhile shows when you come back
 window.addEventListener('hashchange', () => { navs++; });
 
@@ -49,6 +50,7 @@ export async function render(el, id) {
     if (!location.hash.includes(id)) return;
   }
   el.innerHTML = String(page(r));
+  el.querySelector('.more-tools')?.addEventListener('toggle', (e) => { moreOpen = e.target.open; });
   trackPlacements(el);
   // Arriving from a due date on the Home calendar: show the renewal section (how to renew, the checklist), open,
   // without starting anything. The person decides what to do from there.
@@ -106,6 +108,32 @@ function page(r) {
   const docsOf = (cycleId) => detail.documents.filter((d) => d.cycle_id === cycleId);
   const parentHref = subjectHref(r);
   const edit = canEdit();
+  const docsNow = current ? docsOf(current.id).length : 0;
+  const filings = detail.office?.filings || [];
+  const billList = (detail.office?.bills || []).filter((b) => b.status !== 'cancelled');
+  // Only what needs you now sits on the page; the rest waits under "More tools".
+  const clockOn = filings.some((f) => f.status === 'waiting');
+  const billsOn = billList.length > 0;
+  const papersOn = (detail.checks || []).some((c) => ['waiting', 'answered'].includes(c.status));
+  const clock = clockCard(r, filings);
+  const bills = billsCard(r, detail.office?.bills || []);
+  const papers = papersCard(r, detail.checks || [], docsNow);
+  const offer = coverOf(r) ? '' : serviceOffer(r, { compact: true });
+  const steps = checklistCard(r, detail.ticks || [], { offer: html`${offer}${papersLine(r, detail.checks || [], docsNow)}` })
+    || html`${coverOf(r) ? '' : serviceOffer(r)}${papersOn ? '' : papersCard(r, detail.checks || [], docsNow)}`;
+  const record = html`<section class="card record-card">
+      <div class="card-head"><h2>Your permit</h2>
+        ${when(edit, html`<div class="btn-row">
+          <button class="btn btn-sm btn-soft" data-act="req-edit" data-id="${r.id}">${current ? 'Edit details' : 'Add details'}</button>
+          <button class="btn btn-sm btn-soft" data-act="req-upload" data-id="${r.id}">${ICON.upload} Upload</button>
+          ${when(r.expires && current, html`<button class="btn btn-sm btn-renew" data-act="req-renew" data-id="${r.id}">Renew</button>`)}
+        </div>`)}
+      </div>
+      ${current ? recordBody(current, r) : html`<p class="muted">Nothing recorded yet. Add the reference number${r.expires ? ', expiry date' : ''} and upload a copy of the document.</p>`}
+      ${current ? filesList(docsOf(current.id)) : ''}
+      ${when(edit && r.expires && r.status !== 'in_progress' && r.status !== 'compliant', html`<div class="btn-row record-started">
+        <button class="btn btn-ghost btn-sm" data-act="req-start-renewal" data-id="${r.id}">I've started the renewal</button></div>`)}
+    </section>`;
 
   return html`
     <a class="back" href="${parentHref}">← ${subjectLabel(r)}</a>
@@ -142,54 +170,36 @@ function page(r) {
     ${when(t?.help_text, html`<p class="help-text">${t?.help_text}</p>`)}
     ${['action_required', 'renew_soon'].includes(r.status) ? penaltyNote(r) : ''}
 
-    <section class="card">
-      <div class="card-head"><h2>Current record</h2>
-        ${when(edit, html`<div class="btn-row">
-          <button class="btn btn-sm btn-soft" data-act="req-edit" data-id="${r.id}">${current ? 'Edit details' : 'Add details'}</button>
-          <button class="btn btn-sm btn-soft" data-act="req-upload" data-id="${r.id}">${ICON.upload} Upload</button>
-          ${when(r.expires && current, html`<button class="btn btn-sm btn-renew" data-act="req-renew" data-id="${r.id}">Renew</button>`)}
-        </div>`)}
-      </div>
-      ${current ? recordBody(current, r) : html`<p class="muted">Nothing recorded yet. Add the reference number${r.expires ? ', expiry date' : ''} and upload a copy of the document.</p>`}
-      ${current ? filesList(docsOf(current.id)) : ''}
-    </section>
-
-    <div class="btn-row wrap">
-      ${when(edit && r.expires && r.status !== 'in_progress' && r.status !== 'compliant', html`
-        <button class="btn btn-ghost" data-act="req-start-renewal" data-id="${r.id}">I've started the renewal</button>`)}
-    </div>
-    ${packetCard(r, detail.packets || [])}
+    ${r.status === 'compliant' ? html`${record}${steps}` : html`${steps}${record}`}
     ${careNote(r) || ''}
-    ${clockCard(r, detail.office?.filings || [])}
-    ${checklistCard(r, detail.ticks || [], { offer: coverOf(r) ? '' : serviceOffer(r, { compact: true }) }) || (coverOf(r) ? '' : serviceOffer(r))}
-    ${papersCard(r, detail.checks || [], current ? docsOf(current.id).length : 0)}
-    ${billsCard(r, detail.office?.bills || [])}
-    ${partnerSuggestions(r)}
+    ${when(clockOn, clock)}${when(billsOn, bills)}${when(papersOn, papers)}
 
-    ${when(past.length, html`
+    <details class="card more-tools" ${moreOpen ? 'open' : ''}>
+      <summary><span><b>More tools</b><small>Renewal forms filled in for you, a processing timer, bills, past records, notes and history</small></span></summary>
+      ${packetCard(r, detail.packets || [])}
+      ${when(!clockOn, clock)}${when(!billsOn, bills)}
+      ${partnerSuggestions(r)}
+      ${when(past.length, html`
+        <section class="card">
+          <h2>Past records</h2>
+          <p class="muted small">Every earlier permit period stays on file, with its documents.</p>
+          ${past.map((c) => html`<div class="past">${recordBody(c, r, true)}${filesList(docsOf(c.id), true)}</div>`)}
+        </section>`)}
+      ${when(detail.documents.some((d) => !d.cycle_id), html`
+        <section class="card"><h2>Other files</h2>${filesList(detail.documents.filter((d) => !d.cycle_id))}</section>`)}
       <section class="card">
-        <h2>Past records</h2>
-        <p class="muted small">Every earlier permit period stays on file, with its documents.</p>
-        ${past.map((c) => html`<div class="past">${recordBody(c, r, true)}${filesList(docsOf(c.id), true)}</div>`)}
-      </section>`)}
-
-    ${when(detail.documents.some((d) => !d.cycle_id), html`
-      <section class="card"><h2>Other files</h2>${filesList(detail.documents.filter((d) => !d.cycle_id))}</section>`)}
-
-    <section class="card">
-      <div class="card-head"><h2>Notes</h2>${when(edit, html`<button class="btn btn-sm btn-ghost" data-act="req-notes" data-id="${r.id}">Edit</button>`)}</div>
-      <p class="lined ${r.notes ? '' : 'muted'} pre">${r.notes || 'No notes. Add the office address, contact person, fees paid, or anything worth remembering next year.'}</p>
-    </section>
-
-    <section class="card">
-      <h2>Activity</h2>
-      ${detail.activity.length ? detail.activity.map((a) => html`
-        <div class="hist"><div>${a.summary}</div><div class="muted small">${memberName(a.actor_id)} · ${timeAgo(a.created_at)}</div></div>`)
-        : html`<p class="muted">No activity yet.</p>`}
-    </section>
-
+        <div class="card-head"><h2>Notes</h2>${when(edit, html`<button class="btn btn-sm btn-ghost" data-act="req-notes" data-id="${r.id}">Edit</button>`)}</div>
+        <p class="lined ${r.notes ? '' : 'muted'} pre">${r.notes || 'No notes. Add the office address, contact person, fees paid, or anything worth remembering next year.'}</p>
+      </section>
+      <section class="card">
+        <h2>Activity</h2>
+        ${detail.activity.length ? detail.activity.map((a) => html`
+          <div class="hist"><div>${a.summary}</div><div class="muted small">${memberName(a.actor_id)} · ${timeAgo(a.created_at)}</div></div>`)
+          : html`<p class="muted">No activity yet.</p>`}
+      </section>
     ${when(edit, html`<div class="danger-zone"><button class="btn btn-ghost danger" data-act="req-delete" data-id="${r.id}">Delete this permit</button>
       <span class="muted small">You can restore it from Trash.</span></div>`)}
+    </details>
   `;
 }
 

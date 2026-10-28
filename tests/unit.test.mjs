@@ -460,3 +460,17 @@ Gross Income                        930,300.00`;
   assert.equal(readSales('Total Gross Sales/Receipts 450,000').amounts[0], 450000);
   assert.equal(readSales('').amounts.length, 0);
 });
+
+test('The processing clock sets the legal days per permit, so nobody picks', async () => {
+  const { processFor, LEGAL_DAYS } = await import('../web/js/workdays.js');
+  assert.deepEqual(processFor('mayors_permit').kind, 'simple');
+  assert.equal(processFor('mayors_permit').days, 3);
+  assert.equal(processFor('sanitary_permit').days, 7);              // needs an inspection: complex
+  assert.equal(processFor('ecc').days, 20);                         // highly technical
+  assert.equal(processFor('not_a_permit').days, 3);                 // unknown: the simple default
+  for (const code of ['mayors_permit', 'fsic', 'doh_lto', 'nbi_clearance', 'x']) {
+    const p = processFor(code);
+    assert.equal(p.days, LEGAL_DAYS[p.kind]);
+    assert.ok(p.usual >= 1 && p.usual <= p.days);                   // "usually ready" never later than the law
+  }
+});
