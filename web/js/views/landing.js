@@ -200,9 +200,10 @@ const tour = () => html`<section id="tour" class="lp-sec" aria-labelledby="tour-
 
 // ---------------------------------------------------------------- home: what the free plan gives, as a receipt
 const receipt = () => {
-  const lines = [[ICON.building, 't-blue', '1 business + 1 vehicle'], [ICON.list, 't-blue', 'Every permit, one list'], [ICON.bell, 't-green', "Reminders before it's late"],
-    ...(has('filings') ? [[ICON.calendar, 't-teal', 'Tax and contribution dates']] : []), ...(has('library2') ? [[PIC.todo, 't-lilac', 'Step-by-step renewals']] : []),
-    [ICON.file, 't-green', 'Papers safe for years'], [ICON.share, 't-blue', 'Proof in one link'], [ICON.download, 't-lilac', 'Inspection-ready download'],
+  const lines = [[ICON.building, 't-blue', '1 business + 1 vehicle'], [ICON.list, 't-blue', 'Every permit, one list'], [ICON.bell, 't-green', 'Reminders 30, 7 and 1 day before'],
+    ...(has('library2') ? [[PIC.todo, 't-lilac', 'Step-by-step renewal guides']] : []), ...(has('filings') ? [[ICON.calendar, 't-teal', 'Tax and contribution dates']] : []),
+    ...(has('clock') ? [[ICON.calendar, 't-blue', "Know when an office runs late"]] : []),
+    [ICON.file, 't-green', has('vault') ? 'Files kept private and encrypted' : 'Files kept private, for years'], [ICON.share, 't-blue', 'Proof in one link'],
     ...(has('mfa') ? [[PIC.lock, 't-teal', 'Two-step login']] : [])];
   return html`<section id="free" class="lp-sec lp-free2" aria-labelledby="free-h">
     <div class="lp-free2-copy">

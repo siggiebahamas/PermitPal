@@ -1403,8 +1403,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
       const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
       return b.textContent === 'One screen.' && b.getClientRects().length === 1 && b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 2;
     }));
-    check(`website ${label}: 8 worries taken away, and 9 lines on the free-plan receipt at ₱0.00 (1 business + 1 vehicle first)`, (await p.locator('.lp-worry').count()) === 8
-      && (await p.locator('.lp-rc-lines li').count()) === 9 && /1 business \+ 1 vehicle/.test(await p.textContent('.lp-rc-lines li')) && /Total each month\s*₱0\.00/.test(await p.textContent('.lp-receipt')));
+    check(`website ${label}: 8 worries taken away, and 8 or more lines on the free-plan receipt at ₱0.00 (1 business + 1 vehicle first)`, (await p.locator('.lp-worry').count()) === 8
+      && (await p.locator('.lp-rc-lines li').count()) >= 8 && /1 business \+ 1 vehicle/.test(await p.textContent('.lp-rc-lines li')) && /Total each month\s*₱0\.00/.test(await p.textContent('.lp-receipt')));
     check(`website ${label}: no prices on the home page`, (await p.locator('[data-plan-card], .bill-toggle, #pricing').count()) === 0);
     check(`website ${label}: nothing removed, and nothing Pinoy Permit doesn't do`, !/Head office|Year-round care|licensed firm|we verify|verified by Pinoy Permit|vetted|legal/i.test(text));
     check(`website ${label}: Plus mentioned only once its database part is on`, /Plus, more staff/.test(text) === (label !== 'live'));
