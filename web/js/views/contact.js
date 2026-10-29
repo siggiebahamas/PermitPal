@@ -15,14 +15,17 @@ const TOPICS = [
 ];
 
 export function contactPage(el, { signedIn = !!S.user } = {}) {
-  const topic = new URLSearchParams(location.hash.split('?')[1] || '').get('topic') || 'question';
+  const qs = new URLSearchParams(location.hash.split('?')[1] || '');
+  const topic = qs.get('topic') || 'question';
+  // From "Report a problem with this page" on a public permit page.
+  const about = /^https:\/\/|^http:\/\/localhost/.test(qs.get('about') || '') ? qs.get('about').slice(0, 300) : '';
   const body = html`
     <form id="contact-form" class="contact-form">
       ${when(!signedIn, html`<div class="grid2">
         <label class="field"><span>Your name</span><input name="name" maxlength="120" autocomplete="name"></label>
         <label class="field"><span>Your email <small>(so we can reply)</small></span><input type="email" name="email" required maxlength="200" autocomplete="email"></label></div>`)}
       <label class="field"><span>What is it about?</span><select name="topic">${TOPICS.map(([k, l]) => html`<option value="${k}" ${k === topic ? 'selected' : ''}>${l}</option>`)}</select></label>
-      <label class="field"><span>Message</span><textarea name="message" rows="6" maxlength="4000" required placeholder="Tell us what you need. For a problem, say which page and what you clicked."></textarea></label>
+      <label class="field"><span>Message</span><textarea name="message" rows="6" maxlength="4000" required placeholder="Tell us what you need. For a problem, say which page and what you clicked.">${about ? `I want to report this permit page: ${about}\nWhat looks wrong: ` : ''}</textarea></label>
       <div class="form-error" hidden></div>
       <button class="btn btn-primary">Send message</button>
     </form>

@@ -14,6 +14,7 @@ import { papersCard, papersLine, openPapersCheck, loadState, watchPapers } from 
 import { officeData, clockCard, billsCard, watchOffice } from './office.js';
 import { packetCard, loadPackets, watchPacket } from './packet.js';
 import { cityBanner, cityOf, cityRule, cityExtensions } from './citydates.js';
+import { loadFileAccess, fileAccess, lockBox } from './fileguard.js';
 import * as db from 'pp/data';
 
 let detail = null;       // { id, cycles, documents, activity }
@@ -35,15 +36,15 @@ export async function render(el, id) {
     loadingId = id;
     try {
       const [d, checks, office, packets] = await Promise.all([db.requirementDetail(id, { checklist: has('library2') }), has('load') ? db.papersChecks(id).catch(() => []) : [],
-        officeData(id), loadPackets(r), loadPartners(), loadPlacements(), has('load') ? loadState().catch(() => null) : null]);
+        officeData(id), loadPackets(r), loadPartners(), loadPlacements(), has('load') ? loadState().catch(() => null) : null, loadFileAccess(true)]);
       detail = { id, ...d, checks, office, packets, checksNav: navs };
     } catch (e) { toastError(e); }
     loadingId = null;
     if (!location.hash.includes(id)) return; // navigated away while loading
-  } else if ((has('load') || has('clock') || has('billpay')) && detail.checksNav !== navs) {
+  } else if ((has('load') || has('clock') || has('billpay') || has('fileguard')) && detail.checksNav !== navs) {
     // A papers check may have been answered, or a bill paid by Pinoy Permit (its receipt filed here), since: small reads.
     const [checks, office, d] = await Promise.all([has('load') ? db.papersChecks(id).catch(() => detail.checks || []) : [], officeData(id),
-      has('billpay') ? db.requirementDetail(id, { checklist: has('library2') }).catch(() => null) : null]);
+      has('billpay') ? db.requirementDetail(id, { checklist: has('library2') }).catch(() => null) : null, loadFileAccess(true)]);
     detail.checks = checks; detail.office = office;
     if (d) Object.assign(detail, d);
     detail.checksNav = navs;
@@ -131,6 +132,7 @@ function page(r) {
       </div>
       ${current ? recordBody(current, r) : html`<p class="muted">Nothing recorded yet. Add the reference number${r.expires ? ', expiry date' : ''} and upload a copy of the document.</p>`}
       ${current ? filesList(docsOf(current.id)) : ''}
+      ${current && docsOf(current.id).length ? lockBox(r) : ''}
       ${when(edit && r.expires && r.status !== 'in_progress' && r.status !== 'compliant', html`<div class="btn-row record-started">
         <button class="btn btn-ghost btn-sm" data-act="req-start-renewal" data-id="${r.id}">I've started the renewal</button></div>`)}
     </section>`;
@@ -217,15 +219,18 @@ function recordBody(c, r, compact = false) {
 
 function filesList(docs, compact = false) {
   if (!docs.length) return compact ? '' : html`<p class="record-note due needinfo">No document uploaded for this record yet.</p>`;
+  const r = reqById(docs[0].requirement_id);
+  const a = r ? fileAccess(r.id) : 'open';
+  const locked = a === 'locked' || a === 'pending';
   return html`<div class="files">${docs.map((d) => html`
     <div class="file">
       <span class="file-ic">${ICON.file}</span>
       <div class="file-main"><div class="file-name">${d.file_name}</div><div class="muted small">${fileSize(d.size_bytes)} · uploaded ${fmtDate(d.created_at)}</div></div>
-      <div class="btn-row">
+      ${locked ? html`<span class="file-locked-tag">${ICON.lock}Locked</span>` : html`<div class="btn-row">
         <button class="btn btn-sm btn-soft" data-act="doc-view" data-path="${d.storage_path}" data-name="${d.file_name}" data-type="${d.mime_type || ''}">View</button>
         <button class="btn btn-sm btn-ghost" data-act="doc-download" data-path="${d.storage_path}" data-name="${d.file_name}">Download</button>
         ${when(canEdit(), html`<button class="btn btn-sm btn-ghost danger" data-act="doc-remove" data-id="${d.id}" data-name="${d.file_name}">Remove</button>`)}
-      </div>
+      </div>`}
     </div>`)}</div>`;
 }
 
@@ -350,7 +355,8 @@ export function openRenew(r) {
 export function openUpload(r) {
   openModal(`Upload — ${r.name}`, html`
     <p class="muted small">${subjectLabel(r)}. ${r.cycle_id ? 'The file is attached to the current record.' : 'A record is created for it; add the reference number and dates next.'}</p>
-    ${fileField()}`, {
+    ${fileField()}
+    <p class="muted small upload-true">By uploading, you confirm it's a true copy of a document issued to you. <a href="terms.html#genuine" target="_blank" rel="noopener">Why this matters</a></p>`, {
     submitLabel: 'Upload',
     onSubmit: async (fd) => {
       const file = fd.get('file');

@@ -25,6 +25,9 @@ function shell(inner) {
       <a href="${home}#/welcome">Make a page like this for your business</a></p></footer></div>`);
   document.getElementById('print')?.addEventListener('click', () => window.print());
 }
+// What a viewer must know: these are the business's own records, not checked with the government.
+const notice = (report) => html`<section class="tp-notice" role="note"><b>Shown as the business entered it.</b> Pinoy Permit doesn't check permits with the government or confirm that copies are genuine. To be sure, ask to see the originals or check with the office that issued them.
+  <a href="${report}">Report a problem with this page</a></section>`;
 const fail = (title, msg) => shell(html`<section class="card"><div class="card-head"><h1>${title}</h1></div><p class="share-msg">${msg}</p></section>`);
 
 async function main() {
@@ -52,6 +55,7 @@ async function main() {
       <p class="muted small">From ${data.title}'s own records, checked automatically by Pinoy Permit ${checkedWhen(data.checked_at)} · status as of ${fmtDate(data.as_of)}</p>
       ${data.recipient ? html`<p class="small">Hi ${data.recipient}: you get an email when they renew a permit. <a href="?c=${code}&r=${rcpt}&stop=1">Stop these emails</a></p>` : ''}
     </section>
+    ${notice(`${home}#/contact?topic=other&about=${encodeURIComponent(location.href.split('#')[0])}`)}
     <section class="card">
       ${[...groups].map(([g, list]) => html`${groups.size > 1 ? html`<h3 class="share-group">${g}</h3>` : ''}
         ${list.map((i) => { const [t, cls] = label(i); return html`<div class="line share-line tp-line"><div class="share-main"><b>${i.name}</b>
@@ -80,7 +84,7 @@ async function main() {
       const r = await fetch(`${SUPABASE_URL}/functions/v1/doc-vault?op=get&path=${encodeURIComponent(b.dataset.path)}`, { headers: { apikey: SUPABASE_KEY }, cache: 'no-store' });
       if (r.ok) {
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(await r.blob()); a.download = b.dataset.name || 'copy'; document.body.appendChild(a); a.click(); a.remove();
+        a.href = URL.createObjectURL(await r.blob()); a.download = `Copy - ${b.dataset.name || 'document'}`; document.body.appendChild(a); a.click(); a.remove();
         b.disabled = false; return;
       }
     } catch { /* fall back to the plain link */ }

@@ -2,7 +2,7 @@
 // shareable proof-of-compliance links, the inspection pack (.zip) and calendar export (.ics).
 import { html, fmtDate, fmtDateTime, peso, toast, toastError, when, plural, timeAgo, openModal, formObject, normalizePhone, todayPH, download, confirmDialog } from '../util.js';
 import { S, on, go, reload, canEdit, business, vehicle, person, reqsOf, empty, has, hasPlus } from '../core.js';
-import { STATUS, byPriority, subjectLabel, duePill, ICON, counts } from '../components.js';
+import { STATUS, byPriority, subjectLabel, duePill, ICON, counts, attestBox } from '../components.js';
 import * as db from 'pp/data';
 import { makeZip } from '../zip.js';
 import { trustSection } from './trust.js';
@@ -192,8 +192,8 @@ export async function costs(el) {
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Costs & budget</h1><p class="muted">How much your permits cost, and what's coming next.</p></div></div>
     <div class="stats four">
-      <div class="stat ok"><div class="stat-n">${peso(spentTotal)}</div><div class="stat-l" title="Paid in the last 12 months">Paid, last 12 mos</div></div>
-      <div class="stat soon"><div class="stat-n">${peso(known(all))}</div><div class="stat-l" title="Expected in the next 12 months">Due, next 12 mos</div></div>
+      <div class="stat ok"><div class="stat-n">${peso(spentTotal)}</div><div class="stat-l" title="Paid in the last 12 months">Paid, last 12 months</div></div>
+      <div class="stat soon"><div class="stat-n">${peso(known(all))}</div><div class="stat-l" title="Expected in the next 12 months">Due, next 12 months</div></div>
       <div class="stat progress"><div class="stat-n">${busiest && known(busiest.items) ? busiest.label.split(' ')[0] : '—'}</div><div class="stat-l">Biggest month</div></div>
       <div class="stat needinfo"><div class="stat-n">${unknown(all)}</div><div class="stat-l" title="Renewals with no amount yet">No amount yet</div></div>
     </div>
@@ -229,10 +229,12 @@ function openShare(ds) {
     <p class="muted small">Anyone with the link sees a read-only summary of <b>${name}</b>: each permit, its status and expiry. No files, no notes. You can turn the link off anytime.</p>
     <label class="field"><span>Who is it for? <small>(optional)</small></span><input name="label" maxlength="160" placeholder="e.g. Mall leasing office, bank loan"></label>
     <div class="grid2"><label class="field"><span>Link works for</span><select name="days"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></label></div>
-    <label class="check"><input type="checkbox" name="show_refs" checked> Show reference numbers</label>`, {
+    <label class="check"><input type="checkbox" name="show_refs" checked> Show reference numbers</label>
+    ${attestBox()}`, {
     submitLabel: 'Create link',
     onSubmit: async (fd) => {
       const f = formObject(fd);
+      if (!f.attest) throw new Error('Tick the box to confirm these are genuine records.');
       const row = await db.createShare({ org_id: S.org.id, scope, subject_id: scope === 'org' ? null : ds.id, label: f.label, days: f.days, show_refs: !!f.show_refs });
       if (location.hash.startsWith('#/sharing')) shares(document.getElementById('main'));
       setTimeout(() => showLink(row.token), 0);

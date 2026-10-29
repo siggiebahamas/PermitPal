@@ -481,9 +481,10 @@ test('Document vault: files are stored sealed, open only for who storage allows,
   const org = '11111111-1111-4111-8111-111111111111', other = '22222222-2222-4222-8222-222222222222';
   const store = new Map();   // path -> { bytes, type }
   const canRead = { 'Bearer eyMEMBER': [org], 'Bearer eyOUTSIDER': [other] };
-  let staffOpens = 0;
+  let staffOpens = 0; const logged = [];
   const fake = async (url, init = {}) => {
     const u = new URL(url); const auth = init.headers?.Authorization || '';
+    if (u.pathname.endsWith('/rpc/log_file_open')) { logged.push([auth, JSON.parse(init.body).p_path]); return new Response(null, { status: 204 }); }
     if (u.pathname.endsWith('/rpc/staff_open_file')) { const ok = auth === 'Bearer eySTAFF'; if (ok) staffOpens++; return new Response(ok ? '"x.pdf"' : '{}', { status: ok ? 200 : 403 }); }
     const m = /\/storage\/v1\/object\/(authenticated\/)?documents\/(.+)$/.exec(u.pathname); const path = decodeURIComponent(m[2]);
     const mayRead = auth === 'Bearer SERVICE' || (canRead[auth] || []).some((o) => path.startsWith(o + '/'));
@@ -507,6 +508,7 @@ test('Document vault: files are stored sealed, open only for who storage allows,
   const back = await call('get', path, 'Bearer eyMEMBER');
   assert.equal(back.status, 200);
   assert.equal(new TextDecoder().decode(await back.arrayBuffer()), '%PDF-1.7 mayors permit MP-2027-0001');
+  assert.deepEqual(logged, [['Bearer eyMEMBER', path]]);                                                   // the open is recorded
   assert.equal((await call('get', path, 'Bearer eyOUTSIDER')).status, 404);                               // another workspace: no
   assert.equal((await call('put', `${other}/r/x.pdf`, 'Bearer eyMEMBER', pdf)).status, 403);               // can't write elsewhere
   assert.equal((await call('get', path, 'Bearer eySTAFF')).status, 200);                                   // staff: through the logged check

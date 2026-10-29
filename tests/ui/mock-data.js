@@ -335,11 +335,48 @@ async function sampleImage(title) {
   g.font = '24px sans-serif'; g.fillStyle = '#4B5568'; g.fillText('Pinoy Permit demo - sample document', 60, 200);
   return new Promise((res) => c.toBlob(res, 'image/png'));
 }
+// Who can open files (database file 20), as the database does it.
+const fileDb = { mode: 'open', alerts: false, grants: [], opens: [] };
+export const __files = fileDb;
+export const __org = org;
+const fileOk = (path) => {
+  const d = db.documents.find((x) => x.storage_path === path);
+  if (!d || fileDb.mode === 'open' || ['owner', 'admin'].includes(org.role)) return true;
+  return fileDb.grants.some((g) => g.requirement_id === d.requirement_id && g.user_id === user.id && g.status === 'approved' && g.expires_at > new Date().toISOString());
+};
+const fileOpened = (path) => { const d = db.documents.find((x) => x.storage_path === path); if (d) fileDb.opens.unshift({ file_name: d.file_name, requirement_id: d.requirement_id, opened_at: new Date().toISOString(), who: 'Sadie Luna' }); };
+export async function fileAccessState() {
+  const admin = ['owner', 'admin'].includes(org.role);
+  const name = (rid) => db.requirements.find((r) => r.id === rid)?.name;
+  return { mode: fileDb.mode, alerts: fileDb.alerts, role: org.role, mine: fileDb.grants.filter((g) => g.user_id === user.id).map((g) => ({ ...g })),
+    pending: admin ? fileDb.grants.filter((g) => g.status === 'pending').map((g) => ({ id: g.id, requirement_id: g.requirement_id, permit: name(g.requirement_id), note: g.note, who: g.who, requested_at: g.requested_at })) : [],
+    opens: admin ? fileDb.opens.slice(0, 60) : [] };
+}
+export async function setFileMode(orgId, mode, alerts) {
+  if (org.role !== 'owner') throw new Error('Only the workspace owner can change who opens files.');
+  fileDb.mode = mode; fileDb.alerts = !!alerts;
+}
+export async function requestFileAccess(reqId, note) {
+  if (fileDb.mode === 'open' || ['owner', 'admin'].includes(org.role)) throw new Error('You can already open these files.');
+  let g = fileDb.grants.find((x) => x.requirement_id === reqId && x.user_id === user.id && x.status === 'pending');
+  if (!g) fileDb.grants.push(g = { id: uid(), requirement_id: reqId, user_id: user.id, who: 'Ben Cruz', status: 'pending', note: note || null, requested_at: new Date().toISOString(), expires_at: null });
+  return g.id;
+}
+export async function decideFileAccess(id, allow, hours = 24) {
+  const g = fileDb.grants.find((x) => x.id === id);
+  if (g.status !== 'pending') throw new Error('This request was already answered.');
+  Object.assign(g, { status: allow ? 'approved' : 'denied', expires_at: allow ? new Date(Date.now() + hours * 3600e3).toISOString() : null });
+}
+
 export async function fileBlob(path) {
+  if (!fileOk(path)) throw new Error('This file is locked. Ask your workspace owner to let you open it.');
+  fileOpened(path);
   const name = String(path || 'document.pdf').split('/').pop();
   return /\.(jpe?g|png|webp)$/i.test(name) ? sampleImage(name) : samplePdf(name);
 }
 export async function fileUrl(path) {
+  if (!fileOk(path)) throw new Error('This file is locked. Ask your workspace owner to let you open it.');
+  fileOpened(path);
   const name = String(path || 'document.pdf').split('/').pop();
   const blob = /\.(jpe?g|png|webp)$/i.test(name) ? await sampleImage(name) : samplePdf(name);
   return URL.createObjectURL(blob);
@@ -835,7 +872,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus', 'vehicles2'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus', 'vehicles2', 'fileguard'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 

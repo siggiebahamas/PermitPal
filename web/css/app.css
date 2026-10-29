@@ -3073,3 +3073,23 @@ i.r { background: #E5484D; } i.y { background: #E9B949; } i.g { background: #34B
 }
 /* The website never scrolls sideways, whatever fonts the phone has */
 .landing { overflow-x: clip; }
+.lp-scope { margin: 6px 0 0; max-width: 520px; font-size: 14.5px; color: #111827; padding-left: 10px; border-left: 3px solid #E9B949; }
+#main.is-switching > :not(.page-head):not(.tabs):not(.pg-band) { opacity: .45; transition: opacity .15s; }
+
+/* Public pages: say plainly what is and isn't checked */
+.tp-notice { margin: 0 0 14px; padding: 12px 16px; border-radius: 12px; background: #FFF8E6; border: 1px solid #F3D88A; color: #3D2E00; font-size: 15px; line-height: 1.45; }
+.tp-notice b { color: #3D2E00; }
+.tp-notice a { color: #1B3F8F; font-weight: 700; }
+.attest { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #FFF8E6; border: 1px solid #F3D88A; font-size: 14.5px; }
+
+/* Files the owner keeps private */
+.file-lock { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 0; padding: 12px 14px; border-radius: 12px; background: #FFF8E6; border: 1px solid #F3D88A; font-size: 15px; color: #3D2E00; }
+.file-lock > span { flex: 1 1 260px; }
+.file-lock svg { width: 20px; height: 20px; flex: none; stroke: #946C00; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.file-lock.open { background: #E3F4EA; border-color: #BFE3CD; color: #0B3D25; }
+.file-lock.open svg { stroke: var(--jade); }
+.file-locked-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: #946C00; }
+.file-locked-tag svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+.file-guard .radio-card small { display: block; }
+.fg-req { flex-wrap: wrap; gap: 8px; }
+.fg-opens { max-height: 320px; overflow-y: auto; }

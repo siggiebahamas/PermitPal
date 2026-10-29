@@ -1,6 +1,6 @@
 // Ready-to-use templates (Plus): letters and sworn statements businesses keep needing for permits,
 // filled in from the workspace's own details. Everyone sees the list and the first lines; the full
-// text comes from the database only for Plus workspaces. Printouts carry "Prepared with Pinoy Permit for …".
+// text comes from the database only for Plus workspaces. Printouts and Word files carry only the document itself.
 import { html, openModal, toast, toastError, when, fmtDate, todayPH, download, esc, peso } from '../util.js';
 import { S, on, has, hasPlus, isOrgAdmin, rerender, business, locationsOf } from '../core.js';
 import { ICON } from '../components.js';
@@ -146,12 +146,12 @@ on('tpl-fill', async (ds) => {
         reset();
       });
       form.req?.addEventListener('change', reset);
-      const footer = () => `Prepared with Pinoy Permit for ${bizName()} · ${fmtDate(todayPH())}`;
-      form.querySelector('[data-tpl-print]').addEventListener('click', () => printSheet(String(html`<article class="tpl-print"><pre>${text()}</pre><footer>${footer()}</footer></article>`)));
+      // The paper is yours: no Pinoy Permit footnote on letters, affidavits or deeds.
+      form.querySelector('[data-tpl-print]').addEventListener('click', () => printSheet(String(html`<article class="tpl-print"><pre>${text()}</pre></article>`)));
       form.querySelector('[data-tpl-copy]').addEventListener('click', async () => { try { await navigator.clipboard.writeText(text()); toast('Copied.'); } catch { toast("Couldn't copy here. Use Word or Print instead.", 'error'); } });
       form.querySelector('[data-tpl-doc]').addEventListener('click', () => {
         const body = esc(text()).split('\n').map((l) => `<p style="margin:0 0 0;min-height:1em">${l || '&nbsp;'}</p>`).join('');
-        const docHtml = `<html><head><meta charset="utf-8"><title>${esc(t.title)}</title></head><body style="font-family:'Times New Roman',serif;font-size:12pt;line-height:1.5">${body}<p style="margin-top:28pt;font-size:8pt;color:#666">${esc(footer())}</p></body></html>`;
+        const docHtml = `<html><head><meta charset="utf-8"><title>${esc(t.title)}</title></head><body style="font-family:'Times New Roman',serif;font-size:12pt;line-height:1.5">${body}</body></html>`;
         download(`${t.title} - ${bizName()}.doc`.replace(/[\\/:*?"<>|]+/g, '-'), '﻿' + docHtml, 'application/msword');
       });
     },

@@ -22,7 +22,11 @@ const KIND_NAMES = { business: 'Business', head_office: 'Head office', firm: 'Ac
 
 export async function admin(el) {
   if (!S.profile?.is_platform_admin) { el.innerHTML = String(empty('Staff only', 'This page is for the Pinoy Permit team.')); return; }
-  el.innerHTML = String(html`<div class="loading">Loading…</div>`);
+  // Switching tabs keeps the page where it is: no "Loading…" flash that would jump back to the top.
+  const switching = !!el.querySelector('[data-act=admin-tab]');
+  const keepY = window.scrollY;
+  if (switching) { el.style.minHeight = `${el.offsetHeight}px`; el.classList.add('is-switching'); }
+  else el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   const rev = has('revenue');
   tab ||= rev ? 'money' : 'inbox';
   if (tab === 'care' && !IN_PERSON) tab = 'money';
@@ -52,9 +56,17 @@ export async function admin(el) {
     <div class="tabs">${rev ? tabBtn('money', 'Money') : ''}${tabBtn('inbox', 'Inbox')}${has('services') ? html`${tabBtn('orders', 'Orders')}${rev && IN_PERSON ? tabBtn('care', 'Care') : ''}${tabBtn('services', 'Services & prices')}` : ''}${has('plus') ? tabBtn('plus', 'Plus & staff') : ''}${has('load') ? tabBtn('load', 'Load') : ''}${has('billpay') || has('clock') ? tabBtn('office', 'Bills & clock') : ''}${has('citydates') ? tabBtn('cities', has('lgus') ? 'Cities' : 'City deadlines') : ''}${tabBtn('orgs', 'Workspaces & plans')}${tabBtn('partners', 'Professionals')}${rev ? tabBtn('billing', 'Partner billing') : tabBtn('referrals', 'Quote requests')}
       ${tabBtn('payments', 'Payment details')}${tabBtn('outbox', 'Messages')}${has('errors') ? tabBtn('errors', 'Errors') : ''}</div>
     ${body}`);
+  // The page keeps its height while you stay on Admin, so a shorter tab doesn't pull you to the top.
+  if (switching) { el.classList.remove('is-switching'); window.scrollTo(0, keepY); }
+  else el.style.minHeight = '';
   wire(el);
 }
-on('admin-tab', (ds) => { tab = ds.tab; openOrder = null; rerender(); });
+window.addEventListener('hashchange', () => { const m = document.getElementById('main'); if (m) m.style.minHeight = ''; });
+on('admin-tab', (ds, btn) => {
+  tab = ds.tab; openOrder = null;
+  btn?.closest('.tabs')?.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b === btn)); // highlight it now
+  rerender();
+});
 
 // ---------------------------------------------------------------- done-for-you orders
 let openOrder = null;

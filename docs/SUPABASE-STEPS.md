@@ -1,4 +1,4 @@
-# Going live: every step, in order (as of database file 19)
+# Going live: every step, in order (as of database file 20)
 
 Do these on a computer, in your Pinoy Permit project (`zeaiwvgktakbwnqpchbo`). Never the Nifti project.
 The website and the phone app update by themselves when code is pushed (about 10 minutes). Everything below has to be
@@ -19,6 +19,7 @@ done by you, once, in Supabase, Resend or GitHub. Parts A–E are needed before 
    | `lgus` | `2026-11-02-brief.sql` (file 16) |
    | `sites` | `2026-11-03-site-plans.sql` (file 17) |
    | `vehicles2` | `2026-11-04-vehicles-templates.sql` (file 18) |
+   | `fileguard` | `2026-11-06-file-access.sql` (file 20: "Ask me first" for files, and who opened what) |
 
    File 19 (`vault`) comes later, in Part B2: it needs the encryption function first.
    Everything there already → go to Part B.

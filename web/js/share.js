@@ -43,6 +43,8 @@ async function main() {
           <span class="chip ${STATUS[i.status]?.[1] || 'needinfo'}">${STATUS[i.status]?.[0] || 'Needs info'}</span></div>`)}`)}
       ${data.items.length ? '' : html`<p class="share-msg">Nothing to show yet.</p>`}
     </section>
+    <section class="tp-notice" role="note"><b>Shown as the business entered it.</b> Pinoy Permit doesn't check permits with the government or confirm that copies are genuine. To be sure, ask to see the originals or check with the office that issued them.
+      <a href="./#/contact?topic=other&about=${encodeURIComponent(location.href.split('#')[0])}">Report a problem with this page</a></section>
     <p class="fineprint">Generated ${fmtDateTime(data.generated_at)} from the business's own Pinoy Permit records. Pinoy Permit does not issue or certify these documents; ask the business for the original permits if you need them. This link stops working on ${fmtDate(String(data.expires_at).slice(0, 10))}.</p>
   </div>`);
   document.getElementById('print').onclick = () => window.print();

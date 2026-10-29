@@ -32,6 +32,7 @@ export const ICON = {
   car: raw('<svg viewBox="0 0 24 24"><path d="M4 16v-4l1.7-4.2A2 2 0 0 1 7.5 6.5h9a2 2 0 0 1 1.8 1.3L20 12v4"/><path d="M4 16h16"/><circle cx="7.5" cy="17.5" r="1.4"/><circle cx="16.5" cy="17.5" r="1.4"/></svg>'),
   moto: raw('<svg viewBox="0 0 24 24"><circle cx="5.5" cy="16.5" r="3"/><circle cx="18.5" cy="16.5" r="3"/><path d="M5.5 16.5 9.5 10h4.5l4.5 6.5"/><path d="M14 10l-1.6-3.2H10M15.5 6.8h2.8"/></svg>'),
   check: raw('<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'),
+  lock: raw('<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'),
   list: raw('<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>'),
   file: raw('<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/></svg>'),
   help: raw('<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><circle cx="12" cy="17" r=".6"/></svg>'),
@@ -177,3 +178,6 @@ export function planLimitNote(err) {
 
 export const docCount = (r) => (r.document_count ? `${plural(r.document_count, 'file')} on file` : 'No file yet');
 export const orgName = () => S.org?.name || '';
+
+// Before anything is shared: the business confirms its records are genuine (what viewers see says we don't verify them).
+export const attestBox = () => html`<label class="check attest"><input type="checkbox" name="attest" required><span>I confirm these are genuine records of permits issued to us. Sharing fake or altered documents is against the law and closes the account.</span></label>`;

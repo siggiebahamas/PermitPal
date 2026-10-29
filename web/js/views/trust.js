@@ -4,7 +4,7 @@
 // Pinoy Permit does (shows your own records, checked automatically) and never claims a government check.
 import { html, raw, openModal, confirmDialog, toast, toastError, when, plural, fmtDate, timeAgo, todayPH, download, esc } from '../util.js';
 import { S, on, has, hasPlus, canEdit, business, vehicle } from '../core.js';
-import { ICON, STATUS, byPriority, subjectLabel } from '../components.js';
+import { ICON, STATUS, byPriority, subjectLabel, attestBox } from '../components.js';
 import { openUpsell } from './plus.js';
 import { makeZip } from '../zip.js';
 import { qrSvg, qrPng } from '../qr.js';
@@ -64,12 +64,14 @@ function createCard() {
     <form data-trust-create>
       ${bizs.length > 1 ? html`<label class="field"><span>Which business?</span><select name="business_id">${bizs.map((b) => html`<option value="${b.id}">${b.name}</option>`)}<option value="">All of ${S.org.name}</option></select></label>`
         : html`<input type="hidden" name="business_id" value="${bizs[0]?.id || ''}">`}
+      ${attestBox()}
       <button class="btn btn-primary">Make the page</button></form>
     <p class="muted small">Nothing is shown to anyone until you share the link. No copies of your documents are shown unless you allow downloads.</p></section>`;
 }
 document.addEventListener('submit', async (e) => {
   if (!e.target.matches?.('[data-trust-create]')) return;
   e.preventDefault();
+  if (!new FormData(e.target).get('attest')) return toast('Tick the box to confirm these are genuine records.', 'error');
   const bizId = new FormData(e.target).get('business_id') || null;
   const title = bizId ? business(bizId)?.name : S.org.name;
   try {
@@ -82,9 +84,10 @@ document.addEventListener('submit', async (e) => {
 on('trust-new', () => {
   const others = S.data.businesses.filter((b) => !state.pages.some((p) => p.business_id === b.id));
   openModal('Page for another business', html`<label class="field"><span>Business</span><select name="business_id">${others.map((b) => html`<option value="${b.id}">${b.name}</option>`)}
-    ${when(!state.pages.some((p) => !p.business_id), html`<option value="">All of ${S.org.name}</option>`)}</select></label>`, {
+    ${when(!state.pages.some((p) => !p.business_id), html`<option value="">All of ${S.org.name}</option>`)}</select></label>${attestBox()}`, {
     submitLabel: 'Make the page',
     onSubmit: async (fd) => {
+      if (!fd.get('attest')) throw new Error('Tick the box to confirm these are genuine records.');
       const bizId = fd.get('business_id') || null;
       const p = await db.trustPageSave(S.org.id, { business_id: bizId, title: bizId ? business(bizId)?.name : S.org.name });
       state.pageId = p.id; state.tab = 'share';

@@ -293,6 +293,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     // Share proof page creates a link and lists it.
     await go('#/sharing');
     await page.click('[data-act=share-pick]');
+    await page.check('.modal [name=attest]');
     await page.click('.modal button[type=submit]');
     await page.waitForSelector('#share-url');
     await page.click('[data-modal-close]');
@@ -561,7 +562,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.check('[name=payment_qr_remove]'); await page.click('.admin-settings button.btn-primary'); await page.waitForTimeout(400);
   check('admin: the QR code can be removed', (await page.evaluate(async () => (await import('/__mock/mock-data.js')).appSettings().then((x) => x.payment_qr))) === '');
   await page.evaluate(async () => (await import('/__mock/mock-data.js')).adminSaveSetting('payment_qr', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='));
-  await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(300);
+  await page.evaluate(() => window.scrollTo(0, 260)); const y0 = await page.evaluate(() => window.scrollY);
+  await page.evaluate(() => document.querySelector('[data-act=admin-tab][data-tab=orders]').click()); await page.waitForTimeout(300);
+  check('admin: switching tabs keeps the page where it was and highlights the new tab', y0 > 100 && Math.abs((await page.evaluate(() => window.scrollY)) - y0) < 5
+    && (await page.getAttribute('[data-act=admin-tab][data-tab=orders]', 'class')).includes('active'), `${y0} -> ${await page.evaluate(() => window.scrollY)}`);
+  await page.evaluate(() => window.scrollTo(0, 0));
   check('admin: the new request waits under "send a quote"', (await page.locator('main .card', { hasText: 'New: send a quote' }).locator('.line', { hasText: "Renewal: Mayor's" }).count()) === 1);
   await page.locator('main .line', { hasText: "Renewal: Mayor's" }).click(); await page.waitForTimeout(300);
   check('admin: shows when the customer authorized it', /ticked in the app/.test(await page.textContent('main .kv')));
@@ -1361,7 +1366,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   inPerson = true;
 }
 
-// The website as customers see it (online only): "Keep every permit you have current. Easily.", everything on one screen, the
+// The website as customers see it (online only): "Stay on top of every permit. Easily.", everything on one screen, the
 // worries it takes away, the 5-step tour and the free plan as a receipt; prices on their own page.
 {
   inPerson = false;
@@ -1374,7 +1379,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     p.on('pageerror', (x) => e.push(x.message));
     await p.goto('http://localhost:4173/'); await p.waitForSelector('.lp-home h1');
     const text = await p.textContent('.landing');
-    check(`website ${label}: the home page leads with the permits you already have: "Keep every permit you have current. Easily."`, /^Keep every permit you have current\. Easily\.$/.test(await p.textContent('.lp-home h1'))
+    check(`website ${label}: the home page leads with "Stay on top of every permit. Easily." and says it's for businesses already registered`, /^Stay on top of every permit\. Easily\.$/.test(await p.textContent('.lp-home h1'))
+      && /doesn't file new business registrations/.test(await p.textContent('.lp-hero2 .lp-scope'))
       && (await p.textContent('.lp-hero2 .lp-tag')) === 'Permits on autopilot' && /^Add the permits you already have, once\./.test(await p.textContent('.lp-hero2 .lp-lead'))
       && (await p.locator('.lp-hero2 .lp-ticks').count()) === 0);
     check(`website ${label}: the phone and the list look like the app: navy greeting, status tiles, date tiles and green Renew`, (await p.locator('.lp-hero2 .lp-app-band').count()) === 1
@@ -1435,7 +1441,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`website ${label}: what load buys, with prices, only once its database part is on`, (await p.locator('.lp-load-card').count()) === (label === 'live' ? 0 : 4) && (await p.locator('.lp-pass .pass-head').count()) === (label === 'live' ? 0 : 1));
     check(`website ${label}: prices page: no sideways scroll`, (await over(p)) <= 1, `${await over(p)}px`);
     await p.click('.lp-top .brand'); await p.waitForSelector('.lp-home h1');
-    check(`website ${label}: the logo goes back home`, /Keep every permit you have current/.test(await p.textContent('main h1')));
+    check(`website ${label}: the logo goes back home`, /Stay on top of every permit/.test(await p.textContent('main h1')));
     check(`website ${label}: no JavaScript errors`, e.length === 0, e.slice(0, 3).join(' | '));
     await p.close();
   }
@@ -1530,6 +1536,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     await page.click('#modal-root [data-tpl-doc]');
     const d = await dl;
     check(`plus ${label}: the letter downloads for Word`, !!d && /Authorization letter - .*\.doc$/.test(d.suggestedFilename()), d?.suggestedFilename());
+    if (d) { const fs = await import('node:fs'); const body = fs.readFileSync(await d.path(), 'utf8');
+      check(`plus ${label}: the Word letter has no Pinoy Permit footnote`, !/Prepared with Pinoy Permit/.test(body) && /authorize/.test(body)); }
     await page.click('#modal-root [data-modal-close]');
     // the check: answer a question
     await go('#/check'); await page.waitForSelector('.check-score');
@@ -1649,6 +1657,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check('public page: the headline is honest (1 permit expired)', /1 permit expired/.test(t));
     check('public page: each permit shows its state and date', /Valid until Jan 20, 2027/.test(t) && /Expired/.test(t) && /Being renewed/.test(t) && /•••• 0042/.test(t));
     check('public page: says what Pinoy Permit does, and doesn\'t', /checked automatically by Pinoy Permit/.test(t) && /does not issue permits or verify them with the government/.test(t));
+    check('public page: a plain notice up top: shown as the business entered it, not checked with the government, with a way to report it', /Shown as the business entered it/.test(await page.textContent('.tp-notice'))
+      && /doesn't check permits with the government or confirm that copies are genuine/.test(await page.textContent('.tp-notice')) && /#\/contact\?topic=other&about=/.test(await page.getAttribute('.tp-notice a', 'href')));
     check('public page: names are shown as text, never run', !(await page.evaluate(() => window.__xss)) && (await page.locator('main img[src=x]').count()) === 0);
     check('public page: copies can be downloaded when allowed', (await page.locator('.tp-files [data-path]').count()) === 1);
     check('public page: staff licenses as counts only', /14 for 12 people: 13 current, 1 due soon/.test(t));
@@ -2596,6 +2606,40 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
     && /Deed of Absolute Sale/.test(await page.textContent('main')) && /Property owner's consent/.test(await page.textContent('main')));
   await go('#/settings');
   check('settings: no "files are locked" claim until the vault is switched on', (await page.locator('main .vault-note').count()) === 0);
+  await go('#/vehicles/' + ev); await page.click('main [data-act=share-open]'); await page.waitForSelector('.modal [name=attest]');
+  await page.evaluate(() => { document.querySelector('.modal [name=attest]').required = false; });
+  await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(250);
+  check('share proof: a link needs the "these are genuine records" box ticked first', /genuine records/.test(await page.textContent('#modal-root .modal-error')));
+  await page.check('.modal [name=attest]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
+  check('share proof: ticked, the link is made', (await page.locator('#share-url').count()) === 1);
+  await page.click('.modal [data-modal-close]').catch(() => {});
+  const mpq = await page.evaluate(async () => (await (await import('/__mock/mock-data.js')).loadOrgData()).reqs.find((r) => r.type_code === 'mayors_permit').id);
+  await go('#/requirement/' + mpq); await page.click('main .record-card [data-act=req-upload]'); await page.waitForSelector('.modal .upload-true');
+  check('uploads: the form says uploading confirms a true copy', /true copy of a document issued to you/.test(await page.textContent('.modal .upload-true')));
+  await page.click('.modal [data-modal-close]').catch(() => {});
+  // Who can open files: the owner switches on "Ask me first"; a teammate sees the files locked and asks; the owner allows.
+  await go('#/settings/workspace'); await page.waitForSelector('#file-guard');
+  check('files: Settings > Workspace has "Who can open your files", with "Ask me first"', (await page.locator('#file-guard [name=mode][value=ask]').count()) === 1 && /Who opened what/.test(await page.textContent('#file-guard')));
+  await page.check('#file-guard [name=mode][value=ask]'); await page.check('#file-guard [name=alerts]'); await page.click('#file-guard-form button'); await page.waitForTimeout(400);
+  const fdoc = await page.evaluate(async () => { const m = await import('/__mock/mock-data.js'); const d = await m.loadOrgData(); const r = d.reqs.find((x) => x.type_code === 'mayors_permit');
+    await m.uploadDocument({ orgId: 'o1', requirementId: r.id, cycleId: r.cycle_id, file: new File(['%PDF'], 'permit.pdf', { type: 'application/pdf' }) }).catch(() => {}); return r.id; });
+  await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'member'; (await import('/__mock/mock-data.js')).__org.role = 'member'; });
+  await go('#/'); await go('#/requirement/' + fdoc); await page.waitForSelector('main .record-card');
+  check('files: with "Ask me first" on, a teammate sees the files but locked, with "Ask to open"', (await page.locator('main .record-card .file-locked-tag').count()) >= 1
+    && (await page.locator('main .record-card [data-act=doc-view]').count()) === 0 && (await page.locator('main [data-act=file-ask]').count()) === 1);
+  check('files: a locked file can\'t be fetched at all', /locked/.test(await page.evaluate(async (rid) => { const m = await import('/__mock/mock-data.js');
+    try { await m.fileBlob((await m.orgDocuments('o1')).find((d) => d.requirement_id === rid).storage_path); return 'opened'; } catch (e) { return e.message; } }, fdoc)));
+  await page.click('main [data-act=file-ask]'); await page.fill('.modal [name=note]', 'For the BPLO visit'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
+  check('files: asked: it says it is waiting for the owner', /You asked to open them/.test(await page.textContent('main .file-lock')));
+  await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'owner'; (await import('/__mock/mock-data.js')).__org.role = 'owner'; });
+  await go('#/settings/workspace?files=1'); await page.waitForSelector('#file-guard');
+  check('files: the owner sees the request with its reason, and can allow it for 24 hours or 7 days', /wants to open/.test(await page.textContent('#file-guard')) && /For the BPLO visit/.test(await page.textContent('#file-guard'))
+    && (await page.locator('#file-guard [data-act=file-decide][data-hours="168"]').count()) === 1);
+  await page.click('#file-guard [data-act=file-decide][data-hours="24"]'); await page.waitForTimeout(400);
+  await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'member'; (await import('/__mock/mock-data.js')).__org.role = 'member'; });
+  await go('#/'); await go('#/requirement/' + fdoc); await page.waitForSelector('main .record-card');
+  check('files: allowed: the teammate can open them, and is told until when (and that the owner sees each open)', (await page.locator('main .record-card [data-act=doc-view]').count()) >= 1 && /until/.test(await page.textContent('main .file-lock.open')));
+  await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'owner'; const m = await import('/__mock/mock-data.js'); m.__org.role = 'owner'; m.__files.mode = 'open'; });
   check('vehicles and templates: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
 }

@@ -234,6 +234,15 @@ export async function uploadDocument({ orgId, requirementId, cycleId, file }) {
 }
 
 // A file's contents (for the .zip packs and reading photos), straight from private storage.
+// Who can open files (database file 20).
+export const fileAccessState = async (orgId) => ok(await sb.rpc('file_access_state', { p_org: orgId }));
+export const setFileMode = async (orgId, mode, alerts) => ok(await sb.rpc('set_file_mode', { p_org: orgId, p_mode: mode, p_alerts: !!alerts }));
+export const requestFileAccess = async (reqId, note) => ok(await sb.rpc('request_file_access', { p_requirement: reqId, p_note: note || null }));
+export const decideFileAccess = async (id, allow, hours) => ok(await sb.rpc('decide_file_access', { p_grant: id, p_allow: !!allow, p_hours: hours || 24 }));
+// With the vault on, the vault records each open itself; before that, the app does (best effort).
+const logOpen = (path) => { if (!vaultOn) sb.rpc('log_file_open', { p_path: path }).then(() => {}, () => {}); };
+const lockedError = (e) => (/not found|row-level|unauthori|denied/i.test(e?.message || '') ? new Error("This file is locked. Ask your workspace owner to let you open it.") : e);
+
 export async function fileBlob(path) {
   if (vaultOn) {
     const r = await fetch(`${VAULT}?op=get&path=${encodeURIComponent(path)}`, { headers: await vaultHeaders(), cache: 'no-store' });
@@ -241,14 +250,16 @@ export async function fileBlob(path) {
     return r.blob();
   }
   const { data, error } = await sb.storage.from('documents').download(path);
-  if (error) throw error;
+  if (error) throw lockedError(error);
+  logOpen(path);
   return data;
 }
 // A link to view or save a file. With the vault, the file is decrypted here and the link only works in this tab.
 export async function fileUrl(path, downloadName) {
   if (vaultOn) return URL.createObjectURL(await fileBlob(path));
   const { data, error } = await sb.storage.from('documents').createSignedUrl(path, 300, downloadName ? { download: downloadName } : undefined);
-  if (error) throw error;
+  if (error) throw lockedError(error);
+  logOpen(path);
   return data.signedUrl;
 }
 

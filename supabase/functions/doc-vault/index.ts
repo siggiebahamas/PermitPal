@@ -9,7 +9,8 @@
 //   POST ?op=put&path=<org>/<...>   body: the file          stores it sealed (storage's own rules decide who may)
 //   GET  ?op=get&path=<...>[&name=] returns the file         storage's rules decide; Pinoy Permit staff go through
 //                                                            staff_open_file, which checks for an open request and
-//                                                            logs the open for the customer to see
+//                                                            logs the open for the customer to see; every other
+//                                                            open is recorded too (log_file_open)
 //   GET  ?ping=1                    {"ok":true,"vault":true} when the key is set
 //
 // Files stored before the vault was switched on are returned as they are. Deploy with JWT verification OFF: the
@@ -102,6 +103,11 @@ export async function handle(req: Request, env: Env, http: typeof fetch = fetch)
 
   if (q.get("op") === "get") {
     let r = await http(objectUrl(env, path!), { headers: asCaller(req, env) });
+    // Each file a teammate opens is recorded (database file 20); the owner sees who opened what, and when.
+    if (r.ok && /^Bearer ey/.test(req.headers.get("Authorization") ?? "")) {
+      await http(`${env.url}/rest/v1/rpc/log_file_open`, { method: "POST", headers: { ...asCaller(req, env), "Content-Type": "application/json" },
+        body: JSON.stringify({ p_path: path }) }).catch(() => null);
+    }
     if (!r.ok && /^Bearer ey/.test(req.headers.get("Authorization") ?? "")) {
       // Pinoy Permit staff: allowed only for an open request, and every open is logged for the customer.
       const check = await http(`${env.url}/rest/v1/rpc/staff_open_file`, { method: "POST",

@@ -16,6 +16,7 @@ import { loadSettingsCard, loadState, loadStateNow } from './load.js';
 import { brandPage, brandTabShown } from './brand.js';
 import { billToggle, freeCard, planCard, plansShown, PLANS, compareTable, TIERS, TIER_SMALL, TIER_FLEET, tierCard, tierPrice, tiersShown, softwareBanner, peaceBand, helpServices } from './pricing.js';
 import { planTotal } from '../prices.js';
+import { loadFileAccess, fileGuardCard } from './fileguard.js';
 import * as db from 'pp/data';
 
 // ================================================================ history
@@ -270,6 +271,7 @@ export async function settings(el, section) {
   let pay = {};
   let access = [];
   let loadCard = '';
+  if (section === 'workspace') await loadFileAccess(true);
   try {
     [channels, log, conn, pay, access, loadCard] = await Promise.all([
       db.channelStatus().catch(() => ({})),
@@ -338,6 +340,7 @@ export async function settings(el, section) {
 
     ${when(section === 'workspace', html`
     ${requireCard()}
+    ${fileGuardCard()}
     <section class="card"><h2>Workspace</h2>
       <form id="org-form" class="inline-form"><input name="name" aria-label="Workspace name" maxlength="120" value="${org.name}" ${isOrgAdmin() ? '' : 'disabled'}>
         ${when(isOrgAdmin(), html`<button class="btn btn-primary">Rename</button>`)}</form>
@@ -393,6 +396,7 @@ export async function settings(el, section) {
   `);
 
   markNav(el);
+  if (/[?&]files=1/.test(location.hash)) setTimeout(() => el.querySelector('#file-guard')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 30);
   mfaSection(el.querySelector('#mfa-section'));
   el.querySelectorAll('[data-profile-pref]').forEach((i) => i.addEventListener('change', async () => {
     try { await db.updateProfile(S.user.id, { [i.dataset.profilePref]: i.checked }); S.profile[i.dataset.profilePref] = i.checked; toast('Saved.'); } catch (e) { i.checked = !i.checked; toastError(e); }

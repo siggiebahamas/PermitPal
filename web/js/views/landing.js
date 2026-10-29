@@ -1,4 +1,4 @@
-// What a visitor sees before signing in. The home page sells the product: "Keep every permit you have current. Easily."
+// What a visitor sees before signing in. The home page sells the product: "Stay on top of every permit. Easily."
 // (with "Permits on autopilot" as its label), everything
 // to keep current on one screen, the headaches it takes away, a 5-step tour and the free plan as a receipt.
 // Prices have their own page (#/pricing): the free plan, the team plans (prices read live from the plans
@@ -43,10 +43,11 @@ const wireScroll = (app) => app.querySelectorAll('[data-scroll-to]').forEach((a)
 const hero = () => html`<section class="lp-hero2">
   <div class="lp-hero2-copy">
     <p class="lp-tag">Permits on autopilot</p>
-    <h1>Keep every permit you have current. <span class="lp-blue">Easily.</span></h1>
+    <h1>Stay on top of every permit. <span class="lp-blue">Easily.</span></h1>
     <p class="lp-lead">Add the permits you already have, once. Pinoy Permit tracks every expiry date${has('filings') ? ' and tax deadline' : ''}${has('library2') ? ', reminds you before each one is due, and walks you through each renewal, step by step' : ' and reminds you before each one is due'}.</p>
     <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#tour" data-scroll-to="tour">See how it works</a><a class="btn btn-lg lp-btn-demo" href="demo/">${PLAY}Try the demo</a></div>
     <p class="lp-demo-note">No sign-up needed for the demo. Click around with sample data.</p>
+    <p class="lp-scope">Made for businesses that are already registered. Pinoy Permit tracks and guides; it doesn't file new business registrations.</p>
   </div>
   <div class="lp-hero2-art">
     <div class="lp-blob" aria-hidden="true"></div>
@@ -73,7 +74,7 @@ const forYou = () => {
     ['NOV', 10, 'y', 'Sanitary permit', 'Business · Main store', 'soon', 'Due in 12 days'], ['NOV', 18, 'y', 'CTPL insurance', 'Vehicle · ABC 1234', 'soon', 'Due in 20 days'],
     ['MAY', 16, 'g', 'Fire safety (FSIC)', 'Business · Main store', 'ok', 'All good']];
   return html`<section id="for-you" class="lp-sec" aria-labelledby="for-you-h">
-    <h2 class="lp-big" id="for-you-h"><span class="lp-line">Everything you have to keep current.</span><span class="lp-line lp-blue">One screen.</span></h2>
+    <h2 class="lp-big" id="for-you-h"><span class="lp-line">Every permit, vehicle and license.</span><span class="lp-line lp-blue">One screen.</span></h2>
     <p class="lp-lead">Whatever you run, it all lands in one list, sorted by what's due first.</p>
     <div class="lp-split">
       <ul class="lp-kinds">${kinds.map(([ic, t, b, s]) => html`<li><span class="lp-sq ${t}">${ic}</span><span><b>${b}</b>${s}</span></li>`)}</ul>
@@ -98,7 +99,7 @@ const worries = () => {
     [ICON.download, 't-lilac', 'Inspector walk-ins', 'Every document in one download.'],
     ...(has('plus') ? [[PIC.team, 't-green', 'Chasing staff', 'They upload. You tap Approve.']] : has('assign') ? [[PIC.team, 't-green', 'Chasing your team', 'Hand it over. You hear if it slips.']] : []),
     [ICON.upload, 't-blue', 'Setting it all up', has('services') ? 'Import a spreadsheet, or let us do it.' : 'Import it all from a spreadsheet.'],
-    [PIC.pin, 't-teal', 'Long queues', 'Ask a firm near you for a quote.'],
+    [PIC.pin, 't-teal', 'Wasted trips', 'Know what to bring, and renew online where your city allows it.'],
     [PIC.lock, 't-lilac', 'Prying eyes', has('vault') ? 'Every file encrypted, with two-step login.' : has('mfa') ? 'Private by default, with two-step login.' : 'Private by default. Only your team sees it.'],
   ];
   return html`<section id="worry" class="lp-band" aria-labelledby="worry-h"><div class="lp-wrap">
@@ -280,7 +281,7 @@ const loadCards = (list) => {
 };
 const FAQ = [
   ['Is the free plan really free?', 'Yes. One business and one vehicle, with reminders and checklists, cost nothing, with no time limit and no card. Track more with Plus (up to 5), Core (up to 15) or a fleet plan.'],
-  ['Do you register new businesses or get new permits?', "Pinoy Permit is built for the permits you already have: it tracks them, reminds you and walks you through each renewal. Starting a business from zero takes many offices and often months; for that, Find a professional connects you with licensed liaisons and accountants, and our team takes on the parts that can be done fully online, like a DTI business name."],
+  ['Do you register new businesses or get new permits?', "No. Pinoy Permit is built for the permits you already have: it tracks them, reminds you and walks you through each renewal. Registering a brand-new business takes many offices and often months, so it isn't something we file. Your accountant or a licensed liaison can help with that; once you're registered, add your permits here."],
   ['Does a plan include someone renewing for me?', 'No. Every plan is tracking and planning software only. Renewal Assistance (₱499, a review of your papers and a written plan) is a separate service. Full-Service Vehicle Renewal (from ₱1,000) is coming soon. Government and third-party fees are always separate.'],
   ['What happens if I reach my plan\'s limit?', 'Everything you already track stays, and you can still edit it. You just can\'t add another business or vehicle until you move up. If a paid plan ends, nothing is deleted either.'],
   ['What happens after the 30-day trial?', 'You choose to pay monthly or yearly. Nothing is charged by itself: we send a bill, you pay by GCash, Maya or bank transfer.'],
