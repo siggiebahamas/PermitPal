@@ -1366,8 +1366,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   inPerson = true;
 }
 
-// The website as customers see it (online only): "Stay on top of every permit. Easily.", everything on one screen, the
-// worries it takes away, the 5-step tour and the free plan as a receipt; prices on their own page.
+// The website as customers see it (online only), top to bottom: the promise with two buttons, three numbers, six things it
+// tracks, the core pitch with four tiles, proof numbers, how it works in 3 steps, four benefits, the free plan as a boarding
+// pass, guides and help, the last nudge and a full footer; prices on their own page.
 {
   inPerson = false;
   const S2 = ['errors', 'assign', 'library2', 'services', 'filings', 'sms', 'mfa', 'revenue'];
@@ -1390,42 +1391,44 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
       await i.decode();
       return i.alt === 'Pinoy Permit' && i.naturalWidth >= 1000 && Math.abs(r.width / r.height - i.naturalWidth / i.naturalHeight) < 0.05 && r.height >= (innerWidth > 640 ? 64 : 38);
     }));
-    check(`website ${label}: the receipt uses the site's own type (no typewriter font) and the sticker logo`, await p.evaluate(() => {
+    check(`website ${label}: the free plan is a boarding pass in the site's own type, with the real logo`, await p.evaluate(() => {
       const f = (q) => getComputedStyle(document.querySelector(q)).fontFamily;
-      return ['.lp-rc-plan', '.lp-rc-every', '.lp-rc-inc', '.lp-rc-amt'].every((q) => !/Mono|monospace/.test(f(q))) && document.querySelector('.lp-rc-top img.brand-wm')?.alt === 'Pinoy Permit';
+      return ['.lp-bp-kind', '.lp-bp-route b', '.lp-bp-inc li', '.lp-bp-fare'].every((q) => !/Mono|monospace/.test(f(q))) && document.querySelector('.lp-bp-top img.brand-wm')?.alt === 'Pinoy Permit';
     }));
     check(`website ${label}: the name is Pinoy Permit everywhere on the page and in the tab`, !/PermitPal|Permit ?Pal\b/.test(text) && !/PermitPal/.test(await p.title())
       && (await p.title()) === 'Pinoy Permit' && (await p.getAttribute('.lp-top .brand img', 'alt')) === 'Pinoy Permit');
+    check(`website ${label}: the hero has exactly two buttons: Start free and Try the demo`, (await p.locator('.lp-hero2 .btn-row a').count()) === 2 && /Start free/.test(await p.textContent('.lp-hero2 .btn-row a.btn-primary')));
     check(`website ${label}: "Try the demo" sits next to Start free at the top, and again at the bottom`, (await p.locator('.lp-hero2 .btn-row a.lp-btn-demo[href="demo/"]').count()) === 1
       && (await p.locator('.lp-final2 a.lp-btn-demo[href="demo/"]').count()) === 1 && /Try the demo/.test(await p.textContent('.lp-hero2 .btn-row')));
     check(`website ${label}: the example phone shows Sadie's day, with the Mayor's Permit to renew first`, /Good morning, Sadie/.test(await p.textContent('.lp-screen')) && /Mayor's Permit/.test(await p.textContent('.lp-screen .lp-app-row')));
-    check(`website ${label}: "One screen." sits on a line of its own`, await p.evaluate(() => {
+    check(`website ${label}: "Every permit, vehicle, and license." (Oxford comma), then "One screen." on a line of its own`, await p.evaluate(() => {
       const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
-      return b.textContent === 'One screen.' && b.getClientRects().length === 1 && b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 2;
+      return a.textContent === 'Every permit, vehicle, and license.' && b.textContent === 'One screen.' && b.getClientRects().length === 1 && b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 2;
     }));
-    check(`website ${label}: 8 worries taken away, and 8 or more lines on the free-plan receipt at ₱0.00 (1 business + 1 vehicle first)`, (await p.locator('.lp-worry').count()) === 8
-      && (await p.locator('.lp-rc-lines li').count()) >= 8 && /1 business \+ 1 vehicle/.test(await p.textContent('.lp-rc-lines li')) && /Total each month\s*₱0\.00/.test(await p.textContent('.lp-receipt')));
+    check(`website ${label}: the sections run in order: hero, 3 numbers, 6 pictured cards, pitch with 4 tiles, 4 proof numbers, 3 steps, 4 benefits, free plan, guides, last nudge, footer`, await p.evaluate(() => {
+      const order = ['.lp-hero2', '.lp-stats', '.lp-offers', '.lp-pitch', '.lp-proof', '#tour', '.lp-benefits', '#free', '.lp-learn', '.lp-final2', '.lp-foot2'].map((q) => document.querySelector(q));
+      return order.every(Boolean) && order.every((el, i) => !i || order[i - 1].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
+        && document.querySelectorAll('.lp-stat').length === 3 && document.querySelectorAll('.lp-offer .lp-offer-art[role=img]').length === 6 && document.querySelectorAll('.lp-offer h3').length === 6
+        && document.querySelectorAll('.lp-tile').length === 4 && document.querySelectorAll('.lp-proof-in > div').length === 4 && document.querySelectorAll('.lp-step3').length === 3
+        && document.querySelectorAll('.lp-step3 .lp-scr').length === 3 && document.querySelectorAll('.lp-checks li').length === 4 && document.querySelectorAll('.lp-bento .lp-bt').length === 5;
+    }));
+    check(`website ${label}: the numbers are ones that are true today (no user counts)`, /20\+\s*Permit and license types/.test(await p.textContent('.lp-stats')) && /16\s*Cities with free renewal guides/.test(await p.textContent('.lp-stats'))
+      && !/users|customers/i.test(await p.textContent('.lp-stats')));
+    check(`website ${label}: the boarding pass says Free plan, "Certified stress-free", ₱0 for 1 business + 1 vehicle, and that more is on paid plans`, /Certified stress-free\./.test(await p.textContent('#free-h'))
+      && /Free plan/.test(await p.textContent('.lp-bp-kind')) && /FARE · FREE PLAN/.test(await p.textContent('.lp-bp-stub')) && /₱0\/month/.test(await p.textContent('.lp-bp-fare'))
+      && /1 business \+ 1 vehicle/.test(await p.textContent('.lp-bp-stub')) && /More on paid plans/.test(await p.textContent('.lp-bp-stub')) && /Included on the free plan/i.test(await p.textContent('.lp-bp-inc-h'))
+      && (await p.locator('.lp-bp-inc li').count()) >= (label === 'live' ? 6 : 7) && /paid plans/.test(await p.textContent('.lp-bp-note')) && !/Free forever|No time limit/i.test(await p.textContent('#free'))
+      && (await p.getAttribute('.lp-bp-stamp', 'aria-label')) === 'Certified stress-free');
+    check(`website ${label}: the route reads "From STRESS to ON TIME" on one line, above the free-plan list (not beside it)`, await p.evaluate(() => {
+      const r = document.querySelector('.lp-bp-route'), [a, b] = r.querySelectorAll('b'), inc = document.querySelector('.lp-bp-inc');
+      const top = (el) => { let t = 0; for (let e = el; e && !e.classList.contains('lp-bp'); e = e.offsetParent) t += e.offsetTop; return t; }; // layout positions: the pass is tilted on purpose
+      return a.textContent === 'STRESS' && b.textContent === 'ON TIME' && Math.abs(top(a) - top(b)) < 4 && top(inc) >= top(r) + r.offsetHeight - 1;
+    }));
+    check(`website ${label}: the footer says what Pinoy Permit is and isn't, and links the guides`, /tracking and planning software/.test(await p.textContent('.lp-foot-fine')) && (await p.locator('.lp-foot2 a[href="renew/"]').count()) === 1);
     check(`website ${label}: no prices on the home page`, (await p.locator('[data-plan-card], .bill-toggle, #pricing').count()) === 0);
     check(`website ${label}: nothing removed, and nothing Pinoy Permit doesn't do`, !/Head office|Year-round care|licensed firm|we verify|verified by Pinoy Permit|vetted|legal/i.test(text));
     check(`website ${label}: Plus mentioned only once its database part is on`, /Plus, more staff/.test(text) === (label !== 'live'));
-    check(`website ${label}: the tour starts at step 1, Add`, (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === '1' && /Add permits your way/.test(await p.textContent('.lp-stage')));
-    let worst = await over(p), screens = new Set([await p.getAttribute('.lp-stage .lp-scr', 'aria-label')]);
-    for (const [k, title] of [[2, "Reminded before it's late"], [3, 'Know exactly what to bring'], [4, "Show you're legit"], [5, label === 'live' ? 'Share the load' : 'Your team does the chasing']]) {
-      await p.click('.lp-btn-step'); await p.waitForTimeout(120);
-      const ok = (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === String(k) && (await p.textContent('.lp-stage h3')).includes(title);
-      check(`website ${label}: "Next" moves the tour to step ${k}`, ok, await p.textContent('.lp-stage h3'));
-      check(`website ${label}: step ${k}'s earlier steps show as done`, (await p.locator('.lp-dot.on').count()) === k && (await p.locator('.lp-seg.on').count()) === k - 1);
-      screens.add(await p.getAttribute('.lp-stage .lp-scr', 'aria-label'));
-      worst = Math.max(worst, await over(p));
-    }
-    check(`website ${label}: the phone shows a different screen at each step`, screens.size === 5);
-    await p.click('.lp-btn-step'); await p.waitForTimeout(120);
-    check(`website ${label}: "Start again" goes back to step 1`, (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === '1');
-    await p.click('.lp-dot[data-step="4"]'); await p.waitForTimeout(120);
-    check(`website ${label}: tapping a step jumps to it`, (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === '4');
-    await p.click('.lp-stage .btn-ghost'); await p.waitForTimeout(120);
-    check(`website ${label}: "Back" goes one step back`, (await p.getAttribute('.lp-dot[aria-current=step]', 'data-step')) === '3');
-    check(`website ${label}: no sideways scroll at any tour step`, worst <= 1, `${worst}px`);
+    check(`website ${label}: no sideways scroll on the home page`, (await over(p)) <= 1, `${await over(p)}px`);
     if (label === 'all') {
       const before = await p.evaluate(() => location.hash);
       await p.click('.lp-nav[data-scroll-to=tour]'); await p.waitForTimeout(800);
@@ -2641,9 +2644,20 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   check('files: allowed: the teammate can open them, and is told until when (and that the owner sees each open)', (await page.locator('main .record-card [data-act=doc-view]').count()) >= 1 && /until/.test(await page.textContent('main .file-lock.open')));
   await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'owner'; const m = await import('/__mock/mock-data.js'); m.__org.role = 'owner'; m.__files.mode = 'open'; });
   await go('#/costs'); await page.waitForSelector('main .ctl');
-  check('costs: a timeline, one dot per month, full month names, totals in the same style as the month', await page.evaluate(() => {
-    const h = document.querySelector('.ctl-month:not(.late) .ctl-head'); if (!h) return false; const [a, b] = h.children;
-    return document.querySelectorAll('.ctl-dot').length >= 2 && /^[A-Z][a-z]{3,} 20\d\d$/.test(a.textContent) && getComputedStyle(a).color === getComputedStyle(b).color && getComputedStyle(a).fontSize === getComputedStyle(b).fontSize; }));
+  check('costs: a timeline, one dot per month, full month names, month and total one size up from the items', await page.evaluate(() => {
+    const h = document.querySelector('.ctl-month:not(.late) .ctl-head'); if (!h) return false; const [a, b] = h.children; const item = document.querySelector('.ctl-main b');
+    return document.querySelectorAll('.ctl-dot').length >= 2 && /^[A-Z][a-z]{3,} 20\d\d$/.test(a.textContent) && b.classList.contains('ctl-total')
+      && getComputedStyle(a).fontSize === getComputedStyle(b).fontSize && parseFloat(getComputedStyle(a).fontSize) > parseFloat(getComputedStyle(item).fontSize); }));
+  check('costs: each month total is a filled chip, so it never reads like a line item', await page.evaluate(() => {
+    const t = document.querySelector('.ctl-total'), item = document.querySelector('.ctl-item');
+    return /Total/i.test(t.textContent) && getComputedStyle(t).backgroundColor !== getComputedStyle(item).backgroundColor && getComputedStyle(t).backgroundColor !== 'rgba(0, 0, 0, 0)'; }));
+  check('costs: no "Biggest month" box', !/Biggest month/.test(await page.textContent('main')) && (await page.locator('main .stats .stat').count()) === 3);
+  const align = await page.evaluate(() => {
+    const st = [...document.querySelectorAll('.ctl-item .ctl-status')].map((e) => Math.round(e.getBoundingClientRect().left));
+    const gap = [...document.querySelectorAll('.ctl-item')].map((it) => Math.round(it.querySelector('.ctl-amt > *').getBoundingClientRect().left - it.querySelector('.ctl-status > *').getBoundingClientRect().right));
+    const wide = [...document.querySelectorAll('.ctl-status > *')].map((e) => `${e.textContent.trim()}:${Math.round(e.getBoundingClientRect().width)}`);
+    return { ok: st.length >= 2 && new Set(st).size === 1 && Math.min(...gap) >= 20, st: [...new Set(st)], gap, wide }; });
+  check('costs: every status pill starts on the same line, with room before the amounts', align.ok, JSON.stringify(align));
   check('costs: status pills keep their dots, and items with no amount offer "Add amount"', (await page.locator('main .ctl-item .pill, main .ctl-item .chip').count()) >= 1 && (await page.locator('main .ctl-item [data-act=req-edit]', { hasText: 'Add amount' }).count()) >= 1);
   await page.click('main .ctl-item [data-act=req-edit]'); await page.waitForSelector('.modal [name=amount_paid]');
   check('costs: "Add amount" opens the record with the amount field', (await page.locator('.modal [name=amount_paid]').count()) === 1);

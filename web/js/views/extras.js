@@ -188,24 +188,23 @@ export async function costs(el) {
   const known = (list) => list.filter((r) => r.amount_paid != null).reduce((t, r) => t + Number(r.amount_paid), 0);
   const unknown = (list) => list.filter((r) => r.amount_paid == null).length;
   const all = rows.flatMap((m) => m.items);
-  const busiest = months.reduce((b, m) => (known(m.items) > known(b?.items || []) ? m : b), null);
 
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Costs & budget</h1><p class="muted">How much your permits cost, and what's coming next.</p></div></div>
-    <div class="stats four">
+    <div class="stats three">
       <div class="stat ok"><div class="stat-n">${peso(spentTotal)}</div><div class="stat-l" title="Paid in the last 12 months">Paid, last 12 months</div></div>
       <div class="stat soon"><div class="stat-n">${peso(known(all))}</div><div class="stat-l" title="Expected in the next 12 months">Due, next 12 months</div></div>
-      <div class="stat progress"><div class="stat-n">${busiest && known(busiest.items) ? busiest.label.split(' ')[0] : '—'}</div><div class="stat-l">Biggest month</div></div>
       <div class="stat needinfo"><div class="stat-n">${unknown(all)}</div><div class="stat-l" title="Renewals with no amount yet">No amount yet</div></div>
     </div>
     ${rows.length ? html`<section class="card cost-tl-card">
       <div class="card-head"><div><h2>Coming up</h2><p class="card-sub">Estimates use the amount you entered for each permit's current record</p></div></div>
       <div class="ctl">${rows.map((m) => html`<div class="ctl-month ${m.key === 'late' ? 'late' : ''}">
         <span class="ctl-dot" aria-hidden="true"></span>
-        <div class="ctl-head"><span>${m.label}</span><span>${peso(known(m.items))}</span></div>
+        <div class="ctl-head"><span>${m.label}</span><span class="ctl-total"><small>Total</small>${peso(known(m.items))}</span></div>
         ${m.items.sort(byPriority).map((r) => html`<div class="ctl-item cost-line ${STATUS[r.status]?.cls || ''}">
           <a class="ctl-main" href="#/requirement/${r.id}"><b>${r.name}</b><small>${subjectLabel(r)}</small></a>
-          <span class="cost-side">${duePill(r)}${r.amount_paid != null ? html`<b class="cost-amt">${peso(r.amount_paid)}</b>`
+          <span class="ctl-status">${duePill(r)}</span>
+          <span class="ctl-amt">${r.amount_paid != null ? html`<b class="cost-amt">${peso(r.amount_paid)}</b>`
             : canEdit() ? html`<button type="button" class="btn btn-soft btn-sm cost-add" data-act="req-edit" data-id="${r.id}">Add amount</button>` : html`<span class="cost-amt none">No amount</span>`}</span></div>`)}
       </div>`)}</div>
       <div class="sheet-foot">Add "Amount paid" when you record or renew a permit to make this more accurate.</div>
