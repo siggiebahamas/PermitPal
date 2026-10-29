@@ -1401,8 +1401,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`website ${label}: "Try the demo" sits next to Start free at the top, and again at the bottom`, (await p.locator('.lp-hero2 .btn-row a.lp-btn-demo[href="demo/"]').count()) === 1
       && (await p.locator('.lp-final2 a.lp-btn-demo[href="demo/"]').count()) === 1 && /Try the demo/.test(await p.textContent('.lp-hero2 .btn-row')));
     check(`website ${label}: the example phone shows Sadie's day, with the Mayor's Permit to renew first`, /Good morning, Sadie/.test(await p.textContent('.lp-screen')) && /Mayor's Permit/.test(await p.textContent('.lp-screen .lp-app-row')));
-    check(`website ${label}: "Every permit, vehicle, and license." (Oxford comma), then "One screen." on a line of its own`, await p.evaluate(() => {
+    check(`website ${label}: "Every permit, vehicle, and license." (Oxford comma), then "One screen." on a line of its own; the pitch is exactly two lines; "Set up once…" is one line on a computer`, await p.evaluate(() => {
       const [a, b] = document.querySelectorAll('#for-you-h .lp-line');
+      const [p1, p2] = document.querySelectorAll('#pitch-h .lp-line'); const one = (el) => { const r = document.createRange(); r.selectNodeContents(el); return new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size === 1; };
+      if (!(p1?.textContent === 'We do the remembering.' && p2?.textContent === 'You run the business.' && one(p1) && one(p2))) return false;
+      if (innerWidth >= 700 && !one(document.querySelector('#tour-h'))) return false;
       return a.textContent === 'Every permit, vehicle, and license.' && b.textContent === 'One screen.' && b.getClientRects().length === 1 && b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 2;
     }));
     check(`website ${label}: the sections run in order: hero, 3 numbers, 6 pictured cards, pitch with 4 tiles, 4 proof numbers, 3 steps, 4 benefits, free plan, guides, last nudge, footer`, await p.evaluate(() => {
@@ -1413,7 +1416,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
         && document.querySelectorAll('.lp-step3 .lp-scr').length === 3 && document.querySelectorAll('.lp-checks li').length === 4 && document.querySelectorAll('.lp-bento .lp-bt').length === 5;
     }));
     check(`website ${label}: the numbers are ones that are true today (no user counts)`, /20\+\s*Permit and license types/.test(await p.textContent('.lp-stats')) && /16\s*Cities with free renewal guides/.test(await p.textContent('.lp-stats'))
-      && !/users|customers/i.test(await p.textContent('.lp-stats')));
+      && !/users|customers/i.test(await p.textContent('.lp-stats')) && /Para sa negosyo mo, big or small\./.test(await p.textContent('.lp-stats h2')));
     check(`website ${label}: the boarding pass says Free plan, "Certified stress-free", ₱0 for 1 business + 1 vehicle, and that more is on paid plans`, /Certified stress-free\./.test(await p.textContent('#free-h'))
       && /Free plan/.test(await p.textContent('.lp-bp-kind')) && /FARE · FREE PLAN/.test(await p.textContent('.lp-bp-stub')) && /₱0\/month/.test(await p.textContent('.lp-bp-fare'))
       && /1 business \+ 1 vehicle/.test(await p.textContent('.lp-bp-stub')) && /More on paid plans/.test(await p.textContent('.lp-bp-stub')) && /Included on the free plan/i.test(await p.textContent('.lp-bp-inc-h'))
@@ -1547,8 +1550,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`plus ${label}: each item is its own card, and "Fix these" keeps its red left edge`, await page.evaluate(() => {
       const sec = document.querySelector('.check-sec.fix'); const line = sec?.querySelector('.line');
       return !!line && getComputedStyle(sec).borderLeftWidth === '4px' && getComputedStyle(line).borderTopLeftRadius === '14px' && getComputedStyle(line).backgroundImage === 'none'; }));
-    check(`plus ${label}: "Fix these" is a big bold title with the count big on the right`, await page.evaluate(() => { const h = document.querySelector('.check-sec.fix h2'); const n = document.querySelector('.check-sec.fix .check-count');
-      return !!n && parseFloat(getComputedStyle(h).fontSize) >= 22 && parseFloat(getComputedStyle(n).fontSize) >= 44 && n.getBoundingClientRect().left > h.getBoundingClientRect().right; }));
+    check(`plus ${label}: "Fix these" is a big bold title with the count on the right, one step smaller than before`, await page.evaluate(() => { const h = document.querySelector('.check-sec.fix h2'); const n = document.querySelector('.check-sec.fix .check-count');
+      return !!n && parseFloat(getComputedStyle(h).fontSize) >= 22 && parseFloat(getComputedStyle(n).fontSize) >= 32 && parseFloat(getComputedStyle(n).fontSize) <= 36 && n.getBoundingClientRect().left > h.getBoundingClientRect().right; }));
     check(`plus ${label}: "Fix these" lists every item; only "Coming up" shows 3 and folds the rest`, await page.evaluate(() => [...document.querySelectorAll('.check-sec')].every((sec) => {
       const n = Number(sec.querySelector('.check-count').textContent), soon = sec.classList.contains('soon');
       return sec.querySelectorAll(':scope > .line').length === (soon ? Math.min(3, n) : n) && (!soon || n <= 3 || /Show \d+ more/.test(sec.querySelector('.check-more summary').textContent)) && (soon || !sec.querySelector('.check-more')); })));
@@ -2663,11 +2666,17 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   check('costs: "Add amount" opens the record with the amount field', (await page.locator('.modal [name=amount_paid]').count()) === 1);
   await page.click('.modal [data-modal-close]');
   await go('#/settings'); await page.waitForSelector('#site-theme');
-  check('themes: Settings offers five site themes, Signature on', (await page.locator('#site-theme .theme-opt').count()) === 5 && /Signature/.test(await page.textContent('#site-theme .theme-opt.on')));
-  await page.click('#site-theme [data-theme=mint]'); await page.waitForTimeout(250);
-  check('themes: picking Mint garden turns the sidebar and top bar light green, and is saved', await page.evaluate(() => document.documentElement.dataset.theme === 'mint'
-    && getComputedStyle(document.querySelector('.sidebar')).backgroundColor === 'rgb(231, 245, 236)' && getComputedStyle(document.querySelector('.topbar')).backgroundColor === 'rgb(231, 245, 236)')
-    && (await page.evaluate(async () => (await import('/js/core.js')).S.profile.theme)) === 'mint');
+  check('themes: Settings offers three site themes (no Mint garden or Sand), Signature on', (await page.locator('#site-theme .theme-opt').count()) === 3
+    && (await page.locator('#site-theme [data-theme=mint], #site-theme [data-theme=sand]').count()) === 0 && /Signature/.test(await page.textContent('#site-theme .theme-opt.on')));
+  check('themes: someone still on a retired theme gets Signature', await page.evaluate(async () => { const t = await import('/js/theme.js'); const r = t.applyTheme('mint'); t.applyTheme('signature'); return r === 'signature'; }));
+  await page.click('#site-theme [data-theme=forest]'); await page.waitForTimeout(250);
+  check('themes: Forest turns the sidebar dark green, is saved, and the bell is white on a dark square', await page.evaluate(() => document.documentElement.dataset.theme === 'forest'
+    && getComputedStyle(document.querySelector('.sidebar')).backgroundColor === 'rgb(31, 61, 43)' && getComputedStyle(document.querySelector('.topbar .icon-btn.bell svg')).stroke === 'rgb(255, 255, 255)'
+    && getComputedStyle(document.querySelector('.topbar .icon-btn.bell')).backgroundColor === 'rgb(22, 48, 31)')
+    && (await page.evaluate(async () => (await import('/js/core.js')).S.profile.theme)) === 'forest');
+  await go('#/services'); await page.waitForSelector('.dfy-calm');
+  check('themes: Forest: the "On your own" list on Done for you is plain white', await page.evaluate(() => [...document.querySelectorAll('.dfy-calm-col.is-alone h3, .dfy-calm-col.is-alone li')].every((e) => getComputedStyle(e).color === 'rgb(255, 255, 255)')));
+  await go('#/settings'); await page.waitForSelector('#site-theme');
   await page.click('#site-theme [data-theme=signature]'); await page.waitForTimeout(250);
   check('themes: back to Signature: navy again', await page.evaluate(() => !document.documentElement.dataset.theme && getComputedStyle(document.querySelector('.sidebar')).backgroundColor === 'rgb(11, 27, 58)'));
   check('vehicles and templates: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));

@@ -124,7 +124,7 @@ const hero = () => html`<section class="lp-hero2">
 
 // ---------------------------------------------------------------- 2. three big numbers (only ones that are true today)
 const stats = () => html`<section class="lp-stats" aria-label="Pinoy Permit in numbers"><div class="lp-wrap lp-stats-in">
-  <h2>Built for Philippine businesses, big and small.</h2>
+  <h2>Para sa negosyo mo, big or small.</h2>
   ${[['20+', 'Permit and license types'], ['16', 'Cities with free renewal guides'], ['1', 'List for permits, vehicles, and staff']].map(([n, l]) => html`<div class="lp-stat"><b>${n}</b><span>${l}</span></div>`)}
 </div></section>`;
 
@@ -160,7 +160,7 @@ const TILES = () => [
   [ICON.check, 'Done the right way', html`<b>Checklists from each city's own rules,</b> with where we got them.`],
 ];
 const pitch = () => html`<section class="lp-sec lp-pitch" aria-labelledby="pitch-h">
-  <div class="lp-pitch-copy"><h2 class="lp-big" id="pitch-h">We do the remembering. <span class="lp-blue">You run the business.</span></h2>
+  <div class="lp-pitch-copy"><h2 class="lp-big" id="pitch-h"><span class="lp-line">We do the remembering.</span><span class="lp-line lp-blue">You run the business.</span></h2>
     <p class="lp-lead">Pinoy Permit keeps every date, paper and renewal step for the permits you already have. You get a nudge before anything is due, and you stay in charge.</p>
     <a class="btn btn-ghost btn-lg lp-btn-white lp-pill-btn" href="#tour" data-scroll-to="tour">See how it works${PIC.next}</a></div>
   <div class="lp-tiles">${TILES().map(([ic, t, d]) => html`<div class="lp-tile"><span class="lp-tile-ic">${ic}</span><h3>${t}</h3><p>${d}</p></div>`)}</div>

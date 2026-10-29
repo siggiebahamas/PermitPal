@@ -2472,7 +2472,7 @@ a.line:hover, button.line:hover { background-color: #fff; border-color: #C9D2E3;
 .check-sec .card-head { flex-wrap: nowrap; align-items: center; }
 .check-sec .card-head h2 { font-size: 22px; font-weight: 800; }
 .check-sec .card-head .card-sub { font-size: 15px; }
-.check-count { flex: none; margin-left: auto; font-size: 46px; font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--heading); }
+.check-count { flex: none; margin-left: auto; font-size: 34px; font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--heading); }
 .check-sec.fix .check-count { color: var(--s-over); } .check-sec.soon .check-count { color: var(--s-soon); } .check-sec.confirm .check-count { color: var(--s-prog); }
 /* Done for you: how it works and what you can count on, side by side, in plain words */
 .dfy-how { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
@@ -3049,7 +3049,9 @@ i.r { background: #E5484D; } i.y { background: var(--hi); } i.g { background: #3
 .lp-mphone .lp-qr { width: 42px; height: 42px; margin-top: auto; stroke: none; }
 /* 4. the core pitch and four tiles */
 .lp-pitch { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); gap: 56px; align-items: center; border-top: 1px solid var(--border); }
-.lp-pitch .lp-big { font-size: clamp(32px, 3.8vw, 46px); }
+.lp-pitch .lp-big { font-size: clamp(20px, 2.85vw, 38px); }
+@media (max-width: 960px) { .lp-pitch .lp-big { font-size: min(6.4vw, 40px); } }
+.lp-pitch .lp-line { white-space: nowrap; }
 .lp-pitch .lp-lead { margin-bottom: 26px; }
 .lp-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 34px 30px; }
 .lp-tile-ic { display: grid; place-items: center; width: 50px; height: 50px; border-radius: 15px; background: var(--tone); color: var(--hi); }
@@ -3064,7 +3066,8 @@ i.r { background: #E5484D; } i.y { background: var(--hi); } i.g { background: #3
 .lp-proof span { display: block; margin-top: 8px; font-size: 16px; font-weight: 700; }
 /* 6. how it works */
 .lp-how { text-align: center; }
-.lp-how .lp-big { max-width: 22ch; margin: 0 auto; }
+.lp-how .lp-big { margin: 0 auto; font-size: clamp(26px, 3.6vw, 50px); }
+@media (min-width: 700px) { .lp-how .lp-big { white-space: nowrap; } }
 .lp-steps3 { list-style: none; margin: 42px 0 36px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px; }
 .lp-step3 { display: flex; flex-direction: column; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 28px; padding: 28px 22px 0; overflow: hidden; }
 .lp-step3-n { display: grid; place-items: center; width: 62px; height: 62px; border-radius: 50%; background: var(--accent-soft); color: var(--heading); font-size: 26px; font-weight: 800; }
@@ -3267,20 +3270,24 @@ a.lp-bt:hover { transform: translateY(-3px); box-shadow: 0 20px 40px -24px rgba(
 
 /* ================================================================ Site themes (Settings > Site theme). Signature is the default above.
    Each theme sets the ink (--tone), its lighter partner (--tone2), the highlight (--hi) and the button color. Light themes
-   (white, mint, sand) also turn the top bar, sidebar and title band light, with dark text. Status colors never change. */
+   (white) also turn the top bar, sidebar and title band light, with dark text. Status colors never change. */
 html[data-theme="white"] { --tone: #0B1B3A; --tone2: #13295A; --hi: #1B4DB5; --bg: #F7F8FA;
   --shell: #FFFFFF; --shell2: #F7F8FA; --shell-ink: #0B1B3A; --shell-sub: #4B5563; --shell-line: #E5E7EB; --shell-active: #EEF3FF; }
-html[data-theme="mint"] { --tone: #0B3D25; --tone2: #145A38; --hi: #0E8A4F; --bg: #F5FAF7; --heading: #0B3D25;
-  --brand: #0E8A4F; --accent: #0E8A4F; --accent-soft: #DDF1E5; --accent-ink: #0B5E37; --link: #0B6E40; --ring-fill: #0E8A4F; --ring-track: #DDF1E5;
-  --shell: #E7F5EC; --shell2: #DDF1E5; --shell-ink: #0B3D25; --shell-sub: #285B40; --shell-line: #CFE8D9; --shell-active: #C9EBD6; }
-html[data-theme="sand"] { --tone: #3D2B1F; --tone2: #5A4030; --hi: #B8582E; --bg: #FBF8F4; --heading: #3D2B1F; --border: #EADFD2; --rule: #F1E8DD;
-  --brand: #B8582E; --accent: #B8582E; --accent-soft: #F6E6DC; --accent-ink: #8F3F1C; --link: #8F3F1C; --ring-fill: #B8582E; --ring-track: #F6E6DC;
-  --shell: #F6EFE6; --shell2: #F1E7DA; --shell-ink: #3D2B1F; --shell-sub: #6B5444; --shell-line: #E9DFD0; --shell-active: #EADFCF; }
 html[data-theme="forest"] { --tone: #1F3D2B; --tone2: #2C5139; --hi: #D9B26A; --bg: #FAF7EF; --heading: #1D2A20; --border: #E8E1CF; --rule: #F0EBDD;
   --brand: #2F6B45; --accent: #2F6B45; --accent-soft: #E3EFE6; --accent-ink: #24563A; --link: #24563A; --ring-fill: #2F6B45; --ring-track: #E3EFE6; }
 html[data-theme] body { background: var(--bg); }
+/* Forest: anything on the dark green reads in plain white, and every bell is a solid white icon on a darker square */
+html[data-theme="forest"] .dfy-calm-col.is-alone h3, html[data-theme="forest"] .dfy-calm-col.is-alone li { color: #fff; }
+html[data-theme="forest"] .dfy-calm-col.is-alone li::before { color: #fff; background: rgba(255, 255, 255, .22); }
+html[data-theme="forest"] .dfy-calm-top p, html[data-theme="forest"] .dfy-calm-foot span { color: #fff; opacity: 1; }
+html[data-theme="forest"] .pg-band .page-sub, html[data-theme="forest"] .pg-band .page-head p, html[data-theme="forest"] .pg-band .muted, html[data-theme="forest"] .hs-band .hs-line { color: #fff; opacity: 1; }
+html[data-theme="forest"] .sidebar .muted, html[data-theme="forest"] .sidebar .org-name, html[data-theme="forest"] .sidebar .powered-by { color: #fff; opacity: 1; }
+html[data-theme="forest"] .pass-sub, html[data-theme="forest"] .pass-card s, html[data-theme="forest"] .pass-card span { opacity: 1; }
+html[data-theme="forest"] .topbar .icon-btn.bell { background: #16301F; color: #fff; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .35); }
+html[data-theme="forest"] .topbar .icon-btn.bell:hover { background: #0F2417; }
+html[data-theme="forest"] .topbar .icon-btn.bell svg, html[data-theme="forest"] .sidebar .nav svg { color: #fff; stroke: #fff; stroke-width: 2.3; }
 
-/* light shells: white, mint, sand */
+/* light shell: white */
 html[data-shell="light"] .topbar { background: var(--shell); border-bottom: 1px solid var(--shell-line); }
 html[data-shell="light"] .topbar .menu-btn { color: var(--shell-ink); }
 html[data-shell="light"] .top-search { border: 1px solid var(--shell-line); box-shadow: none; }
