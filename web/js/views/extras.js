@@ -9,6 +9,7 @@ import { trustSection } from './trust.js';
 import { maxPenalty } from '../penalty.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // ================================================================ professionals (independent firms)
 // Firms that file and renew in person (liaison, accounting, fire safety...). Customers deal with
@@ -175,7 +176,7 @@ export async function costs(el) {
   const months = [];
   for (let i = 0; i < 12; i++) {
     const m = ((tm - 1 + i) % 12) + 1, y = ty + Math.floor((tm - 1 + i) / 12);
-    months.push({ key: `${y}-${String(m).padStart(2, '0')}`, label: `${MON[m - 1]} ${y}`, items: [] });
+    months.push({ key: `${y}-${String(m).padStart(2, '0')}`, label: `${MONTH[m - 1]} ${y}`, items: [] });
   }
   const overdue = { key: 'late', label: 'Overdue now', items: [] };
   for (const r of reqs) {
@@ -197,11 +198,16 @@ export async function costs(el) {
       <div class="stat progress"><div class="stat-n">${busiest && known(busiest.items) ? busiest.label.split(' ')[0] : '—'}</div><div class="stat-l">Biggest month</div></div>
       <div class="stat needinfo"><div class="stat-n">${unknown(all)}</div><div class="stat-l" title="Renewals with no amount yet">No amount yet</div></div>
     </div>
-    ${rows.length ? html`<section class="card">
+    ${rows.length ? html`<section class="card cost-tl-card">
       <div class="card-head"><div><h2>Coming up</h2><p class="card-sub">Estimates use the amount you entered for each permit's current record</p></div></div>
-      ${rows.map((m) => html`<div class="band month ${m.key === 'late' ? 'overdue' : ''}"><span>${m.label}</span><span>${peso(known(m.items))}</span></div>
-        ${m.items.sort(byPriority).map((r) => html`<a class="line cost-line ${STATUS[r.status]?.cls || ''}" href="#/requirement/${r.id}"><span class="line-main"><b>${r.name}</b><small>${subjectLabel(r)}</small></span>
-          <span class="cost-side">${duePill(r)}${r.amount_paid != null ? html`<b class="cost-amt">${peso(r.amount_paid)}</b>` : html`<span class="cost-amt none">Add amount</span>`}</span></a>`)}`)}
+      <div class="ctl">${rows.map((m) => html`<div class="ctl-month ${m.key === 'late' ? 'late' : ''}">
+        <span class="ctl-dot" aria-hidden="true"></span>
+        <div class="ctl-head"><span>${m.label}</span><span>${peso(known(m.items))}</span></div>
+        ${m.items.sort(byPriority).map((r) => html`<div class="ctl-item cost-line ${STATUS[r.status]?.cls || ''}">
+          <a class="ctl-main" href="#/requirement/${r.id}"><b>${r.name}</b><small>${subjectLabel(r)}</small></a>
+          <span class="cost-side">${duePill(r)}${r.amount_paid != null ? html`<b class="cost-amt">${peso(r.amount_paid)}</b>`
+            : canEdit() ? html`<button type="button" class="btn btn-soft btn-sm cost-add" data-act="req-edit" data-id="${r.id}">Add amount</button>` : html`<span class="cost-amt none">No amount</span>`}</span></div>`)}
+      </div>`)}</div>
       <div class="sheet-foot">Add "Amount paid" when you record or renew a permit to make this more accurate.</div>
     </section>` : empty('No dated renewals yet', 'Add expiry dates to your permits and this page fills in by itself.')}`);
 }

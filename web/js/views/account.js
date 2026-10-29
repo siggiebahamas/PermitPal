@@ -17,6 +17,7 @@ import { brandPage, brandTabShown } from './brand.js';
 import { billToggle, freeCard, planCard, plansShown, PLANS, compareTable, TIERS, TIER_SMALL, TIER_FLEET, tierCard, tierPrice, tiersShown, softwareBanner, peaceBand, helpServices } from './pricing.js';
 import { planTotal } from '../prices.js';
 import { loadFileAccess, fileGuardCard } from './fileguard.js';
+import { THEMES, applyTheme, savedTheme } from '../theme.js';
 import * as db from 'pp/data';
 
 // ================================================================ history
@@ -261,6 +262,14 @@ on('member-leave', async () => {
 const settingsNav = () => html`<nav class="subnav"><a href="#/settings">Profile & reminders</a><a href="#/settings/billing">Plan</a>${brandTabShown() ? html`<a href="#/settings/brand">Your brand</a>` : ''}<a href="#/settings/workspace">Workspace & data</a></nav>`;
 const markNav = (el) => el.querySelectorAll('.subnav a').forEach((a) => { if (a.getAttribute('href') === location.hash.split('?')[0]) a.classList.add('active'); });
 
+const currentTheme = () => S.profile?.theme || savedTheme();
+on('set-theme', async (ds) => {
+  const t = applyTheme(ds.theme);
+  S.profile.theme = t;
+  document.querySelectorAll('.theme-opt').forEach((b) => { const on = b.dataset.theme === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+  if (has('themes')) { try { await db.updateProfile(S.user.id, { theme: t }); } catch (e) { toastError(e); return; } }
+  toast('Theme saved.');
+});
 export async function settings(el, section) {
   if (section === 'brand' && brandTabShown()) return brandPage(el, settingsNav());
   const p = S.profile;
@@ -318,6 +327,10 @@ export async function settings(el, section) {
       <label class="toggle"><div><div>Show partner firms on renewal checklists</div><div class="muted small">At most one partner firm on a checklist step, labelled "Partner". Firms pay Pinoy Permit to be listed there.</div></div>
         <input type="checkbox" data-profile-pref="show_partner_offers" ${p.show_partner_offers !== false ? 'checked' : ''}><span class="switch"></span></label></section>`)}
     ${when(has('sms'), smsSection(channels))}
+    <section class="card" id="site-theme"><div class="card-head"><div><h2>Site theme</h2><p class="card-sub">Pick the colors you like. Only the colors change; red, yellow and green still mean late, soon and good.</p></div></div>
+      <div class="theme-pick" role="radiogroup" aria-label="Site theme">${THEMES.map(([k, name, sub, c]) => html`<button type="button" class="theme-opt ${currentTheme() === k ? 'on' : ''}" role="radio" aria-checked="${currentTheme() === k}" data-act="set-theme" data-theme="${k}">
+        <span class="theme-prev" style="--a:${c.a};--b:${c.b};--c:${c.c};--d:${c.d}" aria-hidden="true"><i></i><span><i></i><em></em></span></span><b>${name}</b><small class="muted">${sub}</small></button>`)}</div>
+    </section>
     ${when(has('mfa'), html`<section class="card" id="mfa-section"><h2>Two-step login</h2><p class="muted">Loading…</p></section>`)}
 
     <section class="card"><h2>Delivery log</h2>

@@ -1381,7 +1381,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const text = await p.textContent('.landing');
     check(`website ${label}: the home page leads with "Stay on top of every permit. Easily." and says it's for businesses already registered`, /^Stay on top of every permit\. Easily\.$/.test(await p.textContent('.lp-home h1'))
       && /doesn't file new business registrations/.test(await p.textContent('.lp-hero2 .lp-scope'))
-      && (await p.textContent('.lp-hero2 .lp-tag')) === 'Permits on autopilot' && /^Add the permits you already have, once\./.test(await p.textContent('.lp-hero2 .lp-lead'))
+      && (await p.textContent('.lp-hero2 .lp-tag')) === 'Permits on autopilot' && /^Every expiry date, reminder and renewal step for the permits you already have\./.test(await p.textContent('.lp-hero2 .lp-lead'))
       && (await p.locator('.lp-hero2 .lp-ticks').count()) === 0);
     check(`website ${label}: the phone and the list look like the app: navy greeting, status tiles, date tiles and green Renew`, (await p.locator('.lp-hero2 .lp-app-band').count()) === 1
       && (await p.locator('.lp-hero2 .lp-app-tile').count()) === 3 && (await p.locator('.lp-board .lp-app-date').count()) >= 4 && (await p.locator('.lp-board .lp-app-renew').count()) >= 3);
@@ -2640,6 +2640,22 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await go('#/'); await go('#/requirement/' + fdoc); await page.waitForSelector('main .record-card');
   check('files: allowed: the teammate can open them, and is told until when (and that the owner sees each open)', (await page.locator('main .record-card [data-act=doc-view]').count()) >= 1 && /until/.test(await page.textContent('main .file-lock.open')));
   await page.evaluate(async () => { const c = await import('/js/core.js'); c.S.org.role = 'owner'; const m = await import('/__mock/mock-data.js'); m.__org.role = 'owner'; m.__files.mode = 'open'; });
+  await go('#/costs'); await page.waitForSelector('main .ctl');
+  check('costs: a timeline, one dot per month, full month names, totals in the same style as the month', await page.evaluate(() => {
+    const h = document.querySelector('.ctl-month:not(.late) .ctl-head'); if (!h) return false; const [a, b] = h.children;
+    return document.querySelectorAll('.ctl-dot').length >= 2 && /^[A-Z][a-z]{3,} 20\d\d$/.test(a.textContent) && getComputedStyle(a).color === getComputedStyle(b).color && getComputedStyle(a).fontSize === getComputedStyle(b).fontSize; }));
+  check('costs: status pills keep their dots, and items with no amount offer "Add amount"', (await page.locator('main .ctl-item .pill, main .ctl-item .chip').count()) >= 1 && (await page.locator('main .ctl-item [data-act=req-edit]', { hasText: 'Add amount' }).count()) >= 1);
+  await page.click('main .ctl-item [data-act=req-edit]'); await page.waitForSelector('.modal [name=amount_paid]');
+  check('costs: "Add amount" opens the record with the amount field', (await page.locator('.modal [name=amount_paid]').count()) === 1);
+  await page.click('.modal [data-modal-close]');
+  await go('#/settings'); await page.waitForSelector('#site-theme');
+  check('themes: Settings offers five site themes, Signature on', (await page.locator('#site-theme .theme-opt').count()) === 5 && /Signature/.test(await page.textContent('#site-theme .theme-opt.on')));
+  await page.click('#site-theme [data-theme=mint]'); await page.waitForTimeout(250);
+  check('themes: picking Mint garden turns the sidebar and top bar light green, and is saved', await page.evaluate(() => document.documentElement.dataset.theme === 'mint'
+    && getComputedStyle(document.querySelector('.sidebar')).backgroundColor === 'rgb(231, 245, 236)' && getComputedStyle(document.querySelector('.topbar')).backgroundColor === 'rgb(231, 245, 236)')
+    && (await page.evaluate(async () => (await import('/js/core.js')).S.profile.theme)) === 'mint');
+  await page.click('#site-theme [data-theme=signature]'); await page.waitForTimeout(250);
+  check('themes: back to Signature: navy again', await page.evaluate(() => !document.documentElement.dataset.theme && getComputedStyle(document.querySelector('.sidebar')).backgroundColor === 'rgb(11, 27, 58)'));
   check('vehicles and templates: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
 }

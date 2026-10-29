@@ -3,6 +3,7 @@ import { html, toast, toastError, fmtDate, closeModal, friendlyError } from './u
 import { S, actions, hooks, on, isStaff, has, IN_PERSON } from './core.js';
 import { ICON } from './components.js';
 import { wireSearch } from './search.js';
+import { applyTheme, clearTheme, savedTheme } from './theme.js';
 import { initErrorReporting, reportError } from './errors.js';
 import * as db from 'pp/data';
 import { authPage, invitePage, onboarding, sessionStorageTake, sessionStorageSet } from './views/auth.js';
@@ -190,6 +191,7 @@ function buildNav() {
 }
 
 function renderShell() {
+  applyTheme(S.profile?.theme || savedTheme());
   buildNav();
   const name = [S.profile.first_name, S.profile.last_name].filter(Boolean).join(' ') || S.profile.email;
   app.innerHTML = String(html`

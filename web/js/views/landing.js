@@ -4,6 +4,7 @@
 // Prices have their own page (#/pricing): the free plan, the team plans (prices read live from the plans
 // table) and add-ons, monthly or yearly (2 months free). Anything whose database part isn't switched on
 // yet stays off both pages.
+import { clearTheme } from '../theme.js';
 import { html, raw, peso } from '../util.js';
 import { ICON } from '../components.js';
 import { has } from '../core.js';
@@ -44,7 +45,7 @@ const hero = () => html`<section class="lp-hero2">
   <div class="lp-hero2-copy">
     <p class="lp-tag">Permits on autopilot</p>
     <h1>Stay on top of every permit. <span class="lp-blue">Easily.</span></h1>
-    <p class="lp-lead">Add the permits you already have, once. Pinoy Permit tracks every expiry date${has('filings') ? ' and tax deadline' : ''}${has('library2') ? ', reminds you before each one is due, and walks you through each renewal, step by step' : ' and reminds you before each one is due'}.</p>
+    <p class="lp-lead">Every expiry date, reminder and renewal step for the permits you already have. All in one place.</p>
     <div class="btn-row"><a class="btn btn-primary btn-lg" href="#/signup">Start free</a><a class="btn btn-ghost btn-lg lp-btn-white" href="#tour" data-scroll-to="tour">See how it works</a><a class="btn btn-lg lp-btn-demo" href="demo/">${PLAY}Try the demo</a></div>
     <p class="lp-demo-note">No sign-up needed for the demo. Click around with sample data.</p>
     <p class="lp-scope">Made for businesses that are already registered. Pinoy Permit tracks and guides; it doesn't file new business registrations.</p>
@@ -231,6 +232,7 @@ const finalCta = () => html`<section class="lp-sec"><div class="lp-final2">
 </div></section>`;
 
 export function landing(app) {
+  clearTheme();
   app.innerHTML = String(html`
     <main class="landing lp-home">
       <div class="lp-wrap">${header(true)}${hero()}${forYou()}</div>
@@ -317,6 +319,7 @@ const addons = () => (has('plus') ? html`<h2 class="lp-h3">Add-ons for any works
   </div>` : '');
 
 export async function pricingPage(app) {
+  clearTheme();
   // Show the page at once; team prices fill in when they arrive (a slow or unreachable server never blocks the page).
   const plansP = db.listPlans().catch(() => []);
   app.innerHTML = String(html`
