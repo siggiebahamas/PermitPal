@@ -77,23 +77,24 @@ If you ever need a new key (for example, you think it leaked): keep the old one,
 the value `1:<old key>`, set `DOC_VAULT_KEY` to the new one and `DOC_VAULT_KEY_ID` to `2`. Old files still open; new
 ones use the new key.
 
-## Part C: email, so reminders and sign-up emails actually go out (20 minutes, free)
+## Part C: email through Gmail (15 minutes, free)
 
-Without this, nobody gets reminder emails and new customers can't confirm their sign-up.
+The full click-by-click version, with what to do for each message you might see, is in the "Pinoy Permit: finish your
+setup" guide. Short version:
 
-16. Buy a domain, e.g. at https://dash.cloudflare.com (Domain Registration; a `.com` is about US$10 a year).
-    Tell Claude the domain and it will point the website at it too.
-17. Make a free account at https://resend.com. Click **Domains** → **Add domain**, type your domain, and copy the
-    records it shows into your domain's DNS (in Cloudflare: your domain → **DNS** → **Add record**). Wait until Resend
-    says **Verified**.
-18. In Resend: **API Keys** → **Create API key**. Copy it (it starts with `re_`).
-19. Supabase → https://supabase.com/dashboard/project/zeaiwvgktakbwnqpchbo/functions/secrets → add two secrets:
-    - `RESEND_API_KEY` = the key from step 18
-    - `EMAIL_FROM` = `Pinoy Permit <reminders@YOURDOMAIN.com>`
-20. Supabase → **Authentication** → **Emails** → **SMTP Settings** → turn on **Custom SMTP** and fill in:
-    host `smtp.resend.com`, port `465`, username `resend`, password = the key from step 18,
-    sender email `hello@YOURDOMAIN.com`, sender name `Pinoy Permit`. Save.
-21. After Part D (you need to be admin): in Pinoy Permit, **Admin** → **Messages** → **Send me a test email**. It should arrive within a minute.
+16. Use a business Gmail. Turn on 2-Step Verification, then make an app password at
+    https://myaccount.google.com/apppasswords (16 letters; save it in your password manager).
+17. Supabase → Authentication → Emails → SMTP Settings → Custom SMTP on: host `smtp.gmail.com`, port `465`, username and
+    sender = your Gmail, password = the app password, sender name `Pinoy Permit`. Save. (Sign-up and password emails.)
+18. Supabase → Edge Functions → Secrets: `GMAIL_USER` = your Gmail, `GMAIL_APP_PASSWORD` = the app password.
+19. Deploy `supabase/functions/send-messages/index.ts` as `send-messages` (or paste over the old code), with
+    **Enforce JWT verification** OFF.
+20. After Part D: **Admin** → **Messages** → **Send me a test email**.
+
+Reminders never pile up: each person gets at most one reminder email a day per workspace (plus the optional Monday
+summary), no address gets more than 3 emails a day, and Gmail sends at most 400 a day in all; extra emails wait for
+7 a.m. the next day. Later, with your own domain, you can switch to Resend instead (`RESEND_API_KEY` + `EMAIL_FROM`; it
+wins over Gmail when set).
 
 ## Part D: logins (2 minutes)
 

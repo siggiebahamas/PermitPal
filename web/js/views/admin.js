@@ -401,12 +401,12 @@ function outboxTab(list, channels = {}) {
       <p class="card-sub">${channels.email ? 'Connected: reminders are going out.' : 'Not connected: customers only see reminders inside the app.'}</p></div>
       <span class="chip ${channels.email ? 'ok' : 'overdue'}">${channels.email ? 'On' : 'Off'}</span></div>
     ${when(!channels.email, html`<ol class="small setup-steps">
-      <li>Create a free account at resend.com (3,000 emails a month) and verify your domain.</li>
-      <li>Supabase → Edge Functions → Secrets: add <b>RESEND_API_KEY</b> and <b>EMAIL_FROM</b> (e.g. Pinoy Permit &lt;reminders@yourdomain.ph&gt;).</li>
-      <li>Supabase → Authentication → Emails → SMTP: use the same Resend details so sign-up emails arrive too.</li>
+      <li>Make a Gmail app password (Google Account → Security → 2-Step Verification on → App passwords).</li>
+      <li>Supabase → Edge Functions → Secrets: add <b>GMAIL_USER</b> (your Gmail address) and <b>GMAIL_APP_PASSWORD</b>.</li>
+      <li>Supabase → Authentication → Emails → SMTP: host smtp.gmail.com, port 465, the same Gmail and app password, so sign-up emails arrive too.</li>
       <li>Press the button below. You should get an email within a minute.</li></ol>`)}
     <button class="btn btn-soft btn-sm" data-act="admin-test-email">Send me a test email</button></section>
-  <section class="card"><p class="muted small">Latest 100 messages. "Skipped" means that channel isn't connected yet.</p>
+  <section class="card"><p class="muted small">Latest 100 messages. "Skipped" means that channel isn't connected yet. No address gets more than 3 emails a day; extra ones wait for the next morning.</p>
     <div class="table-wrap"><table class="table"><thead><tr><th>When</th><th>Channel</th><th>To</th><th>Subject</th><th>Status</th><th>Error</th></tr></thead><tbody>
     ${list.map((m) => html`<tr><td>${fmtDateTime(m.created_at)}</td><td>${m.channel}</td><td>${m.to_address}</td><td>${m.subject || ''}</td>
       <td><span class="tag ${m.status === 'sent' ? 'green' : m.status === 'failed' ? 'red' : ''}">${m.status}${m.attempts > 1 ? ` ×${m.attempts}` : ''}</span></td><td class="small">${m.last_error || ''}</td></tr>`)}

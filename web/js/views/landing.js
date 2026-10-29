@@ -91,11 +91,6 @@ const SCREENS = [
 ];
 
 // ---------------------------------------------------------------- 1. hero: the promise, two buttons, the app on a phone (example data)
-// The arches behind the phone echo a doorway: walk in calm, walk out renewed.
-const ARCH = raw(`<svg class="lp-arch" viewBox="0 0 600 420" aria-hidden="true" preserveAspectRatio="xMidYMax meet"><defs><linearGradient id="lp-arch-g" x1="0" x2="1"><stop offset="0" stop-color="#E9B949"/><stop offset="1" stop-color="#1B4DB5"/></linearGradient></defs>
-  <path d="M60 420V300a240 240 0 0 1 480 0v120" fill="none" stroke="url(#lp-arch-g)" stroke-width="3"/>
-  <path d="M120 420V300a180 180 0 0 1 360 0v120" fill="none" stroke="#C9D5EE" stroke-width="2"/>
-  <path d="M180 420V300a120 120 0 0 1 240 0v120" fill="none" stroke="#DCE3F0" stroke-width="2"/></svg>`);
 const hero = () => html`<section class="lp-hero2">
   <div class="lp-hero2-copy">
     <p class="lp-tag">Permits on autopilot</p>
@@ -106,7 +101,7 @@ const hero = () => html`<section class="lp-hero2">
     <p class="lp-scope">Made for businesses that are already registered. Pinoy Permit tracks and guides; it doesn't file new business registrations.</p>
   </div>
   <div class="lp-hero2-art">
-    ${ARCH}
+    <div class="lp-glow" aria-hidden="true"></div>
     <div class="lp-phone" role="img" aria-label="Pinoy Permit on a phone: 1 overdue, 2 to renew soon, 9 compliant, with what is due next">
       <div class="lp-screen lp-screen-app" aria-hidden="true"><div class="lp-notch"></div>
         <div class="lp-app-band"><small>THURSDAY, OCTOBER 29</small><b>Good morning, Sadie</b><span class="lp-app-alert"><i class="r"></i>1 permit is past due</span></div>
@@ -124,7 +119,7 @@ const hero = () => html`<section class="lp-hero2">
 
 // ---------------------------------------------------------------- 2. three big numbers (only ones that are true today)
 const stats = () => html`<section class="lp-stats" aria-label="Pinoy Permit in numbers"><div class="lp-wrap lp-stats-in">
-  <h2>Para sa negosyo mo, big or small.</h2>
+  <h2>Sari-sari store man o buong fleet, kasama mo kami.</h2>
   ${[['20+', 'Permit and license types'], ['16', 'Cities with free renewal guides'], ['1', 'List for permits, vehicles, and staff']].map(([n, l]) => html`<div class="lp-stat"><b>${n}</b><span>${l}</span></div>`)}
 </div></section>`;
 

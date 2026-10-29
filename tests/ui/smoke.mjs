@@ -1416,7 +1416,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
         && document.querySelectorAll('.lp-step3 .lp-scr').length === 3 && document.querySelectorAll('.lp-checks li').length === 4 && document.querySelectorAll('.lp-bento .lp-bt').length === 5;
     }));
     check(`website ${label}: the numbers are ones that are true today (no user counts)`, /20\+\s*Permit and license types/.test(await p.textContent('.lp-stats')) && /16\s*Cities with free renewal guides/.test(await p.textContent('.lp-stats'))
-      && !/users|customers/i.test(await p.textContent('.lp-stats')) && /Para sa negosyo mo, big or small\./.test(await p.textContent('.lp-stats h2')));
+      && !/users|customers/i.test(await p.textContent('.lp-stats')) && /Sari-sari store man o buong fleet, kasama mo kami\./.test(await p.textContent('.lp-stats h2')) && (await p.locator('.lp-arch').count()) === 0);
     check(`website ${label}: the boarding pass says Free plan, "Certified stress-free", ₱0 for 1 business + 1 vehicle, and that more is on paid plans`, /Certified stress-free\./.test(await p.textContent('#free-h'))
       && /Free plan/.test(await p.textContent('.lp-bp-kind')) && /FARE · FREE PLAN/.test(await p.textContent('.lp-bp-stub')) && /₱0\/month/.test(await p.textContent('.lp-bp-fare'))
       && /1 business \+ 1 vehicle/.test(await p.textContent('.lp-bp-stub')) && /More on paid plans/.test(await p.textContent('.lp-bp-stub')) && /Included on the free plan/i.test(await p.textContent('.lp-bp-inc-h'))
@@ -2665,6 +2665,10 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.click('main .ctl-item [data-act=req-edit]'); await page.waitForSelector('.modal [name=amount_paid]');
   check('costs: "Add amount" opens the record with the amount field', (await page.locator('.modal [name=amount_paid]').count()) === 1);
   await page.click('.modal [data-modal-close]');
+  await page.evaluate(() => { globalThis.PP_DEMO = true; }); await go('#/check'); await go('#/costs'); await page.waitForSelector('main .ctl');
+  check('costs (public demo): at most 4 groups, overdue included, and at most 3 renewals each, still with an "Add amount"', await page.evaluate(() => {
+    const g = [...document.querySelectorAll('.ctl-month')]; return g.length >= 2 && g.length <= 4 && g.every((m) => m.querySelectorAll('.ctl-item').length <= 3) && !!document.querySelector('.ctl-item .cost-add'); }));
+  await page.evaluate(() => { globalThis.PP_DEMO = false; });
   await go('#/settings'); await page.waitForSelector('#site-theme');
   check('themes: Settings offers three site themes (no Mint garden or Sand), Signature on', (await page.locator('#site-theme .theme-opt').count()) === 3
     && (await page.locator('#site-theme [data-theme=mint], #site-theme [data-theme=sand]').count()) === 0 && /Signature/.test(await page.textContent('#site-theme .theme-opt.on')));

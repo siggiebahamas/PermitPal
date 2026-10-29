@@ -530,3 +530,39 @@ test('Document vault: files are stored sealed, open only for who storage allows,
   const s1 = await seal(pdf, path, k1);
   assert.equal(new TextDecoder().decode(await unseal(s1, path, new Map([[2, k2.key], [1, k1.key]]))).slice(0, 8), '%PDF-1.7');
 });
+
+test('Reminder emails: Gmail sending speaks plain SMTP, and no address gets more than 3 emails a day', async () => {
+  const { smtpSend, mimeMessage, holdEmail, manilaDay, PER_ADDRESS_DAY, GMAIL_DAY, handle } = await import('../supabase/functions/send-messages/index.ts');
+  // a stand-in Gmail server: answers each command, records what it was told
+  const said = [];
+  const script = { EHLO: '250-smtp.gmail.com\r\n250 AUTH LOGIN PLAIN\r\n', 'AUTH LOGIN': '334 VXNlcm5hbWU6\r\n', MAIL: '250 OK\r\n', RCPT: '250 OK\r\n', DATA: '354 Go ahead\r\n', QUIT: '221 bye\r\n' };
+  let out = ['220 smtp.gmail.com ready\r\n'], step = 0;
+  const conn = {
+    async read(b) { const s = out.shift(); if (!s) return null; const e = new TextEncoder().encode(s); b.set(e); return e.length; },
+    async write(b) { const line = new TextDecoder().decode(b); said.push(line); step++;
+      const k = Object.keys(script).find((x) => line.startsWith(x));
+      out.push(k ? script[k] : step === 3 ? '334 UGFzc3dvcmQ6\r\n' : step === 4 ? '235 Accepted\r\n' : '250 Queued\r\n'); return b.length; },
+    close() {},
+  };
+  const data = mimeMessage({ from: 'shop@gmail.com', fromName: 'Pinoy Permit', to: 'owner@example.com', subject: "Mayor's Permit due in 7 days · ₱8,500", text: 'Hi', html: '<p>Hi</p>', id: 'x1', date: new Date('2026-10-29T00:00:00Z') });
+  assert.match(data, /^From: "Pinoy Permit" <shop@gmail.com>\r\n/);
+  assert.match(data, /Subject: =\?UTF-8\?B\?/); // the peso sign survives
+  assert.match(data, /multipart\/alternative/);
+  await smtpSend(conn, { user: 'shop@gmail.com', pass: 'abcdabcdabcdabcd', to: 'owner@example.com', data });
+  assert.equal(said[2], Buffer.from('shop@gmail.com').toString('base64') + '\r\n');
+  assert.ok(said.some((l) => l === 'RCPT TO:<owner@example.com>\r\n'));
+  assert.ok(said.some((l) => l.endsWith('\r\n.\r\n')));
+  // a refusal is an error with Gmail's own words
+  out = ['220 ready\r\n']; step = 0; script['AUTH LOGIN'] = '535 5.7.8 Username and Password not accepted\r\n';
+  await assert.rejects(smtpSend(conn, { user: 'a@gmail.com', pass: 'x', to: 'b@x.com', data }), /Username and Password not accepted/);
+  // the daily limits
+  assert.equal(PER_ADDRESS_DAY, 3); assert.ok(GMAIL_DAY < 500);
+  assert.equal(holdEmail(2, 10, true), false);
+  assert.equal(holdEmail(3, 10, false), true);
+  assert.equal(holdEmail(0, GMAIL_DAY, true), true);
+  assert.equal(holdEmail(0, GMAIL_DAY, false), false); // Resend has no such limit
+  const d = manilaDay(new Date('2026-10-29T17:30:00Z')); // 1:30 a.m. Oct 30 in Manila
+  assert.equal(d.start.toISOString(), '2026-10-29T16:00:00.000Z');
+  assert.equal(d.nextMorning.toISOString(), '2026-10-30T23:00:00.000Z'); // 7 a.m. Oct 31, Manila
+  assert.equal((await handle(new Request('https://f/', { method: 'GET' }), {})).status, 405);
+});

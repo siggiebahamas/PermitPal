@@ -2996,9 +2996,10 @@ i.r { background: #E5484D; } i.y { background: var(--hi); } i.g { background: #3
 .lp-mx { margin-left: auto; margin-right: auto; }
 .lp-center-row { justify-content: center; }
 .lp-kick { color: var(--brand); }
-/* 1. hero: a soft gradient, and arches behind the phone */
+/* 1. hero: a soft gradient, and a soft glow behind the phone */
 .lp-hero-bg { background: radial-gradient(55% 70% at 88% 35%, #DCE7FF 0%, rgba(220, 231, 255, 0) 70%), radial-gradient(45% 55% at 0% 100%, #FFF1CC 0%, rgba(255, 241, 204, 0) 70%), linear-gradient(180deg, #F8FAFF 0%, var(--bg) 100%); }
-.lp-arch { position: absolute; left: 50%; bottom: 0; width: min(600px, 112%); height: auto; transform: translateX(-50%); stroke: none; }
+.lp-glow { position: absolute; left: 50%; top: 50%; width: min(520px, 110%); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(27, 77, 181, .22) 0%, rgba(27, 77, 181, .08) 42%, rgba(233, 185, 73, .10) 58%, rgba(233, 185, 73, 0) 70%); filter: blur(6px); }
 .lp-hero2-art .lp-phone { z-index: 1; }
 .lp-hero2-art .lp-float { z-index: 2; }
 /* 2. three numbers */

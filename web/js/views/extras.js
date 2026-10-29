@@ -184,7 +184,9 @@ export async function costs(el) {
     if (r.expires_on < today) overdue.items.push(r);
     else months.find((m) => m.key === r.expires_on.slice(0, 7))?.items.push(r);
   }
-  const rows = [overdue, ...months].filter((m) => m.items.length);
+  let rows = [overdue, ...months].filter((m) => m.items.length);
+  // The public demo shows the idea, not a wall of sample data: 4 groups (overdue counts as one), 3 renewals each.
+  if (globalThis.PP_DEMO) rows = rows.slice(0, 4).map((m) => ({ ...m, items: m.items.sort(byPriority).slice(0, 3) }));
   const known = (list) => list.filter((r) => r.amount_paid != null).reduce((t, r) => t + Number(r.amount_paid), 0);
   const unknown = (list) => list.filter((r) => r.amount_paid == null).length;
   const all = rows.flatMap((m) => m.items);
