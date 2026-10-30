@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /PermitPal/demo/
+Sitemap: https://siggiebahamas.github.io/PermitPal/sitemap.xml

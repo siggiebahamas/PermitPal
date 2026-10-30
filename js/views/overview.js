@@ -1,0 +1,227 @@
+// Dashboard, Compliance (filterable list) and Documents.
+import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError } from '../util.js?v=fd3a394';
+import { S, on, hooks, canEdit, empty, has, memberName, careOf, service, IN_PERSON } from '../core.js?v=fd3a394';
+import { assignable, bulk, bulkBar } from './assign.js?v=fd3a394';
+import { filingsBrief } from './filings.js?v=fd3a394';
+import { STATUS, reqRow, statTiles, counts, byPriority, subjectLabel, dueShort, duePill, ICON } from '../components.js?v=fd3a394';
+import { accountantCard } from './brand.js?v=fd3a394';
+import { cityDashBanner } from './citydates.js?v=fd3a394';
+import { homeCal } from './homecal.js?v=fd3a394';
+import { serviceStrip } from './pricing.js?v=fd3a394';
+import * as db from 'pp/data';
+
+// ---------------------------------------------------------------- dashboard
+export function dashboard(el) {
+  const { reqs, businesses, vehicles } = S.data;
+  const first = S.profile.first_name || 'there';
+  if (!businesses.length && !vehicles.length) {
+    el.innerHTML = String(html`
+      <div class="page-head"><div><h1>Welcome, ${first}.</h1><p class="page-sub">Let's get your permits in order. Pick one to start:</p></div></div>
+      <div class="onboard">
+        <a class="onboard-card" href="#/businesses?add=1">${ICON.building}<b>Add a business</b><span>We list the permits it needs for you: Mayor's Permit, Barangay, BIR, FSIC and more.</span></a>
+        <a class="onboard-card" href="#/vehicles?add=1">${ICON.car}<b>Add a vehicle</b><span>LTO, CTPL and emission dates. We figure out the month from the plate.</span></a>
+        ${when_(has('revenue') && canEdit() && service('setup_from_paper'), html`<button class="onboard-card" data-act="svc-request" data-code="setup_from_paper">${ICON.briefcase}<b>Have a box of papers?</b>
+          <span>Send photos. We set it all up for you. ${service('setup_from_paper')?.price_from != null ? 'From ₱' + Number(service('setup_from_paper').price_from).toLocaleString() : ''}.</span></button>`)}
+      </div>
+      ${accountantCard()}`);
+    return;
+  }
+  const c = counts(reqs);
+  const open = reqs.filter((r) => r.status !== 'compliant').sort(byPriority);
+
+  el.innerHTML = String(html`
+    ${homeCal(first, c)}
+    ${cityDashBanner()}
+    ${statTiles(c)}
+    ${careNudge(open)}
+    <section class="card next home-next">
+      <div class="card-head"><div><h2>Next actions</h2><p class="card-sub">Most urgent first</p></div><a class="link" href="#/compliance">See all</a></div>
+      ${open.length ? open.slice(0, 8).map((r) => reqRow(r, { home: true })) : html`<div class="all-good">${ICON.check} Everything is compliant. Nice work.</div>`}
+      ${when_(open.length, html`<div class="sheet-foot">${plural(open.length, 'open item')} across your businesses and vehicles</div>`)}
+    </section>
+    ${serviceStrip()}
+    ${accountantCard()}
+  `);
+  filingsBrief(el.querySelector('[data-filings-brief]'));
+}
+const when_ = (c, v) => (c ? v : '');
+
+// One quiet suggestion when there's a lot to renew and no Year-round care yet. Closing it keeps it closed.
+const nudgeKey = () => `pp-care-nudge-${S.org?.id}`;
+function careNudge(open) {
+  if (!has('revenue') || !IN_PERSON || !canEdit() || careOf().plans.some((p) => p.status !== 'cancelled') || !careOf().tiers.length) return '';
+  const busy = open.filter((r) => ['action_required', 'renew_soon'].includes(r.status)).length;
+  if (busy < 3) return '';
+  try { if (localStorage.getItem(nudgeKey())) return ''; } catch { /* private browsing: show it */ }
+  const from = Math.min(...careOf().tiers.filter((t) => t.subject === 'branch').map((t) => Number(t.monthly_php)));
+  return html`<section class="card nudge"><div>${ICON.briefcase}<p><b>${busy} renewals coming up.</b> Rather hand them over? With Year-round care we start every renewal for you${Number.isFinite(from) ? `, from ₱${from.toLocaleString()} a month per branch` : ''}.</p></div>
+    <div class="btn-row"><a class="btn btn-sm btn-soft" href="#/care">See how it works</a><button class="btn btn-sm btn-ghost" data-act="nudge-close" aria-label="Don't show this again">Not now</button></div></section>`;
+}
+on('nudge-close', (ds, btn) => { try { localStorage.setItem(nudgeKey(), '1'); } catch { /* fine */ } btn.closest('.nudge')?.remove(); });
+
+
+// ---------------------------------------------------------------- compliance
+const filters = { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', who: 'all', q: '' };
+let moreOpen = false; // "More filters" stays open until the user closes it
+
+export function compliance(el, params) {
+  // Arriving from a number tile: show exactly that list (no leftover search or filters), then take the
+  // instruction out of the address so later redraws keep whatever the person changes on the page.
+  if (params.get('status') || params.get('entity') || params.get('who') || params.get('q')) {
+    Object.assign(filters, { status: params.get('status') || 'all', subject: 'all', entity: params.get('entity') || 'all', city: 'all', type: 'all', due: 'all',
+      who: has('assign') ? params.get('who') || 'all' : 'all', q: params.get('q') || '' });
+    history.replaceState(null, '', '#/compliance');
+  }
+  const { reqs, businesses, vehicles, locations } = S.data;
+  const people = S.data.people || [];
+  const cities = [...new Set(locations.map((l) => l.city).filter(Boolean))].sort();
+  const types = [...new Set(reqs.map((r) => r.name))].sort();
+  const today = todayPH();
+  const entityOf = (r) => `${r.subject}:${r.subject === 'business' ? r.business_id : r.subject === 'vehicle' ? r.vehicle_id : r.person_id}`;
+
+  // Every filter except the status chips, so each chip's count matches the list it shows.
+  const base = reqs.filter((r) => {
+    if (filters.subject !== 'all' && r.subject !== filters.subject) return false;
+    if (filters.entity !== 'all' && entityOf(r) !== filters.entity) return false;
+    if (filters.city !== 'all' && r.location_city !== filters.city) return false;
+    if (filters.type !== 'all' && r.name !== filters.type) return false;
+    if (filters.due === 'overdue' && !r.is_overdue) return false;
+    if (filters.due === '30' && !(r.expires_on && r.days_left >= 0 && r.days_left <= 30)) return false;
+    if (filters.due === '90' && !(r.expires_on && r.days_left >= 0 && r.days_left <= 90)) return false;
+    if (filters.due === 'none' && (r.expires_on || !r.expires)) return false;
+    if (filters.who === 'me' && r.assignee_id !== S.user?.id) return false;
+    if (filters.who === 'nobody' && r.assignee_id) return false;
+    if (!['all', 'me', 'nobody'].includes(filters.who) && r.assignee_id !== filters.who) return false;
+    if (filters.q) {
+      const hay = `${r.name} ${subjectLabel(r)} ${r.reference_no || ''} ${r.location_city || ''}`.toLowerCase();
+      if (!hay.includes(filters.q.toLowerCase())) return false;
+    }
+    return true;
+  });
+  const list = base.filter((r) => filters.status === 'all' || r.status === filters.status).sort(byPriority);
+
+  const byStatus = {};
+  for (const r of base) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+  const extra = ['subject', 'entity', 'city', 'type', 'due', 'who'].filter((k) => filters[k] !== 'all').length;
+  const team = has('assign') ? assignable() : [];
+  const opt = (v, label, cur) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
+  el.innerHTML = String(html`
+    <div class="page-head"><div><h1>Compliance</h1><p class="muted">All your permits in one list, most urgent on top.</p></div>
+      <div class="btn-row">${when_(has('revenue') && IN_PERSON && canEdit(), html`<button class="btn btn-soft btn-sm" data-act="svc-bulk">${ICON.briefcase} Have Pinoy Permit renew several</button>`)}
+        ${when_(canEdit(), html`<button class="btn btn-ghost btn-sm" data-act="imp-open" data-kind="permits">${ICON.upload} Import permit records</button>`)}
+        <button class="btn btn-ghost btn-sm" data-act="calendar-export">${ICON.calendar} Add to calendar</button>
+        <button class="btn btn-ghost btn-sm" data-act="share-open" data-scope="org">${ICON.share} Share proof</button>
+        <button class="btn btn-ghost btn-sm" data-act="export-csv">Export CSV</button>
+        ${when_(has('assign') && canEdit() && list.length, html`<button class="btn btn-sm ${bulk.on ? 'btn-primary' : 'btn-ghost'}" data-act="bulk-toggle" aria-pressed="${bulk.on}">${ICON.person} ${bulk.on ? 'Choosing…' : 'Assign several'}</button>`)}</div></div>
+    <div class="filters" id="filters">
+      <input type="search" name="q" placeholder="Search name, reference no., city…" value="${filters.q}">
+      <div class="status-chips" role="group" aria-label="Show">
+        ${[['all', 'All', ''], ...Object.entries(STATUS).map(([k, s]) => [k, s.label, s.cls])].map(([k, label, cls]) => html`
+          <button type="button" class="chip-btn ${cls} ${filters.status === k ? 'on' : ''}" data-act="filter-status" data-v="${k}" aria-pressed="${filters.status === k}">${label}${k === 'all' ? '' : html` <span>${byStatus[k] || 0}</span>`}</button>`)}
+      </div>
+      <details class="more-filters" ${extra || moreOpen ? 'open' : ''}><summary>More filters${extra ? ` (${extra} on)` : ''}</summary>
+        <div class="more-filters-body">
+          <select name="subject">${opt('all', people.length ? 'Businesses, vehicles & staff' : 'Businesses + vehicles', filters.subject)}${opt('business', 'Businesses', filters.subject)}${opt('vehicle', 'Vehicles', filters.subject)}${when_(people.length, opt('person', 'Staff licenses', filters.subject))}</select>
+          <select name="entity">${opt('all', people.length ? 'All businesses, vehicles & staff' : 'All businesses & vehicles', filters.entity)}
+            ${businesses.map((b) => opt('business:' + b.id, b.name, filters.entity))}
+            ${vehicles.map((v) => opt('vehicle:' + v.id, `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`, filters.entity))}
+            ${people.map((p) => opt('person:' + p.id, p.full_name, filters.entity))}</select>
+          <select name="city">${opt('all', 'All locations', filters.city)}${cities.map((c) => opt(c, c, filters.city))}</select>
+          <select name="type">${opt('all', 'All permit types', filters.type)}${types.map((t) => opt(t, t, filters.type))}</select>
+          ${when_(has('assign'), html`<select name="who" aria-label="Handled by">${opt('all', 'Handled by anyone', filters.who)}${opt('me', 'Handled by me', filters.who)}${opt('nobody', 'Handled by nobody', filters.who)}
+            ${team.filter((m) => m.user_id !== S.user?.id).map((m) => opt(m.user_id, 'Handled by ' + memberName(m.user_id), filters.who))}</select>`)}
+          <select name="due">${opt('all', 'Any due date', filters.due)}${opt('overdue', 'Overdue', filters.due)}${opt('30', 'Next 30 days', filters.due)}${opt('90', 'Next 90 days', filters.due)}${opt('none', 'No expiry date yet', filters.due)}</select>
+        </div>
+      </details>
+      ${when_(extra || filters.status !== 'all' || filters.q, html`<button class="btn btn-ghost btn-sm clear-btn" data-act="clear-filters">Clear filters</button>`)}
+    </div>
+    <section class="card list">
+      <div class="card-head"><div><h2>All permits</h2><p class="card-sub">${plural(list.length, 'permit')} · as of ${fmtDate(today)} (Philippine time)</p></div></div>
+      ${list.length ? Object.keys(STATUS).map((k) => {
+        const group = list.filter((r) => r.status === k);
+        return group.length ? html`<div class="band ${STATUS[k].cls}"><span>${STATUS[k].label}</span><span>${group.length}</span></div>${group.map((r) => reqRow(r))}` : '';
+      }) : empty('Nothing matches', 'Try clearing a filter.')}
+    </section>
+    ${bulkBar(list.map((r) => r.id))}`);
+
+  const f = el.querySelector('#filters');
+  f.querySelector('.more-filters')?.addEventListener('toggle', (e) => { moreOpen = e.target.open; });
+  f.addEventListener('change', (e) => { if (e.target.name) { filters[e.target.name] = e.target.value; if (e.target.name === 'subject') filters.entity = 'all'; compliance(el, new URLSearchParams()); } });
+  let t;
+  f.querySelector('[name=q]').addEventListener('input', (e) => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      // The list redraws with a new search box: keep the cursor where it was so typing carries on normally.
+      const pos = e.target.selectionStart ?? e.target.value.length;
+      filters.q = e.target.value; compliance(el, new URLSearchParams());
+      const q = el.querySelector('[name=q]'); q.focus(); q.setSelectionRange(pos, pos);
+    }, 250);
+  });
+}
+on('filter-status', (d) => { filters.status = d.v; if (location.hash === '#/compliance') hooks.render(); else location.hash = '#/compliance'; });
+on('clear-filters', () => { Object.assign(filters, { status: 'all', subject: 'all', entity: 'all', city: 'all', type: 'all', due: 'all', who: 'all', q: '' });
+  // Already on the page: redraw it (changing the hash to the same value fires no event).
+  if (location.hash === '#/compliance') hooks.render(); else location.hash = '#/compliance';
+});
+
+// Everything tracked, with each permit's full record history, as a spreadsheet.
+on('export-csv', async () => {
+  try {
+    const cycles = await db.allCycles(S.org.id);
+    const rows = [['Business / vehicle', 'Branch', 'City', 'Plate', 'Permit', 'Status', 'Current reference no.', 'Issued', 'Expires', 'Files on current record', 'All records (reference - expiry)']];
+    for (const r of [...S.data.reqs].sort(byPriority)) {
+      const hist = cycles.filter((c) => c.requirement_id === r.id).map((c) => `${c.reference_no || '-'} - ${c.expires_on || 'no expiry'}`).join(' | ');
+      rows.push([r.subject_name, r.location_name || '', r.location_city || '', r.plate_no || '', r.name, STATUS[r.status].label,
+        r.reference_no || '', r.issued_on || '', r.expires ? (r.expires_on || '') : 'Does not expire', r.document_count, hist]);
+    }
+    download(`pinoypermit-${S.org.name.replace(/\W+/g, '-').toLowerCase()}-${todayPH()}.csv`, toCsv(rows));
+  } catch (e) { toastError(e); }
+});
+
+// ---------------------------------------------------------------- document vault
+let docsCache = null;
+export async function documents(el) {
+  el.innerHTML = String(html`<div class="loading">Loading documents…</div>`);
+  try { docsCache = await db.orgDocuments(S.org.id); } catch (e) { toastError(e); docsCache = []; }
+  if (!location.hash.startsWith('#/documents')) return;
+  const { reqs } = S.data;
+  const needDoc = reqs;
+  const onFile = needDoc.filter((r) => r.document_count > 0).length;
+  const current = new Set(reqs.map((r) => r.cycle_id).filter(Boolean));
+  const c = counts(reqs);
+
+  const folder = (subject, id, title, icon, href) => {
+    const list = reqs.filter((r) => (subject === 'business' ? r.business_id === id : subject === 'vehicle' ? r.vehicle_id === id : r.person_id === id)).sort(byPriority);
+    if (!list.length) return '';
+    return html`<details class="folder" open><summary>${icon}<span class="folder-name">${title}</span><span class="muted small">${list.filter((r) => r.document_count).length}/${list.length} on file</span></summary>
+      <p class="folder-open"><a href="${href}">Open the ${subject === 'person' ? 'staff' : subject} page →</a></p>
+      ${list.map((r) => {
+        const files = docsCache.filter((d) => d.requirement_id === r.id && current.has(d.cycle_id) && d.cycle_id === r.cycle_id);
+        const older = docsCache.filter((d) => d.requirement_id === r.id && d.cycle_id !== r.cycle_id).length;
+        return html`<div class="doc-row ${STATUS[r.status].cls}">
+          <div class="row-main"><a class="row-title" href="#/requirement/${r.id}">${r.name}</a>
+            <div class="row-sub">${r.location_id && !r.location_is_main ? html`<span>${r.location_name}</span><span class="sep"> · </span>` : ''}<b class="due ${STATUS[r.status].cls}">${dueShort(r)}</b>${older ? html`<span class="sep"> · </span><span>${plural(older, 'older file')}</span>` : ''}</div>
+            ${files.map((d) => html`<div class="doc-file">${ICON.file}<button class="linklike" data-act="doc-view" data-path="${d.storage_path}" data-name="${d.file_name}" data-type="${d.mime_type || ''}">${d.file_name}</button><span class="muted small">${fileSize(d.size_bytes)}</span></div>`)}
+          </div>
+          <div class="row-side">${duePill(r)}${files.length ? html`<span class="doc-onfile">${ICON.check} On file</span>` : canEdit() ? html`<button class="btn btn-sm btn-soft" data-act="req-upload" data-id="${r.id}">Upload</button>` : html`<span class="doc-onfile missing">No file yet</span>`}</div>
+        </div>`;
+      })}
+    </details>`;
+  };
+
+  el.innerHTML = String(html`
+    <div class="page-head"><div><h1>Documents</h1><p class="muted">Every permit paper, saved and easy to find. Old years too.</p></div>
+      <button class="btn btn-soft" data-act="inspection-pack" data-scope="org">${ICON.download} Inspection pack</button></div>
+    <div class="stats four">
+      <div class="stat ok"><div class="stat-n">${onFile}<small>/${needDoc.length}</small></div><div class="stat-l">On file</div></div>
+      <div class="stat needinfo"><div class="stat-n">${needDoc.length - onFile}</div><div class="stat-l">Missing a file</div></div>
+      <div class="stat soon"><div class="stat-n">${c.renew_soon}</div><div class="stat-l">Expiring soon</div></div>
+      <div class="stat overdue"><div class="stat-n">${c.action_required}</div><div class="stat-l">Expired</div></div>
+    </div>
+    <p class="muted small">${plural(docsCache.length, 'file')} stored in total, including past permit periods.</p>
+    ${S.data.businesses.map((b) => folder('business', b.id, b.name, ICON.building, `#/businesses/${b.id}`))}
+    ${S.data.vehicles.map((v) => folder('vehicle', v.id, `${v.make_model}${v.plate_no ? ' · ' + v.plate_no : ''}`, ICON.car, `#/vehicles/${v.id}`))}
+    ${(S.data.people || []).map((p) => folder('person', p.id, `${p.full_name}${p.role_title ? ' · ' + p.role_title : ''}`, ICON.person, `#/people/${p.id}`))}
+    ${!reqs.length ? empty('No documents yet', 'Add a business or vehicle first.') : ''}`);
+}
+
