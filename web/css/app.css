@@ -3288,6 +3288,19 @@ html[data-theme="forest"] .topbar .icon-btn.bell { background: #16301F; color: #
 html[data-theme="forest"] .topbar .icon-btn.bell:hover { background: #0F2417; }
 html[data-theme="forest"] .topbar .icon-btn.bell svg, html[data-theme="forest"] .sidebar .nav svg { color: #fff; stroke: #fff; stroke-width: 2.3; }
 
+/* Clean white: the accent is blue, so anything that put the accent on navy (or navy text on the accent) goes white */
+html[data-theme="white"] .attn-card > .card-head h2 svg, html[data-theme="white"] .folder > summary > svg, html[data-theme="white"] .load-n,
+html[data-theme="white"] .ls-ic, html[data-theme="white"] .load-uses .pass-card .pass-ic, html[data-theme="white"] .inv-steps span,
+html[data-theme="white"] .ctl-total small, html[data-theme="white"] .pp-per-ic, html[data-theme="white"] .pp-per-t b { color: #fff; }
+html[data-theme="white"] .load-uses .pass-card .pass-ic svg { stroke: #fff; }
+html[data-theme="white"] .attn-card > .card-head h2 svg, html[data-theme="white"] .folder > summary > svg, html[data-theme="white"] .load-uses .pass-card .pass-ic,
+html[data-theme="white"] .ls-ic, html[data-theme="white"] .load-n, html[data-theme="white"] .inv-steps span { background: #1B4DB5; }
+html[data-theme="white"] .btn-gold, html[data-theme="white"] .pg-band .btn-primary, html[data-theme="white"] .dfy-calm-kicker, html[data-theme="white"] .dfy-calm-foot .btn,
+html[data-theme="white"] .tt-save-btn, html[data-theme="white"] .hc-day.is-today b, html[data-theme="white"] .tt-save-k { color: #fff; }
+html[data-theme="white"] .btn-gold:hover, html[data-theme="white"] .dfy-calm-foot .btn:hover, html[data-theme="white"] .tt-save-btn:hover { background: #163F96; border-color: #163F96; color: #fff; }
+html[data-theme="white"] .tt-save-k { opacity: .85; }
+html[data-theme="white"] .pro-promises .promise.p-gold > svg { stroke: #fff; }
+html[data-shell="light"] .sidebar .me-name { color: var(--shell-ink); }
 /* light shell: white */
 html[data-shell="light"] .topbar { background: var(--shell); border-bottom: 1px solid var(--shell-line); }
 html[data-shell="light"] .topbar .menu-btn { color: var(--shell-ink); }

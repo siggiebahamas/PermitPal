@@ -119,7 +119,7 @@ const hero = () => html`<section class="lp-hero2">
 
 // ---------------------------------------------------------------- 2. three big numbers (only ones that are true today)
 const stats = () => html`<section class="lp-stats" aria-label="Pinoy Permit in numbers"><div class="lp-wrap lp-stats-in">
-  <h2>Sari-sari store man o buong fleet, kasama mo kami.</h2>
+  <h2>Maliit man o malaki, ready ka sa renewal.</h2>
   ${[['20+', 'Permit and license types'], ['16', 'Cities with free renewal guides'], ['1', 'List for permits, vehicles, and staff']].map(([n, l]) => html`<div class="lp-stat"><b>${n}</b><span>${l}</span></div>`)}
 </div></section>`;
 

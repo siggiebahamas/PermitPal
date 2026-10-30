@@ -1416,7 +1416,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
         && document.querySelectorAll('.lp-step3 .lp-scr').length === 3 && document.querySelectorAll('.lp-checks li').length === 4 && document.querySelectorAll('.lp-bento .lp-bt').length === 5;
     }));
     check(`website ${label}: the numbers are ones that are true today (no user counts)`, /20\+\s*Permit and license types/.test(await p.textContent('.lp-stats')) && /16\s*Cities with free renewal guides/.test(await p.textContent('.lp-stats'))
-      && !/users|customers/i.test(await p.textContent('.lp-stats')) && /Sari-sari store man o buong fleet, kasama mo kami\./.test(await p.textContent('.lp-stats h2')) && (await p.locator('.lp-arch').count()) === 0);
+      && !/users|customers/i.test(await p.textContent('.lp-stats')) && /Maliit man o malaki, ready ka sa renewal\./.test(await p.textContent('.lp-stats h2')) && (await p.locator('.lp-arch').count()) === 0);
     check(`website ${label}: the boarding pass says Free plan, "Certified stress-free", ₱0 for 1 business + 1 vehicle, and that more is on paid plans`, /Certified stress-free\./.test(await p.textContent('#free-h'))
       && /Free plan/.test(await p.textContent('.lp-bp-kind')) && /FARE · FREE PLAN/.test(await p.textContent('.lp-bp-stub')) && /₱0\/month/.test(await p.textContent('.lp-bp-fare'))
       && /1 business \+ 1 vehicle/.test(await p.textContent('.lp-bp-stub')) && /More on paid plans/.test(await p.textContent('.lp-bp-stub')) && /Included on the free plan/i.test(await p.textContent('.lp-bp-inc-h'))
@@ -2680,6 +2680,13 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
     && (await page.evaluate(async () => (await import('/js/core.js')).S.profile.theme)) === 'forest');
   await go('#/services'); await page.waitForSelector('.dfy-calm');
   check('themes: Forest: the "On your own" list on Done for you is plain white', await page.evaluate(() => [...document.querySelectorAll('.dfy-calm-col.is-alone h3, .dfy-calm-col.is-alone li')].every((e) => getComputedStyle(e).color === 'rgb(255, 255, 255)')));
+  await go('#/settings'); await page.waitForSelector('#site-theme');
+  await page.click('#site-theme [data-theme=white]'); await page.waitForTimeout(250);
+  await go('#/services'); await page.waitForSelector('.dfy-calm');
+  check('themes: Clean white: "See what we can do" and the kicker are white on blue', await page.evaluate(() => getComputedStyle(document.querySelector('.dfy-calm-foot .btn')).color === 'rgb(255, 255, 255)'
+    && getComputedStyle(document.querySelector('.dfy-calm-kicker')).color === 'rgb(255, 255, 255)' && getComputedStyle(document.querySelector('.sidebar .me-name') || document.body).color !== 'rgb(255, 255, 255)'));
+  await go('#/people'); await page.waitForTimeout(300);
+  check('themes: Clean white: section icons on People are white on blue', await page.evaluate(() => [...document.querySelectorAll('.attn-card > .card-head h2 svg')].every((e) => getComputedStyle(e).color === 'rgb(255, 255, 255)' && getComputedStyle(e).backgroundColor === 'rgb(27, 77, 181)')));
   await go('#/settings'); await page.waitForSelector('#site-theme');
   await page.click('#site-theme [data-theme=signature]'); await page.waitForTimeout(250);
   check('themes: back to Signature: navy again', await page.evaluate(() => !document.documentElement.dataset.theme && getComputedStyle(document.querySelector('.sidebar')).backgroundColor === 'rgb(11, 27, 58)'));
