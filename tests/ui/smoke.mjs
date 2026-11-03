@@ -1873,6 +1873,11 @@ const go2 = async (page, h) => { await page.evaluate((x) => { location.hash = x;
     await page.keyboard.press('Escape');
     check(`prices ${label}: every perk explained below the plans, with which plans have it`, (await page.locator('#fp-guide .fg-item').count()) === 15 && (await page.locator('#fp-guide .fg-item[data-perk=export] .fg-plans i.y').count()) === 1
       && (await page.locator('#fp-guide .fg-item[data-perk=board] .fg-plans i.y').count()) === 3);
+    check(`prices ${label}: the plan names in the perk guide sit right over their checkmarks, big and bold`, await page.evaluate(() => {
+      const key = [...document.querySelectorAll('.fg-key span')]; if (getComputedStyle(document.querySelector('.fg-key')).display === 'none') return true;
+      const mid = (e) => { const r = e.getBoundingClientRect(); return r.left + r.width / 2; };
+      const ticks = [...document.querySelector('.fg-item').querySelectorAll('.fg-plans i')];
+      return key.length === 3 && key.every((k, i) => Math.abs(mid(k) - mid(ticks[i])) <= 2) && parseFloat(getComputedStyle(key[0]).fontSize) >= 16 && Number(getComputedStyle(key[0]).fontWeight) >= 700; }));
     check(`prices ${label}: every card says software only`, (await page.locator('#pricing .pp-tier .pp-swonly').count()) === 2 && /tracking and planning software only/.test(await page.textContent('#pricing .fp-sw')));
     const band = await page.textContent('#pricing .pp-peace');
     check(`prices ${label}: under the plans, "As low as ₱35" per vehicle, with every assumption`, /A little peace of mind, for less than you might think/.test(band) && /As low as\s*₱35\*/.test(band)

@@ -3569,3 +3569,8 @@ html[data-shell="light"] .home-cal .hc-body { box-shadow: 0 18px 44px -28px rgba
 .ack-note { margin: 14px 0 0; font-size: 13.5px; color: #4B5563; }
 @media (max-width: 420px) { .ack-dl div { grid-template-columns: 1fr; gap: 0; } }
 .ack-print .ack { max-width: 640px; margin: 40px auto; }
+/* the perk guide's plan names sit exactly over their checkmark columns, bigger and bold */
+.fg-key { padding-right: 47px; gap: 6px; align-items: end; }
+.fg-key span, .fg-plans i { width: 124px; }
+.fg-key span { font-size: 17px; font-weight: 800; letter-spacing: .02em; text-transform: none; color: #0B1B3A; line-height: 1.2; }
+.fg-key span::after { content: ""; display: block; width: 28px; height: 3px; margin: 6px auto 0; border-radius: 2px; background: #1B4DB5; }

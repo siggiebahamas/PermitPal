@@ -1,5 +1,5 @@
 // Boot, sign-in state, the page shell (sidebar, which is a slide-in menu on phones) and the router.
-import { html, toast, toastError, fmtDate, closeModal, friendlyError } from './util.js';
+import { html, toast, toastError, fmtDate, closeModal, openModal, friendlyError } from './util.js';
 import { S, actions, hooks, on, isStaff, has, IN_PERSON } from './core.js';
 import { ICON } from './components.js';
 import { wireSearch } from './search.js';
@@ -134,7 +134,13 @@ async function start() {
     if (connect) history.replaceState(null, '', '#/connect/' + connect);
     await loadData();
     S.unread = await db.unreadCount().catch(() => 0);
-    if (!unsubscribe) unsubscribe = db.onNewNotification(S.user.id, (n) => { S.unread++; paintBadges(); toast(n.title, 'info'); });
+    if (!unsubscribe) unsubscribe = db.onNewNotification(S.user.id, (n) => {
+      S.unread++; paintBadges(); toast(n.title, 'info');
+      // A payment we confirmed: open the plan at once (no reload needed) and say so plainly.
+      if (n.kind === 'billing' && /^Payment received|load added/.test(n.title || '')) {
+        loadData().then(() => { renderPage(); openModal(n.title, html`<p>${n.body || ''}</p><p class="muted small">We also sent this to your email.</p>`, { cancelLabel: 'Start using it' }); }).catch(() => {});
+      }
+    });
     renderShell();
   } catch (e) {
     reportError(e); // a lost connection is ignored by the reporter; anything else is a bug worth knowing about
