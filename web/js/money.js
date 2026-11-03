@@ -9,7 +9,7 @@ export const STREAMS = {
   care: { name: 'Monthly care plans', color: '#eb6834', note: 'Year-round care bills, paid monthly or yearly' },
   partners: { name: 'Fees from partner firms', color: '#1baf7a', note: 'What firms pay you for quote requests, sales and listings' },
   plans: { name: 'Subscriptions', color: '#eda100', note: 'Team plans, Pinoy Permit Plus and staff licenses' },
-  load: { name: 'Wallet top-ups', color: '#7c5cd6', note: 'Prepaid wallet credit for text reminders, single templates, papers checks and season passes' },
+  load: { name: 'Wallet top-ups', color: '#7c5cd6', note: 'Prepaid wallet credit for single templates, papers checks and season passes' },
 };
 export const STREAM_KEYS = Object.keys(STREAMS);
 export const KIND_NAMES = {

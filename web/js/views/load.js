@@ -46,7 +46,7 @@ export async function loadPage(el) {
   const open = L.topups.filter((t) => ['due', 'pending_verification'].includes(t.status) && t.valid_until >= todayPH());
   el.innerHTML = String(html`
     <div class="page-head"><div><h1>Wallet</h1>
-      <p class="page-sub">Your Pinoy Permit wallet: prepaid credit for text reminders, papers checks and letters. Top up once, use it anytime.</p></div></div>
+      <p class="page-sub">Your Pinoy Permit wallet: prepaid credit for ${has('sms') ? 'text reminders, ' : ''}papers checks and letters. Top up once, use it anytime.</p></div></div>
     ${s.invites?.invited_by?.status === 'pending' ? html`<div class="banner info"><div><b>You joined by invitation.</b>
       Add 3 permits with their dates (${s.invites.invited_by.permits} of 3 so far) and you both get a month of Pinoy Permit Plus, free.</div>
       <a class="btn btn-sm btn-primary" href="#/compliance">Add dates</a></div>` : ''}
@@ -59,13 +59,13 @@ export async function loadPage(el) {
     <section class="card load-hero" aria-label="Your wallet">
       <div class="lh-bal"><span class="lh-kick">Your wallet</span><b class="load-amt">${peso(s.total)}</b>
         ${when(Number(s.bonus) > 0, html`<span class="lh-bonus">${peso(s.paid)} paid · ${peso(s.bonus)} bonus (used first)</span>`)}
-        <div class="load-texts">${ICON.bell}<span>${textsLine(s)}</span></div>
+        ${when(has('sms'), html`<div class="load-texts">${ICON.bell}<span>${textsLine(s)}</span></div>`)}
         ${admin ? html`<button class="btn btn-gold btn-lg" data-act="load-topup">Top up</button>`
           : html`<p class="lh-note">Your workspace owner or an admin can top up and use the wallet.</p>`}</div>
       <div class="lh-pitch"><h2>One balance for every extra</h2>
-        <p>Top up once. Use it for reminders by text, a check of your papers, or a ready-to-sign letter. Whatever you don't use stays.</p>
+        <p>Top up once. Use it for ${has('sms') ? 'reminders by text, ' : ''}a check of your papers, or a ready-to-sign letter. Whatever you don't use stays.</p>
         <div class="lh-chips">
-          <span>${ICON.bell} Text reminders <b>from ${peso(minPrice('texts_'))}</b></span>
+          ${when(has('sms'), html`<span>${ICON.bell} Text reminders <b>from ${peso(minPrice('texts_'))}</b></span>`)}
           <span>${ICON.check} Papers check <b>${peso(price('papers_check'))}</b></span>
           <span>${ICON.file} Letters &amp; forms <b>from ${peso(price('template'))}</b></span></div></div>
     </section>
@@ -78,7 +78,7 @@ export async function loadPage(el) {
 
     <h2 class="section-label">What you can use it on</h2>
     <div class="load-uses">
-      ${textsCard(s, admin)}
+      ${has('sms') ? textsCard(s, admin) : ''}
       ${papersCardUse(admin)}
       ${templatesCardUse(s)}
       ${seasonCard(s, admin)}
@@ -138,7 +138,7 @@ function templatesCardUse(s) {
 }
 // The renewal season pass: a blue header with the price and what it's worth, then every benefit with its value.
 export const passPerks = (s, priceOf) => [
-  ...(!s?.plan_texts && s?.sms_ready !== false ? [[ICON.bell, 'Up to 100 text reminders', ['A text before each deadline this season', "Doesn't touch your wallet"], 2 * priceOf('texts_50')]] : []),
+  ...(has('sms') && !s?.plan_texts && s?.sms_ready !== false ? [[ICON.bell, 'Up to 100 text reminders', ['A text before each deadline this season', "Doesn't touch your wallet"], 2 * priceOf('texts_50')]] : []),
   [ICON.check, 'We check your papers', ['Send photos of one renewal\'s documents', "We tell you what's missing", 'No wasted trip to the counter'], priceOf('papers_check')],
   [ICON.file, 'A ready-to-sign letter', ['Authorization letter, SPA, affidavit of loss or Secretary\'s Certificate', 'Filled in with your details'], 500],
   [ICON.calendar, 'Your January checklist', ['Everything due in January, in order', 'Emailed now, on Dec 1 and on Jan 5'], 0],
@@ -447,6 +447,6 @@ export async function loadSettingsCard() {
   let s;
   try { s = (await loadState(true)).summary; } catch { return ''; }
   return html`<section class="card load-mini"><div class="card-head"><h2>Pinoy Permit wallet</h2><a class="btn btn-sm btn-soft" href="#/load">Open</a></div>
-    <p><b class="load-amt-sm">${peso(s.total)}</b> <span class="muted">· ${s.plan_texts ? 'texts included in your plan' : plural(s.texts, 'text reminder') + ' left'}${s.pass ? ` · season pass until ${fmtDate(s.pass.ends_on)}` : ''}</span></p>
-    <p class="muted small">Prepaid credit for text reminders, single templates, papers checks and the renewal season pass. It never expires.</p></section>`;
+    <p><b class="load-amt-sm">${peso(s.total)}</b> <span class="muted">${has('sms') ? `· ${s.plan_texts ? 'texts included in your plan' : plural(s.texts, 'text reminder') + ' left'}` : ''}${s.pass ? ` · season pass until ${fmtDate(s.pass.ends_on)}` : ''}</span></p>
+    <p class="muted small">Prepaid credit for ${has('sms') ? 'text reminders, ' : ''}single templates, papers checks and the renewal season pass. It never expires.</p></section>`;
 }

@@ -18,6 +18,7 @@ import { brandPage, brandTabShown } from './brand.js';
 import { billToggle, freeCard, planCard, plansShown, PLANS, compareTable, TIERS, TIER_SMALL, fleetPicker, perkGuide, tierCard, tierPrice, tiersShown, softwareBanner, peaceBand, helpServices } from './pricing.js';
 import { planTotal } from '../prices.js';
 import { loadFileAccess, fileGuardCard } from './fileguard.js';
+import { paymentsCard, openPlanPay } from './payments.js';
 import { THEMES, applyTheme, savedTheme } from '../theme.js';
 import * as db from 'pp/data';
 
@@ -305,15 +306,17 @@ export async function settings(el, section) {
   let pay = {};
   let access = [];
   let loadCard = '';
+  let payCard = '';
   if (section === 'workspace') await loadFileAccess(true);
   try {
-    [channels, log, conn, pay, access, loadCard] = await Promise.all([
+    [channels, log, conn, pay, access, loadCard, payCard] = await Promise.all([
       db.channelStatus().catch(() => ({})),
       db.myDeliveryLog(S.user.id).catch(() => []),
       section === 'workspace' ? connectionsCard() : '',
       section === 'billing' ? db.appSettings().catch(() => ({})) : {},
       section === 'workspace' && has('services') ? db.staffAccessLog(S.org.id).catch(() => []) : [],
       section === 'billing' ? loadSettingsCard() : has('load') ? loadState(true).then(() => '').catch(() => '') : '',
+      section === 'billing' ? (has('load') ? loadState(true).catch(() => null) : Promise.resolve()).then(() => paymentsCard()).catch(() => '') : '',
     ]);
   } catch { /* shown as empty */ }
   const toggle = (k, label, sub = '', disabled = false) => html`<label class="toggle ${disabled ? 'disabled' : ''}"><div><div>${label}</div>${when(sub, html`<div class="muted small">${sub}</div>`)}</div>
@@ -331,7 +334,7 @@ export async function settings(el, section) {
           <label class="field"><span>First name</span><input name="first_name" maxlength="80" value="${p.first_name}"></label>
           <label class="field"><span>Last name</span><input name="last_name" maxlength="80" value="${p.last_name}"></label>
           <label class="field"><span>Role / title <small>(optional)</small></span><input name="role_title" maxlength="80" value="${p.role_title}" placeholder="e.g. Fleet head"></label>
-          ${when(!has('sms'), html`<label class="field"><span>Mobile number <small>(for SMS / WhatsApp)</small></span><input name="phone" value="${p.phone || ''}" placeholder="0917 123 4567"></label>`)}
+          ${when(!has('sms'), html`<label class="field"><span>Mobile number <small>(optional, so our team can call you about an order)</small></span><input name="phone" value="${p.phone || ''}" placeholder="0917 123 4567"></label>`)}
         </div>
         <label class="field"><span>Photo <small>(optional)</small></span><input type="file" name="avatar" accept="image/jpeg,image/png,image/webp"></label>
         <p class="muted small">Email: ${p.email}</p>
@@ -374,7 +377,7 @@ export async function settings(el, section) {
     </section>`}`)}
 
     ${when(section === 'billing', html`
-    ${billingSection(pay)}${loadCard}`)}
+    ${billingSection(pay, payCard)}${loadCard}`)}
 
     ${when(section === 'workspace', html`
     ${requireCard()}
@@ -513,7 +516,7 @@ on('org-undelete', async () => { try { await db.cancelOrgDeletion(S.org.id); awa
 
 
 // ---------------------------------------------------------------- plans
-function billingSection(pay) {
+function billingSection(pay, payCard = '') {
   const org = S.org;
   const acc = teamAccess();
   const kind = org.kind || 'business';
@@ -556,6 +559,7 @@ function billingSection(pay) {
   };
   return html`<section class="card"><h2>Your plan</h2>${status}${usage}
       ${pickable.map((id) => S.plans.find((p) => p.id === id)).filter(Boolean).map((p) => html`<h3 class="h4 pay-for" id="pay-${p.id}">${p.name}${TIERS[p.id] ? html`: ${TIERS[p.id].range}` : PLANS[p.id] ? `: ${PLANS[p.id]?.who.split(': ')[1] || ''}` : ''}</h3>${payBox(p, pay)}`)}</section>
+    ${payCard}
     <h3 class="section-label">Plans</h3>
     ${softwareBanner()}
     ${billToggle('How often to pay')}
@@ -594,23 +598,7 @@ function payBox(p, pay) {
         ${when(isOrgAdmin(), html`<button class="btn btn-primary" data-act="plan-request" data-plan="${p.id}">I've paid: turn on ${p.name}</button>`)}`}
   </div>`;
 }
-on('plan-request', (ds) => {
-  const p = S.plans.find((x) => x.id === ds.plan);
-  const m = Number(p.price_php_monthly);
-  const y = planTotal(m, 12);
-  openModal(`Turn on ${p.name}`, html`<p>What did you pay for?</p>
-    <div class="radio-cards">
-      <label class="radio-card on"><input type="radio" name="months" value="12" checked><span><b>12 months: ${peso(y)}</b><small>2 months free</small></span></label>
-      <label class="radio-card"><input type="radio" name="months" value="1"><span><b>1 month: ${peso(m)}</b></span></label></div>
-    <p class="muted small">We match your payment and turn the plan on within 1 business day. You get a notification when it's on.</p>`, {
-    submitLabel: 'Send', danger: false,
-    onSubmit: async (fd) => {
-      const months = Number(fd.get('months'));
-      await db.requestPlan(S.org.id, ds.plan, months === 12 ? `Paid for 12 months (${peso(y)}, 2 months free)` : `Paid for 1 month (${peso(m)})`);
-      toast("Thanks! We'll confirm and turn your plan on within 1 business day.");
-    },
-  });
-});
+on('plan-request', (ds) => openPlanPay(ds.plan));
 
 // ---------------------------------------------------------------- text messages
 // A number gets texts only after the person types back the code we text to it, so reminders never go to

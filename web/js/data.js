@@ -763,6 +763,18 @@ export async function topupReport(t, { method, ref, file }) {
   }
   return ok(await sb.rpc('load_topup_report', { p_topup: t.id, p_method: method, p_ref: ref || null, p_proof_path: proof?.path || null, p_proof_name: proof?.name || null }));
 }
+// Paying for a team plan: the reference and/or a screenshot. Shows as "We're checking it" until staff confirm it.
+export async function planPaymentReport(orgId, { plan, months, method, ref, file }) {
+  let proof = null;
+  if (file && file.size) {
+    const problem = checkFile(file);
+    if (problem) throw new Error(problem);
+    proof = { path: `${orgId}/payments/${rand()}-${safeName(file.name)}`, name: file.name.slice(0, 255) };
+    await putFile(proof.path, file, file.type || 'image/jpeg');
+  }
+  return ok(await sb.rpc('plan_payment_report', { p_org: orgId, p_plan: plan, p_months: months, p_method: method, p_ref: ref || null,
+    p_proof_path: proof?.path || null, p_proof_name: proof?.name || null }));
+}
 export const topupCancel = async (id) => ok(await sb.rpc('load_topup_cancel', { p_topup: id }));
 export const buyTexts = async (orgId, pack) => ok(await sb.rpc('buy_texts', { p_org: orgId, p_pack: pack }));
 export const buySeasonPass = async (orgId) => ok(await sb.rpc('buy_season_pass', { p_org: orgId }));

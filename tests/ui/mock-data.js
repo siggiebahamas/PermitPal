@@ -412,7 +412,19 @@ export async function trash() {
 export const invites = async () => [];
 export const invite = async () => ({});
 export const channelStatus = async () => ({ email: false, sms: !!globalThis.PP_SMS, whatsapp: false });
-export const payments = async () => [];
+// Plan payments: reported by the customer ("checking"), confirmed by staff (__confirmPay in tests).
+const payDb = [];
+export const payments = async (orgId) => payDb.filter((p) => p.org_id === orgId).map((p) => ({ ...p })).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+export async function planPaymentReport(orgId, { plan, months, method, ref, file }) {
+  const p = plans.find((x) => x.id === plan);
+  if (!p) throw new Error('That plan is not available.');
+  if (!ref && !(file && file.size)) throw new Error('Add the reference number or a screenshot of the payment.');
+  const row = { id: crypto.randomUUID(), org_id: orgId, plan_id: plan, months, amount_php: Number(p.price_php_monthly) * (months === 12 ? 10 : 1), provider: 'manual', status: 'pending',
+    method, reference: ref || null, proof_path: file && file.size ? `${orgId}/payments/x-${file.name}` : null, proof_name: file?.name || null, reported_at: new Date().toISOString(), created_at: new Date().toISOString(), paid_at: null };
+  payDb.push(row);
+  return row.id;
+}
+globalThis.__confirmPay = () => { payDb.filter((p) => p.status === 'pending').forEach((p) => { p.status = 'paid'; p.paid_at = new Date().toISOString(); }); };
 export const updatePrefs = async (userId, patch) => { Object.assign(myPrefs, patch); };
 export const updateProfile = async (userId, patch) => { if ('phone' in patch && patch.phone !== me.phone) me.phone_verified_at = null; Object.assign(me, patch); };
 export const adminOrgs = async () => [{ id: org.id, name: org.name, plan_id: org.plan_id, created_at: new Date().toISOString(), owner_email: user.email, members: 1, businesses: 1, vehicles: 1, open_requests: db.requests.length }];
@@ -881,9 +893,9 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus', 'vehicles2', 'fileguard', 'themes', 'push'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus', 'vehicles2', 'fileguard', 'themes', 'push', 'anysize', 'payproof'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
-export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
+export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : [...ALL_FEATURES, ...(globalThis.PP_SMS ? ['sms'] : [])]).map((f) => [f, true])));
 
 db.clientErrors = [];
 let errSeq = 0;

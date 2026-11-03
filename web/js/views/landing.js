@@ -244,7 +244,7 @@ const pass = () => {
         </div>
         ${STAMP}
       </div>
-      <p class="lp-bp-note">The free plan covers 1 business and 1 vehicle. More businesses, vehicles, teammates' tools and texts come with <a href="#/pricing">paid plans</a>.</p>
+      <p class="lp-bp-note">The free plan covers 1 business and 1 vehicle. More businesses, vehicles and teammates' tools come with <a href="#/pricing">paid plans</a>.</p>
     </div>
   </section>`;
 };
@@ -314,12 +314,12 @@ const LOAD_WHY = {
   texts_200: 'The same texts, for bigger teams: works out cheaper per text.',
   template: 'An authorization letter, SPA or affidavit of loss, filled in with your details. Buy only the one you need.',
   papers_check: 'Before you queue, we check photos of your papers against the checklist. Usually answered by 6 pm the next weekday.',
-  season_pass: 'For the January rush: up to 100 texts, one papers check, one template of your choice and your renewal plan by email. September to February.',
+  season_pass: 'For the January rush: one papers check, one template of your choice and your renewal plan by email. September to February.',
 };
 const loadCards = (list) => {
   const priceOf = (code) => Number(list.find((x) => x.code === code)?.price_php ?? 0);
   const pass = list.find((p) => p.code === 'season_pass' && p.active);
-  return html`${list.filter((p) => p.active && p.code !== 'season_pass').map((p) => html`<div class="card lp-load-card"><b>${p.name}</b><span class="lp-load-price">${peso(p.price_php)}</span><p>${LOAD_WHY[p.code] || ''}</p></div>`)}
+  return html`${list.filter((p) => p.active && p.code !== 'season_pass' && (has('sms') || !p.code.startsWith('texts_'))).map((p) => html`<div class="card lp-load-card"><b>${p.name}</b><span class="lp-load-price">${peso(p.price_php)}</span><p>${LOAD_WHY[p.code] || ''}</p></div>`)}
     ${pass ? html`<div class="card pass-card lp-pass">${passHeader(Number(pass.price_php), passPerks({}, priceOf), 'Most cities want renewals by January 20')}${passList(passPerks({}, priceOf))}</div>` : ''}`;
 };
 const FAQ = [
@@ -331,7 +331,7 @@ const FAQ = [
   ['How does yearly work?', 'You pay for 10 months and get 12. That is 2 months free, every year.'],
   ['Can I stop anytime?', 'Yes. Your plan runs to the end of what you paid. Your data is never locked or deleted, and you can download it anytime.'],
 ];
-const faq = () => [...FAQ, ...(has('load') ? [['What is the Pinoy Permit wallet?', "Prepaid credit for the small extras: text reminders, one template at a time, a papers check, the renewal season pass. Top up from ₱100. It never expires, and unused paid load can be paid back to you if you ask."]] : [])];
+const faq = () => [...FAQ, ...(has('load') ? [['What is the Pinoy Permit wallet?', "Prepaid credit for the small extras: one template at a time, a papers check, the renewal season pass. Top up from ₱100. It never expires, and unused paid load can be paid back to you if you ask."]] : [])];
 // The plans: software by size (small, then fleets), the per-vehicle band, landlords, then the separate services.
 const TIER_CTA = { plus: ['#/signup', 'Try free for 14 days'], core: ['#/signup', 'Start with Core'], multi: ['#/signup?type=fleet', 'Try free for 30 days'],
   fleet: ['#/signup?type=fleet', 'Try free for 30 days'], fleet_pro: ['#/signup?type=fleet', 'Try free for 30 days'], enterprise: ['#/signup?type=fleet', 'Start a trial, then ask for a quote'] };

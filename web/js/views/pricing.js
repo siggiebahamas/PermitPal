@@ -84,7 +84,7 @@ const TENANT_WINS = [[ICON.grid, 'Every site, one screen', 'Green is OK. Red is 
   [ICON.list, 'You set the rules', 'Pick the permits every site must keep']];
 const tenantChecks = (cap) => [cap, 'Tenants, franchisees or branches: every one\'s permits on one screen', 'You choose the permits every site must keep',
   'They upload their own permits, free. No more chasing paper', "Download any site's shared copies in one click",
-  'Remind every late site in one click', 'Text message (SMS) reminders', PLUS_LINE, 'Download a list for audits and city hall', 'Everything in Free'];
+  'Remind every late site in one click', PLUS_LINE, 'Download a list for audits and city hall', 'Everything in Free'];
 export const PLANS = {
   firm: {
     icon: ICON.briefcase, name: 'Accounting firm', who: 'For accountants and bookkeepers with many clients',
@@ -94,7 +94,7 @@ export const PLANS = {
       [ICON.upload, 'Clients do the updating', 'They join free and keep their own permits current']],
     checks: ["See every client's permits on one screen", 'Green means OK. Red means late. No more spreadsheets', 'Remind late clients in one click',
       'Clients join free and update their own permits', "Or look after a client's permits for them", 'Download the copies clients share with you',
-      'Text message (SMS) reminders', PLUS_LINE, `Your own logo on client emails, with White-label (add ${peso(BRAND_MONTHLY)})`, 'Everything in Free'],
+      PLUS_LINE, `Your own logo on client emails, with White-label (add ${peso(BRAND_MONTHLY)})`, 'Everything in Free'],
     why: { title: 'It pays for itself', lines: [(m) => `Charge each client ₱150 a month for permit watching: ${Math.ceil(m / 150)} clients cover it`, 'Never lose a client over a missed permit'] },
   },
   fleet: {
@@ -105,7 +105,7 @@ export const PLANS = {
       [ICON.calendar, 'This month’s renewals', 'Ready on the 1st of every month']],
     checks: ['Every vehicle on one screen: registration, CTPL, smoke test, inspection', 'See which vehicles should NOT be on the road today',
       'A list of what to renew this month', 'Add your whole fleet from a spreadsheet', 'Sort vehicles by company or branch',
-      'Text message (SMS) reminders', PLUS_LINE, 'Download a list for your records', 'Everything in Free'],
+      PLUS_LINE, 'Download a list for your records', 'Everything in Free'],
     why: { title: 'It pays for itself', lines: ['One unregistered vehicle caught can mean a ₱10,000 LTO fine', 'No surprise renewals: every month starts with a ready list'] },
   },
   property_s: {
@@ -136,7 +136,7 @@ export const TIERS = {
       'Your own permit page and QR poster', 'Ready letters and forms, filled in for you', 'Everything in Free'] },
   core: { icon: ICON.briefcase, name: 'Core', who: 'For households and small businesses', range: 'Up to 15 businesses and vehicles together', users: 'Up to 3 users (you + 2 staff)', kind: 'business',
     per: 15,
-    checks: ['Group by business and branch', 'One dashboard, reminders and renewal tasks for everything', 'Text message reminders', 'Pinoy Permit Plus included', 'Everything in Plus'] },
+    checks: ['Group by business and branch', 'One dashboard, reminders and renewal tasks for everything', 'Pinoy Permit Plus included', 'Everything in Plus'] },
   multi: { icon: ICON.car, name: 'Multi-Vehicle', who: 'For big households and small fleets', range: 'Up to 30 vehicles', users: 'Up to 3 users', kind: 'fleet',
     per: 30,
     checks: ['Up to 20 files for each vehicle', 'Fleet board: who can’t drive today', 'Status and history for every vehicle', 'Includes up to 3 business records', 'Everything in Core'] },
@@ -264,7 +264,7 @@ const COMPARE = [
   ['Checklists with official source links', Y, Y, Y, Y, Y, Y],
   ['Snap a photo, we read the dates', Y, Y, Y, Y, Y, Y],
   ['Permit page, QR poster and ready letters (Plus)', N, Y, Y, Y, Y, Y],
-  ['Text message (SMS) reminders', N, N, Y, Y, Y, Y],
+  ['Alerts on your phone, no app to install', Y, Y, Y, Y, Y, Y],
   ['Fleet board and spreadsheet import', N, N, N, Y, Y, Y],
   ['Business records included', '1', 'Any mix', 'Any mix', 'Up to 3', 'Up to 3', 'Up to 3'],
   ['Someone handling your renewal', 'Separate service', 'Separate service', 'Separate service', 'Separate service', 'Separate service', 'Separate service'],
@@ -360,9 +360,6 @@ export const PERKS = {
   history: { icon: PIC.clock, name: 'Vehicle history', short: 'Every renewal and upload, with dates',
     what: 'Each vehicle keeps its own timeline: when each paper was renewed, who uploaded the new copy and what changed. Nothing is lost when someone leaves the company.',
     example: ['ABC 1234 · Van', 'CTPL renewed 12 Mar, uploaded by Ana', 'ok'], why: 'Answer "did we renew this?" in seconds, and show proof during an audit or when you sell the vehicle.' },
-  sms: { icon: PIC.text, name: 'Text reminders', short: 'A text message before anything expires',
-    what: 'On top of email and app alerts, we text you 30, 7 and 1 day before each paper runs out. Works on any phone, even without mobile data.',
-    example: ['Text message', 'ABC 1234 registration runs out in 7 days', 'soon'], why: 'Emails get buried. A text gets read.' },
   files: { icon: ICON.file, name: '20 files per vehicle', short: 'OR/CR, CTPL policy, test results, photos',
     what: 'Each vehicle has its own folder for up to 20 files: OR/CR, CTPL policy, emission results, inspection reports and photos. Files are stored encrypted, and you choose who can open them.',
     example: ['TQS 980 · folder', 'OR/CR.pdf · CTPL-2026.pdf · Smoke-test.jpg', 'ok'], why: 'When a checkpoint, buyer or insurer asks, the copy is on your phone in two taps.' },
@@ -393,6 +390,9 @@ export const PERKS = {
 };
 // Every plan, free included (shown in the guide only).
 const BASICS = {
+  push: { icon: PIC.text, name: 'Phone alerts', short: 'Your phone buzzes, no app to install',
+    what: 'Add Pinoy Permit to your home screen and turn on alerts. Your phone or computer then buzzes when something is due, just like a message, on top of the email and the in-app reminder.',
+    example: ['Pinoy Permit', 'ABC 1234 registration runs out in 7 days', 'soon'], why: 'Emails get buried. An alert on your lock screen gets seen.' },
   remind: { icon: ICON.bell, name: 'Reminders 30, 7 and 1 day before', short: 'By email and in the app',
     what: 'Before any paper runs out, we remind you 30, 7 and 1 day ahead, by email and in the app, and on your phone if you turn on alerts.', example: ['Reminder', 'CTPL for ABC 1234 runs out in 30 days', 'soon'], why: 'You renew on your schedule, not in a panic.' },
   snap: { icon: ICON.camera, name: 'Snap a photo', short: 'We read the dates for you',
@@ -403,8 +403,8 @@ const BASICS = {
 const ALL_PERKS = { ...PERKS, ...BASICS };
 const FLEET_IDS = ['multi', 'fleet', 'fleet_pro'];
 const USERS = { multi: 3, fleet: 5, fleet_pro: 10 };
-const OWN = { multi: ['board', 'history', 'sms', 'files', 'biz', 'plus', 'users'], fleet: ['import', 'filters', 'renewlist', 'users'], fleet_pro: ['yearplan', 'export', 'users'] };
-const KEPT = { fleet: { from: 'Multi-Vehicle', keys: ['board', 'history', 'sms', 'files', 'biz', 'plus'] },
+const OWN = { multi: ['board', 'history', 'files', 'biz', 'plus', 'users'], fleet: ['import', 'filters', 'renewlist', 'users'], fleet_pro: ['yearplan', 'export', 'users'] };
+const KEPT = { fleet: { from: 'Multi-Vehicle', keys: ['board', 'history', 'files', 'biz', 'plus'], more: 1 },
   fleet_pro: { from: 'Fleet', keys: ['import', 'filters', 'renewlist', 'board', 'history'], more: 4 } };
 const planHas = (id, key) => (key in BASICS) || FLEET_IDS.slice(0, FLEET_IDS.indexOf(id) + 1).some((p) => OWN[p].includes(key));
 const tileName = (id, key) => (key === 'users' ? `Up to ${USERS[id]} users` : PERKS[key].name);
@@ -464,10 +464,10 @@ export function perkGuide() {
   return html`<section class="fg" id="fp-guide" aria-labelledby="fg-h">
     <div class="fg-head"><h3 id="fg-h">What every perk means</h3><p>Plain words, a real example, and which plans have it. Tap any perk for the full story.</p>
       <p class="fg-key" aria-hidden="true">${FLEET_IDS.map((id) => html`<span>${TIERS[id].name}</span>`)}</p></div>
-    ${group('In every fleet plan', 'Multi-Vehicle and up', ['board', 'history', 'sms', 'files', 'biz', 'plus', 'users'])}
+    ${group('In every fleet plan', 'Multi-Vehicle and up', ['board', 'history', 'files', 'biz', 'plus', 'users'])}
     ${group('Added in Fleet', 'Fleet and Fleet Pro', ['import', 'filters', 'renewlist'])}
     ${group('Added in Fleet Pro', 'Fleet Pro only', ['yearplan', 'export'])}
-    ${group('In every plan, free included', 'The basics', ['remind', 'snap', 'checklist'])}
+    ${group('In every plan, free included', 'The basics', ['remind', 'push', 'snap', 'checklist'])}
   </section>`;
 }
 const ORDER = [...Object.keys(PERKS), ...Object.keys(BASICS)];

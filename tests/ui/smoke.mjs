@@ -775,16 +775,21 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
 }
 
 // Text messages: who can get them, verifying a number with a code, changing and removing it.
+const go2 = async (page, h) => { await page.evaluate((x) => { location.hash = x; }, h); await page.waitForTimeout(700); };
 {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   await page.goto('http://localhost:4173/#/settings');
   await page.waitForSelector('main h1');
-  check('texts: while texting is being set up, says so', /being set up/.test(await page.textContent('#sms')));
-  check('texts: the number lives in its own section, not the profile form', (await page.locator('#profile-form [name=phone]').count()) === 0);
+  check('texts: switched off for now: no text section, nothing to buy, the phone number is optional', (await page.locator('#sms').count()) === 0
+    && /optional/.test(await page.textContent('#profile-form')) && !/text reminders?/i.test(await page.textContent('main')));
+  await go2(page, '#/load');
+  check('texts: the wallet sells no texts while they are off', !/Text reminders|text reminder/i.test(await page.textContent('main')));
+  await go2(page, '#/settings');
   await page.addInitScript(() => { globalThis.PP_SMS = true; });
   await page.reload(); await page.waitForSelector('#sms');
+  check('texts: when switched back on, the number lives in its own section, not the profile form', (await page.locator('#profile-form [name=phone]').count()) === 0);
   check('texts: on the Free plan, texts run on text credits from load, after verifying the number', /text reminders left|No text credits yet/.test(await page.textContent('#sms')) && (await page.locator('#sms-start [name=phone]').count()) === 1);
   await page.addInitScript(() => { globalThis.PP_FEATURES = ['errors', 'assign', 'library2', 'services', 'filings', 'sms', 'mfa', 'revenue', 'plus']; });
   await page.reload(); await page.waitForSelector('#sms');
@@ -1444,7 +1449,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check(`website ${label}: the prices page lists Free and every team plan on sale`, (await p.locator('#pricing .pp-plan.pp-free').count()) === 1
       && (await p.locator('#pricing [data-plan-card]').count()) === (label === 'live' ? 4 : 8)); // the size plans and Small property come with their database files
     check(`website ${label}: Plus shown on the prices page only once its database part is on`, (await p.locator('.lp-show').count()) === (label === 'live' ? 0 : 1));
-    check(`website ${label}: what load buys, with prices, only once its database part is on`, (await p.locator('.lp-load-card').count()) === (label === 'live' ? 0 : 4) && (await p.locator('.lp-pass .pass-head').count()) === (label === 'live' ? 0 : 1));
+    check(`website ${label}: what load buys, with prices, only once its database part is on`, (await p.locator('.lp-load-card').count()) === (label === 'live' ? 0 : 2) && !/text reminders/i.test(await p.textContent('#pricing')) && (await p.locator('.lp-pass .pass-head').count()) === (label === 'live' ? 0 : 1));
     check(`website ${label}: prices page: no sideways scroll`, (await over(p)) <= 1, `${await over(p)}px`);
     await p.click('.lp-top .brand'); await p.waitForSelector('.lp-home h1');
     check(`website ${label}: the logo goes back home`, /Stay on top of every permit/.test(await p.textContent('main h1')));
@@ -1928,8 +1933,22 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     check('prices app: paying the plan offers a month or 12 months with 2 free', /1 month\s*₱1,990/.test(box) && /2 months FREE/i.test(box) && /12 months\s*₱19,900/.test(box) && /you save ₱3,980/.test(box), box.replace(/\s+/g, ' ').slice(0, 200));
     await page.click('[data-act=plan-request]'); await page.waitForSelector('#modal-root .modal');
     check('prices app: "I\'ve paid" asks what for, a year first', await page.isChecked('#modal-root [name=months][value="12"]'));
-    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(400);
-    check('prices app: the request is sent', /turn your plan on within 1 business day/.test(await page.textContent('#toast')));
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(300);
+    check('prices app: "I\'ve paid" needs the reference or a screenshot', /reference number or a screenshot/.test(await page.textContent('#modal-root')));
+    await page.selectOption('#modal-root [name=method]', 'bank_transfer'); await page.fill('#modal-root [name=ref]', 'BT-778812');
+    await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(900);
+    check('prices app: the payment is sent, and shows at once as being checked', /confirm it within 1 business day/.test(await page.textContent('#toast'))
+      && /Accounting firm plan · 12 months/.test(await page.textContent('#payments')) && /We're checking it/.test(await page.textContent('#payments')) && /Ref BT-778812/.test(await page.textContent('#payments')));
+    await page.click('#payments .ph-row'); await page.waitForSelector('#modal-root .modal');
+    check('prices app: a payment being checked says what happens next, with no acknowledgment yet', /within 1 business day/.test(await page.textContent('#modal-root')) && (await page.locator('#modal-root .ack').count()) === 0);
+    await page.click('#modal-root [data-modal-close]');
+    await page.evaluate(async () => { globalThis.__confirmPay(); (await import('/js/core.js')).rerender(); }); await page.waitForTimeout(900);
+    check('prices app: once staff confirm it, it says Confirmed', /Confirmed/.test(await page.textContent('#payments .ph-row')));
+    await page.click('#payments .ph-row'); await page.waitForSelector('#modal-root .ack');
+    const ack = await page.textContent('#modal-root .ack');
+    check('prices app: the acknowledgment shows who paid, for what, how much, how and when, and that it is not an official receipt', /Aligned Solutions/.test(ack) && /₱19,900/.test(ack)
+      && /Bank transfer · Ref BT-778812/.test(ack) && /Acknowledgment no\.\s*PP-/.test(ack) && /not an official receipt/.test(ack) && (await page.locator('#modal-root [data-ack-print]').count()) === 1);
+    await page.click('#modal-root [data-modal-close]');
     // staff record a yearly payment: 12 months cost 10
     await page.evaluate(async () => { (await import('/js/core.js')).S.profile.is_platform_admin = true; });
     await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=orgs]'); await page.waitForTimeout(400);

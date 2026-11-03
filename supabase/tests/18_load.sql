@@ -2,6 +2,8 @@
 -- papers checks (asking, photos, staff answering, cancelling, refunds, late answers), the renewal season pass,
 -- inviting a business, staff gifts and pay-backs, money views and who can see what. Rolled back at the end.
 begin;
+-- Text packs are off for now (file 24); this test still covers them, so they're switched back on inside the rollback.
+update public.load_products set active = true where code like 'texts\_%';
 -- This test checks how load works with the original prices; test 24 checks today's prices.
 update public.load_products set price_php = case code when 'template' then 39 when 'papers_check' then 149 when 'season_pass' then 149 else price_php end;
 update public.doc_templates set price_php = 99 where code = 'authorization_letter';
