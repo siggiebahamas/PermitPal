@@ -90,7 +90,7 @@ async function ordersTab() {
   const earned = closed.filter((a) => a.status === 'completed' && ['paid', 'waived'].includes(a.payment_status)).reduce((t, a) => t + Number(a.quote_service_fee || 0), 0);
   const line = (a) => html`<button class="line" data-act="admin-order" data-id="${a.id}"><span class="line-main"><b>${KIND_LABEL[a.kind] || 'Request'}: ${a.requirement_name} — ${a.subject_label}</b>
     <small>${a.orgs?.name || ''} · ${timeAgo(a.created_at)}${a.rush ? ' · URGENT' : ''}${a.care_plan_id ? (a.created_by ? ' · CARE (walk-through included)' : a.care_plans?.billing === 'per_renewal' ? ' · CARE (pay per renewal)' : ' · CARE') : ''}${a.batch_id ? ' · several at once' : ''}${a.due_on ? ' · due ' + fmtDate(a.due_on) : ''}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
-    <span class="chip ${ORDER_STATUS[a.status]?.[1]}">${ORDER_STATUS[a.status]?.[0]}</span></button>`;
+    <span class="chip ${ORDER_STATUS[a.filed_on && !["completed", "cancelled"].includes(a.status) ? "filed" : a.status]?.[1]}">${ORDER_STATUS[a.filed_on && !["completed", "cancelled"].includes(a.status) ? "filed" : a.status]?.[0]}</span></button>`;
   const used = new Set();
   return html`
     <div class="stats four">
@@ -124,7 +124,7 @@ function orderDetail(a, events) {
     <button class="back linklike" data-act="admin-back">← All orders</button>
     <section class="card">
       <div class="card-head"><div><h2>${KIND_LABEL[a.kind] || 'Request'}: ${a.requirement_name} — ${a.subject_label}</h2><p class="card-sub">${a.orgs?.name} · ${a.service_code}${a.rush ? ' · URGENT' : ''}</p></div>
-        <span class="chip ${ORDER_STATUS[a.status]?.[1]}">${ORDER_STATUS[a.status]?.[0]}</span></div>
+        <span class="chip ${ORDER_STATUS[a.filed_on && !["completed", "cancelled"].includes(a.status) ? "filed" : a.status]?.[1]}">${ORDER_STATUS[a.filed_on && !["completed", "cancelled"].includes(a.status) ? "filed" : a.status]?.[0]}</span></div>
       <dl class="kv">
         <dt>Location</dt><dd>${a.location_label || '—'}</dd>
         <dt>Deadline</dt><dd>${a.due_on ? fmtDate(a.due_on) : '—'}</dd>
@@ -162,7 +162,7 @@ function orderDetail(a, events) {
       <form class="admin-steps" data-id="${a.id}"><ol class="job-steps">${steps.map((t, i) => html`<li class="${i < (a.steps_done || 0) ? 'done' : ''}"><label class="check"><input type="radio" name="done" value="${i + 1}" ${a.steps_done === i + 1 ? 'checked' : ''}><span>${t}</span></label></li>`)}</ol>
         <label class="check"><input type="radio" name="done" value="0" ${!a.steps_done ? 'checked' : ''}><span>None done yet</span></label>
         <button class="btn btn-sm btn-soft">Save progress</button></form></section>`)}
-    ${has('govclock') ? when(!closed && !['filed', 'submitted'].includes(a.status), html`<section class="card adm-filed"><h2>Filed with the government office?</h2>
+    ${has('govclock') ? when(!closed && !a.filed_on && a.status !== 'submitted', html`<section class="card adm-filed"><h2>Filed with the government office?</h2>
       <p class="muted small">Do this the day you file. It hands responsibility to the office: the customer sees "Pinoy Permit's part is done, now with ${svc?.agency || 'the office'}", the office's legal deadline and a clock, by email and in the app. Attach the office's acknowledgment or receipt.</p>
       <form class="admin-filed" data-id="${a.id}"><div class="grid2">
         <label class="field"><span>Government office</span><input name="agency" maxlength="120" required value="${svc?.agency || a.location_label || ''}" placeholder="e.g. DTI (Business Name Registration System)"></label>
@@ -172,7 +172,7 @@ function orderDetail(a, events) {
         <label class="field"><span>The office's acknowledgment / filing receipt</span><input type="file" name="file" accept=".pdf,image/*"></label>
         <button class="btn btn-primary">Mark as filed: now with the office</button></form></section>`)
       : clockStartButton(a)}
-    ${when(a.status === 'filed', html`<section class="card"><h2>With ${a.agency} since ${fmtDate(a.filed_on)}</h2><p class="muted small">Legal deadline ${fmtDate(a.agency_due_on)} (${a.agency_days} working days)${a.agency_ref ? ` · Ref ${a.agency_ref}` : ''}. When the office releases it, save it below.</p></section>`)}
+    ${when(!closed && a.filed_on, html`<section class="card"><h2>With ${a.agency} since ${fmtDate(a.filed_on)}</h2><p class="muted small">Legal deadline ${fmtDate(a.agency_due_on)} (${a.agency_days} working days)${a.agency_ref ? ` · Ref ${a.agency_ref}` : ''}. When the office releases it, save it below.</p></section>`)}
     ${when(rev && svc?.needs_access && !closed, html`<section class="card"><h2>Their workspace</h2>
       ${a.staff_access ? html`<p class="muted small">The customer agreed to give you temporary access. You join as a plain member; it ends automatically when you mark this order completed.</p>
         <button class="btn btn-sm ${paid ? 'btn-primary' : 'btn-soft'}" data-act="admin-join" data-id="${a.id}" ${paid ? '' : 'disabled'}>${paid ? 'Join their workspace' : 'Join (after payment)'}</button>`

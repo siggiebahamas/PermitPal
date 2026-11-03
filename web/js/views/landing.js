@@ -58,8 +58,9 @@ const SCREENS = [
     <div class="lp-opt"><span class="lp-sq lp-sq-sm t-blue">${ICON.camera}</span><b>Fill from a photo</b><small>optional</small></div>
     ${has('services') ? html`<div class="lp-opt"><span class="lp-sq lp-sq-sm t-blue">${PIC.team}</span><b>Let us set it up</b></div>` : ''}
     <div class="lp-saved"><b>Mayor's Permit saved</b>Expires Dec 31. We'll remind you.</div></div>`,
-  () => html`<div class="lp-scr" role="img" aria-label="Reminders 30 days, 7 days and 1 day before the Mayor's Permit is due">
+  () => html`<div class="lp-scr" role="img" aria-label="Reminders 30 days, 7 days and 1 day before the Mayor's Permit is due, by email, in the app and as a phone alert">
     <div class="lp-clock"><b>7:00</b>Monday</div>
+    <div class="lp-chan"><span>${ICON.bell}Phone alert</span><span>✉ Email</span><span>${ICON.check}In the app</span></div>
     <div class="lp-msg"><b>Pinoy Permit</b>Mayor's Permit is due in <b>30 days</b>.${has('library2') ? " Here's the checklist." : ''}</div>
     <div class="lp-msg"><b>Pinoy Permit</b>Still to do: Mayor's Permit, due in <b>7 days</b>.</div>
     <div class="lp-msg"><b>Pinoy Permit</b>Mayor's Permit is due <b>tomorrow</b>.</div>
@@ -68,7 +69,7 @@ const SCREENS = [
     <b class="lp-scr-h">How to renew: step by step</b>
     ${[['Do this first', 'Barangay clearance ✓'], ['Get these papers ready', '3 of 5 ready'], ['Where to file', "City hall's BPLO, or online"], ['How to pay', 'Cashier or online. Keep the receipt.']]
       .map(([t, d], i) => html`<div class="lp-guide"><span class="lp-guide-n ${i ? '' : 'first'}">${i + 1}</span><span><b>${t}</b><small>${d}</small></span></div>`)}
-    <div class="lp-fake-btn">Need help? We can do it online</div></div>`
+    <div class="lp-fake-btn">Need help? We prepare and file it online</div></div>`
     : html`<div class="lp-scr" role="img" aria-label="The Mayor's Permit, renewed, with next year's date set">
     <b class="lp-scr-h">Mayor's Permit</b>
     <div class="lp-ck">${tick}Renewal recorded</div><div class="lp-ck">${tick}Receipt saved</div>
@@ -151,7 +152,7 @@ const offers = () => html`<section id="for-you" class="lp-sec" aria-labelledby="
 const TILES = () => [
   [ICON.upload, 'Quick setup', html`<b>Type it in, import a spreadsheet,</b> or fill it from a photo${has('services') ? ', or let us set it up' : ''}.`],
   [PIC.bag, 'Pay your way', html`<b>GCash, Maya or bank transfer.</b> No card needed, and the free plan costs nothing.`],
-  [ICON.bell, 'Reminders that stick', html`<b>30, 7 and 1 day before,</b> then every week until it's done.`],
+  [ICON.bell, 'Reminders that stick', html`<b>30, 7 and 1 day before,</b> by email, in the app and as a phone alert. No app to install.`],
   [ICON.check, 'Done the right way', html`<b>Checklists from each city's own rules,</b> with where we got them.`],
 ];
 const pitch = () => html`<section class="lp-sec lp-pitch" aria-labelledby="pitch-h">
@@ -327,7 +328,8 @@ const FAQ = [
   ['Do you register new businesses or get new permits?', "No. Pinoy Permit is built for the permits you already have: it tracks them, reminds you and walks you through each renewal. Registering a brand-new business takes many offices and often months, so it isn't something we file. Your accountant or a licensed liaison can help with that; once you're registered, add your permits here."],
   ['Does a plan include someone renewing for me?', 'No. Every plan is tracking and planning software only. Renewal Assistance (₱499, a review of your papers and a written plan) is a separate service. Full-Service Vehicle Renewal (from ₱1,000) is coming soon. Government and third-party fees are always separate.'],
   ['What happens if I reach my plan\'s limit?', 'Everything you already track stays, and you can still edit it. You just can\'t add another business or vehicle until you move up. If a paid plan ends, nothing is deleted either.'],
-  ['What happens after the 30-day trial?', 'You choose to pay monthly or yearly. Nothing is charged by itself: we send a bill, you pay by GCash, Maya or bank transfer.'],
+  ['What happens after the 30-day trial?', 'You choose to pay monthly or yearly. Nothing is charged by itself: you pay by GCash, Maya or bank transfer, send the reference or a screenshot, and every payment shows in Settings → Plan with an acknowledgment you can print.'],
+  ['If you file something for me, who is responsible for how long it takes?', "Our part is preparing your papers and filing them. Once filed, the government office alone decides how long it takes and whether it approves. The app shows the office's name, the filing date and its legal deadline (RA 11032), so you always know who has it. Pinoy Permit does not follow up with offices on your behalf and is not liable for their delays or decisions."],
   ['How does yearly work?', 'You pay for 10 months and get 12. That is 2 months free, every year.'],
   ['Can I stop anytime?', 'Yes. Your plan runs to the end of what you paid. Your data is never locked or deleted, and you can download it anytime.'],
 ];

@@ -797,7 +797,8 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const o = await page.textContent('main .resp');
     check(`liability ${L}: the order says who is responsible now: the office, and that our part is done`, /Who is responsible right now/.test(o) && /Pinoy Permit's part is done/.test(o)
       && (await page.locator('main .resp .who-steps li.now.who-gov').count()) === 1 && /Responsible now/.test(await page.textContent('main .resp .who-steps li.now')));
-    check(`liability ${L}: a late office: "This delay is PhilGEPS's, not Pinoy Permit's"`, /This delay is PhilGEPS's, not Pinoy Permit's/.test(o) && /working days? late/.test(await page.textContent('main .gclock-state')));
+    check(`liability ${L}: a late office: "This delay is PhilGEPS's, not Pinoy Permit's", and no promise to follow up`, /This delay is PhilGEPS's, not Pinoy Permit's/.test(o) && /working days? late/.test(await page.textContent('main .gclock-state'))
+      && !/following up|we follow up/i.test(o));
     check(`liability ${L}: what each side answers for, and that we are not liable for the office`, /Pinoy Permit is responsible for/.test(o) && /PhilGEPS is responsible for/.test(o)
       && /not liable for their delays, decisions, outages, added requirements, fees or penalties/.test(o));
     check(`liability ${L}: the stepper shows "With PhilGEPS" as its own step`, /With PhilGEPS/.test(await page.textContent('main .stepper')));
@@ -2392,8 +2393,9 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   check('admin: after filing, staff see it is with the office and its deadline', /With BFP Mandaue since/.test(await page.textContent('main')) && (await page.locator('.admin-filed').count()) === 0);
   const fsicId = await page.evaluate(async () => (await import('/__mock/mock-data.js')).__office.filings.find((f) => f.request_id === 'ord1')?.requirement_id);
   await go('#/requirement/' + fsicId); await openMore(page); await page.waitForSelector('#clock');
-  check('clock: on an order we filed, the customer sees the clock and that we follow up', /BFP Mandaue/.test(await page.textContent('#clock')) && /Pinoy Permit filed this for you/.test(await page.textContent('#clock'))
-    && (await page.locator('#clock [data-act=clock-edit]').count()) === 0);
+  check('clock: on an order we filed, the customer sees the clock, and that the timing is the office\'s, with no promise to follow up', /BFP Mandaue/.test(await page.textContent('#clock')) && /Pinoy Permit filed this for you/.test(await page.textContent('#clock'))
+    && /the office's responsibility/.test(await page.textContent('#clock')) && !/following up|we follow up/i.test(await page.textContent('#clock')) && (await page.locator('#clock [data-act=clock-edit]').count()) === 0);
+  check('liability: no page promises that Pinoy Permit follows up with offices', !/following up|we follow up|follow it up|follow up daily/i.test(await page.evaluate(() => document.body.innerText)));
   check('clock+bills demo: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
   const off = await browser.newPage({ viewport: { width: 1280, height: 860 } });

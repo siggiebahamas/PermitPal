@@ -169,7 +169,7 @@ function page(r) {
         </div>`)}
       </div>`)}
 
-    ${(() => { const o = r.open_request_id && (S.data.requests || []).find((x) => x.id === r.open_request_id); return o && ['filed', 'in_progress'].includes(o.status) ? whoPanel(o, { compact: true }) : ''; })()}
+    ${(() => { const o = r.open_request_id && (S.data.requests || []).find((x) => x.id === r.open_request_id); return o && o.status === 'in_progress' ? whoPanel(o, { compact: true }) : ''; })()}
     ${cityBanner(r)}
     ${when(t?.help_text, html`<p class="help-text">${t?.help_text}</p>`)}
     ${['action_required', 'renew_soon'].includes(r.status) ? penaltyNote(r) : ''}

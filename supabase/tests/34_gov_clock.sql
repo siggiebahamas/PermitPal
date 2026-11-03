@@ -15,7 +15,8 @@ select pg_temp.res('the feature switch is on', exists (select 1 from private.fea
 select pg_temp.res('each online service names its government office and legal time', (select agency = 'DTI (Business Name Registration System)' and agency_days = 3 from public.services where code = 'renew_dti_business_name')
   and (select agency like 'PhilGEPS%' and agency_days = 7 from public.services where code = 'renew_philgeps'), '');
 select pg_temp.res('each service promises only our part: when we file', (select turnaround like 'We file within%' from public.services where code = 'renew_philgeps'), '');
-select pg_temp.res('the stage after filing says it is with the government office', private.help_status_label('filed') = 'Filed: now with the government office', '');
+select pg_temp.res('nothing promises that Pinoy Permit follows up with offices', not exists (select 1 from pg_proc where proname in ('clock_daily','admin_start_filing','admin_mark_filed')
+  and (prosrc ilike '%following up%' or prosrc ilike '%we follow up%' or prosrc ilike '%follow up today%')), '');
 
 insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, email_confirmed_at) values
  ('ed000000-0000-4000-8000-0000000000a1','00000000-0000-0000-0000-000000000000','authenticated','authenticated','gina@gov.ph','{"first_name":"Gina"}', now()),
@@ -48,10 +49,10 @@ select pg_temp.res('the office is required', pg_temp.err(format($q$select public
 select pg_temp.res('the day filed cannot be in the future', pg_temp.err(format($q$select public.admin_mark_filed(%L, 'DTI', 3, %L)$q$, (select ord from t_ids), private.today_ph() + 1)) like '%day it was filed%', '');
 select public.admin_mark_filed(ord, 'DTI (Business Name Registration System)', 3, private.today_ph() - 1, 'BN-778812') from t_ids;
 reset role;
-select pg_temp.res('filed: status, office, reference and the legal deadline in working days', (select status = 'filed' and agency like 'DTI%' and agency_ref = 'BN-778812'
+select pg_temp.res('filed: status, office, reference and the legal deadline in working days', (select status = 'in_progress' and filed_on is not null and agency like 'DTI%' and agency_ref = 'BN-778812'
   and agency_due_on = private.add_workdays(private.today_ph() - 1, 3) from public.assistance_requests where id = (select ord from t_ids)), '');
 select pg_temp.res('the order''s timeline says plainly who is responsible now', exists (select 1 from public.request_events where request_id = (select ord from t_ids)
-  and message like '%Pinoy Permit''s part is done. From here, DTI (Business Name Registration System) is responsible%' and message like '%not responsible for its delays or decisions%'), '');
+  and message like '%Pinoy Permit''s part is done. From here, DTI (Business Name Registration System) is responsible%' and message like '%not responsible for its delays, decisions or responses%' and message not ilike '%follow up%'), '');
 select pg_temp.res('the permit''s own clock starts too, naming the office', exists (select 1 from public.office_filings where requirement_id = (select mp from t_ids) and status = 'waiting'
   and office like 'DTI%' and days = 3), '');
 select pg_temp.res('the customer is told, by email as well', exists (select 1 from public.notifications where user_id = 'ed000000-0000-4000-8000-0000000000a1' and title like 'Filed with DTI%')

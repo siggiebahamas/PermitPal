@@ -7,7 +7,7 @@ import { html, fmtDate, fmtDateTime, peso, toast, toastError, confirmDialog, whe
 import { S, on, go, reload, canEdit, has, reqById, service, serviceFor, offered, IN_PERSON, business, vehicle, person, empty, careOf, coverOf, tierOf, location_ } from '../core.js';
 import { byPriority, subjectLabel, dueShort, ICON } from '../components.js';
 import { serviceStrip } from './pricing.js';
-import { whoPanel, waitingCard, agencyOf, loadHolidays, paintWaiting, liability } from './govclock.js';
+import { whoPanel, waitingCard, agencyOf, loadHolidays, paintWaiting, liability, isFiled } from './govclock.js';
 import * as db from 'pp/data';
 
 // Customer-facing names for each stage of an order.
@@ -52,7 +52,7 @@ const PROMISES = [
 const CALM = [
   ['Find the right forms and rules for your city', 'Approve one fixed price'],
   ['Fill in the same details, again', 'Send photos of what you already have'],
-  ['Chase the office for updates', 'See every update here, as it happens'],
+  ['Track down the right office and online portal', 'We file it with the right office for you'],
   ["Remember next year's deadline", 'Your new permit is saved, and next year is already on your calendar'],
 ];
 // How it works, in three steps.
@@ -65,7 +65,7 @@ const price = (s) => (s.price_from == null ? 'Quoted per job' : `From ${peso(s.p
 const isOpen = (a) => !['completed', 'cancelled'].includes(a.status);
 // What "urgent" costs, said before they ask (rush pays for our priority, never the government's).
 const rushText = (s) => (has('revenue') && s?.rush_fee != null
-  ? (Number(s.rush_fee) > 0 ? `+${peso(s.rush_fee)} rush fee: we file within 1 business day and follow up daily. Government processing times don't change.` : 'No extra charge.')
+  ? (Number(s.rush_fee) > 0 ? `+${peso(s.rush_fee)} rush fee: we file within 1 business day of complete papers and payment. The government office's processing time doesn't change.` : 'No extra charge.')
   : "may cost more; we'll say so in the quote");
 // Orders the customer sees: done-for-you jobs and renewals started by Year-round care.
 const isOrder = (a) => a.service_code || a.care_plan_id;
@@ -101,8 +101,8 @@ export function services(el, params) {
     ${waitingCard({ title: 'Waiting on government offices' })}
     <section class="dfy-calm" aria-labelledby="dfy-calm-h">
       <div class="dfy-calm-top"><span class="dfy-calm-kicker">Peace of mind, handled</span>
-        <h2 id="dfy-calm-h">Your permits, off your mind.</h2>
-        <p>Hand us the paperwork. We file it online, follow it up, and save the new permit to your account. You just say yes.</p></div>
+        <h2 id="dfy-calm-h">Your paperwork, off your mind.</h2>
+        <p>Hand us the paperwork. We prepare it and file it online with the right office. The office processes it on its own time, and when it releases the permit we save it to your account.</p></div>
       <div class="dfy-calm-cols">
         <div class="dfy-calm-col is-alone"><h3>On your own</h3><ul>${CALM.map(([a]) => html`<li>${a}</li>`)}</ul></div>
         <div class="dfy-calm-col is-us"><h3>With Pinoy Permit</h3><ul>${CALM.map(([, b]) => html`<li>${b}</li>`)}</ul></div>
@@ -185,7 +185,7 @@ function orderLine(a) {
   const [label, cls] = ORDER_STATUS[a.status] || [a.status, 'needinfo'];
   const care = a.care_plan_id && has('revenue');
   const action = a.status === 'quoted' ? 'Review quote' : a.payment_status === 'awaiting_payment' && isOpen(a) ? 'Pay now' : 'Open';
-  const shown = a.status === 'filed' ? `With ${agencyOf(a).split(' (')[0]} (government)` : label;
+  const shown = isFiled(a) ? `With ${agencyOf(a).split(' (')[0]} (government)` : label;
   return html`<a class="line" href="#/services/orders/${a.id}"><span class="line-main"><b>${a.kind === 'apply' ? 'New: ' : ''}${a.requirement_name}</b>
     <small>${a.subject_label} · ${care ? (a.created_by ? 'included in your care plan' : 'started by Year-round care') : 'sent'} ${timeAgo(a.created_at)}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
     <span class="chip ${cls}">${shown}</span><span class="btn btn-sm ${['Review quote', 'Pay now'].includes(action) ? 'btn-primary' : 'btn-soft'}">${action}</span></a>`;
@@ -326,11 +326,11 @@ export async function order(el, id) {
   let ev = [], st = {}, refunds = [];
   try { [ev, st, refunds] = await Promise.all([db.orderEvents(id), settings(), db.orderRefunds(id).catch(() => []), loadHolidays()]); } catch (e) { toastError(e); }
   if (!location.hash.includes(id)) return;
-  const [label, cls] = ORDER_STATUS[a.status] || [a.status, 'needinfo'];
+  const [label, cls] = ORDER_STATUS[isFiled(a) ? 'filed' : a.status] || [a.status, 'needinfo'];
   const s = service(a.service_code);
   const closed = !isOpen(a);
   const stage = a.status === 'cancelled' ? -1 : a.status === 'completed' ? 6 // every step ticked
-    : a.status === 'filed' ? 4 : ['paid', 'waived'].includes(a.payment_status) ? 3 : a.accepted_at ? 2 : a.quoted_at ? 1 : 0;
+    : isFiled(a) ? 4 : ['paid', 'waived'].includes(a.payment_status) ? 3 : a.accepted_at ? 2 : a.quoted_at ? 1 : 0;
   const steps = ['Request sent', 'Quote', 'Payment', 'We prepare & file', `With ${agencyOf(a).split(' (')[0]}`, 'Done'];
   const r = a.requirement_id ? reqById(a.requirement_id) : null;
   const rev = has('revenue');
@@ -342,7 +342,7 @@ export async function order(el, id) {
     <a class="back" href="#/services">← Done for you</a>
     <div class="page-head"><div><h1>${a.requirement_name}</h1><p class="muted">${KIND_LABEL[a.kind] || 'Request'} · ${a.subject_label}${a.location_label ? ' · ' + a.location_label : ''}${a.rush ? ' · Urgent' : ''}${care ? (a.created_by ? ' · Included in your care plan' : ' · Year-round care') : ''}</p></div>
       <div class="head-side"><span class="chip lg ${cls}">${label}</span></div></div>
-    ${when(isOpen(a) && (a.status === 'filed' || ['paid', 'waived'].includes(a.payment_status) || a.status === 'quoted'), whoPanel(a))}
+    ${when(isOpen(a) && (isFiled(a) || ['paid', 'waived'].includes(a.payment_status) || a.status === 'quoted'), whoPanel(a))}
     ${when(stage >= 0, html`<ol class="stepper" aria-label="Progress">${steps.map((t, i) => html`<li class="${i < stage ? 'done' : i === stage ? 'now' : ''}" ${i === stage ? 'aria-current="step"' : ''}><span>${i < stage ? '✓' : i + 1}</span>${t}</li>`)}</ol>`)}
 
     ${when(a.status === 'submitted', care && !a.created_by
@@ -353,7 +353,7 @@ export async function order(el, id) {
     ${when(access && !closed, html`<div class="banner info"><div><b>Pinoy Permit has access to ${S.org.name}</b> to do this set-up. It ends automatically when this order is done. <a href="#/team">Remove it now</a></div></div>`)}
     ${when(a.status === 'quoted', quoteBox(a))}
     ${when(['awaiting_payment', 'pending_verification'].includes(a.payment_status) && !closed, payBox(a, st))}
-    ${when(['paid', 'waived'].includes(a.payment_status) && !closed && a.status !== 'filed', html`<div class="banner progress"><div><b>We're preparing and filing it.</b> Sign and upload the authorization letter below if you haven't yet. We'll post every update here, including the day we file.</div></div>`)}
+    ${when(['paid', 'waived'].includes(a.payment_status) && !closed && !isFiled(a), html`<div class="banner progress"><div><b>We're preparing and filing it.</b> Sign and upload the authorization letter below if you haven't yet. We'll post every update here, including the day we file.</div></div>`)}
     ${when(a.status === 'completed', html`<div class="banner ok-banner"><div><b>Done.</b> ${r ? html`The new record is saved to <a href="#/requirement/${r.id}">${r.name}</a>.` : 'Your documents are attached below.'}</div></div>`)}
     ${when(a.admin_note && !closed && a.status !== 'quoted', html`<div class="banner warn"><div><b>From Pinoy Permit:</b> ${a.admin_note}</div></div>`)}
 
@@ -489,7 +489,7 @@ on('auth-letter', (ds) => {
     <h2 class="letter-title">AUTHORIZATION LETTER</h2>
     <p>To whom it may concern:</p>
     <p>I, <b>${me || '______________________________'}</b>, ${b ? html`owner / authorized officer of <b>${b.name}</b>` : html`owner of <b>${who}</b>`}, hereby authorize
-      <b>______________________________</b> of Pinoy Permit to ${what}, follow up, pay the official fees for, and receive on my behalf the
+      <b>______________________________</b> of Pinoy Permit to ${what}, pay the official fees for, and receive on my behalf the
       <b>${a.requirement_name}</b> for <b>${who}</b>${/\.$/.test(who) ? '' : '.'}</p>
     <p>This authorization is valid only for the transaction stated above.</p>
     <div class="letter-sig"><div>Signature over printed name<br>${me}</div><div>Authorized representative<br>Signature over printed name</div></div>

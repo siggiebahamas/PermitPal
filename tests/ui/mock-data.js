@@ -513,7 +513,7 @@ const addWd = (iso, n) => { let d = new Date(iso + 'T00:00:00Z'); let k = 0; whi
 export async function adminMarkFiled(a0, { agency, days, filed_on, ref }) {
   const a = db.requests.find((x) => x.id === a0.id);
   if (!agency) throw new Error('Which government office did you file with?');
-  Object.assign(a, { status: 'filed', agency, agency_days: Number(days), filed_on, agency_ref: ref || null, agency_due_on: addWd(filed_on, Number(days)) });
+  Object.assign(a, { status: 'in_progress', agency, agency_days: Number(days), filed_on, agency_ref: ref || null, agency_due_on: addWd(filed_on, Number(days)) });
   event(a, 'status', `Filed with ${agency} on ${filed_on}. Pinoy Permit's part is done. From here, ${agency} is responsible for processing and for its decision.`, true);
   // As the database does: the permit's own clock starts too.
   if (a.requirement_id && !office.filings.some((x) => x.requirement_id === a.requirement_id && x.status === 'waiting')) {
@@ -2556,7 +2556,7 @@ if (globalThis.PP_FILED || globalThis.PP_DEMO) {
     updated_at: new Date().toISOString(), kind: 'renew', consented_at: new Date().toISOString(), gov_terms_at: new Date().toISOString(), quote_php: 2000, quote_service_fee: 1500, quote_gov_fees: 500, quote_rush_fee: 0, steps_done: 0, docs_status: 'have', contact_method: 'email' };
   db.requests.unshift(
     { ...base, id: 'ord-dti', service_code: 'renew_dti_business_name', requirement_id: dti?.id || null, business_id: dti?.business_id || null, requirement_name: 'DTI business name renewal', subject_label: "Sadie's Kitchen",
-      status: 'filed', agency: 'DTI (Business Name Registration System)', agency_days: 3, filed_on: back(1), agency_ref: 'BN-2026-778812', agency_due_on: addWd(back(1), 3) },
+      status: 'in_progress', agency: 'DTI (Business Name Registration System)', agency_days: 3, filed_on: back(1), agency_ref: 'BN-2026-778812', agency_due_on: addWd(back(1), 3) },
     { ...base, id: 'ord-pg', service_code: 'renew_philgeps', requirement_id: null, requirement_name: 'PhilGEPS Platinum renewal', subject_label: "Sadie's Kitchen",
-      status: 'filed', agency: 'PhilGEPS (Procurement Service, DBM)', agency_days: 7, filed_on: back(10), agency_ref: 'PG-55120', agency_due_on: addWd(back(10), 7) });
+      status: 'in_progress', agency: 'PhilGEPS (Procurement Service, DBM)', agency_days: 7, filed_on: back(10), agency_ref: 'PG-55120', agency_due_on: addWd(back(10), 7) });
 }

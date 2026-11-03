@@ -18,7 +18,9 @@ async function holidays() {
 const short = (ag) => String(ag).split(' (')[0];
 export const agencyOf = (a) => a.agency || service(a.service_code)?.agency || 'the government office';
 const open = (a) => !['completed', 'cancelled'].includes(a.status);
-export const filedOrders = () => (S.data?.requests || []).filter((a) => a.status === 'filed' && open(a) && a.filed_on);
+// Filed: an open order with a filing date (the office has it). The database keeps it 'in progress'.
+export const isFiled = (a) => !!a && !!a.filed_on && open(a);
+export const filedOrders = () => (S.data?.requests || []).filter(isFiled);
 
 // Where the office is on its legal clock: day n of N, or how many working days late.
 export function clockOf(a, hol = HOL || new Set()) {
@@ -34,7 +36,7 @@ export function whoPanel(a, { compact = false } = {}) {
   if (!has('govclock')) return '';
   const ag = agencyOf(a);
   const paid = ['paid', 'waived'].includes(a.payment_status);
-  const now = a.status === 'completed' ? 4 : a.status === 'filed' ? 2 : paid ? 1 : 0;
+  const now = a.status === 'completed' ? 4 : isFiled(a) ? 2 : paid ? 1 : 0;
   const days = a.agency_days || service(a.service_code)?.agency_days;
   const steps = [
     ['you', 'You', 'Send complete papers, sign the authorization letter and pay.'],
@@ -42,7 +44,7 @@ export function whoPanel(a, { compact = false } = {}) {
     ['gov', `${short(ag)} (government)`, `Processes and decides: approves, asks for more, or denies.${days ? ` By law, within ${plural(days, 'working day')} after filing.` : ''} Its speed and its decision are ${short(ag)}'s responsibility, not Pinoy Permit's.`],
     ['gov', `${short(ag)} (government)`, 'Releases the permit or certificate. We save it to your account and set your next reminder.'],
   ];
-  const c = a.status === 'filed' && a.filed_on ? clockOf(a) : null;
+  const c = isFiled(a) ? clockOf(a) : null;
   return html`<section class="card resp ${compact ? 'compact' : ''}" aria-labelledby="who-${a.id}">
     <div class="card-head"><div><h2 id="who-${a.id}">Who is responsible right now</h2>
       <p class="card-sub">${now >= 2 && a.status !== 'completed' ? html`<b>${ag}</b>, a government office. Pinoy Permit's part is done.` : now === 1 ? 'Pinoy Permit: we are preparing and filing.' : now === 0 ? 'You: send your papers and pay to start.' : 'Done.'}</p></div></div>
@@ -62,7 +64,7 @@ export function govClock(a, c = clockOf(a)) {
       <span class="gclock-state">${c.late ? `${plural(c.late, 'working day')} late` : `Day ${Math.max(c.used, 0)} of ${c.days}`}</span></div>
     <div class="gclock-bar" aria-hidden="true"><i style="width:${c.late ? 100 : Math.min(100, Math.round((100 * c.used) / Math.max(1, c.days)))}%"></i></div>
     <p class="gclock-line">Filed ${fmtDate(a.filed_on)}${a.agency_ref ? ` · Reference ${a.agency_ref}` : ''} · By law ${short(ag)} must act by <b>${fmtDate(c.due)}</b> (${plural(c.days, 'working day')}, RA 11032).</p>
-    ${c.late ? html`<p class="gclock-blame"><b>This delay is ${short(ag)}'s, not Pinoy Permit's.</b> We filed on time. We are following up with ${short(ag)} for you${a.requirement_id ? html`, and you can send a formal follow-up letter or an ARTA complaint from <a href="#/requirement/${a.requirement_id}">the permit</a>` : ''}.</p>`
+    ${c.late ? html`<p class="gclock-blame"><b>This delay is ${short(ag)}'s, not Pinoy Permit's.</b> Pinoy Permit filed on time; what the office does next is up to the office.${a.requirement_id ? html` If you wish, you can send your own follow-up letter or an ARTA complaint from <a href="#/requirement/${a.requirement_id}">the permit</a>.` : ''}</p>`
       : html`<p class="gclock-note">Waiting on ${short(ag)}. Pinoy Permit cannot speed up a government office or decide for it.</p>`}
   </div>`;
 }

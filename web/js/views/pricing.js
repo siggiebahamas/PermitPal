@@ -208,6 +208,7 @@ export function helpServices({ assistCta = '', complexCta = '' } = {}) {
   return html`<section class="pp-helpwrap" aria-labelledby="help-h">
     <h2 class="lp-h3" id="help-h">Need us to handle the renewal?</h2>
     <p class="pp-help-lead">${CHOOSE_HELP}</p>
+    <p class="pp-help-who"><b>Who is responsible:</b> our part is reviewing, preparing and filing. After filing, the government office alone decides how long it takes and whether it approves. Pinoy Permit does not follow up with offices on your behalf and is not liable for their delays, decisions, fees or penalties.</p>
     <div class="pp-grid three">
       ${card('', 'Available now', 'Renewal Assistance', '₱499 one-time', ['A human review of the papers you send', 'A tailored checklist and a written plan: ready, missing, next steps', 'Which papers need an original, a copy or an issuer-sent record', 'Guidance only: no agency visits or filing'], ASSIST_FULL, assistCta)}
       ${card('pp-help-soon', 'Coming soon', 'Full-Service Vehicle Renewal', 'From ₱1,000 coordination fee', ['We coordinate an eligible standard renewal within a written scope', 'Itemized quote before you pay; government and third-party costs separate', "We're building a team of trusted, verified runners so we can offer this soon"], FULL_SERVICE_FULL,

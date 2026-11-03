@@ -99,13 +99,13 @@ export function clockCard(r, filings = []) {
       <div><dt>Fees</dt><dd>${open.fees === 'paid' ? `Paid ${fmtDate(open.fees_paid_on)}` : FEES[open.fees]}</dd></div>
     </dl>
     ${late ? html`<div class="banner warn clock-late"><div><b>${open.office} is past its deadline.</b>
-      ${ours ? ' Pinoy Permit filed this for you and is following up.' : html` Send the follow-up letter today: most offices act on a written, polite reminder.
+      ${ours ? ' Pinoy Permit filed this for you on time. The delay is the office\'s responsibility. If you wish, you can send your own follow-up letter below; what the office does with it is up to the office.' : html` If you wish, send a written follow-up letter; what the office does with it is up to the office.
       ${open.fees === 'paid' ? ' You handed in everything and paid, so the law treats your application as approved; the letter says so.' : ''}`}</div></div>`
-      : html`<p class="muted small">${open.extended ? `The office extended it once, in writing: "${open.extension_note}". ` : ''}${ours ? 'Pinoy Permit filed this for you. If the office runs late, we follow up.'
+      : html`<p class="muted small">${open.extended ? `The office extended it once, in writing: "${open.extension_note}". ` : ''}${ours ? 'Pinoy Permit filed this for you. From here, the timing and the decision are the office\'s responsibility. If it runs late, the app tells you, with a follow-up letter you can send yourself.'
         : `If ${open.office} hasn't acted by then, we'll tell you, with a follow-up letter ready.`}</p>`}
     ${when(open.followup_at || open.complaint_at, html`<p class="small clock-letters">${open.followup_at ? html`Follow-up letter drafted ${fmtDate(open.followup_at.slice(0, 10))}. ` : ''}${open.complaint_at ? html`ARTA complaint drafted ${fmtDate(open.complaint_at.slice(0, 10))}${open.complaint_ref ? `, ARTA reference ${open.complaint_ref}` : ''}.` : ''}</p>`)}
     ${when(edit, html`<div class="btn-row">
-      ${when(late && !ours, html`<button class="btn btn-primary btn-sm" data-act="clock-letter" data-id="${open.id}" data-req="${r.id}" data-kind="followup">Follow-up letter</button>
+      ${when(late, html`<button class="btn btn-primary btn-sm" data-act="clock-letter" data-id="${open.id}" data-req="${r.id}" data-kind="followup">Follow-up letter</button>
         <button class="btn btn-soft btn-sm" data-act="clock-letter" data-id="${open.id}" data-req="${r.id}" data-kind="complaint">Complain to ARTA</button>`)}
       <button class="btn ${late ? 'btn-ghost' : 'btn-soft'} btn-sm" data-act="clock-close" data-id="${open.id}" data-req="${r.id}">Got it / it's over</button>
       ${when(!ours, html`<button class="btn btn-ghost btn-sm" data-act="clock-edit" data-id="${open.id}" data-req="${r.id}">Edit</button>`)}</div>`)}

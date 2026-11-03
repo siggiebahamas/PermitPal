@@ -2,7 +2,7 @@
 -- the government office decides how fast it moves and whether it approves. So every order now:
 --   * names the government office (DTI, SEC, PhilGEPS, ...) and its legal processing time (RA 11032 / the office's
 --     Citizen's Charter), on the service and on the order;
---   * has a "Filed" stage: our part is done, the agency's receipt is saved, and the office's legal clock starts;
+--   * has a "Filed" stage (in progress, with the filing date set): our part is done, the agency's receipt is saved, and the office's legal clock starts;
 --   * records that the customer read and accepted, before paying, that the office's speed and decisions are the
 --     office's responsibility, not Pinoy Permit's.
 
@@ -37,9 +37,7 @@ alter table public.assistance_requests
   add column if not exists filed_on date,
   add column if not exists agency_due_on date,
   add column if not exists gov_terms_at timestamptz;
-alter table public.assistance_requests drop constraint if exists assistance_requests_status_check;
-alter table public.assistance_requests add constraint assistance_requests_status_check
-  check (status in ('submitted','quoted','matching','provider_contacted','awaiting_customer','in_progress','filed','completed','cancelled'));
+-- A filed order stays 'in_progress' with filed_on set: the office has it. (No new status, so nothing else changes.)
 -- Customers can't rewrite the filing details (staff and the order functions can).
 create or replace function private.assistance_lock_filed() returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -51,8 +49,7 @@ begin
   end if;
   return new;
 end $$;
-drop trigger if exists assistance_lock_filed on public.assistance_requests;
-create trigger assistance_lock_filed before update on public.assistance_requests for each row execute function private.assistance_lock_filed();
+create or replace trigger assistance_lock_filed before update on public.assistance_requests for each row execute function private.assistance_lock_filed();
 
 create or replace function private.help_status_label(s text) returns text
 language sql immutable set search_path = '' as $$
@@ -63,7 +60,6 @@ language sql immutable set search_path = '' as $$
     when 'provider_contacted' then 'Provider contacted'
     when 'awaiting_customer' then 'Waiting for you'
     when 'in_progress' then 'Pinoy Permit is preparing and filing'
-    when 'filed' then 'Filed: now with the government office'
     when 'completed' then 'Completed'
     when 'cancelled' then 'Cancelled'
     else s end
@@ -99,12 +95,12 @@ begin
   if length(coalesce(p_ref, '')) > 120 then raise exception 'That reference number is too long.' using errcode = '22023'; end if;
   if p_file_path is not null and split_part(p_file_path, '/', 1) <> a.org_id::text then raise exception 'Invalid file location.' using errcode = '42501'; end if;
   v_due := private.add_workdays(p_filed_on, p_days);
-  update public.assistance_requests set status = 'filed', agency = btrim(p_agency), agency_days = p_days, filed_on = p_filed_on,
+  update public.assistance_requests set status = 'in_progress', agency = btrim(p_agency), agency_days = p_days, filed_on = p_filed_on,
     agency_ref = nullif(btrim(p_ref), ''), agency_due_on = v_due where id = a.id;
   v_msg := 'Filed with ' || btrim(p_agency) || ' on ' || private.fmt_date(p_filed_on) || coalesce(' (reference ' || nullif(btrim(p_ref), '') || ')', '') || '. '
     || 'Pinoy Permit''s part is done. From here, ' || btrim(p_agency) || ' is responsible for processing and for its decision. '
     || 'By law it should act within ' || p_days || ' working days, by ' || private.fmt_date(v_due) || '. Pinoy Permit cannot speed up or decide for a government office, '
-    || 'and is not responsible for its delays or decisions. We follow up for you if it runs late.';
+    || 'and is not responsible for its delays, decisions or responses.';
   perform private.order_event(a.id, 'status', v_msg, p_file_path, p_file_name);
   if a.requirement_id is not null and exists (select 1 from public.requirements r where r.id = a.requirement_id and r.deleted_at is null)
      and not exists (select 1 from public.office_filings where requirement_id = a.requirement_id and status = 'waiting') then
@@ -119,5 +115,84 @@ begin
 end $$;
 revoke all on function public.admin_mark_filed(uuid, text, int, date, text, text, text) from public, anon;
 grant execute on function public.admin_mark_filed(uuid, text, int, date, text, text, text) to authenticated;
+
+-- ======================================================================== no promises about what offices do
+-- Pinoy Permit does not follow up with offices on anyone's behalf: the messages say whose responsibility it is, nothing more.
+create or replace function public.admin_start_filing(p_request uuid, p_office text, p_reference text, p_filed_on date, p_kind text, p_days int default null)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare a public.assistance_requests; f public.office_filings; v_today date := private.today_ph();
+begin
+  if not private.is_platform_admin() then raise exception 'Staff only.' using errcode = '42501'; end if;
+  perform private.clock_ready();
+  select * into a from public.assistance_requests where id = p_request;
+  if a.id is null then raise exception 'Request not found.' using errcode = 'P0002'; end if;
+  if a.status in ('completed','cancelled') then raise exception 'This request is closed.' using errcode = 'P0001'; end if;
+  if a.requirement_id is null or not exists (select 1 from public.requirements r where r.id = a.requirement_id and r.deleted_at is null) then
+    raise exception 'This request isn''t for one permit, so there''s no clock to start.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.office_filings where requirement_id = a.requirement_id and status = 'waiting') then
+    raise exception 'The clock is already running for this permit.' using errcode = 'P0001';
+  end if;
+  if length(btrim(coalesce(p_office, ''))) not between 2 and 160 then raise exception 'Which office did you file with?' using errcode = '22023'; end if;
+  if length(coalesce(p_reference, '')) > 120 then raise exception 'That reference number is too long.' using errcode = '22023'; end if;
+  if p_filed_on is null or p_filed_on > v_today or p_filed_on < v_today - 60 then raise exception 'Enter the day you filed (in the last 60 days).' using errcode = '22023'; end if;
+  if coalesce(p_kind, '') not in ('simple','complex','technical','charter') then raise exception 'Choose the processing time.' using errcode = '22023'; end if;
+  if p_kind = 'charter' and (p_days is null or p_days not between 1 and 60) then raise exception 'Enter the working days in the Citizen''s Charter (1 to 60).' using errcode = '22023'; end if;
+  insert into public.office_filings (org_id, requirement_id, request_id, office, reference_no, filed_on, kind, days)
+  values (a.org_id, a.requirement_id, a.id, btrim(p_office), nullif(btrim(p_reference), ''), p_filed_on, p_kind, coalesce(p_days, 3))
+  returning * into f;
+  perform private.order_event(a.id, 'status', 'Filed with ' || f.office || coalesce(' (reference ' || f.reference_no || ')', '') || ' on '
+    || private.fmt_date(f.filed_on) || '. By law the office has until ' || private.fmt_date(f.due_on) || ' to act. Pinoy Permit''s part is done: from here the office is responsible for processing and for its decision.');
+  perform private.req_activity(a.requirement_id, 'office_filing', f.id, 'clock_start',
+    'Pinoy Permit filed with ' || f.office || ' on ' || private.fmt_date(f.filed_on) || '. By law it has until ' || private.fmt_date(f.due_on) || '.');
+  return f.id;
+end $$;
+
+-- ================================================================ every morning, 7:30 am Manila
+create or replace function private.clock_daily() returns int
+language plpgsql security definer set search_path = '' as $$
+declare v_today date := private.today_ph(); v_n int := 0; f record; b record;
+begin
+  if exists (select 1 from private.features where name = 'clock') then
+    -- an office ran past its legal deadline: tell the business once (and staff, for orders they filed)
+    for f in select x.* from public.office_filings x join public.orgs o on o.id = x.org_id and o.deleted_at is null
+             where x.status = 'waiting' and x.due_on < v_today and x.late_noticed_at is null for update of x loop
+      perform private.notify_req(f.requirement_id, 'system', f.office || ' is past its deadline',
+        'By law it had until ' || private.fmt_date(f.due_on) || ' to act on ' || coalesce(private.requirement_label(f.requirement_id), 'your permit')
+          || ' (filed ' || private.fmt_date(f.filed_on) || coalesce(', ref ' || f.reference_no, '') || ').'
+          || ' The delay is the office''s responsibility. If you wish, open the permit for a follow-up letter you can send yourself.',
+        '#/requirement/' || f.requirement_id, 'clocklate:' || f.id || ':' || f.due_on);
+      if f.request_id is not null then
+        perform private.notify_admins('Office late on an order: ' || f.office, coalesce(private.requirement_label(f.requirement_id), '') || ', due '
+          || private.fmt_date(f.due_on) || '.', 'clocklate:' || f.id || ':' || f.due_on, true);
+      end if;
+      update public.office_filings set late_noticed_at = now() where id = f.id;
+      v_n := v_n + 1;
+    end loop;
+  end if;
+  if exists (select 1 from private.features where name = 'billpay') then
+    -- bills to pay soon: 3 days before and on the day
+    for b in select x.* from public.gov_bills x join public.orgs o on o.id = x.org_id and o.deleted_at is null
+             where x.status = 'due' and x.pay_by is not null and x.pay_by - v_today in (3, 0) loop
+      perform private.notify_req(b.requirement_id, 'billing',
+        case when b.pay_by = v_today then 'Pay ' || b.office || ' today' else 'Pay ' || b.office || ' by ' || private.fmt_date(b.pay_by) end,
+        'Bill ' || b.number || coalesce(' (' || b.bill_ref || ')', '') || ': ' || private.peso(b.amount_php) || '.'
+          || case when b.mode = 'permitpal' then ' Send Pinoy Permit ' || private.peso(b.amount_php + b.fee_php) || ' and we pay it for you.'
+                  else ' Late payments can add a surcharge and interest.' end,
+        '#/requirement/' || b.requirement_id, 'billdue:' || b.id || ':' || (b.pay_by - v_today));
+      v_n := v_n + 1;
+    end loop;
+    -- bills Pinoy Permit was asked to pay, never sent: closed after 14 days
+    update public.gov_bills set status = 'cancelled', note = 'Not paid within 14 days, so we closed it. Add the bill again anytime.'
+    where mode = 'permitpal' and status = 'due' and created_at < now() - interval '14 days';
+    -- a bill we hold the money for and haven't paid by our deadline: remind staff every morning
+    for b in select x.* from public.gov_bills x where x.status = 'processing' and x.pay_deadline < now() loop
+      perform private.notify_admins('Late: pay city bill ' || b.number, b.office || ' ' || private.peso(b.amount_php) || coalesce(', the office''s due date is '
+        || private.fmt_date(b.pay_by), '') || '. We promised to pay by ' || to_char(b.pay_deadline at time zone 'Asia/Manila', 'Mon FMDD, FMHH12 pm') || '.',
+        'billlate:' || b.id || ':' || v_today, true);
+    end loop;
+  end if;
+  return v_n;
+end $$;
 
 insert into private.features (name) values ('govclock') on conflict do nothing;
