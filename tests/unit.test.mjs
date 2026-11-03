@@ -566,3 +566,49 @@ test('Reminder emails: Gmail sending speaks plain SMTP, and no address gets more
   assert.equal(d.nextMorning.toISOString(), '2026-10-30T23:00:00.000Z'); // 7 a.m. Oct 31, Manila
   assert.equal((await handle(new Request('https://f/', { method: 'GET' }), {})).status, 405);
 });
+
+test('Phone alerts: a phone can decrypt what we send, and the sender signature checks out', async () => {
+  const { makeVapidKeys, vapidHeader, encryptPush, sendPush, deliverPush, b64u, unb64u } = await import('../supabase/functions/send-messages/index.ts');
+  const s = crypto.subtle, te = new TextEncoder();
+  // the phone's own keys, as a browser makes them
+  const ua = await s.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const uaPub = new Uint8Array(await s.exportKey('raw', ua.publicKey)), auth = crypto.getRandomValues(new Uint8Array(16));
+  const body = await encryptPush(te.encode('{"title":"Mayor\'s Permit is due in 7 days"}'), b64u(uaPub), b64u(auth));
+  // decrypt exactly as RFC 8291 says a phone does
+  const salt = body.slice(0, 16), idlen = body[20], asPub = body.slice(21, 21 + idlen), ct = body.slice(21 + idlen);
+  assert.equal(new DataView(body.buffer, body.byteOffset).getUint32(16), 4096);
+  const asKey = await s.importKey('raw', asPub, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const shared = new Uint8Array(await s.deriveBits({ name: 'ECDH', public: asKey }, ua.privateKey, 256));
+  const hk = async (salt2, ikm, info, n) => new Uint8Array(await s.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt: salt2, info }, await s.importKey('raw', ikm, 'HKDF', false, ['deriveBits']), n * 8));
+  const ikm = await hk(auth, shared, new Uint8Array([...te.encode('WebPush: info\0'), ...uaPub, ...asPub]), 32);
+  const cek = await hk(salt, ikm, te.encode('Content-Encoding: aes128gcm\0'), 16), nonce = await hk(salt, ikm, te.encode('Content-Encoding: nonce\0'), 12);
+  const plain = new Uint8Array(await s.decrypt({ name: 'AES-GCM', iv: nonce }, await s.importKey('raw', cek, 'AES-GCM', false, ['decrypt']), ct));
+  assert.equal(plain[plain.length - 1], 2); // last-record marker
+  assert.equal(new TextDecoder().decode(plain.slice(0, -1)), '{"title":"Mayor\'s Permit is due in 7 days"}');
+  // the VAPID signature verifies with the public key the phone subscribed with
+  const keys = await makeVapidKeys();
+  assert.equal(unb64u(keys.public).length, 65);
+  const h = await vapidHeader('https://fcm.googleapis.com/fcm/send/abc', 'https://siggiebahamas.github.io/PermitPal/', keys.public, keys.private, Date.parse('2026-11-03T00:00:00Z'));
+  const [, token, k] = /^vapid t=([^,]+), k=(.+)$/.exec(h);
+  assert.equal(k, keys.public);
+  const [hd, cl, sig] = token.split('.');
+  assert.deepEqual(JSON.parse(new TextDecoder().decode(unb64u(cl))), { aud: 'https://fcm.googleapis.com', exp: Date.parse('2026-11-03T00:00:00Z') / 1000 + 43200, sub: 'https://siggiebahamas.github.io/PermitPal/' });
+  const pubKey = await s.importKey('raw', unb64u(keys.public), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+  assert.ok(await s.verify({ name: 'ECDSA', hash: 'SHA-256' }, pubKey, unb64u(sig), te.encode(`${hd}.${cl}`)));
+  // sending: the right headers; a gone phone is reported as gone
+  let seen;
+  const r = await sendPush({ id: 's1', endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: b64u(uaPub), auth: b64u(auth) },
+    { title: 'Hi', body: 'There', url: '#/' }, { ...keys, subject: 'https://x.ph/' }, async (u, o) => { seen = o; return new Response(null, { status: 410 }); });
+  assert.equal(seen.headers['Content-Encoding'], 'aes128gcm'); assert.match(seen.headers.Authorization, /^vapid t=/);
+  assert.deepEqual([r.ok, r.gone], [false, true]);
+  // the whole run: keys made once, alerts sent, results reported; without database file 22 it stays quiet
+  const calls = [];
+  const db = { rpc: async (name, args) => { calls.push(name);
+    if (name === 'push_public_key') return { data: null };
+    if (name === 'push_claim') return { data: { public: keys.public, private: keys.private, subject: 'https://x.ph/', alerts: [{ title: 'A', body: 'B', url: '#/', subs: [{ id: 's1', endpoint: 'https://web.push.apple.com/xyz', p256dh: b64u(uaPub), auth: b64u(auth) }] }] } };
+    return { data: null }; } };
+  const out = await deliverPush(db, 'secret', async () => new Response(null, { status: 201 }));
+  assert.deepEqual(out, { pushed: 1, push: 'on' });
+  assert.deepEqual(calls, ['push_public_key', 'push_set_keys', 'push_claim', 'push_result']);
+  assert.deepEqual(await deliverPush({ rpc: async () => ({ error: { message: 'not found' } }) }, 'x'), { pushed: 0, push: 'off' });
+});

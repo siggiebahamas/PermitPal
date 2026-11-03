@@ -340,6 +340,11 @@ export const listNotifications = async (limit = 100) =>
   ok(await sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(limit));
 export const unreadCount = async () =>
   (await sb.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null)).count || 0;
+// Phone alerts (database file 22)
+export const pushPublicKey = async () => ok(await sb.rpc('push_public_key'));
+export const pushSubscribe = async (endpoint, p256dh, auth, device) => ok(await sb.rpc('push_subscribe', { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth, p_device: device }));
+export const pushUnsubscribe = async (endpoint) => ok(await sb.rpc('push_unsubscribe', { p_endpoint: endpoint }));
+export const pushTest = async () => ok(await sb.rpc('push_test'));
 export const markRead = async (ids) => ok(await sb.from('notifications').update({ read_at: new Date().toISOString() }).in('id', ids));
 export const markUnread = async (ids) => ok(await sb.from('notifications').update({ read_at: null }).in('id', ids));
 export const markAllRead = async () => ok(await sb.from('notifications').update({ read_at: new Date().toISOString() }).is('read_at', null));

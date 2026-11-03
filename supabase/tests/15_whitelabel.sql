@@ -189,6 +189,7 @@ select pg_temp.res('the managed client''s contact gets it under the firm''s name
 -- ---------------------------------------------------------------- the monthly client report (pretend today is the 1st)
 create or replace function private.today_ph() returns date language sql stable set search_path = '' as
   $f$ select (date_trunc('month', now() at time zone 'Asia/Manila') + interval '1 month')::date $f$;
+update public.addons set paid_through = private.today_ph() + 13 where kind = 'brand'; -- the trial still runs on that pretend 1st
 delete from public.message_outbox;
 select pg_temp.res('on the 1st, a report for each client', private.brand_reports() = 2, '');
 select pg_temp.res('...the connected client''s owner gets it', o.subject = 'Dela Cruz & Co.: your permits this month' and o.from_name = 'Dela Cruz & Co.'

@@ -1,4 +1,4 @@
-// Delivers queued reminders from public.message_outbox.
+// Delivers queued reminders from public.message_outbox, and phone alerts for new notifications (database file 22).
 //
 // Called by the database (pg_net) every 5 minutes and right after new messages are queued.
 // The caller must present the shared x-cron-secret; the database checks it.
@@ -181,6 +181,78 @@ async function deliver(m: Msg): Promise<Result> {
   }
 }
 
+// ---------------------------------------------------------------- phone alerts (Web Push: RFC 8291 + VAPID RFC 8292)
+// The keys are made here the first time (push_set_keys keeps them in the database); phones subscribe with the public one.
+const u8 = (b: ArrayBuffer | Uint8Array) => (b instanceof Uint8Array ? b : new Uint8Array(b));
+export const b64u = (b: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...u8(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+export const unb64u = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+const cat = (...parts: Uint8Array[]) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let i = 0; for (const p of parts) { out.set(p, i); i += p.length; } return out; };
+const hkdf = async (salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, bytes: number) =>
+  u8(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]), bytes * 8));
+
+export async function makeVapidKeys() {
+  const k = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const jwk = await crypto.subtle.exportKey("jwk", k.privateKey) as JsonWebKey;
+  return { public: b64u(await crypto.subtle.exportKey("raw", k.publicKey)), private: JSON.stringify({ kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, d: jwk.d }) };
+}
+
+// "vapid t=<signed token>, k=<public key>": proves to the phone maker's server (Google, Apple, Mozilla) who is sending.
+export async function vapidHeader(endpoint: string, subject: string, pub: string, privJwk: string, now = Date.now()) {
+  const enc = (o: unknown) => b64u(new TextEncoder().encode(JSON.stringify(o)));
+  const unsigned = `${enc({ typ: "JWT", alg: "ES256" })}.${enc({ aud: new URL(endpoint).origin, exp: Math.floor(now / 1000) + 12 * 3600, sub: subject })}`;
+  const key = await crypto.subtle.importKey("jwk", { ...JSON.parse(privJwk), ext: true }, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(unsigned));
+  return `vapid t=${unsigned}.${b64u(sig)}, k=${pub}`;
+}
+
+// The alert, encrypted so only that phone can read it (aes128gcm, one record).
+export async function encryptPush(payload: Uint8Array, p256dh: string, authSecret: string, salt = crypto.getRandomValues(new Uint8Array(16))) {
+  const uaPub = unb64u(p256dh), auth = unb64u(authSecret);
+  const as = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const asPub = u8(await crypto.subtle.exportKey("raw", as.publicKey));
+  const ua = await crypto.subtle.importKey("raw", uaPub, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const shared = u8(await crypto.subtle.deriveBits({ name: "ECDH", public: ua }, as.privateKey, 256));
+  const ikm = await hkdf(auth, shared, cat(new TextEncoder().encode("WebPush: info\0"), uaPub, asPub), 32);
+  const cek = await hkdf(salt, ikm, new TextEncoder().encode("Content-Encoding: aes128gcm\0"), 16);
+  const nonce = await hkdf(salt, ikm, new TextEncoder().encode("Content-Encoding: nonce\0"), 12);
+  const key = await crypto.subtle.importKey("raw", cek, "AES-GCM", false, ["encrypt"]);
+  const body = u8(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, key, cat(payload, new Uint8Array([2]))));
+  const rs = new Uint8Array([0, 0, 16, 0]); // record size 4096
+  return cat(salt, rs, new Uint8Array([asPub.length]), asPub, body);
+}
+
+type Sub = { id: string; endpoint: string; p256dh: string; auth: string };
+type Alert = { title: string; body: string; url: string; subs: Sub[] };
+// 201 = delivered to the phone maker; 404/410 = that phone is gone for good.
+export async function sendPush(sub: Sub, alert: { title: string; body: string; url: string }, keys: { public: string; private: string; subject: string }, http: typeof fetch = fetch) {
+  const payload = new TextEncoder().encode(JSON.stringify({ title: alert.title, body: alert.body, url: alert.url }).slice(0, 3000));
+  const res = await http(sub.endpoint, { method: "POST", headers: {
+    Authorization: await vapidHeader(sub.endpoint, keys.subject, keys.public, keys.private), "Content-Encoding": "aes128gcm",
+    "Content-Type": "application/octet-stream", TTL: "86400", Urgency: "normal" }, body: await encryptPush(payload, sub.p256dh, sub.auth) });
+  return { ok: res.ok, gone: res.status === 404 || res.status === 410, status: res.status };
+}
+
+// deno-lint-ignore no-explicit-any
+export async function deliverPush(db: any, secret: string, http: typeof fetch = fetch) {
+  let pushed = 0;
+  // keys first, so nothing is claimed before it can be sent
+  const { data: pub, error: e1 } = await db.rpc("push_public_key");
+  if (e1) return { pushed, push: "off" }; // database file 22 not run yet
+  if (!pub) { const k = await makeVapidKeys(); await db.rpc("push_set_keys", { p_secret: secret, p_public: k.public, p_private: k.private }); }
+  const { data, error } = await db.rpc("push_claim", { p_secret: secret, p_limit: 100 });
+  if (error || !data?.public || !data?.private) return { pushed, push: error ? "error" : "no keys" };
+  for (const a of (data.alerts ?? []) as Alert[]) {
+    for (const s of a.subs ?? []) {
+      try {
+        const r = await sendPush(s, a, { public: data.public, private: data.private, subject: data.subject }, http);
+        if (r.ok) pushed++;
+        await db.rpc("push_result", { p_secret: secret, p_id: s.id, p_ok: r.ok, p_gone: r.gone });
+      } catch { await db.rpc("push_result", { p_secret: secret, p_id: s.id, p_ok: false, p_gone: false }); }
+    }
+  }
+  return { pushed, push: "on" };
+}
+
 // Where the Manila day started, and the next 7 a.m. Manila (when held-back emails go out).
 export function manilaDay(now = new Date()) {
   const ph = new Date(now.getTime() + 8 * 3600e3);
@@ -236,7 +308,8 @@ export async function handle(req: Request, db: any): Promise<Response> {
     }
     if (msgs.length < 50) break;
   }
-  return Response.json({ sent, failed, skipped, held, configured, email_via: viaResend() ? "resend" : viaGmail() ? "gmail" : "off" });
+  const phone = await deliverPush(db, secret).catch(() => ({ pushed: 0, push: "error" }));
+  return Response.json({ sent, failed, skipped, held, ...phone, configured, email_via: viaResend() ? "resend" : viaGmail() ? "gmail" : "off" });
 }
 
 if (D) {

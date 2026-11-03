@@ -4,6 +4,7 @@ import { S, actions, hooks, on, isStaff, has, IN_PERSON } from './core.js';
 import { ICON } from './components.js';
 import { wireSearch } from './search.js';
 import { applyTheme, clearTheme, savedTheme } from './theme.js';
+import { registerWorker } from './phone.js';
 import { initErrorReporting, reportError } from './errors.js';
 import * as db from 'pp/data';
 import { authPage, invitePage, onboarding, sessionStorageTake, sessionStorageSet } from './views/auth.js';
@@ -44,11 +45,11 @@ let unsubscribe = null;
 
 const T = {
   en: { dashboard: 'Home', businesses: 'Businesses', vehicles: 'Vehicles', people: 'People', compliance: 'Compliance', documents: 'Documents',
-        filings: 'Taxes & contributions', pros: 'Find a professional', services: 'Done for you', care: 'Year-round care', team_tools: 'Team tools', costs: 'Costs & budget', sharing: 'Share proof',
+        filings: 'Taxes & contributions', pros: 'Find a professional', services: 'Done for you', care: 'Year-round care', team_tools: 'Fleet & Branches', costs: 'Costs & budget', sharing: 'Share proof',
         check: 'Permit check', templates: 'Templates', load: 'Wallet',
         notifications: 'Notifications', history: 'History', trash: 'Trash', team: 'Team', settings: 'Settings', admin: 'Admin', signout: 'Sign out', more: 'More', contact: 'Contact Pinoy Permit', tools: 'Tools', account: 'Account' },
   tl: { dashboard: 'Home', businesses: 'Mga Negosyo', vehicles: 'Mga Sasakyan', people: 'Mga Tao', compliance: 'Compliance', documents: 'Mga Dokumento',
-        filings: 'Buwis at kontribusyon', pros: 'Maghanap ng Propesyonal', services: 'Ipaasikaso sa amin', care: 'Alaga buong taon', team_tools: 'Team tools', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
+        filings: 'Buwis at kontribusyon', pros: 'Maghanap ng Propesyonal', services: 'Ipaasikaso sa amin', care: 'Alaga buong taon', team_tools: 'Fleet at Branches', costs: 'Gastos', sharing: 'Ibahagi ang Patunay',
         check: 'Pagsusuri ng permit', templates: 'Mga template', load: 'Wallet',
         notifications: 'Mga Abiso', history: 'Kasaysayan', trash: 'Basurahan', team: 'Team', settings: 'Mga Setting', admin: 'Admin', signout: 'Mag-sign out', more: 'Iba pa', contact: 'Kontakin ang Pinoy Permit', tools: 'Mga Tool', account: 'Account' },
 };
@@ -192,6 +193,7 @@ function buildNav() {
 
 function renderShell() {
   applyTheme(S.profile?.theme || savedTheme());
+  registerWorker();
   buildNav();
   const name = [S.profile.first_name, S.profile.last_name].filter(Boolean).join(' ') || S.profile.email;
   app.innerHTML = String(html`

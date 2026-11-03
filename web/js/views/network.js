@@ -1,4 +1,4 @@
-// Team tools: one board for every branch, client, tenant or vehicle you're responsible for.
+// Fleet & Branches (was Team tools): one board for every branch, client, tenant or vehicle you're responsible for.
 //   head_office  company-owned branches + franchisees who connect their own workspace
 //   firm         clients who connect their workspace, or workspaces you manage for them
 //   property     tenants who connect their workspace (and may share copies of their permits)
@@ -237,7 +237,7 @@ function chooser(el) {
       <span data-bill-swap data-m="or save ${peso(r.m * FREE_MONTHS)} yearly" data-y="you save ${peso(r.m * FREE_MONTHS)}">${getBilling() === 'yearly' ? `you save ${peso(r.m * FREE_MONTHS)}` : `or save ${peso(r.m * FREE_MONTHS)} yearly`}</span></div>
     ${when(isOrgAdmin(), html`<button class="btn btn-primary btn-sm" data-act="nb-set-kind" data-kind="${r.kind}">Try free</button>`)}</div>`;
   el.innerHTML = String(html`
-    <div class="page-head"><div><h1>Team tools</h1><p class="page-sub">Look after many vehicles or sites from one screen. Free for 30 days.</p></div></div>
+    <div class="page-head"><div><h1>Fleet & Branches</h1><p class="page-sub">Scale up without losing track: every vehicle, branch and site on one screen. Free for 30 days.</p></div></div>
     <section class="tt-hero" aria-labelledby="tt-hero-h">
       <div class="tt-hero-l"><h2 id="tt-hero-h">Sleep well. Every plate and every site is watched.</h2>
         <ol class="tt-steps">${['We remind your team before anything expires', 'They upload the new papers from their phone', 'You see green across the board, and proof is one tap away']

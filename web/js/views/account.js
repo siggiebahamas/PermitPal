@@ -11,6 +11,7 @@ import { handledCount } from './assign.js';
 import { avatar, ICON } from '../components.js';
 import { KINDS, teamAccess, connectionsCard } from './network.js';
 import { mfaSection, requireCard } from './mfa.js';
+import { phoneSettings, fillPhoneSettings } from '../phone.js';
 import { addonSection, wireAddons, showBrandCard } from './plus.js';
 import { loadSettingsCard, loadState, loadStateNow } from './load.js';
 import { brandPage, brandTabShown } from './brand.js';
@@ -211,8 +212,8 @@ export async function team(el) {
                    <button class="btn btn-sm btn-ghost danger" data-act="member-remove" data-id="${m.user_id}" data-name="${name}">Remove</button>`
             : html`<span class="tag">${m.role}</span>${me && members.length > 1 ? html`<button class="btn btn-sm btn-ghost" data-act="member-leave">Leave</button>` : ''}`}</div></div>`;
       })}
-      <div class="muted small">${Object.entries(ROLES).map(([k, v]) => html`<div>${v}</div>`)}</div>
     </section>
+    ${roleCards(members)}
     ${when(isOrgAdmin(), html`<section class="card"><h2>Invite someone</h2>
       ${seatsLeft !== null && seatsLeft <= 0
         ? html`<p class="muted">Your ${plan.name} plan includes ${plural(plan.max_members, 'person', 'people')}. <a href="#/settings/billing">Upgrade</a> to invite more.</p>`
@@ -259,6 +260,30 @@ on('member-leave', async () => {
 });
 
 // ================================================================ settings
+// Who can do what, as four cards: big role names, plain can / can't lines, and who has each role now.
+const ROLE_CARDS = [
+  ['owner', 'Owner', 'The boss of this workspace', ['Everything below', 'Change the plan and pay', 'Decide who can open files'], []],
+  ['admin', 'Admin', 'Runs things day to day', ['Everything a member can', 'Invite people and change roles', 'Approve file requests'], ['Change the plan or pay']],
+  ['member', 'Member', 'Does the renewals', ['Add and update permits and vehicles', 'Upload files and record renewals'], ['Invite people', 'Change the plan or pay']],
+  ['viewer', 'Viewer', 'Looks only', ['See every permit and date'], ['Change anything']],
+];
+const ROLE_IC = {
+  owner: raw('<svg viewBox="0 0 24 24"><path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/></svg>'),
+  admin: raw('<svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>'),
+  member: raw('<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>'),
+  viewer: raw('<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>'),
+};
+function roleCards(members) {
+  const who = (r) => members.filter((m) => m.role === r).map((m) => m.profile?.first_name || (m.profile?.email || '').split('@')[0]);
+  return html`<section class="card roles-card" id="roles"><div class="card-head"><div><h2>Who can do what</h2>
+      <p class="card-sub">Pick the role that fits each person. You can change it anytime.</p></div></div>
+    <div class="roles">${ROLE_CARDS.map(([k, name, line, can, cannot]) => { const w = who(k);
+      return html`<article class="role role-${k}"><span class="role-ic">${ROLE_IC[k]}</span><h3>${name}</h3><p class="role-line">${line}</p>
+        <ul>${can.map((t) => html`<li class="yes">${t}</li>`)}${cannot.map((t) => html`<li class="no">${t}</li>`)}</ul>
+        <p class="role-who">${w.length ? html`<b>${w.length}</b> ${w.slice(0, 3).join(', ')}${w.length > 3 ? '…' : ''}` : 'Nobody yet'}</p></article>`; })}</div>
+  </section>`;
+}
+
 const settingsNav = () => html`<nav class="subnav"><a href="#/settings">Profile & reminders</a><a href="#/settings/billing">Plan</a>${brandTabShown() ? html`<a href="#/settings/brand">Your brand</a>` : ''}<a href="#/settings/workspace">Workspace & data</a></nav>`;
 const markNav = (el) => el.querySelectorAll('.subnav a').forEach((a) => { if (a.getAttribute('href') === location.hash.split('?')[0]) a.classList.add('active'); });
 
@@ -340,13 +365,13 @@ export async function settings(el, section) {
           <td><span class="tag ${m.status === 'sent' ? 'green' : m.status === 'failed' ? 'red' : ''}" title="${m.last_error || ''}">${m.status}</span></td></tr>`)}
       </tbody></table></div>` : html`<p class="muted">Nothing sent yet.</p>`}
     </section>
-    <section class="card" id="install"><h2>Put Pinoy Permit on your phone</h2>
+    ${has('push') ? phoneSettings() : html`<section class="card" id="install"><h2>Put Pinoy Permit on your phone</h2>
       <p class="muted small">It opens like an app, full screen, with no app store needed.</p>
       <div class="grid2">
         <div><b>iPhone (Safari)</b><ol class="small"><li>Open Pinoy Permit in Safari.</li><li>Tap the Share button (square with an arrow).</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol></div>
         <div><b>Android (Chrome)</b><ol class="small"><li>Open Pinoy Permit in Chrome.</li><li>Tap the ⋮ menu at the top right.</li><li>Tap <b>Add to Home screen</b> or <b>Install app</b>.</li></ol></div>
       </div>
-    </section>`)}
+    </section>`}`)}
 
     ${when(section === 'billing', html`
     ${billingSection(pay)}${loadCard}`)}
@@ -411,6 +436,7 @@ export async function settings(el, section) {
   markNav(el);
   if (/[?&]files=1/.test(location.hash)) setTimeout(() => el.querySelector('#file-guard')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 30);
   mfaSection(el.querySelector('#mfa-section'));
+  fillPhoneSettings(el);
   el.querySelectorAll('[data-profile-pref]').forEach((i) => i.addEventListener('change', async () => {
     try { await db.updateProfile(S.user.id, { [i.dataset.profilePref]: i.checked }); S.profile[i.dataset.profilePref] = i.checked; toast('Saved.'); } catch (e) { i.checked = !i.checked; toastError(e); }
   }));
@@ -502,7 +528,7 @@ function billingSection(pay) {
   const u = S.data?.usage;
   const status = paid ? html`<p>You're on the <b>${current?.name}</b> plan${org.plan_expires_at ? html`, paid until <b>${fmtDate(org.plan_expires_at.slice(0, 10))}</b>` : ''}.</p>`
     : acc.why === 'trial' ? html`<p>You're on a <b>free trial</b>: ${plural(acc.days, 'day')} left. Choose how to pay below to keep it after the trial.</p>`
-    : acc.why === 'staff' ? html`<p>Staff access: team tools are on.</p>`
+    : acc.why === 'staff' ? html`<p>Staff access: Fleet & Branches is on.</p>`
     : kind === 'business' ? html`<p>This workspace is on <b>${u?.name || (hasPlus() ? 'Plus' : 'Free')}</b>.</p>`
     : html`<p>Your free trial has ended. Your data is safe; pay below to open your board again.</p>`;
   const usage = u ? html`<div class="plan-usage">

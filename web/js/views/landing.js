@@ -222,7 +222,7 @@ const pass = () => {
       <span class="lp-chip-free">Free plan</span>
       <h2 class="lp-big" id="free-h">Certified <span class="lp-blue">stress-free.</span></h2>
       <p class="lp-lead"><b>1 business and 1 vehicle, ₱0 a month.</b> No card needed to start.</p>
-      <p class="lp-free3-more">Need more businesses, vehicles or team tools? That's on a paid plan. <a href="#/pricing">Compare plans</a></p>
+      <p class="lp-free3-more">Need more businesses, vehicles, or fleet and branch tools? That's on a paid plan. <a href="#/pricing">Compare plans</a></p>
       <a class="btn btn-primary btn-lg lp-pill-btn" href="#/signup">Start on the free plan${PIC.next}</a>
     </div>
     <div class="lp-free3-art">

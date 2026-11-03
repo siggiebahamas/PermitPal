@@ -8,6 +8,7 @@ import { accountantCard } from './brand.js';
 import { cityDashBanner } from './citydates.js';
 import { homeCal } from './homecal.js';
 import { serviceStrip } from './pricing.js';
+import { phoneCard, revealPhoneCard } from '../phone.js';
 import * as db from 'pp/data';
 
 // ---------------------------------------------------------------- dashboard
@@ -30,6 +31,7 @@ export function dashboard(el) {
   const open = reqs.filter((r) => r.status !== 'compliant').sort(byPriority);
 
   el.innerHTML = String(html`
+    ${phoneCard()}
     ${homeCal(first, c)}
     ${cityDashBanner()}
     ${statTiles(c)}
@@ -43,6 +45,7 @@ export function dashboard(el) {
     ${accountantCard()}
   `);
   filingsBrief(el.querySelector('[data-filings-brief]'));
+  revealPhoneCard(el);
 }
 const when_ = (c, v) => (c ? v : '');
 

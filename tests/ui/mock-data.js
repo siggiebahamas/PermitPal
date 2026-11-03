@@ -385,6 +385,15 @@ export const orgDocuments = async () => db.documents.filter((d) => !d.deleted_at
 export const allCycles = async () => db.cycles;
 export const cancelHelpRequest = async (id) => { const a = db.requests.find((x) => x.id === id); a.status = 'cancelled'; event(a, 'cancelled', 'You cancelled this request.'); };
 export const listNotifications = async (limit = 100) => [...db.notifications].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, limit);
+// Phone alerts: the subscriptions this browser made, and test alerts as ordinary notifications.
+export const __push = [];
+export const pushPublicKey = async () => 'BPkPx4ZQ2b8mI3X6fWJ1kKZ0aQx6m2p7Hq9R0vT3yU5wLbN8cD4eF6gH1jK2lM3nO5pQ7rS9tU1vW3xY5zA7bC9';
+export const pushSubscribe = async (endpoint, p256dh, auth, device) => { __push.splice(0, __push.length, ...__push.filter((x) => x.endpoint !== endpoint), { endpoint, p256dh, auth, device }); };
+export const pushUnsubscribe = async (endpoint) => { __push.splice(0, __push.length, ...__push.filter((x) => x.endpoint !== endpoint)); };
+export const pushTest = async () => {
+  if (!__push.length) throw new Error('Turn on reminders on this phone first.');
+  db.notifications.push({ id: 'n-push-' + Date.now(), user_id: me.id, kind: 'system', title: 'Reminders are on', body: 'This is how Pinoy Permit will tell you about a deadline.', link: '#/notifications', read_at: null, created_at: new Date().toISOString() });
+};
 export const markRead = async (ids) => ids.forEach((id) => { const n = db.notifications.find((x) => x.id === id); if (n) n.read_at = 'now'; });
 export const markUnread = async (ids) => ids.forEach((id) => { const n = db.notifications.find((x) => x.id === id); if (n) n.read_at = null; });
 export const markAllRead = async () => db.notifications.forEach((n) => { n.read_at = 'now'; });
@@ -872,7 +881,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus', 'vehicles2', 'fileguard', 'themes'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'sms', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus', 'vehicles2', 'fileguard', 'themes', 'push'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : ALL_FEATURES).map((f) => [f, true])));
 

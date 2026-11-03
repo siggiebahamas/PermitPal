@@ -2694,6 +2694,60 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.close();
 }
 
+// Phone reminders: the guide shows only the steps for that phone; one tap turns alerts on (the browser's push
+// service is a stand-in here); the test alert is a real notification. Plus the Team role cards and the new name.
+for (const [label, ua, standalone] of [
+  ['android', 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36', false],
+  ['iphone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1', false],
+  ['iphone app', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1', true]]) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: ua, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  const errs = []; page.on('pageerror', (e) => errs.push(e.message));
+  await page.addInitScript((sa) => {
+    let sub = null, perm = 'default';
+    globalThis.__ppPush = { supported: () => true, permission: () => perm, ask: async () => (perm = 'granted'), current: async () => sub,
+      subscribe: async () => (sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/t1', unsubscribe: async () => { sub = null; },
+        toJSON: () => ({ endpoint: 'https://fcm.googleapis.com/fcm/send/t1', keys: { p256dh: 'B'.repeat(87), auth: 'a'.repeat(22) } }) }) };
+    if (sa) { const mm = window.matchMedia; window.matchMedia = (q) => (q.includes('standalone') ? { matches: true, addEventListener() {}, removeEventListener() {} } : mm.call(window, q)); }
+  }, standalone);
+  await page.goto('http://localhost:4173/'); await page.waitForSelector('main h1'); await page.waitForTimeout(400);
+  check(`phone ${label}: Home leads with a big "Get reminders on your phone" card`, await page.isVisible('[data-phone-card]') && /Get reminders on your phone/.test(await page.textContent('[data-phone-card]'))
+    && (await page.evaluate(() => document.querySelector('[data-phone-card]').getBoundingClientRect().top < document.querySelector('.home-next').getBoundingClientRect().top)));
+  await page.click('[data-act=phone-guide]'); await page.waitForSelector('.ph-guide');
+  if (label === 'iphone') {
+    check('phone iphone: Safari shows 4 picture steps to add it to the home screen, with an arrow to the Share button, and no alert button yet',
+      (await page.locator('.ph-step').count()) === 4 && /Add to Home Screen/.test(await page.textContent('.ph-guide')) && (await page.locator('.ph-arrow').count()) === 1
+      && (await page.locator('[data-act=phone-on]').count()) === 0 && /Step 1 of 2/.test(await page.textContent('.ph-kick')));
+  } else {
+    check(`phone ${label}: one big "Turn on reminders" button, with a picture of what an alert looks like`, (await page.locator('.ph-big[data-act=phone-on]').count()) === 1 && (await page.locator('.ph-mock').count()) === 1
+      && parseFloat(await page.evaluate(() => getComputedStyle(document.querySelector('.ph-big')).fontSize)) >= 18);
+    await page.click('[data-act=phone-on]'); await page.waitForTimeout(500);
+    const saved = await page.evaluate(async () => (await import('/__mock/mock-data.js')).__push.length);
+    if (label === 'android') check('phone android: after one tap, alerts are on and it offers the home-screen steps next', saved === 1 && /Put Pinoy Permit on your home screen/.test(await page.textContent('.ph-guide')) && (await page.locator('.ph-step').count()) === 3);
+    else {
+      check('phone iphone app: after one tap, "You\'re all set" with a test button', saved === 1 && /You're all set/.test(await page.textContent('.ph-guide')));
+      await page.click('[data-act=phone-test]'); await page.waitForTimeout(300);
+      check('phone iphone app: the test alert is a real notification', await page.evaluate(async () => (await import('/__mock/mock-data.js')).listNotifications().then((l) => l.some((n) => n.title === 'Reminders are on'))));
+      await page.click('.modal [data-modal-close]'); await page.waitForTimeout(300);
+      check('phone iphone app: once alerts are on in the app, the Home card goes away', !(await page.isVisible('[data-phone-card]')));
+      await page.evaluate(() => { location.hash = '#/settings'; }); await page.waitForSelector('[data-phone-state] .ph-status');
+      check('phone iphone app: Settings says reminders are on, with a test button', /On for this phone/.test(await page.textContent('[data-phone-state]')) && (await page.locator('[data-phone-state] [data-act=phone-test]').count()) === 1);
+    }
+  }
+  if (label === 'android') {
+    await page.evaluate(() => { location.hash = '#/team'; }); await page.waitForSelector('#roles');
+    check('team: four role cards with what each can and can\'t do, and who has each role', (await page.locator('#roles .role').count()) === 4
+      && /Owner[\s\S]*Admin[\s\S]*Member[\s\S]*Viewer/.test(await page.textContent('#roles')) && (await page.locator('#roles li.no').count()) >= 3
+      && parseFloat(await page.evaluate(() => getComputedStyle(document.querySelector('.role h3')).fontSize)) >= 22 && /Sadie/.test(await page.textContent('#roles .role-owner')));
+    await page.evaluate(() => { location.hash = '#/network'; }); await page.waitForSelector('main h1');
+    check('fleet page: called "Fleet & Branches", vehicle plans in big type', (await page.textContent('main h1')) === 'Fleet & Branches'
+      && parseFloat(await page.evaluate(() => getComputedStyle(document.querySelector('.tt-name b')).fontSize)) >= 24
+      && /Fleet & Branches/.test(await page.evaluate(() => document.querySelector('.sidebar')?.textContent || document.body.textContent)));
+  }
+  check(`phone ${label}: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 for (const [s, n, e] of results) console.log(`${s} ${n}${s === 'FAIL' && e ? ' -> ' + e : ''}`);
