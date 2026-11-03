@@ -507,6 +507,22 @@ export const orderRefunds = async (id) => db.refunds.filter((r) => r.request_id 
 export const staffAccessLog = async () => db.access;
 export const getRequest = async (id) => { const a = db.requests.find((x) => x.id === id); return a ? { ...a } : null; };
 export const orderEvents = async (id) => db.events.filter((e) => e.request_id === id);
+// Before paying: "after filing, the office decides". Staff: "Filed" hands the order to the office, with its legal clock.
+export const acceptGovTerms = async (id) => { const a = db.requests.find((x) => x.id === id); if (a) a.gov_terms_at = now(); };
+const addWd = (iso, n) => { let d = new Date(iso + 'T00:00:00Z'); let k = 0; while (k < n) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) k++; } return d.toISOString().slice(0, 10); };
+export async function adminMarkFiled(a0, { agency, days, filed_on, ref }) {
+  const a = db.requests.find((x) => x.id === a0.id);
+  if (!agency) throw new Error('Which government office did you file with?');
+  Object.assign(a, { status: 'filed', agency, agency_days: Number(days), filed_on, agency_ref: ref || null, agency_due_on: addWd(filed_on, Number(days)) });
+  event(a, 'status', `Filed with ${agency} on ${filed_on}. Pinoy Permit's part is done. From here, ${agency} is responsible for processing and for its decision.`, true);
+  // As the database does: the permit's own clock starts too.
+  if (a.requirement_id && !office.filings.some((x) => x.requirement_id === a.requirement_id && x.status === 'waiting')) {
+    const f = { id: uid(), org_id: org.id, requirement_id: a.requirement_id, request_id: a.id, office: agency, reference_no: ref || null, filed_on, kind: 'charter', days: Number(days),
+      fees: 'not_assessed', fees_paid_on: null, extended: false, extension_note: null, closed_days: 0, status: 'waiting', closed_on: null, followup_at: null, complaint_at: null, complaint_ref: null, created_at: new Date().toISOString() };
+    f.due_on = clockDue(f); office.filings.push(f);
+  }
+  return a.agency_due_on;
+}
 export async function acceptQuote(id, access = false) {
   const a = db.requests.find((x) => x.id === id);
   if (a.status !== 'quoted') throw new Error('There is no quote to accept.');
@@ -893,7 +909,7 @@ if (globalThis.PP_SCALE) {
 
 // ---------------------------------------------------------------- newer features (all switched on in the mock;
 // PP_FEATURES = 'none' simulates a database without the new migrations, to prove nothing breaks)
-const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus', 'vehicles2', 'fileguard', 'themes', 'push', 'anysize', 'payproof'];
+const ALL_FEATURES = ['errors', 'assign', 'library2', 'services', 'import2', 'filings', 'mfa', 'revenue', 'autorenew', 'leads', 'plus', 'brand', 'yearly', 'property_s', 'load', 'clock', 'billpay', 'packet', 'citydates', 'payqr', 'tplprice', 'prices2', 'lgus', 'vehicles2', 'fileguard', 'themes', 'push', 'anysize', 'payproof', 'govclock'];
 // A list in PP_FEATURES switches on only those (a database part-way through the manual files).
 export const features = async () => (globalThis.PP_FEATURES === 'none' ? {} : Object.fromEntries((Array.isArray(globalThis.PP_FEATURES) ? globalThis.PP_FEATURES : [...ALL_FEATURES, ...(globalThis.PP_SMS ? ['sms'] : [])]).map((f) => [f, true])));
 
@@ -2530,4 +2546,17 @@ if (CITY_ON && globalThis.PP_QC) {
   db.businesses.push({ id: 'bq', org_id: org.id, name: 'Kanto Café', activity: 'restaurant', structure: 'Sole Proprietorship', tin: '210-555-000-000', deleted_at: null });
   db.locations.push({ id: 'lq', business_id: 'bq', name: 'Main branch', city: 'QC', address: '18 Maginhawa St, Teachers Village', is_main: true, deleted_at: null });
   addReq('business', 'bq', 'lq', types[0], { reference_no: 'QC-BP-2291', issued_on: `${y}-03-15`, expires_on: `${y + 1}-01-20` });
+}
+
+// Orders already filed and waiting on a government office (PP_FILED, and the demo): one on time, one late.
+if (globalThis.PP_FILED || globalThis.PP_DEMO) {
+  const back = (n) => { let d = new Date(today() + 'T00:00:00Z'); let k = 0; while (k < n) { d.setUTCDate(d.getUTCDate() - 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) k++; } return d.toISOString().slice(0, 10); };
+  const dti = db.requirements.find((r) => r.type_code === 'dti_business_name');
+  const base = { org_id: org.id, created_by: user.id, payment_status: 'paid', paid_at: new Date().toISOString(), created_at: new Date(Date.now() - 20 * 864e5).toISOString(),
+    updated_at: new Date().toISOString(), kind: 'renew', consented_at: new Date().toISOString(), gov_terms_at: new Date().toISOString(), quote_php: 2000, quote_service_fee: 1500, quote_gov_fees: 500, quote_rush_fee: 0, steps_done: 0, docs_status: 'have', contact_method: 'email' };
+  db.requests.unshift(
+    { ...base, id: 'ord-dti', service_code: 'renew_dti_business_name', requirement_id: dti?.id || null, business_id: dti?.business_id || null, requirement_name: 'DTI business name renewal', subject_label: "Sadie's Kitchen",
+      status: 'filed', agency: 'DTI (Business Name Registration System)', agency_days: 3, filed_on: back(1), agency_ref: 'BN-2026-778812', agency_due_on: addWd(back(1), 3) },
+    { ...base, id: 'ord-pg', service_code: 'renew_philgeps', requirement_id: null, requirement_name: 'PhilGEPS Platinum renewal', subject_label: "Sadie's Kitchen",
+      status: 'filed', agency: 'PhilGEPS (Procurement Service, DBM)', agency_days: 7, filed_on: back(10), agency_ref: 'PG-55120', agency_due_on: addWd(back(10), 7) });
 }

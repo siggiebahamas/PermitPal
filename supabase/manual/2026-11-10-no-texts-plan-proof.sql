@@ -14,7 +14,7 @@ end $$;
 
 -- ======================================================================== 20261110001000_no_texts_plan_proof.sql
 -- ======================================================================== 1) no text reminders
-delete from private.features where name = 'sms';
+update private.features set name = 'sms_off' where name = 'sms'; -- off for now (kept, renamed, so it can come back)
 update public.plans set features = array_remove(array_remove(features, 'Text message reminders'), 'SMS and WhatsApp reminders')
  where features && array['Text message reminders', 'SMS and WhatsApp reminders'];
 update public.load_products set active = false where code like 'texts\_%';

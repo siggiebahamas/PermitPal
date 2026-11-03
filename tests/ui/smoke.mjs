@@ -576,6 +576,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   // Customer: accept, pay.
   await go(orderHash);
   check('order: the quote adds up', (await page.textContent('.qline.total')).includes('6,700'));
+  check('order: before paying, the customer reads who is responsible after filing', /after filing, .*a government office, alone decides how long it takes/i.test(await page.textContent('.gov-consent'))
+    && /not responsible for the office's delays/.test(await page.textContent('.gov-consent')));
+  await page.click('[data-act=quote-accept]'); await page.waitForTimeout(200);
+  check('order: the quote cannot be accepted without ticking it', /Tick the box first/.test(await page.textContent('#toast')) && (await page.locator('#modal-root .modal').count()) === 0);
+  await page.check('[data-gov-ok]');
   await page.click('[data-act=quote-accept]'); await page.click('.modal button[type=submit]'); await page.waitForTimeout(400);
   check('order: after accepting, payment details show', (await page.locator('.pay-form').count()) === 1 && /0917 000 0000/.test(await page.textContent('.paywiths')));
   check('order: the payment QR shows next to GCash and bank, with how to use it', (await page.locator('.payqr img[src^="data:image/png"]').count()) === 1 && /scan this code/.test(await page.textContent('.payqr')));
@@ -595,7 +600,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.fill('.admin-renewal [name=expires_on]', '2027-12-31');
   await page.click('.admin-renewal button'); await page.click('.modal button[type=submit]'); await page.waitForTimeout(400);
   await go(orderHash);
-  check('order: done, and the new permit is linked', /Done\./.test(await page.textContent('main .banner')) && (await page.locator('.stepper li.done').count()) === 5);
+  check('order: done, and the new permit is linked', /Done\./.test(await page.textContent('main .banner')) && (await page.locator('.stepper li.done').count()) === 6);
   await go('#/requirement/' + mpId);
   check('order: the permit now shows the new record and a fresh checklist', /MP-2027-0001/.test(await page.textContent('main .kv')) && (await page.textContent('.ck-count')).includes('0 of 6'));
   await go('#/services');
@@ -772,6 +777,41 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   await page.click('.modal [data-modal-close]');
   check('photo: no JavaScript or security-policy errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.close();
+}
+
+// Who is responsible: the government office's name, its legal clock and the blame line, where people look.
+{
+  for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+    const page = await browser.newPage({ viewport: vp }); const errs = [];
+    page.on('pageerror', (e) => errs.push(e.message)); page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+    await page.addInitScript(() => { globalThis.PP_FILED = true; });
+    const L = vp.width;
+    await page.goto('http://localhost:4173/#/'); await page.waitForSelector('main h1, main .home-next');
+    const home = await page.textContent('[data-gov-wait]');
+    check(`liability ${L}: Home lists what waits on government offices, by office, with the legal deadline`, /Waiting on government offices/.test(home) && /DTI \(Business Name Registration System\)/.test(home)
+      && /must act by/.test(home) && /Delays from here are the office's, not Pinoy Permit's/.test(home));
+    check(`liability ${L}: a late office is named as late on Home`, /PhilGEPS is \d+ working days? late/.test(home) && (await page.locator('[data-gov-wait] .gw-row.late').count()) === 1);
+    const top = await page.evaluate(() => { const g = document.querySelector('[data-gov-wait]').getBoundingClientRect(); const n = document.querySelector('.home-next').getBoundingClientRect(); return g.top < n.top; });
+    check(`liability ${L}: it sits above Next actions, easy to see`, top);
+    await page.evaluate(() => { location.hash = '#/services/orders/ord-pg'; }); await page.waitForSelector('main .resp');
+    const o = await page.textContent('main .resp');
+    check(`liability ${L}: the order says who is responsible now: the office, and that our part is done`, /Who is responsible right now/.test(o) && /Pinoy Permit's part is done/.test(o)
+      && (await page.locator('main .resp .who-steps li.now.who-gov').count()) === 1 && /Responsible now/.test(await page.textContent('main .resp .who-steps li.now')));
+    check(`liability ${L}: a late office: "This delay is PhilGEPS's, not Pinoy Permit's"`, /This delay is PhilGEPS's, not Pinoy Permit's/.test(o) && /working days? late/.test(await page.textContent('main .gclock-state')));
+    check(`liability ${L}: what each side answers for, and that we are not liable for the office`, /Pinoy Permit is responsible for/.test(o) && /PhilGEPS is responsible for/.test(o)
+      && /not liable for their delays, decisions, outages, added requirements, fees or penalties/.test(o));
+    check(`liability ${L}: the stepper shows "With PhilGEPS" as its own step`, /With PhilGEPS/.test(await page.textContent('main .stepper')));
+    await page.evaluate(() => { location.hash = '#/services/orders/ord-dti'; }); await page.waitForSelector('main .gclock');
+    check(`liability ${L}: an office on time shows day n of N and the legal deadline`, /Day \d of 3/.test(await page.textContent('main .gclock-state')) && /must act by/.test(await page.textContent('main .gclock-line')) && /RA 11032/.test(await page.textContent('main .gclock-line')));
+    await page.evaluate(() => { location.hash = '#/services'; }); await page.waitForSelector('main .who-card');
+    check(`liability ${L}: Done for you explains who is responsible for what, near the top`, /Who is responsible for what/.test(await page.textContent('main .who-card')) && (await page.locator('main [data-gov-wait]').count()) === 1);
+    const card = await page.locator('main .svc', { hasText: 'PhilGEPS Platinum renewal' }).first().textContent();
+    check(`liability ${L}: each service card splits our part from the government's part`, /Our part/.test(card) && /We file within 2 working days/.test(card) && /Then the government's part/.test(card) && /not ours/.test(card));
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    check(`liability ${L}: no sideways scrolling`, over <= 1, String(over));
+    check(`liability ${L}: no JavaScript errors`, errs.length === 0, errs.slice(0, 3).join(' | '));
+    await page.close();
+  }
 }
 
 // Text messages: who can get them, verifying a number with a code, changing and removing it.
@@ -1021,6 +1061,7 @@ const go2 = async (page, h) => { await page.evaluate((x) => { location.hash = x;
   check('admin: the set-up job shows the "join their workspace" card, waiting for consent', /haven't agreed to access yet/.test(await page.textContent('main')));
   await page.fill('.admin-quote [name=fee]', '2000'); await page.click('.admin-quote button'); await page.waitForTimeout(400);
   await go(setupHash);
+  await page.check('[data-gov-ok]');
   await page.click('[data-act=quote-accept]'); await page.waitForTimeout(200);
   check('jobs: accepting a set-up quote needs the access tick first', /Tick the box to let Pinoy Permit join/.test(await page.textContent('#toast')) && (await page.locator('#modal-root .modal').count()) === 0);
   await page.check('[data-access-ok]'); await page.click('[data-act=quote-accept]'); await page.click('#modal-root button[type=submit]'); await page.waitForTimeout(500);
@@ -2345,9 +2386,10 @@ for (const [label, vp] of [['desktop', { width: 1280, height: 860 }], ['phone', 
   await page.click('.modal [data-modal-close]');
   await go('#/admin'); await page.click('[data-act=admin-tab][data-tab=orders]'); await page.waitForTimeout(600);
   await page.click('[data-act=admin-order][data-id=ord1]'); await page.waitForTimeout(500);
-  check('admin: an order we filed offers to start the clock', (await page.locator('[data-act=adm-clock-start]').count()) === 1);
-  await page.click('[data-act=adm-clock-start]'); await page.waitForSelector('.modal');
-  await page.fill('.modal [name=office]', 'BFP Mandaue'); await page.fill('.modal [name=reference_no]', 'FSIC-88'); await submit(700);
+  check('admin: a paid order offers "Mark as filed", which hands it to the office', (await page.locator('.admin-filed').count()) === 1 && /hands responsibility to the office/.test(await page.textContent('.adm-filed')));
+  await page.fill('.admin-filed [name=agency]', 'BFP Mandaue'); await page.fill('.admin-filed [name=days]', '7'); await page.fill('.admin-filed [name=ref]', 'FSIC-88');
+  await page.click('.admin-filed button'); await page.waitForTimeout(700);
+  check('admin: after filing, staff see it is with the office and its deadline', /With BFP Mandaue since/.test(await page.textContent('main')) && (await page.locator('.admin-filed').count()) === 0);
   const fsicId = await page.evaluate(async () => (await import('/__mock/mock-data.js')).__office.filings.find((f) => f.request_id === 'ord1')?.requirement_id);
   await go('#/requirement/' + fsicId); await openMore(page); await page.waitForSelector('#clock');
   check('clock: on an order we filed, the customer sees the clock and that we follow up', /BFP Mandaue/.test(await page.textContent('#clock')) && /Pinoy Permit filed this for you/.test(await page.textContent('#clock'))

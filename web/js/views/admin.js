@@ -162,7 +162,17 @@ function orderDetail(a, events) {
       <form class="admin-steps" data-id="${a.id}"><ol class="job-steps">${steps.map((t, i) => html`<li class="${i < (a.steps_done || 0) ? 'done' : ''}"><label class="check"><input type="radio" name="done" value="${i + 1}" ${a.steps_done === i + 1 ? 'checked' : ''}><span>${t}</span></label></li>`)}</ol>
         <label class="check"><input type="radio" name="done" value="0" ${!a.steps_done ? 'checked' : ''}><span>None done yet</span></label>
         <button class="btn btn-sm btn-soft">Save progress</button></form></section>`)}
-    ${clockStartButton(a)}
+    ${has('govclock') ? when(!closed && !['filed', 'submitted'].includes(a.status), html`<section class="card adm-filed"><h2>Filed with the government office?</h2>
+      <p class="muted small">Do this the day you file. It hands responsibility to the office: the customer sees "Pinoy Permit's part is done, now with ${svc?.agency || 'the office'}", the office's legal deadline and a clock, by email and in the app. Attach the office's acknowledgment or receipt.</p>
+      <form class="admin-filed" data-id="${a.id}"><div class="grid2">
+        <label class="field"><span>Government office</span><input name="agency" maxlength="120" required value="${svc?.agency || a.location_label || ''}" placeholder="e.g. DTI (Business Name Registration System)"></label>
+        <label class="field"><span>Its legal processing time (working days)</span><input name="days" type="number" min="1" max="60" required value="${svc?.agency_days || 3}"></label>
+        <label class="field"><span>Day filed</span><input name="filed_on" type="date" required max="${todayPH()}" value="${todayPH()}"></label>
+        <label class="field"><span>Office's reference no.</span><input name="ref" maxlength="120"></label></div>
+        <label class="field"><span>The office's acknowledgment / filing receipt</span><input type="file" name="file" accept=".pdf,image/*"></label>
+        <button class="btn btn-primary">Mark as filed: now with the office</button></form></section>`)
+      : clockStartButton(a)}
+    ${when(a.status === 'filed', html`<section class="card"><h2>With ${a.agency} since ${fmtDate(a.filed_on)}</h2><p class="muted small">Legal deadline ${fmtDate(a.agency_due_on)} (${a.agency_days} working days)${a.agency_ref ? ` · Ref ${a.agency_ref}` : ''}. When the office releases it, save it below.</p></section>`)}
     ${when(rev && svc?.needs_access && !closed, html`<section class="card"><h2>Their workspace</h2>
       ${a.staff_access ? html`<p class="muted small">The customer agreed to give you temporary access. You join as a plain member; it ends automatically when you mark this order completed.</p>
         <button class="btn btn-sm ${paid ? 'btn-primary' : 'btn-soft'}" data-act="admin-join" data-id="${a.id}" ${paid ? '' : 'disabled'}>${paid ? 'Join their workspace' : 'Join (after payment)'}</button>`
@@ -436,6 +446,11 @@ function wire(el) {
     if (fd.get('status') === 'cancelled' && !(await confirmDialog('Cancel this order?', 'The customer is told it was cancelled. Refund anything they paid separately.', { confirmLabel: 'Cancel order' }))) return;
     await db.adminUpdateOrder(order(f), { status: fd.get('status'), message, file: fd.get('file'), govActual: fd.get('gov'), provider: String(fd.get('provider')).trim() });
     toast('Update sent.'); rerender();
+  });
+  submit('.admin-filed', async (f, fd) => {
+    const v = Object.fromEntries(fd.entries());
+    await db.adminMarkFiled(order(f), { agency: String(v.agency).trim(), days: v.days, filed_on: v.filed_on, ref: String(v.ref || '').trim(), file: fd.get('file') });
+    toast('Marked as filed. The customer was told it is now with the office, with its legal deadline.'); rerender();
   });
   submit('.admin-refund', async (f, fd) => {
     const v = Object.fromEntries(fd.entries());

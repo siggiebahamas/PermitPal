@@ -7,6 +7,7 @@ import { html, fmtDate, fmtDateTime, peso, toast, toastError, confirmDialog, whe
 import { S, on, go, reload, canEdit, has, reqById, service, serviceFor, offered, IN_PERSON, business, vehicle, person, empty, careOf, coverOf, tierOf, location_ } from '../core.js';
 import { byPriority, subjectLabel, dueShort, ICON } from '../components.js';
 import { serviceStrip } from './pricing.js';
+import { whoPanel, waitingCard, agencyOf, loadHolidays, paintWaiting, liability } from './govclock.js';
 import * as db from 'pp/data';
 
 // Customer-facing names for each stage of an order.
@@ -16,7 +17,8 @@ export const ORDER_STATUS = {
   matching: ['Finding a provider', 'progress'],
   provider_contacted: ['Provider contacted', 'progress'],
   awaiting_customer: ['Waiting for you', 'soon'],
-  in_progress: ['In progress', 'progress'],
+  in_progress: ['Pinoy Permit is filing', 'progress'],
+  filed: ['Filed: now with the government', 'progress'],
   completed: ['Completed', 'ok'],
   cancelled: ['Cancelled', 'overdue'],
 };
@@ -41,10 +43,10 @@ const CATEGORIES = IN_PERSON ? [
 // What people can count on, in plain sentences (not badges).
 const PROMISES = [
   ['peso', 'You see the price first.', 'Nothing starts, and nothing is charged, until you say yes.'],
+  ['file', 'We prepare and file. The office decides.', "You pay us to prepare your papers and file them. Once filed, the government office alone controls how long it takes and whether it approves."],
+  ['calendar', "You see the office's legal deadline.", "From the day we file, a clock shows the office's time limit under RA 11032, and says plainly if the office is late."],
   ['file', 'Government fees at cost.', 'Exactly what the office charges, with the official receipt. If it ends up lower, we refund the difference.'],
-  ['list', 'You can follow every step.', 'Updates, messages and receipts are all here.'],
-  ['check', 'Your new permit is saved for you.', 'And your reminders start again for next time.'],
-  ['handshake', "If we can't file it, you get our fee back.", "Once it's filed, the office sets the pace. We follow up and tell you each step."],
+  ['handshake', "If we can't file it, you get our fee back.", 'In full. That is our part, and we stand by it.'],
 ];
 // The weight we take off: the same four chores, on your own and with us.
 const CALM = [
@@ -54,8 +56,8 @@ const CALM = [
   ["Remember next year's deadline", 'Your new permit is saved, and next year is already on your calendar'],
 ];
 // How it works, in three steps.
-const STEPS = [['Pick a service', 'From the list below.'], ['Get your price', 'Within 1 business day.'], ['We do it', 'You can follow each step here.']];
-const FINE_PRINT = 'Pinoy Permit acts as your authorized representative, only with your written authorization, and follows each office\'s standard process. We never pay anyone to speed things up: that is against the law (RA 11032). Processing times are set by the government office.';
+const STEPS = [['Pick a service', 'From the list below.'], ['Get your price', 'Within 1 business day.'], ['We prepare and file', 'Then the government office processes it, on its own clock.']];
+const FINE_PRINT = 'Pinoy Permit acts as your authorized representative, only with your written authorization, and follows each office\'s standard process. Our service is preparing and filing. After filing, the government office alone controls processing time, approval, denial, added requirements, system outages, fees and penalties; Pinoy Permit is not liable for any of these. We never pay anyone to speed things up: that is against the law (RA 11032).';
 let settingsCache = null;
 const settings = async () => (settingsCache ||= await db.appSettings().catch(() => ({})));
 export const paySettings = settings;
@@ -96,6 +98,7 @@ export function services(el, params) {
     <div class="page-head"><div><h1>Done for you</h1>
       <p class="page-sub">${IN_PERSON ? 'Busy? We do the paperwork and the lines. You just say yes.' : 'Busy? We do the paperwork online. You just say yes.'}</p></div>
       ${when(many.length > 1, html`<button class="btn btn-primary" data-act="svc-bulk">Renew ${many.length} for me</button>`)}</div>
+    ${waitingCard({ title: 'Waiting on government offices' })}
     <section class="dfy-calm" aria-labelledby="dfy-calm-h">
       <div class="dfy-calm-top"><span class="dfy-calm-kicker">Peace of mind, handled</span>
         <h2 id="dfy-calm-h">Your permits, off your mind.</h2>
@@ -105,12 +108,14 @@ export function services(el, params) {
         <div class="dfy-calm-col is-us"><h3>With Pinoy Permit</h3><ul>${CALM.map(([, b]) => html`<li>${b}</li>`)}</ul></div>
       </div>
       <div class="dfy-calm-foot"><a class="btn btn-primary" href="#svc-menu" data-scroll-to="svc-menu">See what we can do</a>
-        <span>You approve the price before we start. Online work only, so nothing waits on a queue.</span></div>
+        <span>You approve the price before we start. We prepare and file; the government office processes it on its own time.</span></div>
     </section>
     <section class="card dfy-how"><div class="dfy-how-col"><h2>How it works</h2>
         <ol class="dfy-steps">${STEPS.map(([t, d], i) => html`<li><span class="dfy-n">${i + 1}</span><b>${t}</b><span>${d}</span></li>`)}</ol></div>
       <div class="dfy-how-col"><h2>What you can count on</h2>
         <ul class="dfy-promises">${PROMISES.map(([ic, t, d]) => html`<li><span class="dfy-p-ic" aria-hidden="true">${ICON[ic] || ICON.check}</span><span><b>${t}</b> ${d}</span></li>`)}</ul></div></section>
+    ${when(has('govclock'), html`<section class="card who-card" aria-labelledby="who-all-h"><div class="card-head"><div><h2 id="who-all-h">Who is responsible for what</h2>
+      <p class="card-sub">We prepare and file. The government office processes and decides. <a href="terms.html#government" target="_blank" rel="noopener">The full terms</a></p></div></div>${liability()}</section>`)}
     ${due.map((i) => html`<div class="banner ${i.due_on < todayPH() ? 'warn' : 'info'}"><div><b>Year-round care bill ${i.number}:</b> ${peso(i.amount_php)}${i.first ? ', coverage starts when it\'s paid' : `, due ${fmtDate(i.due_on)}`}.</div>
       <div class="banner-actions"><a class="btn btn-sm btn-primary" href="#/care?pay=${i.id}">Pay</a></div></div>`)}
     ${when(rev && IN_PERSON, careTeaser())}
@@ -140,6 +145,7 @@ export function services(el, params) {
       <a href="terms.html#services" target="_blank" rel="noopener">Done-for-you terms</a></section>
     ${serviceStrip()}`);
   el.querySelectorAll('[data-scroll-to]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); document.getElementById(a.dataset.scrollTo)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
+  paintWaiting(el);
   // Links from a permit page or a notification open the request form straight away.
   const pre = params?.get('req');
   if (pre && canEdit()) { history.replaceState(null, '', '#/services'); const r = reqById(pre); if (r) openRequest(serviceFor(r)?.code, { requirementId: r.id }); }
@@ -166,7 +172,8 @@ function serviceCard(s, tag) {
     ${tag ? html`<span class="svc-tag">${ICON[tag[1]] || ICON.check}${tag[0]}</span>` : ''}
     <h2>${s.name}</h2>
     <div class="svc-price"><b>${price(s)}</b><small>${s.price_unit}</small></div>
-    <div class="svc-chips">${s.turnaround ? html`<span class="svc-chip">${ICON.calendar}${s.turnaround}</span>` : ''}</div>
+    <div class="svc-chips">${s.turnaround ? html`<span class="svc-chip svc-ours">${ICON.calendar}<span><small>Our part</small>${s.turnaround}</span></span>` : ''}
+      ${has('govclock') && s.agency ? html`<span class="svc-chip svc-gov">${ICON.building}<span><small>Then the government's part</small><b>${s.agency}</b> processes it${s.agency_days ? `, by law within ${plural(s.agency_days, 'working day')}` : ''}. Its speed and decision are ${s.agency.split(' (')[0]}'s, not ours.</span></span>` : ''}</div>
     <details class="svc-more"><summary>What you get</summary><p class="svc-sum">${s.summary}</p>
       <ul class="svc-inc">${(s.includes || []).map((i) => html`<li>${ICON.check}<span>${i}</span></li>`)}</ul>
       ${when(has('revenue') && Number(s.rush_fee) > 0, html`<p class="svc-rush"><b>In a hurry?</b> Add ${peso(s.rush_fee)} and we file within 1 business day.</p>`)}</details>
@@ -178,9 +185,10 @@ function orderLine(a) {
   const [label, cls] = ORDER_STATUS[a.status] || [a.status, 'needinfo'];
   const care = a.care_plan_id && has('revenue');
   const action = a.status === 'quoted' ? 'Review quote' : a.payment_status === 'awaiting_payment' && isOpen(a) ? 'Pay now' : 'Open';
+  const shown = a.status === 'filed' ? `With ${agencyOf(a).split(' (')[0]} (government)` : label;
   return html`<a class="line" href="#/services/orders/${a.id}"><span class="line-main"><b>${a.kind === 'apply' ? 'New: ' : ''}${a.requirement_name}</b>
     <small>${a.subject_label} · ${care ? (a.created_by ? 'included in your care plan' : 'started by Year-round care') : 'sent'} ${timeAgo(a.created_at)}${a.quote_php != null ? ' · ' + peso(a.quote_php) : ''}</small></span>
-    <span class="chip ${cls}">${label}</span><span class="btn btn-sm ${['Review quote', 'Pay now'].includes(action) ? 'btn-primary' : 'btn-soft'}">${action}</span></a>`;
+    <span class="chip ${cls}">${shown}</span><span class="btn btn-sm ${['Review quote', 'Pay now'].includes(action) ? 'btn-primary' : 'btn-soft'}">${action}</span></a>`;
 }
 
 // ---------------------------------------------------------------- asking for a quote
@@ -316,14 +324,14 @@ export async function order(el, id) {
   if (!a) { el.innerHTML = String(empty('Request not found', 'It may belong to another workspace.', html`<a class="btn btn-primary" href="#/services">Back to Done for you</a>`)); return; }
   el.innerHTML = String(html`<div class="loading">Loading…</div>`);
   let ev = [], st = {}, refunds = [];
-  try { [ev, st, refunds] = await Promise.all([db.orderEvents(id), settings(), db.orderRefunds(id).catch(() => [])]); } catch (e) { toastError(e); }
+  try { [ev, st, refunds] = await Promise.all([db.orderEvents(id), settings(), db.orderRefunds(id).catch(() => []), loadHolidays()]); } catch (e) { toastError(e); }
   if (!location.hash.includes(id)) return;
   const [label, cls] = ORDER_STATUS[a.status] || [a.status, 'needinfo'];
   const s = service(a.service_code);
   const closed = !isOpen(a);
-  const stage = a.status === 'cancelled' ? -1 : a.status === 'completed' ? 5 // every step ticked
-    : ['paid', 'waived'].includes(a.payment_status) ? 3 : a.accepted_at ? 2 : a.quoted_at ? 1 : 0;
-  const steps = ['Request sent', 'Quote', 'Payment', 'In progress', 'Done'];
+  const stage = a.status === 'cancelled' ? -1 : a.status === 'completed' ? 6 // every step ticked
+    : a.status === 'filed' ? 4 : ['paid', 'waived'].includes(a.payment_status) ? 3 : a.accepted_at ? 2 : a.quoted_at ? 1 : 0;
+  const steps = ['Request sent', 'Quote', 'Payment', 'We prepare & file', `With ${agencyOf(a).split(' (')[0]}`, 'Done'];
   const r = a.requirement_id ? reqById(a.requirement_id) : null;
   const rev = has('revenue');
   const care = rev && a.care_plan_id;
@@ -334,6 +342,7 @@ export async function order(el, id) {
     <a class="back" href="#/services">← Done for you</a>
     <div class="page-head"><div><h1>${a.requirement_name}</h1><p class="muted">${KIND_LABEL[a.kind] || 'Request'} · ${a.subject_label}${a.location_label ? ' · ' + a.location_label : ''}${a.rush ? ' · Urgent' : ''}${care ? (a.created_by ? ' · Included in your care plan' : ' · Year-round care') : ''}</p></div>
       <div class="head-side"><span class="chip lg ${cls}">${label}</span></div></div>
+    ${when(isOpen(a) && (a.status === 'filed' || ['paid', 'waived'].includes(a.payment_status) || a.status === 'quoted'), whoPanel(a))}
     ${when(stage >= 0, html`<ol class="stepper" aria-label="Progress">${steps.map((t, i) => html`<li class="${i < stage ? 'done' : i === stage ? 'now' : ''}" ${i === stage ? 'aria-current="step"' : ''}><span>${i < stage ? '✓' : i + 1}</span>${t}</li>`)}</ol>`)}
 
     ${when(a.status === 'submitted', care && !a.created_by
@@ -344,7 +353,7 @@ export async function order(el, id) {
     ${when(access && !closed, html`<div class="banner info"><div><b>Pinoy Permit has access to ${S.org.name}</b> to do this set-up. It ends automatically when this order is done. <a href="#/team">Remove it now</a></div></div>`)}
     ${when(a.status === 'quoted', quoteBox(a))}
     ${when(['awaiting_payment', 'pending_verification'].includes(a.payment_status) && !closed, payBox(a, st))}
-    ${when(['paid', 'waived'].includes(a.payment_status) && !closed, html`<div class="banner progress"><div><b>We're working on it.</b> Sign and upload the authorization letter below if you haven't yet. We'll post every update here.</div></div>`)}
+    ${when(['paid', 'waived'].includes(a.payment_status) && !closed && a.status !== 'filed', html`<div class="banner progress"><div><b>We're preparing and filing it.</b> Sign and upload the authorization letter below if you haven't yet. We'll post every update here, including the day we file.</div></div>`)}
     ${when(a.status === 'completed', html`<div class="banner ok-banner"><div><b>Done.</b> ${r ? html`The new record is saved to <a href="#/requirement/${r.id}">${r.name}</a>.` : 'Your documents are attached below.'}</div></div>`)}
     ${when(a.admin_note && !closed && a.status !== 'quoted', html`<div class="banner warn"><div><b>From Pinoy Permit:</b> ${a.admin_note}</div></div>`)}
 
@@ -421,11 +430,13 @@ function quoteBox(a) {
     <div class="qline"><span>Government fees <small class="muted">(estimate, paid at cost with official receipts)</small></span><b>${peso(a.quote_gov_fees)}</b></div>
     <div class="qline total"><span>Total</span><b>${peso(a.quote_php)}</b></div>
     ${when(a.quote_note, html`<p class="quote-note pre">${a.quote_note}</p>`)}
+    ${when(has('govclock') && canEdit(), html`<label class="check consent gov-consent"><input type="checkbox" data-gov-ok>
+      <span><b>I understand:</b> Pinoy Permit prepares and files this. After filing, <b>${agencyOf(a)}</b>, a government office, alone decides how long it takes and whether it is approved. Pinoy Permit is not responsible for the office's delays, decisions, outages, added requirements, fees or penalties.</span></label>`)}
     ${when(access && canEdit(), html`<label class="check consent"><input type="checkbox" data-access-ok>
       <span>Pinoy Permit may join ${S.org.name} as a team member to set it up. Access ends automatically when the job is done, and I can remove it anytime under Team.</span></label>`)}
     ${when(canEdit(), html`<div class="btn-row qbtns"><button class="btn btn-primary" data-act="quote-accept" data-id="${a.id}">Accept quote</button>
       <button class="btn btn-ghost" data-act="order-cancel" data-id="${a.id}">No thanks</button></div>`)}
-    <div class="sheet-foot">If the government fees end up lower, we refund the difference. If they are higher, we ask you before paying. If we can't file it, the service fee is refunded in full. Once filed, the office decides how long it takes.</div>
+    <div class="sheet-foot">If the government fees end up lower, we refund the difference. If they are higher, we ask you before paying. If we can't file it, the service fee is refunded in full. Once filed, the government office alone decides how long it takes and whether it approves.</div>
   </section>`;
 }
 
@@ -449,10 +460,12 @@ function payBox(a, st) {
 on('quote-accept', async (ds) => {
   const a = S.data.requests.find((x) => x.id === ds.id);
   if (!a) return;
+  const gov = document.querySelector('[data-gov-ok]');
+  if (gov && !gov.checked) { gov.closest('label').classList.add('need'); gov.focus(); return toast('Tick the box first: after filing, the government office decides the timing and the result.', 'error'); }
   const box = document.querySelector('[data-access-ok]');
   if (box && !box.checked) { box.closest('label').classList.add('need'); box.focus(); return toast('Tick the box to let Pinoy Permit join for the set-up first.', 'error'); }
   if (!(await confirmDialog('Accept this quote?', `Total ${peso(a.quote_php)}. Next you'll pay, then we start.`, { confirmLabel: 'Accept quote', danger: false }))) return;
-  try { await db.acceptQuote(ds.id, !!box?.checked); await reload(); toast(Number(a.quote_php) ? 'Quote accepted. Pay below to get started.' : 'Accepted. We\'re starting now.'); } catch (e) { toastError(e); }
+  try { if (gov) await db.acceptGovTerms(ds.id); await db.acceptQuote(ds.id, !!box?.checked); await reload(); toast(Number(a.quote_php) ? 'Quote accepted. Pay below to get started.' : 'Accepted. We\'re starting now.'); } catch (e) { toastError(e); }
 });
 on('order-cancel', async (ds) => {
   if (!(await confirmDialog('Cancel this request?', 'We will stop working on it. Nothing has been charged.', { confirmLabel: 'Cancel request', cancelLabel: 'Keep it' }))) return;

@@ -3,6 +3,7 @@ import { html, fmtDate, fileSize, plural, toCsv, download, todayPH, toastError }
 import { S, on, hooks, canEdit, empty, has, memberName, careOf, service, IN_PERSON } from '../core.js';
 import { assignable, bulk, bulkBar } from './assign.js';
 import { filingsBrief } from './filings.js';
+import { waitingCard, paintWaiting } from './govclock.js';
 import { STATUS, reqRow, statTiles, counts, byPriority, subjectLabel, dueShort, duePill, ICON } from '../components.js';
 import { accountantCard } from './brand.js';
 import { cityDashBanner } from './citydates.js';
@@ -33,6 +34,7 @@ export function dashboard(el) {
   el.innerHTML = String(html`
     ${phoneCard()}
     ${homeCal(first, c)}
+    ${waitingCard()}
     ${cityDashBanner()}
     ${statTiles(c)}
     ${careNudge(open)}
@@ -46,6 +48,7 @@ export function dashboard(el) {
   `);
   filingsBrief(el.querySelector('[data-filings-brief]'));
   revealPhoneCard(el);
+  paintWaiting(el);
 }
 const when_ = (c, v) => (c ? v : '');
 

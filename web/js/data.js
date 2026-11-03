@@ -549,6 +549,12 @@ export const requestServicesBulk = async (f) => ok(await sb.rpc('request_service
   p_org: f.org_id, p_reqs: f.requirement_ids, p_rush: !!f.rush, p_contact_method: f.contact_method || 'email',
   p_contact_value: f.contact_value || null, p_notes: f.notes || null, p_consent: !!f.consent,
 }));
+export const acceptGovTerms = async (reqId) => ok(await sb.rpc('accept_gov_terms', { p_req: reqId }));
+export async function adminMarkFiled(a, { agency, days, filed_on, ref, file }) {
+  const up = file && file.size ? await uploadRequestFile(a.org_id, a.id, file) : null;
+  return ok(await sb.rpc('admin_mark_filed', { p_req: a.id, p_agency: agency, p_days: Number(days), p_filed_on: filed_on, p_ref: ref || null,
+    p_file_path: up?.path || null, p_file_name: up?.name || null }));
+}
 export const adminOrderStep = async (reqId, done) => ok(await sb.rpc('admin_order_step', { p_req: reqId, p_done: done }));
 export const adminJoinWorkspace = async (reqId) => ok(await sb.rpc('admin_join_workspace', { p_req: reqId }));
 

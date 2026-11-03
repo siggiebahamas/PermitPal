@@ -15,6 +15,7 @@ import { officeData, clockCard, billsCard, watchOffice } from './office.js';
 import { packetCard, loadPackets, watchPacket } from './packet.js';
 import { cityBanner, cityOf, cityRule, cityExtensions } from './citydates.js';
 import { loadFileAccess, fileAccess, lockBox } from './fileguard.js';
+import { whoPanel } from './govclock.js';
 import * as db from 'pp/data';
 
 let detail = null;       // { id, cycles, documents, activity }
@@ -168,6 +169,7 @@ function page(r) {
         </div>`)}
       </div>`)}
 
+    ${(() => { const o = r.open_request_id && (S.data.requests || []).find((x) => x.id === r.open_request_id); return o && ['filed', 'in_progress'].includes(o.status) ? whoPanel(o, { compact: true }) : ''; })()}
     ${cityBanner(r)}
     ${when(t?.help_text, html`<p class="help-text">${t?.help_text}</p>`)}
     ${['action_required', 'renew_soon'].includes(r.status) ? penaltyNote(r) : ''}
