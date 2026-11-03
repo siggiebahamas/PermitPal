@@ -137,16 +137,16 @@ export const TIERS = {
   core: { icon: ICON.briefcase, name: 'Core', who: 'For households and small businesses', range: 'Up to 15 businesses and vehicles together', users: 'Up to 3 users (you + 2 staff)', kind: 'business',
     per: 15,
     checks: ['Group by business and branch', 'One dashboard, reminders and renewal tasks for everything', 'Text message reminders', 'Pinoy Permit Plus included', 'Everything in Plus'] },
-  multi: { icon: ICON.car, name: 'Multi-Vehicle', who: 'For big households and small fleets', range: '16 to 30 vehicles', users: 'Up to 3 users', kind: 'fleet',
+  multi: { icon: ICON.car, name: 'Multi-Vehicle', who: 'For big households and small fleets', range: 'Up to 30 vehicles', users: 'Up to 3 users', kind: 'fleet',
     per: 30,
     checks: ['Up to 20 files for each vehicle', 'Fleet board: who can’t drive today', 'Status and history for every vehicle', 'Includes up to 3 business records', 'Everything in Core'] },
-  fleet: { icon: ICON.car, name: 'Fleet', who: 'For companies with many vehicles', range: '31 to 75 vehicles', users: 'Up to 5 users', kind: 'fleet',
+  fleet: { icon: ICON.car, name: 'Fleet', who: 'For companies with many vehicles', range: 'Up to 75 vehicles', users: 'Up to 5 users', kind: 'fleet',
     per: 75,
     checks: ['Filter by plate, status, expiry and business', 'Import vehicles from a spreadsheet', 'A renew-this-month list', 'Includes up to 3 business records', 'Everything in Multi-Vehicle'] },
-  fleet_pro: { icon: ICON.car, name: 'Fleet Pro', who: 'For large fleets', range: '76 to 150 vehicles', users: 'Up to 10 users', kind: 'fleet',
+  fleet_pro: { icon: ICON.car, name: 'Fleet Pro', who: 'For large fleets', range: 'Up to 150 vehicles', users: 'Up to 10 users', kind: 'fleet',
     per: 150,
     checks: ['Fleet-wide renewal planning', 'Export for your records', 'Includes up to 3 business records', 'Everything in Fleet'] },
-  enterprise: { icon: ICON.grid, name: 'Enterprise', who: 'For the biggest fleets', range: '151 or more vehicles', users: 'Users agreed in your quote', kind: 'fleet', quote: true,
+  enterprise: { icon: ICON.grid, name: 'Enterprise', who: 'For the biggest fleets', range: 'More than 150 vehicles', users: 'Users agreed in your quote', kind: 'fleet', quote: true,
     checks: ['A written plan and quote for your fleet', 'We show the cost per vehicle in your quote', 'Tracking and planning software, like every plan'] },
 };
 export const TIER_SMALL = ['plus', 'core'];
@@ -157,8 +157,8 @@ export const tierPrice = (plans, id) => (id === 'plus' ? PLUS_MONTHLY : Number(p
 // Plans the database sells now (Plus is an add-on, always there; Enterprise is quoted).
 export const tiersShown = (plans, ids) => (plans?.length ? ids.filter((id) => id === 'plus' || id === 'enterprise' || plans.some((p) => p.id === id && p.available !== false)) : ids);
 
-// "16 to 30 vehicles" → the number part big, the words small, so the size of the plan reads at a glance.
-const bigLead = (txt) => { const m = /^((?:Up to )?\d+(?: to \d+| or more)?)\s+(.*)$/.exec(txt); return m ? html`<span><b>${m[1]}</b> ${m[2]}</span>` : html`<span>${txt}</span>`; };
+// "Up to 30 vehicles" → the number part big, the words small, so the size of the plan reads at a glance.
+const bigLead = (txt) => { const m = /^((?:Up to |More than )?\d+(?: to \d+| or more)?)\s+(.*)$/.exec(txt); return m ? html`<span><b>${m[1]}</b> ${m[2]}</span>` : html`<span>${txt}</span>`; };
 export function tierCard(id, monthly, cta = '', { current = false } = {}) {
   const t = TIERS[id];
   if (!t) return '';
@@ -256,7 +256,7 @@ export function planCard(id, monthly, cta = '', { current = false, trialLine = t
 // Everything side by side (a tick, a dash, or a few words): the software plans by size.
 const Y = true; const N = false;
 const COMPARE = [
-  ['Businesses and vehicles you can track', '1 + 1', 'Up to 5', 'Up to 15', '16–30 vehicles', '31–75 vehicles', '76–150 vehicles'],
+  ['Businesses and vehicles you can track', '1 + 1', 'Up to 5', 'Up to 15', 'Up to 30 vehicles', 'Up to 75 vehicles', 'Up to 150 vehicles'],
   ['Users (owner included)', '1', '1', '3', '3', '5', '10'],
   ['Files for each business or vehicle', '3', '20', '20', '20', '20', '20'],
   ['Reminders 30, 7 and 1 day before (email and app)', Y, Y, Y, Y, Y, Y],

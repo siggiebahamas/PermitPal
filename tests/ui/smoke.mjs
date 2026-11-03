@@ -1843,9 +1843,9 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const c = await core(page).textContent();
     check(`prices ${label}: Core: ₱799 a month, up to 15 records, 3 users, the per-vehicle figure in whole pesos`, /₱799\s*\/month/.test(c) && /Up to 15 businesses and vehicles together/.test(c)
       && /Up to 3 users/.test(c) && /under ₱55\s*per vehicle a month/.test(c) && !/\.\d\d per vehicle/.test(c), c.replace(/\s+/g, ' ').slice(0, 260));
-    check(`prices ${label}: plan size reads at a glance: the vehicle and user numbers big`, (await page.locator('[data-plan-card=multi] .pp-range2 b').first().textContent()) === '16 to 30'
+    check(`prices ${label}: plan size reads at a glance: the vehicle and user numbers big`, (await page.locator('[data-plan-card=multi] .pp-range2 b').first().textContent()) === 'Up to 30'
       && await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('[data-plan-card=multi] .pp-range2 b')).fontSize) >= 22));
-    check(`prices ${label}: each fleet plan shows its range and per-vehicle figure`, /16 to 30 vehicles/.test(await page.textContent('[data-plan-card=multi]')) && /under ₱50\s*per vehicle a month/.test(await page.textContent('[data-plan-card=multi]'))
+    check(`prices ${label}: each fleet plan shows its range and per-vehicle figure`, /Up to 30 vehicles/.test(await page.textContent('[data-plan-card=multi]')) && !/16 to 30/.test(await page.textContent('main')) && /under ₱50\s*per vehicle a month/.test(await page.textContent('[data-plan-card=multi]'))
       && /under ₱40/.test(await page.textContent('[data-plan-card=fleet]')) && /under ₱35/.test(await page.textContent('[data-plan-card=fleet_pro]')) && /Quoted/.test(await page.textContent('[data-plan-card=enterprise]')));
     check(`prices ${label}: every card says software only`, (await page.locator('#pricing .pp-tier .pp-swonly').count()) === 6);
     const band = await page.textContent('#pricing .pp-peace');

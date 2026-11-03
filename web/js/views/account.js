@@ -556,6 +556,7 @@ function billingSection(pay) {
     <div class="pp-grid three">${freeCard(!paid && !hasPlus() && kind === 'business' ? html`<span class="chip ok">Your plan</span>` : '')}
       ${tiersShown(S.plans, TIER_SMALL).map((id) => tierCard(id, tierPrice(S.plans, id), cta(id), { current: paid ? id === eff : id === 'plus' && hasPlus() && !plusIncluded() }))}</div>
     <h4 class="pp-group-h">For big households and fleets</h4>
+    <p class="pp-anysize">Any plan works for any fleet size. The number on each plan is the most vehicles it holds.</p>
     <div class="pp-grid four">${tiersShown(S.plans, TIER_FLEET).map((id) => tierCard(id, tierPrice(S.plans, id), cta(id), { current: paid && id === eff }))}</div>
     ${peaceBand(S.plans)}
     ${kind === 'property' ? html`<h4 class="pp-group-h">For landlords and malls</h4><div class="pp-grid">${plansShown(S.plans).map((id) => planCard(id, price(id),

@@ -32,8 +32,8 @@ if (globalThis.PP_FEATURES === 'none' || (Array.isArray(globalThis.PP_FEATURES) 
 const LIMITS_ON = globalThis.PP_FEATURES !== 'none' && (!Array.isArray(globalThis.PP_FEATURES) || globalThis.PP_FEATURES.includes('lgus'));
 if (LIMITS_ON) {
   plans.push({ id: 'core', name: 'Core', available: true, paid_channels: true, price_php_monthly: 799, features: ['Up to 15 businesses and vehicles together'] },
-    { id: 'multi', name: 'Multi-Vehicle', available: true, paid_channels: true, price_php_monthly: 1499, features: ['16 to 30 vehicles'] },
-    { id: 'fleet_pro', name: 'Fleet Pro', available: true, paid_channels: true, price_php_monthly: 4999, features: ['76 to 150 vehicles'] },
+    { id: 'multi', name: 'Multi-Vehicle', available: true, paid_channels: true, price_php_monthly: 1499, features: ['Up to 30 vehicles'] },
+    { id: 'fleet_pro', name: 'Fleet Pro', available: true, paid_channels: true, price_php_monthly: 4999, features: ['Up to 150 vehicles'] },
     { id: 'enterprise', name: 'Enterprise', available: false, paid_channels: true, price_php_monthly: null, features: ['151 or more vehicles'] });
   Object.assign(plans.find((p) => p.id === 'fleet'), { price_php_monthly: 2999 });
 }

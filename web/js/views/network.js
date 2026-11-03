@@ -248,7 +248,7 @@ function chooser(el) {
     </section>
     ${billToggle('How often to pay for a team plan')}
     <section class="card tt-menu">
-      ${when(rows.some((r) => r.unit === 'vehicle'), html`<h3 class="tt-group">For fleets</h3>${rows.filter((r) => r.unit === 'vehicle').map(row)}`)}
+      ${when(rows.some((r) => r.unit === 'vehicle'), html`<h3 class="tt-group">For fleets</h3><p class="pp-anysize">Any plan works for any fleet size. The number is the most vehicles each plan holds.</p>${rows.filter((r) => r.unit === 'vehicle').map(row)}`)}
       ${when(rows.some((r) => r.unit === 'site'), html`<h3 class="tt-group">For landlords, franchisors and groups</h3>${rows.filter((r) => r.unit === 'site').map(row)}`)}
       <p class="tt-foot">Every plan: reminders 30, 7 and 1 day before, your team on one screen, 30 days free with no card. Tracking software only:
         <a href="#/services">our team can also do online renewals for you</a>, always with a price first.</p>
