@@ -1839,15 +1839,36 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const order = await page.evaluate(() => { const b = document.querySelector('#pricing .pp-swbanner'); const c = document.querySelector('#pricing [data-plan-card]'); return !!(b && c && (b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING)); });
     check(`prices ${label}: the banner sits directly above the plan cards`, order);
     check(`prices ${label}: Free, Plus and Core, then Multi-Vehicle, Fleet, Fleet Pro and Enterprise, then the property plans`, (await page.locator('#pricing .pp-plan.pp-free').count()) === 1
-      && (await page.locator('#pricing [data-plan-card]').count()) === 8 && (await page.locator('#pricing .pp-tier').count()) === 6);
+      && (await page.locator('#pricing [data-plan-card]').count()) === 8 && (await page.locator('#pricing .pp-tier').count()) === 2 && (await page.locator('#pricing .fp-card').count()) === 3);
     const c = await core(page).textContent();
     check(`prices ${label}: Core: ₱799 a month, up to 15 records, 3 users, the per-vehicle figure in whole pesos`, /₱799\s*\/month/.test(c) && /Up to 15 businesses and vehicles together/.test(c)
       && /Up to 3 users/.test(c) && /under ₱55\s*per vehicle a month/.test(c) && !/\.\d\d per vehicle/.test(c), c.replace(/\s+/g, ' ').slice(0, 260));
-    check(`prices ${label}: plan size reads at a glance: the vehicle and user numbers big`, (await page.locator('[data-plan-card=multi] .pp-range2 b').first().textContent()) === 'Up to 30'
-      && await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('[data-plan-card=multi] .pp-range2 b')).fontSize) >= 22));
-    check(`prices ${label}: each fleet plan shows its range and per-vehicle figure`, /Up to 30 vehicles/.test(await page.textContent('[data-plan-card=multi]')) && !/16 to 30/.test(await page.textContent('main')) && /under ₱50\s*per vehicle a month/.test(await page.textContent('[data-plan-card=multi]'))
-      && /under ₱40/.test(await page.textContent('[data-plan-card=fleet]')) && /under ₱35/.test(await page.textContent('[data-plan-card=fleet_pro]')) && /Quoted/.test(await page.textContent('[data-plan-card=enterprise]')));
-    check(`prices ${label}: every card says software only`, (await page.locator('#pricing .pp-tier .pp-swonly').count()) === 6);
+    check(`prices ${label}: fleet plans show only the most vehicles each holds, big`, (await page.locator('[data-plan-card=multi] .fp-cap b').textContent()) === '30'
+      && /Up to 30 vehicles/.test(await page.textContent('[data-plan-card=multi] .fp-cap')) && /Up to 150 vehicles/.test(await page.textContent('[data-plan-card=fleet_pro] .fp-cap'))
+      && await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('[data-plan-card=multi] .fp-cap b')).fontSize) >= 24) && !/16 to 30|76 to 150/.test(await page.textContent('main')));
+    check(`prices ${label}: fleet cards lead with the monthly price and the yearly saving, not a per-vehicle figure`, /₱1,499\s*\/month/.test(await page.textContent('[data-plan-card=multi] .fp-price'))
+      && /Save ₱2,998 if you pay yearly/.test(await page.textContent('[data-plan-card=multi] .fp-save')) && !/per vehicle a month|\/vehicle/.test(await page.textContent('.fp-row')) && /More than 150 vehicles/.test(await page.textContent('[data-plan-card=enterprise]')));
+    check(`prices ${label}: bigger plans say what they keep, with green checks, and what's NEW in gold`, /Everything in Multi-Vehicle/.test(await page.textContent('[data-plan-card=fleet] .fp-kept'))
+      && /Everything in Fleet/.test(await page.textContent('[data-plan-card=fleet_pro] .fp-kept')) && (await page.locator('[data-plan-card=multi] .fp-kept').count()) === 0
+      && await page.evaluate(() => getComputedStyle(document.querySelector('.fp-pill svg')).stroke === 'rgb(18, 161, 80)')
+      && (await page.locator('[data-plan-card=fleet] .fp-tile.new').count()) === 3 && (await page.locator('[data-plan-card=fleet_pro] .fp-tile.new').count()) === 2);
+    check(`prices ${label}: room to breathe: saving, kept perks and new perks are spaced apart`, await page.evaluate(() => { const c = document.querySelector('[data-plan-card=fleet]');
+      const sv = c.querySelector('.fp-save').getBoundingClientRect(), k = c.querySelector('.fp-kept').getBoundingClientRect(), t = c.querySelector('.fp-tiles').getBoundingClientRect();
+      return k.top - sv.bottom >= 20 && t.top - k.bottom >= 40; }));
+    check(`prices ${label}: no card is singled out; tapping one lights it up with the free trial button`, (await page.locator('.fp-card.on').count()) === 0 && !/recommended|most popular/i.test(await page.textContent('.fp-row')));
+    await page.click('[data-plan-card=fleet] .fp-pick'); await page.waitForTimeout(100);
+    check(`prices ${label}: the picked card glows and says "Try 30 days for free"`, (await page.locator('.fp-card.on').count()) === 1 && (await page.locator('[data-plan-card=fleet].on').count()) === 1
+      && await page.locator('[data-plan-card=fleet] .fp-go a', { hasText: 'Try 30 days for free' }).isVisible() && !(await page.locator('[data-plan-card=multi] .fp-go a').isVisible()));
+    await page.click('[data-plan-card=fleet] [data-perk=import]'); await page.waitForSelector('#modal-root .pk');
+    const pk = await page.textContent('#modal-root');
+    check(`prices ${label}: tapping a perk explains it: meaning, example, why, and which plans have it`, /Spreadsheet import/.test(pk) && /What it means/i.test(pk) && /Example/i.test(pk) && /Why it matters/.test(pk)
+      && (await page.locator('#modal-root .pk-plans .y').count()) === 2 && (await page.locator('#modal-root .pk-plans .n').count()) === 1);
+    await page.click('#modal-root .pk-nav button:last-child'); await page.waitForTimeout(100);
+    check(`prices ${label}: next / previous move through every perk`, /Smart filters/.test(await page.textContent('#modal-root #modal-title')));
+    await page.keyboard.press('Escape');
+    check(`prices ${label}: every perk explained below the plans, with which plans have it`, (await page.locator('#fp-guide .fg-item').count()) === 15 && (await page.locator('#fp-guide .fg-item[data-perk=export] .fg-plans i.y').count()) === 1
+      && (await page.locator('#fp-guide .fg-item[data-perk=board] .fg-plans i.y').count()) === 3);
+    check(`prices ${label}: every card says software only`, (await page.locator('#pricing .pp-tier .pp-swonly').count()) === 2 && /tracking and planning software only/.test(await page.textContent('#pricing .fp-sw')));
     const band = await page.textContent('#pricing .pp-peace');
     check(`prices ${label}: under the plans, "As low as ₱35" per vehicle, with every assumption`, /A little peace of mind, for less than you might think/.test(band) && /As low as\s*₱35\*/.test(band)
       && /billed at the monthly plan price, not as a separate per-car charge/.test(band) && /Core ₱53\.27\/vehicle at 15 vehicles only when all 15 records are vehicles/.test(band) && /Actual cost per vehicle is higher/.test(band));
@@ -1861,7 +1882,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
     const prop = await page.locator('#pricing [data-plan-card=property]').textContent();
     check(`prices ${label}: the Multi-Site Unlimited card stays short: price, 3 benefits, the full list folded`, /₱9,990/.test(prop) && (await page.locator('#pricing [data-plan-card=property] .pp-wins li').count()) === 3
       && (await page.locator('#pricing [data-plan-card] .pp-why, #pricing [data-plan-card] .pp-preview, #pricing [data-plan-card] .pp-bonus').count()) === 0);
-    check(`prices ${label}: per vehicle is its own block, in whole pesos, with no "at 30 vehicles" line`, /^\s*under ₱50\s*per vehicle a month\s*$/.test(await page.locator('[data-plan-card=multi] .pp-per').textContent()));
+    check(`prices ${label}: per vehicle is its own block, in whole pesos, with no "at 15 vehicles" line`, /^\s*under ₱55\s*per vehicle a month\s*$/.test(await page.locator('[data-plan-card=core] .pp-per').textContent()));
     await page.locator('#pricing .bill-toggle input[value=yearly]').first().check({ force: true }); await page.waitForTimeout(150);
     const y = await core(page).textContent();
     check(`prices ${label}: yearly shows 2 months free, the old price crossed out and the saving`, /2 months FREE/i.test(y) && /₱7,990\s*\/year/.test(y) && /Instead of ₱9,588 paying monthly/.test(y) && /You save ₱1,598 a year/.test(y) && !/\/month/.test(y), y.replace(/\s+/g, ' ').slice(0, 220));
@@ -1945,11 +1966,14 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['deskt
   {
     const { page, errs } = await newPage({ PP_TEAM: true }, { width: 390, height: 844 });
     await page.goto('http://localhost:4173/#/network'); await page.waitForSelector('main [data-plan-card]');
-    check('prices team tools: the fleet and property plans, with a trial button each', (await page.locator('main [data-plan-card]').count()) === 5 && (await page.locator('main [data-act=nb-set-kind]').count()) === 5);
+    check('prices team tools: the fleet and property plans, with a trial button each', (await page.locator('main [data-plan-card]').count()) === 6 && (await page.locator('main [data-act=nb-set-kind]').count()) === 5
+      && (await page.locator('main .fp-card').count()) === 3 && (await page.locator('main #fp-guide').count()) === 1);
     check('prices team tools: calm promise (3 steps) beside the yearly saving, then one short plan menu', (await page.locator('main .tt-hero .tt-steps li').count()) === 3
-      && /Save up to ₱19,980/.test(await page.textContent('main .tt-save')) && (await page.locator('main .tt-row').count()) === 5 && /per vehicle/.test(await page.textContent('main .tt-row')));
+      && /Save up to ₱19,980/.test(await page.textContent('main .tt-save')) && (await page.locator('main .tt-row').count()) === 2 && /Up to 75 vehicles/.test(await page.textContent('main [data-plan-card=fleet]')));
     await page.click('main .tt-save-btn'); await page.waitForTimeout(150);
-    check('prices team tools: "See yearly prices" switches every row to the yearly price and its saving', /₱14,990\/yr/.test(await page.textContent('main [data-plan-card=multi]')) && /you save ₱2,998/.test(await page.textContent('main [data-plan-card=multi]')));
+    check('prices team tools: "See yearly prices" switches every row to the yearly price and its saving', /₱14,990\s*\/year/.test(await page.textContent('main [data-plan-card=multi]')) && /You save ₱2,998/.test(await page.textContent('main [data-plan-card=multi]')));
+    await page.click('main [data-plan-card=fleet_pro]'); await page.waitForTimeout(100);
+    check('prices team tools: picking Fleet Pro shows its free trial button', await page.locator('main [data-plan-card=fleet_pro] [data-act=nb-set-kind]', { hasText: 'Try 30 days for free' }).isVisible());
     check('prices team tools: no JavaScript errors', errs.length === 0, errs.slice(0, 3).join(' | '));
     await page.close();
   }

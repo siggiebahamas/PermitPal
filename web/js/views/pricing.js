@@ -2,7 +2,7 @@
 // checkmark list, the monthly price with what it comes to a day (and per client, vehicle or tenant), and
 // the yearly deal (pay for 10 months, get 12) made easy to see. Every price comes from the plans table or
 // prices.js, the same numbers the database charges; nothing here sets a price.
-import { html, raw, peso } from '../util.js';
+import { html, raw, peso, openModal } from '../util.js';
 import { ICON } from '../components.js';
 import { YEAR_MONTHS, FREE_MONTHS, PLUS_MONTHLY, BRAND_MONTHLY, FREE_PEOPLE, BANDS, staffMonthly } from '../prices.js';
 
@@ -102,7 +102,7 @@ export const PLANS = {
     promise: 'Every vehicle, every renewal, one screen', per: 30, unit: 'vehicle', kind: 'fleet',
     preview: { title: 'Your vehicles', rows: [['ABC 1234 · Van', 'ok', 'Good to go'], ['NBX 5521 · Truck', 'late', 'Off the road'], ['TQS 980 · Car', 'soon', 'Renew in 6 days']] },
     wins: [[ICON.car, 'Every vehicle, one screen', 'Registration, CTPL, smoke test, inspection'], [ICON.check, "Who can't drive today", 'Expired papers show up first'],
-      [ICON.calendar, 'Renew-this-month list', 'Ready on the 1st of every month']],
+      [ICON.calendar, 'This month’s renewals', 'Ready on the 1st of every month']],
     checks: ['Every vehicle on one screen: registration, CTPL, smoke test, inspection', 'See which vehicles should NOT be on the road today',
       'A list of what to renew this month', 'Add your whole fleet from a spreadsheet', 'Sort vehicles by company or branch',
       'Text message (SMS) reminders', PLUS_LINE, 'Download a list for your records', 'Everything in Free'],
@@ -340,3 +340,158 @@ export function staffExamples() {
     return html`<div><b>${n} people</b><span>${peso(t)} a month</span>${save > 0 ? html`<em>save ${peso(save)}</em>` : html`<em class="plain">3 free + 7 × ${peso(BANDS[0].each)}</em>`}</div>`;
   })}</div>`;
 }
+
+// ---------------------------------------------------------------- fleet plans: pick a card, and see what every perk means
+// Three equal cards (no "recommended"). Tap a card to pick it: it lights up and its button becomes the trial button.
+// Bigger plans show what they keep from the plan before ("Everything in Multi-Vehicle", green checks), then what's
+// NEW in gold. Tap any perk, on a card or in the guide below, to see exactly what it means.
+const svg = (d) => raw(`<svg viewBox="0 0 24 24">${d}</svg>`);
+const PIC = {
+  clock: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  text: svg('<path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-8l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5z"/><path d="M8 10h8M8 13h5"/>'),
+  people: svg('<circle cx="9" cy="9" r="3"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><circle cx="17" cy="9.5" r="2.4"/><path d="M15.8 14.6c2.3.1 4 1.5 4.7 4.4"/>'),
+  filter: svg('<path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/>'),
+  star: svg('<path d="M12 3.8l2.5 5.1 5.6.8-4 4 1 5.5L12 16.6l-5 2.6 1-5.5-4-4 5.6-.8z"/>'),
+};
+export const PERKS = {
+  board: { icon: ICON.grid, name: 'Fleet board', short: "Every vehicle's papers on one screen",
+    what: 'One table with every vehicle in a row and its papers in columns: registration, CTPL insurance, smoke test and inspection. Each box is green (good), yellow (due soon) or red (expired). Vehicles that should not be on the road today rise to the top.',
+    example: ['NBX 5521 · Truck', 'Registration expired 2 days ago', 'late'], why: 'An unregistered vehicle can be stopped and fined. You see the problem before the driver leaves the yard.' },
+  history: { icon: PIC.clock, name: 'Vehicle history', short: 'Every renewal and upload, with dates',
+    what: 'Each vehicle keeps its own timeline: when each paper was renewed, who uploaded the new copy and what changed. Nothing is lost when someone leaves the company.',
+    example: ['ABC 1234 · Van', 'CTPL renewed 12 Mar, uploaded by Ana', 'ok'], why: 'Answer "did we renew this?" in seconds, and show proof during an audit or when you sell the vehicle.' },
+  sms: { icon: PIC.text, name: 'Text reminders', short: 'A text message before anything expires',
+    what: 'On top of email and app alerts, we text you 30, 7 and 1 day before each paper runs out. Works on any phone, even without mobile data.',
+    example: ['Text message', 'ABC 1234 registration runs out in 7 days', 'soon'], why: 'Emails get buried. A text gets read.' },
+  files: { icon: ICON.file, name: '20 files per vehicle', short: 'OR/CR, CTPL policy, test results, photos',
+    what: 'Each vehicle has its own folder for up to 20 files: OR/CR, CTPL policy, emission results, inspection reports and photos. Files are stored encrypted, and you choose who can open them.',
+    example: ['TQS 980 · folder', 'OR/CR.pdf · CTPL-2026.pdf · Smoke-test.jpg', 'ok'], why: 'When a checkpoint, buyer or insurer asks, the copy is on your phone in two taps.' },
+  biz: { icon: ICON.building, name: '3 business records', short: "Your company's own permits too",
+    what: "Besides vehicles, track up to 3 businesses: Mayor's Permit, fire safety, BIR and the rest, with the same reminders and folders.",
+    example: ['Dela Cruz Trucking', "Mayor's Permit due in 14 days", 'soon'], why: "The company that owns the fleet needs its permits too. They don't fall through the cracks." },
+  plus: { icon: PIC.star, name: 'Plus included', short: 'Permit page, QR poster, ready letters',
+    what: 'Every Plus feature comes with your plan: your own permit page and QR poster, filled-in letters and forms (authorization letter, SPA, affidavit of loss and more), a check of your permits every morning, and a report on the 1st of every month.',
+    example: ['Ready letter', 'Authorization letter for ABC 1234, filled in', 'ok'], why: `Worth ${peso(PLUS_MONTHLY)} a month on its own.` },
+  users: { icon: PIC.people, name: 'Team sign-ins', short: 'Multi-Vehicle 3 · Fleet 5 · Fleet Pro 10',
+    what: 'The number of people who can sign in to your workspace, you included. Each person has their own login, and you choose what they can do: a driver can upload a new OR/CR without seeing your bills.',
+    example: ['Your team', 'You, Ana (admin), Ben (uploads only)', 'ok'], why: 'Share the work without sharing one password.' },
+  import: { icon: ICON.upload, name: 'Spreadsheet import', short: 'Add your whole fleet in one go',
+    what: 'Upload your Excel (.xlsx) or CSV list of plates, models and expiry dates. We turn every row into a vehicle with its papers, and show you anything we could not read before saving.',
+    example: ['fleet-list.xlsx', '48 vehicles added, 2 rows to check', 'ok'], why: 'No typing 50 vehicles one by one. Your fleet is in within minutes.' },
+  filters: { icon: PIC.filter, name: 'Smart filters', short: 'Find any vehicle in seconds',
+    what: 'Narrow the board by plate, by status (expired, due soon, all good), by expiry month, or by the company or branch that uses the vehicle.',
+    example: ['Filter: Due soon · Cebu branch', '6 vehicles', 'soon'], why: 'Big fleets get messy. Filters show each branch manager only what they need.' },
+  renewlist: { icon: ICON.list, name: 'This month’s renewals', short: 'Your to-do list on the 1st',
+    what: 'Every vehicle with papers due this month, soonest first, ready on the 1st. Hand it to whoever does your renewals and tick them off as they are done.',
+    example: ['November renewals', '9 vehicles, soonest first', 'soon'], why: 'No surprise renewals. Every month starts with a plan.' },
+  yearplan: { icon: ICON.calendar, name: 'Year-round planning', short: "The whole year's renewals and costs",
+    what: 'A month-by-month view of every renewal across the fleet, with the costs you expect, so you can budget ahead and spread renewals out instead of paying for many in one month.',
+    example: ['2027 plan', 'March: 14 renewals · about ₱38,000', 'soon'], why: 'Big fleets renew something every week. Planning the year keeps cash flow calm.' },
+  export: { icon: ICON.download, name: 'Export for records', short: 'Download the whole fleet as a spreadsheet',
+    what: "Download every vehicle with its papers' status and dates as a spreadsheet, for your accountant, auditors, insurer or your own files.",
+    example: ['fleet-status.csv', '150 vehicles · 600 papers · dates and status', 'ok'], why: 'Proof for audits and insurers in one click, and your data is always yours.' },
+};
+// Every plan, free included (shown in the guide only).
+const BASICS = {
+  remind: { icon: ICON.bell, name: 'Reminders 30, 7 and 1 day before', short: 'By email and in the app',
+    what: 'Before any paper runs out, we remind you 30, 7 and 1 day ahead, by email and in the app, and on your phone if you turn on alerts.', example: ['Reminder', 'CTPL for ABC 1234 runs out in 30 days', 'soon'], why: 'You renew on your schedule, not in a panic.' },
+  snap: { icon: ICON.camera, name: 'Snap a photo', short: 'We read the dates for you',
+    what: 'Take a photo of an OR/CR or a permit. We read the dates and fill them in for you to check.', example: ['Photo of OR/CR', 'Expiry found: 15 Aug 2027', 'ok'], why: 'Less typing, fewer mistakes.' },
+  checklist: { icon: ICON.check, name: 'Checklists with official links', short: 'What to bring, from the source',
+    what: 'For each renewal, a checklist of what to prepare, linked to the official source so you can check it yourself.', example: ['Registration renewal', 'CTPL, smoke test, OR/CR: linked to LTO', 'ok'], why: 'Go once, with everything.' },
+};
+const ALL_PERKS = { ...PERKS, ...BASICS };
+const FLEET_IDS = ['multi', 'fleet', 'fleet_pro'];
+const USERS = { multi: 3, fleet: 5, fleet_pro: 10 };
+const OWN = { multi: ['board', 'history', 'sms', 'files', 'biz', 'plus', 'users'], fleet: ['import', 'filters', 'renewlist', 'users'], fleet_pro: ['yearplan', 'export', 'users'] };
+const KEPT = { fleet: { from: 'Multi-Vehicle', keys: ['board', 'history', 'sms', 'files', 'biz', 'plus'] },
+  fleet_pro: { from: 'Fleet', keys: ['import', 'filters', 'renewlist', 'board', 'history'], more: 4 } };
+const planHas = (id, key) => (key in BASICS) || FLEET_IDS.slice(0, FLEET_IDS.indexOf(id) + 1).some((p) => OWN[p].includes(key));
+const tileName = (id, key) => (key === 'users' ? `Up to ${USERS[id]} users` : PERKS[key].name);
+
+const perkTile = (id, key) => {
+  const up = key === 'users' && id !== 'multi', isNew = id !== 'multi' && key !== 'users';
+  return html`<button type="button" class="fp-tile ${isNew ? 'new' : ''} ${up ? 'up' : ''}" data-perk="${key}" aria-label="${tileName(id, key)}: what this means">
+    <span class="fp-tile-ic" aria-hidden="true">${PERKS[key].icon}</span><span class="fp-tile-t">${tileName(id, key)}</span>
+    ${isNew ? html`<em class="fp-tag">✓ NEW</em>` : up ? html`<em class="fp-tag up">⬆ MORE</em>` : ''}</button>`;
+};
+const kept = (id) => {
+  const k = KEPT[id];
+  if (!k) return '';
+  return html`<div class="fp-kept"><p class="fp-kept-h"><span class="fp-kept-ic" aria-hidden="true">${ICON.check}</span>Everything in ${k.from}, including</p>
+    <div class="fp-pills">${k.keys.map((key) => html`<button type="button" class="fp-pill" data-perk="${key}"><span aria-hidden="true">${ICON.check}</span>${PERKS[key].name}</button>`)}
+      ${k.more ? html`<a class="fp-pill fp-pill-more" href="#fp-guide" data-perk-guide><span aria-hidden="true">${ICON.check}</span>${k.more} more</a>` : ''}</div></div>`;
+};
+// cta(id): what the lit-up card's button does. current: the plan this workspace pays for (lit up from the start).
+export function fleetPicker(plans, { cta = () => '', current = null } = {}) {
+  const ids = tiersShown(plans, FLEET_IDS);
+  const y = billing === 'yearly';
+  const card = (id) => {
+    const t = TIERS[id], m = tierPrice(plans, id), save = m * FREE_MONTHS;
+    return html`<article class="fp-card ${id === current ? 'on' : ''}" data-plan-card="${id}" data-fp-card tabindex="-1">
+      <span class="fp-picked">${id === current ? 'YOUR PLAN' : 'YOUR PICK'}</span>
+      <h3 class="fp-name">${t.name}</h3>
+      <p class="fp-cap"><span aria-hidden="true">${ICON.car}</span><span>Up to <b>${t.per}</b> vehicles</span></p>
+      ${m > 0 ? html`<p class="fp-price"><b data-bill-swap data-m="${peso(m)}" data-y="${peso(m * YEAR_MONTHS)}">${y ? peso(m * YEAR_MONTHS) : peso(m)}</b><small data-bill-swap data-m="/month" data-y="/year">${y ? '/year' : '/month'}</small></p>
+        <p class="fp-save" data-bill-swap data-m="Save ${peso(save)} if you pay yearly" data-y="You save ${peso(save)}: 2 months free">${y ? `You save ${peso(save)}: 2 months free` : `Save ${peso(save)} if you pay yearly`}</p>`
+        : html`<p class="fp-price"><small>Loading the price…</small></p>`}
+      ${kept(id)}
+      ${id !== 'multi' ? html`<p class="fp-new-h">Plus, new in ${t.name}</p>` : html`<p class="fp-new-h">What you get</p>`}
+      <div class="fp-tiles">${OWN[id].map((key) => perkTile(id, key))}</div>
+      <div class="fp-foot"><button type="button" class="btn fp-pick" data-fp-pick>Select this plan</button><div class="fp-go">${cta(id)}</div></div>
+    </article>`;
+  };
+  return html`<div class="fp">
+    <p class="fp-hint"><span aria-hidden="true">${ICON.help}</span>Tap any perk to see exactly what it means. <a href="#fp-guide" data-perk-guide>See every perk explained</a></p>
+    ${when2(ids.length, html`<div class="fp-row">${ids.map(card)}</div>`)}
+    ${when2(tiersShown(plans, ['enterprise']).length, html`<div class="fp-ent" data-plan-card="enterprise"><div><b>More than 150 vehicles?</b> <span>Enterprise: a written plan and a quote for your exact fleet, with every Fleet Pro perk.</span></div>${cta('enterprise')}</div>`)}
+    <p class="fp-sw">Every plan is tracking and planning software only. Hands-on renewal help is a separate service.</p>
+  </div>`;
+}
+const when2 = (c, v) => (c ? v : '');
+
+// The guide: every perk, what it means, and which plans have it.
+export function perkGuide() {
+  const item = (key) => {
+    const p = ALL_PERKS[key];
+    return html`<button type="button" class="fg-item ${key in BASICS ? 'base' : ''}" data-perk="${key}">
+      <span class="fg-ic" aria-hidden="true">${p.icon}</span>
+      <span class="fg-t"><b>${p.name}</b><small>${p.short}</small></span>
+      <span class="fg-plans" aria-label="In: ${FLEET_IDS.filter((id) => planHas(id, key)).map((id) => TIERS[id].name).join(', ')}">${FLEET_IDS.map((id) => html`<i class="${planHas(id, key) ? 'y' : ''}" title="${TIERS[id].name}">${planHas(id, key) ? '✓' : '–'}</i>`)}</span>
+      <span class="fg-more" aria-hidden="true">›</span></button>`;
+  };
+  const group = (title, sub, keys) => html`<div class="fg-group"><h4>${title}<small>${sub}</small></h4>${keys.map(item)}</div>`;
+  return html`<section class="fg" id="fp-guide" aria-labelledby="fg-h">
+    <div class="fg-head"><h3 id="fg-h">What every perk means</h3><p>Plain words, a real example, and which plans have it. Tap any perk for the full story.</p>
+      <p class="fg-key" aria-hidden="true">${FLEET_IDS.map((id) => html`<span>${TIERS[id].name}</span>`)}</p></div>
+    ${group('In every fleet plan', 'Multi-Vehicle and up', ['board', 'history', 'sms', 'files', 'biz', 'plus', 'users'])}
+    ${group('Added in Fleet', 'Fleet and Fleet Pro', ['import', 'filters', 'renewlist'])}
+    ${group('Added in Fleet Pro', 'Fleet Pro only', ['yearplan', 'export'])}
+    ${group('In every plan, free included', 'The basics', ['remind', 'snap', 'checklist'])}
+  </section>`;
+}
+const ORDER = [...Object.keys(PERKS), ...Object.keys(BASICS)];
+function perkBody(key) {
+  const p = ALL_PERKS[key], i = ORDER.indexOf(key);
+  const prev = ORDER[(i - 1 + ORDER.length) % ORDER.length], next = ORDER[(i + 1) % ORDER.length];
+  const [exT, exS, exK] = p.example;
+  return html`<div class="pk">
+    <div class="pk-top"><span class="pk-ic" aria-hidden="true">${p.icon}</span><div><p class="pk-short">${p.short}</p></div></div>
+    <h4>What it means</h4><p class="pk-what">${p.what}</p>
+    <div class="pk-ex" aria-label="Example"><span class="pk-ex-k">Example</span><div class="pk-ex-row"><b>${exT}</b><span class="pk-dot ${exK}">${exS}</span></div></div>
+    <p class="pk-why"><b>Why it matters:</b> ${p.why}</p>
+    <div class="pk-plans">${FLEET_IDS.map((id) => html`<span class="${planHas(id, key) ? 'y' : 'n'}">${planHas(id, key) ? '✓' : '–'} ${TIERS[id].name}${key === 'users' ? `: ${USERS[id]}` : ''}</span>`)}</div>
+    <div class="pk-nav"><button type="button" class="btn btn-ghost btn-sm" data-perk="${prev}">‹ ${ALL_PERKS[prev].name}</button><button type="button" class="btn btn-ghost btn-sm" data-perk="${next}">${ALL_PERKS[next].name} ›</button></div>
+  </div>`;
+}
+export const openPerk = (key) => { if (ALL_PERKS[key]) openModal(ALL_PERKS[key].name, perkBody(key), { cancelLabel: 'Got it' }); };
+document.addEventListener('click', (e) => {
+  const t = e.target.closest?.('[data-perk], [data-perk-guide], [data-fp-card]');
+  if (!t) return;
+  if (t.hasAttribute('data-perk')) { e.preventDefault(); openPerk(t.dataset.perk); return; }
+  if (t.hasAttribute('data-perk-guide')) { e.preventDefault(); const g = document.getElementById('fp-guide'); g?.scrollIntoView({ behavior: 'smooth', block: 'start' }); g?.classList.remove('flash'); void g?.offsetWidth; g?.classList.add('flash'); return; }
+  if (e.target.closest('.fp-go')) return;
+  const row = t.closest('.fp-row');
+  row?.querySelectorAll('[data-fp-card]').forEach((c) => c.classList.toggle('on', c === t));
+  if (e.target.closest('[data-fp-pick]')) t.querySelector('.fp-go a, .fp-go button')?.focus({ preventScroll: true });
+});

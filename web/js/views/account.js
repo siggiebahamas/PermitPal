@@ -15,7 +15,7 @@ import { phoneSettings, fillPhoneSettings } from '../phone.js';
 import { addonSection, wireAddons, showBrandCard } from './plus.js';
 import { loadSettingsCard, loadState, loadStateNow } from './load.js';
 import { brandPage, brandTabShown } from './brand.js';
-import { billToggle, freeCard, planCard, plansShown, PLANS, compareTable, TIERS, TIER_SMALL, TIER_FLEET, tierCard, tierPrice, tiersShown, softwareBanner, peaceBand, helpServices } from './pricing.js';
+import { billToggle, freeCard, planCard, plansShown, PLANS, compareTable, TIERS, TIER_SMALL, fleetPicker, perkGuide, tierCard, tierPrice, tiersShown, softwareBanner, peaceBand, helpServices } from './pricing.js';
 import { planTotal } from '../prices.js';
 import { loadFileAccess, fileGuardCard } from './fileguard.js';
 import { THEMES, applyTheme, savedTheme } from '../theme.js';
@@ -547,6 +547,13 @@ function billingSection(pay) {
     if (TIERS[id]?.kind === 'fleet' || id === 'core') return isOrgAdmin() ? html`<a class="btn btn-primary btn-block" href="#pay-${id}">Pay for ${TIERS[id].name}</a>` : '';
     return '';
   };
+  const fleetCta = (id) => {
+    if (paid && id === eff) return html`<span class="chip ok">Your plan</span>`;
+    if (!isOrgAdmin()) return '';
+    if (TIERS[id]?.quote) return html`<a class="btn" href="#/contact">Ask for a quote</a>`;
+    if (kind !== 'fleet') return html`<button type="button" class="btn" data-act="nb-set-kind" data-kind="fleet">Try 30 days for free →</button>`;
+    return html`<a class="btn" href="#pay-${id}">Pay for ${TIERS[id].name} →</a>`;
+  };
   return html`<section class="card"><h2>Your plan</h2>${status}${usage}
       ${pickable.map((id) => S.plans.find((p) => p.id === id)).filter(Boolean).map((p) => html`<h3 class="h4 pay-for" id="pay-${p.id}">${p.name}${TIERS[p.id] ? html`: ${TIERS[p.id].range}` : PLANS[p.id] ? `: ${PLANS[p.id]?.who.split(': ')[1] || ''}` : ''}</h3>${payBox(p, pay)}`)}</section>
     <h3 class="section-label">Plans</h3>
@@ -557,7 +564,8 @@ function billingSection(pay) {
       ${tiersShown(S.plans, TIER_SMALL).map((id) => tierCard(id, tierPrice(S.plans, id), cta(id), { current: paid ? id === eff : id === 'plus' && hasPlus() && !plusIncluded() }))}</div>
     <h4 class="pp-group-h">For big households and fleets</h4>
     <p class="pp-anysize">Any plan works for any fleet size. The number on each plan is the most vehicles it holds.</p>
-    <div class="pp-grid four">${tiersShown(S.plans, TIER_FLEET).map((id) => tierCard(id, tierPrice(S.plans, id), cta(id), { current: paid && id === eff }))}</div>
+    ${fleetPicker(S.plans, { cta: fleetCta, current: paid && TIERS[eff]?.kind === 'fleet' ? eff : null })}
+    ${perkGuide()}
     ${peaceBand(S.plans)}
     ${kind === 'property' ? html`<h4 class="pp-group-h">For landlords and malls</h4><div class="pp-grid">${plansShown(S.plans).map((id) => planCard(id, price(id),
       acc.why === 'plan' && id === org.plan_id ? html`<span class="chip ok">Your plan</span>` : html`<span class="chip progress">${acc.why === 'trial' ? 'In your free trial' : 'Pay for it above'}</span>`,

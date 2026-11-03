@@ -10,7 +10,7 @@ import { ICON } from '../components.js';
 import { has } from '../core.js';
 import { PLUS_MONTHLY, BRAND_MONTHLY } from '../prices.js';
 import { billToggle, freeCard, planCard, plansShown, compareTable, paintPrices, addonCard, checks, PLUS_CHECKS, BRAND_CHECKS, STAFF_CHECKS, staffTracks, staffLadder, staffExamples,
-  tierCard, tierPrice, tiersShown, TIER_SMALL, TIER_FLEET, softwareBanner, peaceBand, helpServices, SOFTWARE_ONLY } from './pricing.js';
+  tierCard, tierPrice, tiersShown, TIER_SMALL, fleetPicker, perkGuide, softwareBanner, peaceBand, helpServices, SOFTWARE_ONLY } from './pricing.js';
 import { passHeader, passPerks, passList } from './load.js';
 import * as db from 'pp/data';
 
@@ -344,7 +344,8 @@ function pricingCards(plans) {
     <div class="pp-grid three">${freeCard(html`<a class="btn btn-primary btn-block" href="#/signup">Start free</a>`)}${tiersShown(plans, TIER_SMALL).map((id) => tierCard(id, tierPrice(plans, id), cta(id)))}</div>
     <h3 class="pp-group-h">For big households and fleets</h3>
     <p class="pp-anysize">Any plan works for any fleet size. The number on each plan is the most vehicles it holds: pick the one with the features you want.</p>
-    <div class="pp-grid four">${tiersShown(plans, TIER_FLEET).map((id) => tierCard(id, tierPrice(plans, id), cta(id)))}</div>
+    ${fleetPicker(plans, { cta: (id) => html`<a class="btn btn-block" href="#/signup?type=fleet">${id === 'enterprise' ? 'Start a trial, then ask for a quote' : 'Try 30 days for free →'}</a>` })}
+    ${perkGuide()}
     ${peaceBand(plans)}
     ${props.length ? html`<h3 class="pp-group-h">For landlords and malls</h3>
       <div class="pp-grid">${props.map((id) => planCard(id, price(id), html`<a class="btn btn-primary btn-block" href="#/signup?type=property">Try free for 30 days</a>`))}</div>` : ''}
